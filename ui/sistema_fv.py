@@ -110,35 +110,6 @@ def _render_radiacion(sf: Dict[str, Any]) -> None:
     )
 
 
-def _render_geometria(sf: Dict[str, Any]) -> None:
-    st.markdown("#### Geometría del arreglo")
-
-    opciones = _opciones_orientacion()
-    labels = [o["label"] for o in opciones]
-
-    # encontrar índice por azimut guardado
-    az = int(sf.get("azimut_deg", 180))
-    idx = 0
-    for i, o in enumerate(opciones):
-        if int(o["azimut"]) == az:
-            idx = i
-            break
-
-    c1, c2 = st.columns(2)
-    with c1:
-        sel_label = st.selectbox("Orientación", options=labels, index=idx)
-        sel = next(o for o in opciones if o["label"] == sel_label)
-        sf["orientacion_label"] = sel_label
-        sf["azimut_deg"] = int(sel["azimut"])
-
-    with c2:
-        sf["inclinacion_deg"] = st.slider(
-            "Inclinación (°)",
-            min_value=0,
-            max_value=45,
-            value=int(sf["inclinacion_deg"]),
-            help="Referencia Honduras: ~15° suele ser buen punto de partida.",
-        )
 
 
 def _render_condiciones(sf: Dict[str, Any]) -> None:
