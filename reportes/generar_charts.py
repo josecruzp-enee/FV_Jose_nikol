@@ -1,4 +1,4 @@
-cat > reportes/generar_charts.py <<'PY'
+
 # reportes/generar_charts.py
 from __future__ import annotations
 
