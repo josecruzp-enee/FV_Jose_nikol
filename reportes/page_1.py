@@ -144,7 +144,7 @@ def p1_conclusion(impacto, ds, peor, kwp, cobertura_objetivo, estado, pal, conte
     return [box_paragraph(concl, pal, content_w, font_size=10)]
 
 
-def build_page_1(resultado: Dict[str, Any], datos, paths, pal, styles):
+def build_page_1(resultado: Dict[str, Any], datos, paths, pal, styles, content_w):
     """
     Page 1 versión GitHub = tu Page 1 local.
     No pedimos content_w desde builder; lo calculamos aquí.
