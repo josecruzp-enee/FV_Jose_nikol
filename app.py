@@ -10,14 +10,9 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from ui.router import PasoWizard, render_wizard
-from ui import (
-    datos_cliente,
-    consumo_energetico,
-    sistema_fv,
-    seleccion_equipos,
-    ingenieria_electrica,
-    resultados,
-)
+from ui import datos_cliente, consumo_energetico, sistema_fv, seleccion_equipos
+from ui import ingenieria_electrica
+from ui import resultados
 
 def main() -> None:
     st.set_page_config(page_title="FV Engine", layout="wide")
