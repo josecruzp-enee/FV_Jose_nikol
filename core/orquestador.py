@@ -3,13 +3,13 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from core.validacion import validar_entradas
-from core.sizing import calcular_sizing_unificado
-from core.simulacion_12m import simular_12_meses, calcular_cuota_mensual
-from core.evaluacion import evaluar_viabilidad, resumen_decision_mensual, payback_simple
-from core.finanzas_lp import proyectar_flujos_anuales
-from core.electrico_ref import simular_electrico_fv_para_pdf
-from core.modelo import DatosProyecto
+from .validacion import validar_entradas
+from .sizing import calcular_sizing_unificado
+from .simulacion_12m import simular_12_meses, calcular_cuota_mensual
+from .evaluacion import evaluar_viabilidad, resumen_decision_mensual, payback_simple
+from .finanzas_lp import proyectar_flujos_anuales
+from .electrico_ref import simular_electrico_fv_para_pdf
+from .modelo import DatosProyecto
 
 
 def ejecutar_evaluacion(p: DatosProyecto) -> Dict[str, Any]:
