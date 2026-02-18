@@ -8,7 +8,7 @@ from reportlab.lib.units import inch
 from .helpers_pdf import make_table, table_style_uniform, box_paragraph
 
 
-def build_page_2(resultado, datos, paths, pal, styles):
+def build_page_2(resultado, datos, paths, pal, styles, content_w):
     # content width estándar carta con márgenes típicos
     page_w, _ = letter
     left_margin = 36
