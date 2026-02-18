@@ -1,9 +1,9 @@
 # calcular.py
 from __future__ import annotations
 
-from core.modelo import modelo
-from core.rutas import preparar_salida
-from core.orquestador import ejecutar_evaluacion
+from .modelo import modelo
+from .rutas import preparar_salida
+from .orquestador import ejecutar_evaluacion
 
 from reportes.charts import generar_charts
 from reportes.layout_paneles import generar_layout_paneles
