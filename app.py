@@ -11,7 +11,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 # === IMPORTS CORRECTOS (tu repo usa core/ y reportes/) ===
-from core.modelo import DatosProyecto
+from core.modelo import Datosproyecto
 from core.rutas import preparar_salida, money_L, num
 from core.orquestador import ejecutar_evaluacion
 
