@@ -109,6 +109,79 @@ def _render_radiacion(sf: Dict[str, Any]) -> None:
         disabled=disabled,
     )
 
+def _render_geometria(sf: Dict[str, Any]) -> None:
+    st.markdown("#### Geometría del arreglo")
+
+    # -------- Orientación (azimut) --------
+    opciones = _opciones_orientacion()
+    labels = [o["label"] for o in opciones]
+
+    az = int(sf.get("azimut_deg", 180))
+    idx = 0
+    for i, o in enumerate(opciones):
+        if int(o["azimut"]) == az:
+            idx = i
+            break
+
+    c1, c2 = st.columns(2)
+
+    with c1:
+        sel_label = st.selectbox("Orientación", options=labels, index=idx, key="sf_orientacion")
+        sel = next(o for o in opciones if o["label"] == sel_label)
+        sf["orientacion_label"] = str(sel_label)
+        sf["azimut_deg"] = int(sel["azimut"])
+
+    # -------- Inclinación (modo auto/manual) --------
+    with c2:
+        sf.setdefault("tilt_modo", "auto")
+        sf.setdefault("tilt_techo", "Techo residencial")
+        sf.setdefault("inclinacion_deg", 15)
+
+        modo = st.radio(
+            "Definir inclinación",
+            options=["Automática (por tipo de techo)", "Manual (°)"],
+            index=0 if sf.get("tilt_modo") == "auto" else 1,
+            horizontal=True,
+            key="sf_tilt_modo",
+        )
+        sf["tilt_modo"] = "auto" if "Automática" in modo else "manual"
+
+        if sf["tilt_modo"] == "auto":
+            tipos = ["Techo plano", "Techo residencial", "Techo pronunciado"]
+            tipo_actual = str(sf.get("tilt_techo", "Techo residencial"))
+            if tipo_actual not in tipos:
+                tipo_actual = "Techo residencial"
+
+            tipo = st.selectbox("Tipo de techo", options=tipos, index=tipos.index(tipo_actual), key="sf_tilt_techo")
+            sf["tilt_techo"] = str(tipo)
+
+            defaults = {
+                "Techo plano": 12,
+                "Techo residencial": 20,
+                "Techo pronunciado": 30,
+            }
+            sf["inclinacion_deg"] = int(defaults[tipo])
+            st.caption(f"Inclinación sugerida: {sf['inclinacion_deg']}° (modo manual para exactitud).")
+
+        else:
+            sf["inclinacion_deg"] = int(
+                st.number_input(
+                    "Inclinación (°)",
+                    min_value=0,
+                    max_value=45,
+                    step=1,
+                    value=int(sf.get("inclinacion_deg", 15)),
+                    key="sf_inclinacion_manual",
+                )
+            )
+
+
+
+
+
+
+
+
 
 
 
