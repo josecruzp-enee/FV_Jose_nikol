@@ -1,7 +1,7 @@
 # calcular.py
 from __future__ import annotations
 
-from nucleo.modelo import DatosProyecto
+from nucleo.modelo import modelo
 from nucleo.rutas import preparar_salida
 from nucleo.orquestador import ejecutar_evaluacion
 
