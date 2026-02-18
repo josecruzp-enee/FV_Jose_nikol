@@ -1,40 +1,24 @@
 # ui/datos_cliente.py
 from __future__ import annotations
 from typing import List, Tuple
-
 import streamlit as st
 
 
 def render(ctx) -> None:
     st.markdown("### Datos del cliente")
 
-    cliente = st.text_input(
+    ctx.datos_cliente["cliente"] = st.text_input(
         "Nombre del cliente",
         value=str(ctx.datos_cliente.get("cliente", "")),
     )
-    ubicacion = st.text_input(
+    ctx.datos_cliente["ubicacion"] = st.text_input(
         "Ubicación",
         value=str(ctx.datos_cliente.get("ubicacion", "")),
     )
-    email = st.text_input(
+    ctx.datos_cliente["email"] = st.text_input(
         "Email (opcional)",
         value=str(ctx.datos_cliente.get("email", "")),
     )
-
-    # persistencia en ctx
-    ctx.datos_cliente["cliente"] = cliente
-    ctx.datos_cliente["ubicacion"] = ubicacion
-    ctx.datos_cliente["email"] = email
-
-    # Construir/actualizar objeto raíz SIN email (para no romper si el modelo no lo tiene)
-    try:
-        from core.modelo import Datosproyecto
-        ctx.datos_proyecto = Datosproyecto(
-            cliente=str(cliente).strip(),
-            ubicacion=str(ubicacion).strip(),
-        )
-    except Exception:
-        pass
 
 
 def validar(ctx) -> Tuple[bool, List[str]]:
@@ -49,17 +33,7 @@ def validar(ctx) -> Tuple[bool, List[str]]:
     if not ubicacion:
         errores.append("Ingrese la ubicación.")
 
-    # email: solo si lo ingresan (no afecta avanzar)
     if email and ("@" not in email or "." not in email.split("@")[-1]):
         errores.append("Email inválido (revise el formato).")
 
-    ok = (len(errores) == 0)
-
-    if ok:
-        from core.modelo import Datosproyecto
-        ctx.datos_proyecto = Datosproyecto(
-            cliente=cliente,
-            ubicacion=ubicacion,
-        )
-
-    return ok, errores
+    return (len(errores) == 0), errores
