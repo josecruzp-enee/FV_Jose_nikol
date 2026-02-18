@@ -11,7 +11,8 @@ if str(ROOT) not in sys.path:
 
 from ui.router import PasoWizard, render_wizard
 from ui import datos_cliente, consumo_energetico, sistema_fv, seleccion_equipos
-from ui import ingenieria_electrica
+import ui.ingenieria_electrica as ingenieria_electrica
+
 
 
 from ui import resultados
