@@ -14,7 +14,7 @@ def build_page_3(resultado, datos, pal, styles):
     story.append(Spacer(1, 12))
 
     story.append(Paragraph(
-        f"TIR estimada: {resultado['finanzas']['tir']:.2f} %",
+        resultado['evaluacion']['tir']
 
         styles["BodyText"]
     ))
