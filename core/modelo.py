@@ -6,7 +6,7 @@ from typing import List
 
 
 @dataclass
-class DatosProyecto:
+class Datosproyecto:
     cliente: str
     ubicacion: str
 
