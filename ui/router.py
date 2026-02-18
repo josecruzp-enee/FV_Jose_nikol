@@ -29,8 +29,36 @@ def _puede_abrir(ctx, paso: PasoWizard) -> bool:
 def _marcar_completado(ctx, paso_id: int, ok: bool) -> None:
     ctx.completado[paso_id] = bool(ok)
 
+def _init_defaults(st_mod) -> None:
+    s = st_mod.session_state
+
+    # ===== defaults generales (evita KeyError en validaciones) =====
+    s.setdefault("modo_sizing", "offset")   # "offset" | "kwp" | etc (según tu UI)
+    s.setdefault("offset_pct", 80.0)
+
+    # si tu paso 3 usa otros campos típicos, déjalos seguros también
+    s.setdefault("dos_aguas", True)
+    s.setdefault("t_min_c", 10.0)
+
+    # selección de catálogos (evita validaciones rompiendo por None)
+    s.setdefault("panel_sel", "")
+    s.setdefault("inv_sel", "")
+
+    # parámetros eléctricos/cableado (si se usan en ing eléctrica)
+    s.setdefault("vac", 240.0)
+    s.setdefault("fases", 1)
+    s.setdefault("fp", 1.0)
+    s.setdefault("dist_dc_m", 15.0)
+    s.setdefault("dist_ac_m", 25.0)
+    s.setdefault("vdrop_obj_dc_pct", 2.0)
+    s.setdefault("vdrop_obj_ac_pct", 2.0)
+    s.setdefault("incluye_neutro_ac", False)
+    s.setdefault("otros_ccc", 0)
+
+
 
 def render_wizard(pasos: List[PasoWizard]) -> None:
+    _init_defaults(st)
     ctx = ctx_get(st)
 
     # ====== sidebar navegación ======
