@@ -26,6 +26,19 @@ def render(ctx) -> None:
     ctx.datos_cliente["ubicacion"] = ubicacion
     ctx.datos_cliente["email"] = email
 
+    # ✅ construir/actualizar el objeto raíz (aunque esté incompleto)
+    # (la validación formal ocurre en validar())
+    try:
+        from core.modelo import Datosproyecto
+        ctx.datos_proyecto = Datosproyecto(
+            cliente=str(cliente).strip(),
+            ubicacion=str(ubicacion).strip(),
+            email=str(email).strip(),
+        )
+    except Exception:
+        # si el modelo aún no está listo o cambia el nombre, no rompemos la UI
+        pass
+
 
 def validar(ctx) -> Tuple[bool, List[str]]:
     errores: List[str] = []
@@ -43,4 +56,15 @@ def validar(ctx) -> Tuple[bool, List[str]]:
     if email and ("@" not in email or "." not in email.split("@")[-1]):
         errores.append("Email inválido (revise el formato).")
 
-    return (len(errores) == 0), errores
+    ok = (len(errores) == 0)
+
+    # ✅ si el paso es válido, garantizamos ctx.datos_proyecto listo
+    if ok:
+        from core.modelo import Datosproyecto
+        ctx.datos_proyecto = Datosproyecto(
+            cliente=cliente,
+            ubicacion=ubicacion,
+            email=email,
+        )
+
+    return ok, errores
