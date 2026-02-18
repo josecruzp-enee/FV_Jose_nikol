@@ -138,6 +138,35 @@ def render(ctx) -> None:
         t_min_c=float(e["t_min_c"]),
     )
 
+    # ==========================================
+# Consolidar modelo del proyecto
+# ==========================================
+from core.modelo import Datosproyecto
+
+if ctx.datos_proyecto is None:
+
+    ctx.datos_proyecto = Datosproyecto(
+        cliente=ctx.datos_cliente.get("cliente", ""),
+        ubicacion=ctx.datos_cliente.get("ubicacion", ""),
+
+        consumo_12m=ctx.consumo["kwh_12m"],
+        tarifa_energia=ctx.consumo["tarifa_energia_L_kwh"],
+        cargos_fijos=ctx.consumo["cargos_fijos_L_mes"],
+
+        prod_base_kwh_kwp_mes=ctx.sistema_fv.get("produccion_base", 145.0),
+        factores_fv_12m=[1.0]*12,
+
+        cobertura_objetivo=ctx.sistema_fv.get("offset_pct", 80)/100,
+
+        costo_usd_kwp=1200.0,
+        tcambio=24.6,
+
+        tasa_anual=0.16,
+        plazo_anios=7,
+        porcentaje_financiado=1.0,
+    )
+
+    
     ctx.resultado_electrico = pkg
 
     # 4) Mostrar resumen
