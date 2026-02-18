@@ -4,7 +4,8 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional
 
 from .modelo import Datosproyecto
-from modelo.simulacion_12_meses import om_mensual
+from .simular_12_meses import om_mensual
+
 
 
 def _npv(rate: float, cashflows: List[float]) -> float:
