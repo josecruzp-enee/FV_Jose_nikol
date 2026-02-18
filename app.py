@@ -141,11 +141,13 @@ def main() -> None:
     # 5) Salidas (charts/layout/pdf)
     paths = preparar_salida("salidas")
 
-    # generar charts: (ajusta a tu firma real; si tu generar_charts espera res completo, pásalo)
+    # generar charts (CORRECTO)
     try:
-        generar_charts(res, paths["charts_dir"])
-    except Exception:
-        pass
+        charts = generar_charts(res["tabla_12m"], paths["charts_dir"])
+        res["charts"] = charts
+        paths.update(charts)  # opcional: paths["chart_energia"] etc.
+    except Exception as e:
+        st.warning(f"No se pudieron generar charts: {e}")
 
     try:
         generar_layout_paneles(
