@@ -16,6 +16,7 @@ class WizardCtx:
 
     # datos del proyecto (se van llenando)
     datos_cliente: Dict[str, Any] = field(default_factory=dict)
+    datos_proyecto: Any = None
 
     # consumo: estructura estable (12 meses)
     consumo: Dict[str, Any] = field(default_factory=lambda: {
