@@ -21,6 +21,7 @@ from reportes.generar_pdf_profesional import generar_pdf_profesional
 
 
 
+
 st.set_page_config(page_title="FV Engine", layout="wide")
 
 st.title("Evaluación Fotovoltaica (FV Engine)")
