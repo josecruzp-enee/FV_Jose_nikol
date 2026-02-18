@@ -2,7 +2,7 @@
 from reportlab.platypus import Paragraph, Spacer, PageBreak
 
 
-def build_page_3(resultado, datos, paths, pal, styles):
+def build_page_3(resultado, datos, paths, pal, styles, content_w):
     story = []
 
     story.append(Paragraph("Finanzas (largo plazo)", styles["Title"]))
