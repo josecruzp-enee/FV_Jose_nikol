@@ -21,12 +21,16 @@ from reportes.generar_charts import generar_charts
 from reportes.generar_layout_paneles import generar_layout_paneles
 from reportes.generar_pdf_profesional import generar_pdf_profesional
 from ui.router import PasoWizard, render_wizard
-from ui import datos_cliente, consumo_energetico
+from ui import datos_cliente, consumo_energetico, sistema_fv, seleccion_equipos
+
 
 pasos = [
-    PasoWizard(1, "Datos cliente", datos_cliente.render, datos_cliente.validar, requiere=[]),
-    PasoWizard(2, "Consumo energético", consumo_energetico.render, consumo_energetico.validar, requiere=[1]),
-]
+        PasoWizard(1, "Datos cliente", datos_cliente.render, datos_cliente.validar, requiere=[]),
+        PasoWizard(2, "Consumo energético", consumo_energetico.render, consumo_energetico.validar, requiere=[1]),
+        PasoWizard(3, "Sistema FV", sistema_fv.render, sistema_fv.validar, requiere=[1, 2]),
+        PasoWizard(4, "Selección de equipos", seleccion_equipos.render, seleccion_equipos.validar, requiere=[1, 2, 3]),
+    ]
+
 render_wizard(pasos)
 
 # UI helpers (si ya los creaste)
