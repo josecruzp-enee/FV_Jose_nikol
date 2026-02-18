@@ -1,3 +1,4 @@
+# ui/seleccion_equipos.py
 from __future__ import annotations
 from typing import List, Tuple
 import streamlit as st
@@ -5,7 +6,7 @@ import streamlit as st
 from electrical.catalogos import catalogo_paneles, catalogo_inversores
 
 
-def _defaults(ctx):
+def _defaults(ctx) -> None:
     if not ctx.equipos:
         ctx.equipos = {
             "panel_id": None,
@@ -15,76 +16,102 @@ def _defaults(ctx):
         }
 
 
-def render(ctx):
+def _safe_index(opciones: List[str], valor_actual: str | None) -> int:
+    if not opciones:
+        return 0
+    if valor_actual in opciones:
+        return opciones.index(valor_actual)
+    return 0
+
+
+def render(ctx) -> None:
     _defaults(ctx)
-    e = ctx.equipos
+    eq = ctx.equipos
 
     st.markdown("### Selección de equipos")
 
-    # ===== Cargar catálogos =====
-    paneles = catalogo_paneles()      # debe devolver dict/list
+    # ===== Cargar catálogos (API pública electrical) =====
+    paneles = catalogo_paneles()
     inversores = catalogo_inversores()
 
-    # Normalización simple: dict {id: obj}
+    if not paneles:
+        st.error("Catálogo de paneles vacío. Revise electrical/catalogos.py.")
+        return
+    if not inversores:
+        st.error("Catálogo de inversores vacío. Revise electrical/catalogos.py.")
+        return
+
     panel_map = {p["id"]: p for p in paneles}
-    inv_map   = {i["id"]: i for i in inversores}
+    inv_map = {i["id"]: i for i in inversores}
+
+    panel_ids = list(panel_map.keys())
+    inv_ids = list(inv_map.keys())
 
     col1, col2 = st.columns(2)
 
     with col1:
-        e["panel_id"] = st.selectbox(
+        eq["panel_id"] = st.selectbox(
             "Panel FV",
-            options=list(panel_map.keys()),
-            index=0 if e["panel_id"] is None else list(panel_map.keys()).index(e["panel_id"]),
+            options=panel_ids,
+            index=_safe_index(panel_ids, eq.get("panel_id")),
             format_func=lambda pid: f'{panel_map[pid]["marca"]} {panel_map[pid]["modelo"]} ({panel_map[pid]["pmax_w"]} W)',
         )
 
     with col2:
-        e["inversor_id"] = st.selectbox(
+        eq["inversor_id"] = st.selectbox(
             "Inversor",
-            options=list(inv_map.keys()),
-            index=0 if e["inversor_id"] is None else list(inv_map.keys()).index(e["inversor_id"]),
+            options=inv_ids,
+            index=_safe_index(inv_ids, eq.get("inversor_id")),
             format_func=lambda iid: f'{inv_map[iid]["marca"]} {inv_map[iid]["modelo"]} ({inv_map[iid]["pac_kw"]} kW)',
         )
 
     st.markdown("#### Criterios")
-
     a, b = st.columns(2)
+
     with a:
-        e["sobredimension_dc_ac"] = st.number_input(
+        eq["sobredimension_dc_ac"] = st.number_input(
             "Objetivo DC/AC",
             min_value=1.0,
             max_value=1.6,
             step=0.05,
-            value=float(e.get("sobredimension_dc_ac", 1.20)),
+            value=float(eq.get("sobredimension_dc_ac", 1.20)),
         )
+
     with b:
-        e["tension_sistema"] = st.selectbox(
+        opciones_v = ["1F_240V", "3F_208Y120V", "3F_480Y277V"]
+        eq["tension_sistema"] = st.selectbox(
             "Tensión del sistema",
-            options=["1F_240V", "3F_208Y120V", "3F_480Y277V"],
-            index=["1F_240V", "3F_208Y120V", "3F_480Y277V"].index(e.get("tension_sistema", "1F_240V")),
+            options=opciones_v,
+            index=_safe_index(opciones_v, eq.get("tension_sistema", "1F_240V")),
         )
 
-    # ===== Preview técnico rápido (sin cálculos) =====
+    # ===== Preview técnico rápido =====
     st.markdown("#### Resumen técnico")
-    p = panel_map[e["panel_id"]]
-    inv = inv_map[e["inversor_id"]]
+    p = panel_map[eq["panel_id"]]
+    inv = inv_map[eq["inversor_id"]]
 
-    st.write(f"**Panel:** {p['marca']} {p['modelo']} — Pmax {p['pmax_w']} W, Voc {p['voc_v']} V")
-    st.write(f"**Inversor:** {inv['marca']} {inv['modelo']} — AC {inv['pac_kw']} kW, MPPT {inv['mppt_min_v']}-{inv['mppt_max_v']} V")
+    st.write(
+        f"**Panel:** {p['marca']} {p['modelo']} — "
+        f"Pmax {p['pmax_w']:.0f} W | Voc {p['voc_v']:.1f} V | Vmp {p['vmp_v']:.1f} V"
+    )
+    st.write(
+        f"**Inversor:** {inv['marca']} {inv['modelo']} — "
+        f"AC {inv['pac_kw']:.1f} kW | MPPT {inv['mppt_min_v']:.0f}-{inv['mppt_max_v']:.0f} V | "
+        f"Vdc max {inv['vmax_dc_v']:.0f} V | MPPTs {inv['n_mppt']}"
+    )
 
-    ctx.equipos = e
+    ctx.equipos = eq
 
 
 def validar(ctx) -> Tuple[bool, List[str]]:
-    e = []
+    errores: List[str] = []
     eq = ctx.equipos or {}
 
     if not eq.get("panel_id"):
-        e.append("Seleccione un panel.")
+        errores.append("Seleccione un panel.")
     if not eq.get("inversor_id"):
-        e.append("Seleccione un inversor.")
+        errores.append("Seleccione un inversor.")
     if float(eq.get("sobredimension_dc_ac", 0)) < 1.0:
-        e.append("DC/AC inválido (>= 1.0).")
+        errores.append("DC/AC inválido (>= 1.0).")
 
-    return len(e) == 0, e
+    return (len(errores) == 0), errores
