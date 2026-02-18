@@ -1,4 +1,4 @@
-# reportes/pdf/page_3.py
+# reportes/page_3.py
 from reportlab.platypus import Paragraph, Spacer, PageBreak
 
 
