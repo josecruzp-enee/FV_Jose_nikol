@@ -1,5 +1,6 @@
 # ui/router.py
 from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import Callable, List, Tuple
 
@@ -29,11 +30,12 @@ def _puede_abrir(ctx, paso: PasoWizard) -> bool:
 def _marcar_completado(ctx, paso_id: int, ok: bool) -> None:
     ctx.completado[paso_id] = bool(ok)
 
+
 def _init_defaults(st_mod) -> None:
     s = st_mod.session_state
 
     # ===== defaults generales (evita KeyError en validaciones) =====
-    s.setdefault("modo_sizing", "offset")   # "offset" | "kwp" | etc (según tu UI)
+    s.setdefault("modo_sizing", "offset")
     s.setdefault("offset_pct", 80.0)
 
     # si tu paso 3 usa otros campos típicos, déjalos seguros también
@@ -55,29 +57,27 @@ def _init_defaults(st_mod) -> None:
     s.setdefault("incluye_neutro_ac", False)
     s.setdefault("otros_ccc", 0)
 
+
 def render_wizard(pasos: List[PasoWizard]) -> None:
-    # Defaults en session_state (si ya lo tienes)
+    # Defaults en session_state
     _init_defaults(st)
 
     # Contexto del wizard
     ctx = ctx_get(st)
 
-    # ====== INIT: dict específico de Paso 3 ======
+    # ====== INIT: dict específico de Paso 3 (ctx.sistema_fv) ======
     # Paso 3 usa: s = ctx.sistema_fv
     if not hasattr(ctx, "sistema_fv") or getattr(ctx, "sistema_fv") is None:
         ctx.sistema_fv = {}
     if not isinstance(ctx.sistema_fv, dict):
-        # Si alguien lo dejó como otra cosa, forzamos dict para evitar crashes
         ctx.sistema_fv = {}
 
     # Defaults críticos del Paso 3
-    ctx.sistema_fv.setdefault("modo_sizing", "offset")
-    ctx.sistema_fv.setdefault("offset_pct", 80.0)
+    ctx.sistema_fv.setdefault("modo_sizing", st.session_state.get("modo_sizing", "offset"))
+    ctx.sistema_fv.setdefault("offset_pct", st.session_state.get("offset_pct", 80.0))
     ctx.sistema_fv.setdefault("kwp_objetivo", None)
-
-    # (si tu UI los usa, deja listos también)
-    ctx.sistema_fv.setdefault("dos_aguas", True)
-    ctx.sistema_fv.setdefault("t_min_c", 10.0)
+    ctx.sistema_fv.setdefault("dos_aguas", st.session_state.get("dos_aguas", True))
+    ctx.sistema_fv.setdefault("t_min_c", st.session_state.get("t_min_c", 10.0))
 
     # ====== sidebar navegación ======
     st.sidebar.title("FV Engine • Wizard")
@@ -122,5 +122,3 @@ def render_wizard(pasos: List[PasoWizard]) -> None:
             _marcar_completado(ctx, paso.id, True)
             ctx_set_paso(st, min(ctx.paso_actual + 1, total))
             st.rerun()
-
-
