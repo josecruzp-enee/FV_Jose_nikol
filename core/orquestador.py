@@ -9,7 +9,7 @@ from .simular_12_meses import simular_12_meses, calcular_cuota_mensual
 from .evaluacion import evaluar_viabilidad, resumen_decision_mensual, payback_simple
 from .finanzas_lp import proyectar_flujos_anuales
 from .electrico_ref import simular_electrico_fv_para_pdf
-from .modelo import DatosProyecto
+from .modelo import Datosproyecto
 
 
 def ejecutar_evaluacion(p: Datosproyecto) -> Dict[str, Any]:
