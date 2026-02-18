@@ -2,7 +2,7 @@
 from reportlab.platypus import Paragraph, Spacer, PageBreak
 
 
-def build_page_5(resultado, datos, paths, pal, styles):
+def build_page_5(resultado, datos, paths, pal, styles, content_w):
     """
     Página 5 — Resumen técnico (mínimo, robusto)
     No asume atributos en `resultado` (es dict).
