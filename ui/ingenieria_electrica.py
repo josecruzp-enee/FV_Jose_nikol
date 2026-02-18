@@ -1,7 +1,7 @@
 # ui/ingenieria_electrica.py
 from __future__ import annotations
 
-from typing import List, Tuple
+from typing import List, Tuple, Dict, Any
 
 import streamlit as st
 
@@ -10,10 +10,11 @@ from electrical.estimador import calcular_paquete_electrico_desde_inputs
 
 from core.orquestador import ejecutar_evaluacion
 from core.modelo import Datosproyecto
+from core.configuracion import cargar_configuracion, construir_config_efectiva
 
 
 # ==========================================================
-# Defaults / Helpers (cortos y claros)
+# Helpers (cortos y claros)
 # ==========================================================
 
 def _asegurar_dict(ctx, nombre: str) -> dict:
@@ -33,13 +34,14 @@ def _defaults_electrico(ctx) -> dict:
     e.setdefault("dist_dc_m", 15.0)
     e.setdefault("dist_ac_m", 25.0)
 
+    # estos 3 serán overrides (UI), pero los mantenemos aquí como inputs del paso
     e.setdefault("vdrop_obj_dc_pct", 2.0)
     e.setdefault("vdrop_obj_ac_pct", 2.0)
+    e.setdefault("t_min_c", 10.0)
 
     e.setdefault("incluye_neutro_ac", False)
     e.setdefault("otros_ccc", 0)
 
-    e.setdefault("t_min_c", 10.0)
     e.setdefault("dos_aguas", True)
     return e
 
@@ -71,13 +73,15 @@ def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
         tasa_anual=float(s.get("tasa_anual", 0.08)),
         plazo_anios=int(s.get("plazo_anios", 10)),
         porcentaje_financiado=float(s.get("porcentaje_financiado", 1.0)),
-
-        # Si tu dataclass lo requiere (tu código ya lo usaba)
         om_anual_pct=float(s.get("om_anual_pct", 0.01)),
     )
 
 
 def _params_cableado_desde_ui(e: dict) -> ParametrosCableado:
+    """
+    ParametrosCableado = instalación/geométrico.
+    (Aún incluye vdrop/t_min en tu modelo actual; lo limpiaremos en el siguiente paso.)
+    """
     return ParametrosCableado(
         vac=float(e["vac"]),
         fases=int(e["fases"]),
@@ -92,12 +96,35 @@ def _params_cableado_desde_ui(e: dict) -> ParametrosCableado:
     )
 
 
+def _guardar_overrides_tecnicos_en_session(e: dict) -> None:
+    """
+    UI decide overrides; core construye config efectiva.
+    """
+    st.session_state["cfg_overrides"] = {
+        "tecnicos": {
+            "t_min_c": float(e["t_min_c"]),
+            "vdrop_obj_dc_pct": float(e["vdrop_obj_dc_pct"]),
+            "vdrop_obj_ac_pct": float(e["vdrop_obj_ac_pct"]),
+        }
+    }
+
+
+def _config_tecnica_efectiva() -> Dict[str, Any]:
+    """
+    Lee YAML base + aplica overrides de UI (si existen).
+    Retorna SOLO cfg.tecnicos (dict).
+    """
+    cfg_base = cargar_configuracion()
+    cfg = construir_config_efectiva(cfg_base, st.session_state.get("cfg_overrides"))
+    return cfg.tecnicos
+
+
 def _mostrar_resultados(pkg: dict) -> None:
     st.success("Ingeniería eléctrica generada.")
 
     st.subheader("Strings DC (referencial)")
     for line in (pkg.get("texto_ui", {}).get("strings") or []):
-        st.write("• " + line)
+        st.write("• " + str(line))
 
     checks = pkg.get("texto_ui", {}).get("checks") or []
     if checks:
@@ -105,11 +132,11 @@ def _mostrar_resultados(pkg: dict) -> None:
 
     st.subheader("Cableado AC/DC (referencial)")
     for line in (pkg.get("texto_ui", {}).get("cableado") or []):
-        st.write("• " + line)
+        st.write("• " + str(line))
 
     disclaimer = pkg.get("texto_ui", {}).get("disclaimer") or ""
     if disclaimer:
-        st.caption(disclaimer)
+        st.caption(str(disclaimer))
 
 
 # ==========================================================
@@ -159,16 +186,9 @@ def render(ctx) -> None:
 
     e["dos_aguas"] = st.checkbox("Techo dos aguas (reparte strings)", value=bool(e["dos_aguas"]))
 
-    # --- Overrides (UI) -> Config efectiva (core/electrical) ---
-    st.session_state["cfg_overrides"] = {
-        "tecnicos": {
-            "t_min_c": float(e["t_min_c"]),
-            "vdrop_obj_dc_pct": float(e["vdrop_obj_dc_pct"]),
-            "vdrop_obj_ac_pct": float(e["vdrop_obj_ac_pct"]),
-        }
-    }
+    # ✅ overrides quedan definidos aquí (UI), pero NO se calcula nada aquí
+    _guardar_overrides_tecnicos_en_session(e)
 
-    
     st.divider()
 
     # --- Ejecutar pipeline ---
@@ -183,8 +203,9 @@ def render(ctx) -> None:
     res = ejecutar_evaluacion(datos)
     ctx.resultado_core = res
 
-    # 3) Ejecutar eléctrico
+    # 3) Ejecutar eléctrico (cfg técnica efectiva)
     params = _params_cableado_desde_ui(e)
+    cfg_tecnicos = _config_tecnica_efectiva()
 
     pkg = calcular_paquete_electrico_desde_inputs(
         res=res,
@@ -192,7 +213,7 @@ def render(ctx) -> None:
         inv_nombre=str(ctx.equipos["inversor_id"]),
         dos_aguas=bool(e["dos_aguas"]),
         params=params,
-        t_min_c=float(e["t_min_c"]),
+        cfg_tecnicos=cfg_tecnicos,
     )
     ctx.resultado_electrico = pkg
 
