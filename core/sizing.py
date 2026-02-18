@@ -4,7 +4,7 @@ from __future__ import annotations
 import math
 from typing import Any, Dict, Optional
 
-from nucleo.modelo import DatosProyecto
+from nucleo.modelo import modelo
 from nucleo.simulacion_12m import capex_L, consumo_anual, consumo_promedio
 
 
