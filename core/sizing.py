@@ -289,7 +289,7 @@ def texto_config_electrica_pdf(cfg_strings: dict, *, etiqueta_izq="Techo izquier
     return "".join(lines)
 
 
-def calcular_sizing_unificado(p: DatosProyecto) -> Dict[str, Any]:
+def calcular_sizing_unificado(p: Datosproyecto) -> Dict[str, Any]:
     kwh_mes_prom = consumo_promedio(p.consumo_12m)
 
     sz = dimensionar_para_ahorro(
