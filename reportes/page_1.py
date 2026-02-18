@@ -19,7 +19,7 @@ def build_page_1(resultado, datos, pal, styles):
     ))
 
     story.append(Paragraph(
-        f"Potencia propuesta: {resultado.potencia_kwp:.2f} kWp",
+        f"Potencia propuesta: {resultado['sizing']['kwp_dc']:.2f} kWp",
         styles["BodyText"]
     ))
 
