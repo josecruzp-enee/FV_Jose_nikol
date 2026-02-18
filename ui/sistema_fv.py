@@ -27,6 +27,16 @@ def render(ctx):
 
     st.markdown("### Sistema Fotovoltaico")
 
+    # ===== Producción base =====
+    s["produccion_base"] = st.number_input(
+        "Producción base (kWh/kWp·mes)",
+        min_value=0.0,
+        value=float(s.get("produccion_base", 145.0)),
+        step=1.0,
+        help="Producción promedio mensual por cada kWp instalado."
+    )
+
+
 
 from typing import List, Tuple
 
