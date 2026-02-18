@@ -3,7 +3,8 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from .catalogos import PANELES, INVERSORES
+from .catalogos import get_panel, get_inversor
+
 from .strings import calcular_strings_dc
 from .cableado import calcular_cableado_referencial
 from .modelos import ParametrosCableado
@@ -156,10 +157,14 @@ def calcular_paquete_electrico(
     panel_nombre = state.get(panel_sel_key)
     inv_nombre = state.get(inv_sel_key)
 
-    if not panel_nombre or panel_nombre not in PANELES:
-        raise KeyError(f"state['{panel_sel_key}'] inválido o no existe.")
-    if not inv_nombre or inv_nombre not in INVERSORES:
-        raise KeyError(f"state['{inv_sel_key}'] inválido o no existe.")
+    if not panel_nombre:
+        raise KeyError("panel_nombre vacío.")
+    if not inv_nombre:
+        raise KeyError("inv_nombre vacío.")
+
+    panel = get_panel(panel_nombre)
+    inv = get_inversor(inv_nombre)
+
 
     params = construir_parametros_cableado_desde_state(state)
     dos_aguas = bool(state.get(dos_aguas_key, True))
