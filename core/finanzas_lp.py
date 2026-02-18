@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from modelo.modelo import DatosProyecto
+from .modelo import DatosProyecto
 from modelo.simulacion_12m import om_mensual
 
 
