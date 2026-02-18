@@ -6,10 +6,12 @@ def build_page_3(resultado, datos, pal, styles):
 
     story = []
 
-    story.append(Paragraph(
-        "Financiamiento — Evolución del préstamo",
-        styles["Heading1"]
-    ))
+    story.append(
+    Paragraph(
+        f"TIR estimada: {resultado['evaluacion']['tir']:.2f} %",
+        styles["BodyText"],
+    )
+    
 
     story.append(Spacer(1, 12))
 
