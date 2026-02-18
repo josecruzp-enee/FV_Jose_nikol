@@ -3,8 +3,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from nucleo.modelo import DatosProyecto
-from nucleo.simulacion_12m import om_mensual
+from modelo.modelo import DatosProyecto
+from modelo.simulacion_12m import om_mensual
 
 
 def _npv(rate: float, cashflows: List[float]) -> float:
