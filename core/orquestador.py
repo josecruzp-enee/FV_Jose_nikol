@@ -12,7 +12,7 @@ from .electrico_ref import simular_electrico_fv_para_pdf
 from .modelo import DatosProyecto
 
 
-def ejecutar_evaluacion(p: DatosProyecto) -> Dict[str, Any]:
+def ejecutar_evaluacion(p: Datosproyecto) -> Dict[str, Any]:
     validar_entradas(p)
 
     sizing = calcular_sizing_unificado(p)
