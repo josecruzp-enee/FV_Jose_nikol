@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-from nucleo.modelo import DatosProyecto
+from nucleo.modelo import modelo
 from nucleo.rutas import preparar_salida, money_L, num
 from nucleo.orquestador import ejecutar_evaluacion
 
