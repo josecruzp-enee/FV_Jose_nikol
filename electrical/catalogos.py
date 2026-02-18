@@ -1,17 +1,78 @@
 # electrical/catalogos.py
 from __future__ import annotations
-from electrical.modelos import Panel, Inversor
+
+from dataclasses import replace
+from typing import Dict, List
+
+from .modelos import Panel, Inversor
+
+
+# ==========================================================
+# Fuente de verdad: catálogos en objetos (NO UI dicts)
+# ==========================================================
+
+_PANELES: Dict[str, Panel] = {
+    # 🔻 Pon aquí tu catálogo real. Estos son ejemplos "genéricos".
+    "panel_550w": Panel(
+        nombre="Panel 550 W (genérico)",
+        w=550.0,
+        vmp=41.5,
+        voc=49.5,
+        imp=13.25,
+        isc=14.10,
+    ),
+}
+
+_INVERSORES: Dict[str, Inversor] = {
+    "inv_5kw_2mppt": Inversor(
+        nombre="Inversor 5 kW (2 MPPT) genérico",
+        kw_ac=5.0,
+        n_mppt=2,
+        vmppt_min=120.0,
+        vmppt_max=480.0,
+        vdc_max=550.0,
+    ),
+}
+
+
+# ==========================================================
+# API pública para el resto del sistema
+# ==========================================================
+
+def get_panel(panel_id: str) -> Panel:
+    try:
+        return _PANELES[panel_id]
+    except KeyError as e:
+        raise KeyError(f"Panel no existe en catálogo: {panel_id}") from e
+
+
+def get_inversor(inv_id: str) -> Inversor:
+    try:
+        return _INVERSORES[inv_id]
+    except KeyError as e:
+        raise KeyError(f"Inversor no existe en catálogo: {inv_id}") from e
+
+
+def ids_paneles() -> List[str]:
+    return sorted(_PANELES.keys())
+
+
+def ids_inversores() -> List[str]:
+    return sorted(_INVERSORES.keys())
+
+
+# ==========================================================
+# API para UI (listas de dicts estandarizados)
+# ==========================================================
 
 def catalogo_paneles() -> list[dict]:
-    """
-    API para UI: lista de dicts con campos estándar.
-    """
-    out = []
-    for nombre, p in PANELES.items():
+    out: list[dict] = []
+    for pid in ids_paneles():
+        p = _PANELES[pid]
         out.append({
-            "id": nombre,
+            "id": pid,
             "marca": "Genérico",
-            "modelo": p.nombre if hasattr(p, "nombre") else nombre,
+            "modelo": p.nombre,
             "pmax_w": float(p.w),
             "vmp_v": float(p.vmp),
             "voc_v": float(p.voc),
@@ -22,15 +83,13 @@ def catalogo_paneles() -> list[dict]:
 
 
 def catalogo_inversores() -> list[dict]:
-    """
-    API para UI: lista de dicts con campos estándar.
-    """
-    out = []
-    for nombre, inv in INVERSORES.items():
+    out: list[dict] = []
+    for iid in ids_inversores():
+        inv = _INVERSORES[iid]
         out.append({
-            "id": nombre,
+            "id": iid,
             "marca": "Genérico",
-            "modelo": inv.nombre if hasattr(inv, "nombre") else nombre,
+            "modelo": inv.nombre,
             "pac_kw": float(inv.kw_ac),
             "n_mppt": int(inv.n_mppt),
             "mppt_min_v": float(inv.vmppt_min),
@@ -38,4 +97,3 @@ def catalogo_inversores() -> list[dict]:
             "vmax_dc_v": float(inv.vdc_max),
         })
     return out
-
