@@ -4,7 +4,7 @@ from __future__ import annotations
 from .modelo import DatosProyecto
 
 
-def validar_entradas(p: modelo) -> None:
+def validar_entradas(p: DatosProyecto) -> None:
     if len(p.consumo_12m) != 12:
         raise ValueError("consumo_12m debe tener 12 valores (Ene..Dic)")
     if len(p.factores_fv_12m) != 12:
