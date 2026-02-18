@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
-from .modelo import DatosProyecto
+from .modelo import Datosproyecto
 
 
 def promedio(vals: List[float]) -> float:
@@ -49,7 +49,7 @@ def evaluar_viabilidad(tabla: List[Dict[str, float]], cuota_mensual_: float) -> 
     }
 
 
-def resumen_decision_mensual(tabla_12m: List[Dict[str, float]], cuota_mensual_: float, p: DatosProyecto) -> Dict[str, float]:
+def resumen_decision_mensual(tabla_12m: List[Dict[str, float]], cuota_mensual_: float, p: Datosproyecto) -> Dict[str, float]:
     pago_actual_total = 0.0
     pago_residual_total = 0.0
 
