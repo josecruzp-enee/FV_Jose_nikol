@@ -5,7 +5,9 @@ from typing import Callable, List, Tuple
 
 import streamlit as st
 
-from ui.wizard.estado import ctx_get, ctx_set_paso
+from ui import datos_cliente
+
+
 
 # ====== Contrato de un paso ======
 ValidarFn = Callable[[object], Tuple[bool, List[str]]]
