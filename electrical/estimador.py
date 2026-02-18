@@ -4,8 +4,6 @@ from __future__ import annotations
 from typing import Any, Dict
 
 from .catalogos import get_panel, get_inversor
-
-
 from .strings import calcular_strings_dc
 from .cableado import calcular_cableado_referencial
 from .modelos import ParametrosCableado
@@ -20,16 +18,12 @@ def construir_parametros_cableado_desde_state(state: Dict[str, Any]) -> Parametr
         vac=float(state.get("vac", 240.0)),
         fases=int(state.get("fases", 1)),
         fp=float(state.get("fp", 1.0)),
-
         dist_dc_m=float(state.get("dist_dc_m", 15.0)),
         dist_ac_m=float(state.get("dist_ac_m", 25.0)),
-
         vdrop_obj_dc_pct=float(state.get("vdrop_obj_dc_pct", 2.0)),
         vdrop_obj_ac_pct=float(state.get("vdrop_obj_ac_pct", 2.0)),
-
         incluye_neutro_ac=bool(state.get("incluye_neutro_ac", False)),
         otros_ccc=int(state.get("otros_ccc", 0)),
-
         t_min_c=float(state.get("t_min_c", 10.0)),
     )
 
@@ -75,13 +69,12 @@ def calcular_paquete_electrico_desde_inputs(
 
     if not panel_nombre:
         raise KeyError("panel_nombre vacío.")
-    
+
     if not inv_nombre:
         raise KeyError("inv_nombre vacío.")
 
     panel = get_panel(panel_nombre)
     inv = get_inversor(inv_nombre)
-
 
     n_paneles = int(res["sizing"]["n_paneles"])
 
@@ -93,7 +86,6 @@ def calcular_paquete_electrico_desde_inputs(
         dos_aguas=bool(dos_aguas),
         t_min_c=float(t_min_c),
     )
-    res["cfg_strings"] = cfg
 
     if not cfg.get("strings"):
         raise ValueError("cfg_strings no contiene strings calculados.")
@@ -110,7 +102,6 @@ def calcular_paquete_electrico_desde_inputs(
         isc_a=float(s0.get("isc_A")) if s0.get("isc_A") is not None else None,
         iac_estimado_a=float(iac),
     )
-    res["electrico_ref"] = elect
 
     # 3) Texto listo para UI/PDF (sin depender de streamlit)
     lineas_strings = [
@@ -164,10 +155,6 @@ def calcular_paquete_electrico(
         raise KeyError("panel_nombre vacío.")
     if not inv_nombre:
         raise KeyError("inv_nombre vacío.")
-
-    panel = get_panel(panel_nombre)
-    inv = get_inversor(inv_nombre)
-
 
     params = construir_parametros_cableado_desde_state(state)
     dos_aguas = bool(state.get(dos_aguas_key, True))
