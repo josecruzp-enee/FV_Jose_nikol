@@ -59,7 +59,7 @@ def neto_mes(ahorro: float, cuota: float, om: float) -> float:
     return float(ahorro) - float(cuota) - float(om)
 
 
-def simular_12_meses(p: DatosProyecto, kwp: float, cuota_mensual_: float, capex_L_: float) -> List[Dict[str, float]]:
+def simular_12_meses(p: Datosproyecto, kwp: float, cuota_mensual_: float, capex_L_: float) -> List[Dict[str, float]]:
     tabla: List[Dict[str, float]] = []
     om_ = om_mensual(capex_L_, p.om_anual_pct)
 
