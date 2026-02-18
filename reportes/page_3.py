@@ -4,7 +4,8 @@ from __future__ import annotations
 from reportlab.platypus import Paragraph, Spacer, PageBreak, TableStyle
 
 # Ajusta este import a donde realmente estén tus helpers:
-from reportes.pdf.utils import make_table, table_style_uniform, box_paragraph
+from .utils import make_table, table_style_uniform, box_paragraph
+
 
 
 def amortizacion_anual(principal: float, tasa_anual: float, cuota_mensual: float, plazo_anios: int):
