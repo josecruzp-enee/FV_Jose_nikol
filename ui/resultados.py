@@ -1,6 +1,7 @@
 # ui/resultados.py
 from __future__ import annotations
-from typing import List, Tuple
+
+from typing import Any, Dict, List, Tuple
 
 import streamlit as st
 
@@ -10,99 +11,213 @@ from reportes.generar_layout_paneles import generar_layout_paneles
 from reportes.generar_pdf_profesional import generar_pdf_profesional
 
 
-def render(ctx) -> None:
-    st.markdown("### Resultados y propuesta")
+# ==========================================================
+# Vista (controles UI)
+# ==========================================================
 
+def _vista_defaults() -> Dict[str, Any]:
+    return {
+        "mostrar_teorica": False,
+        "inclinacion_deg": 15,
+        "orientacion": "Sur",
+    }
+
+
+def _get_vista_resultados() -> Dict[str, Any]:
+    if "vista_resultados" not in st.session_state or not isinstance(st.session_state["vista_resultados"], dict):
+        st.session_state["vista_resultados"] = _vista_defaults()
+    v = st.session_state["vista_resultados"]
+    for k, val in _vista_defaults().items():
+        v.setdefault(k, val)
+    return v
+
+
+def _render_ajustes_vista(v: Dict[str, Any]) -> None:
+    with st.expander("Ajustes de visualización (curva teórica FV)", expanded=False):
+        c1, c2, c3 = st.columns(3)
+
+        with c1:
+            v["mostrar_teorica"] = st.checkbox("Mostrar curva teórica", value=bool(v["mostrar_teorica"]))
+
+        with c2:
+            v["inclinacion_deg"] = st.slider(
+                "Inclinación (°)",
+                min_value=0,
+                max_value=45,
+                value=int(v["inclinacion_deg"]),
+            )
+
+        with c3:
+            opciones = ["Norte", "Sur", "Este", "Oeste", "NE", "NO", "SE", "SO"]
+            v["orientacion"] = st.selectbox(
+                "Orientación",
+                options=opciones,
+                index=opciones.index(str(v["orientacion"])),
+            )
+
+
+# ==========================================================
+# Validaciones / lectura de ctx
+# ==========================================================
+
+def _validar_ctx(ctx) -> bool:
     if ctx.resultado_core is None:
         st.error("No hay resultados del motor FV. Genere primero la ingeniería eléctrica (Paso 5).")
-        return
+        return False
     if ctx.resultado_electrico is None:
         st.error("No hay resultados eléctricos. Genere primero la ingeniería eléctrica (Paso 5).")
-        return
+        return False
+    return True
 
-    res = ctx.resultado_core
-    pkg = ctx.resultado_electrico
 
-    # ===== KPIs =====
+def _get_res_y_pkg(ctx) -> Tuple[dict, dict]:
+    return ctx.resultado_core, ctx.resultado_electrico
+
+
+# ==========================================================
+# Render: KPIs y bloques
+# ==========================================================
+
+def _render_kpis(res: dict) -> None:
     c1, c2, c3 = st.columns(3)
     c1.metric("Sistema (kWp DC)", num(float(res["sizing"]["kwp_dc"]), 2))
     c2.metric("Cuota mensual", money_L(float(res["cuota_mensual"])))
-    c3.metric("Estado", res["evaluacion"]["estado"])
+    c3.metric("Estado", str(res["evaluacion"]["estado"]))
 
-    st.divider()
 
-    # ===== Mostrar resumen eléctrico =====
+def _render_strings(pkg: dict) -> None:
     st.subheader("Strings DC (referencial)")
-    for line in pkg["texto_ui"]["strings"]:
-        st.write("• " + line)
-    if pkg["texto_ui"]["checks"]:
-        st.warning("\n".join(pkg["texto_ui"]["checks"]))
+    for line in (pkg.get("texto_ui", {}).get("strings") or []):
+        st.write("• " + str(line))
 
+    checks = pkg.get("texto_ui", {}).get("checks") or []
+    if checks:
+        st.warning("\n".join([str(x) for x in checks]))
+
+
+def _render_cableado(pkg: dict) -> None:
     st.subheader("Cableado AC/DC (referencial)")
-    for line in pkg["texto_ui"]["cableado"]:
-        st.write("• " + line)
-    st.caption(pkg["texto_ui"]["disclaimer"])
+    for line in (pkg.get("texto_ui", {}).get("cableado") or []):
+        st.write("• " + str(line))
 
-    st.divider()
+    disc = pkg.get("texto_ui", {}).get("disclaimer") or ""
+    if disc:
+        st.caption(str(disc))
 
-    # ===== Generación de artefactos =====
+
+def _render_resumen_electrico(pkg: dict) -> None:
+    _render_strings(pkg)
+    _render_cableado(pkg)
+
+
+# ==========================================================
+# Generación de artefactos (PDF)
+# ==========================================================
+
+def _ui_boton_pdf() -> bool:
     st.markdown("#### Generar propuesta (PDF)")
-
     col_a, col_b = st.columns([1, 2])
     with col_a:
         run = st.button("Generar PDF", type="primary")
     with col_b:
         st.caption("Genera charts, layout y PDF profesional usando los datos ya calculados.")
+    return bool(run)
 
-    if not run:
-        return
 
-    # 1) Salidas
+def _generar_charts(res: dict, paths: dict, vista: Dict[str, Any]) -> None:
+    charts = generar_charts(
+        res["tabla_12m"],
+        paths["charts_dir"],
+        vista_resultados=vista,  # 👈 NUEVO (lo agregaremos en generar_charts.py)
+    )
+    res["charts"] = charts
+    paths.update(charts)
+
+
+def _generar_layout_paneles(res: dict, ctx, paths: dict) -> None:
+    dos_aguas = bool(ctx.electrico.get("dos_aguas", True)) if hasattr(ctx, "electrico") else True
+    generar_layout_paneles(
+        n_paneles=int(res["sizing"]["n_paneles"]),
+        out_path=paths["layout_paneles"],
+        max_cols=7,
+        dos_aguas=dos_aguas,
+        gap_cumbrera_m=0.35,
+    )
+
+
+def _validar_datos_para_pdf(ctx) -> bool:
+    if not hasattr(ctx, "datos_proyecto") or ctx.datos_proyecto is None:
+        st.error("Falta ctx.datos_proyecto. En Paso 5 guarda datos (Datosproyecto) en ctx.datos_proyecto.")
+        return False
+    return True
+
+
+def _generar_pdf(res: dict, ctx, paths: dict) -> str:
+    pdf_path = generar_pdf_profesional(res, ctx.datos_proyecto, paths)
+    ctx.artefactos["pdf"] = pdf_path
+    return str(pdf_path)
+
+
+def _render_descarga_pdf(pdf_path: str) -> None:
+    with open(pdf_path, "rb") as f:
+        st.download_button(
+            "Descargar PDF",
+            data=f,
+            file_name="reporte_evaluacion_fv.pdf",
+            mime="application/pdf",
+        )
+
+
+def _ejecutar_pipeline_pdf(ctx, res: dict, vista: Dict[str, Any]) -> None:
     paths = preparar_salida("salidas")
 
-    # 2) Charts
     try:
-        charts = generar_charts(res["tabla_12m"], paths["charts_dir"])
-        res["charts"] = charts
-        paths.update(charts)
+        _generar_charts(res, paths, vista)
     except Exception as e:
         st.warning(f"No se pudieron generar charts: {e}")
 
-    # 3) Layout paneles
     try:
-        generar_layout_paneles(
-            n_paneles=int(res["sizing"]["n_paneles"]),
-            out_path=paths["layout_paneles"],
-            max_cols=7,
-            dos_aguas=bool(ctx.electrico.get("dos_aguas", True)) if hasattr(ctx, "electrico") else True,
-            gap_cumbrera_m=0.35,
-        )
+        _generar_layout_paneles(res, ctx, paths)
     except Exception as e:
         st.warning(f"No se pudo generar layout de paneles: {e}")
 
-    # 4) PDF
+    if not _validar_datos_para_pdf(ctx):
+        return
+
     try:
-        # OJO: generar_pdf_profesional espera (res, datos, paths)
-        # En este wizard aún no estamos guardando "datos" como objeto Datosproyecto.
-        # Solución correcta: guardar datos en ctx en Paso 5 cuando ejecutas core.
-        if not hasattr(ctx, "datos_proyecto") or ctx.datos_proyecto is None:
-            st.error("Falta ctx.datos_proyecto. En Paso 5 guarda datos (Datosproyecto) en ctx.datos_proyecto.")
-            return
-
-        pdf_path = generar_pdf_profesional(res, ctx.datos_proyecto, paths)
-        ctx.artefactos["pdf"] = pdf_path
-
-        with open(pdf_path, "rb") as f:
-            st.download_button(
-                "Descargar PDF",
-                data=f,
-                file_name="reporte_evaluacion_fv.pdf",
-                mime="application/pdf",
-            )
-
+        pdf_path = _generar_pdf(res, ctx, paths)
+        _render_descarga_pdf(pdf_path)
         st.success("PDF generado.")
     except Exception as e:
         st.warning(f"No se pudo generar PDF aún: {e}")
+
+
+# ==========================================================
+# Paso 6
+# ==========================================================
+
+def render(ctx) -> None:
+    st.markdown("### Resultados y propuesta")
+
+    if not _validar_ctx(ctx):
+        return
+
+    res, pkg = _get_res_y_pkg(ctx)
+
+    _render_kpis(res)
+    st.divider()
+
+    vista = _get_vista_resultados()
+    _render_ajustes_vista(vista)
+    st.divider()
+
+    _render_resumen_electrico(pkg)
+    st.divider()
+
+    if not _ui_boton_pdf():
+        return
+
+    _ejecutar_pipeline_pdf(ctx, res, vista)
 
 
 def validar(ctx) -> Tuple[bool, List[str]]:
