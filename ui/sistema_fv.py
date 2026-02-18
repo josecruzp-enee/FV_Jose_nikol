@@ -27,6 +27,22 @@ def render(ctx):
 
     st.markdown("### Sistema Fotovoltaico")
 
+
+def validar(ctx) -> Tuple[bool, List[str]]:
+    e=[]
+    s = ctx.sistema_fv
+
+    if s["modo_sizing"]=="offset" and s.get("offset_pct",0)<=0:
+        e.append("Offset inválido.")
+
+    if s["modo_sizing"]=="kwp_fijo" and not s.get("kwp_objetivo"):
+        e.append("Ingrese potencia objetivo.")
+
+    if s["produccion_base"]<=0:
+        e.append("Producción base inválida.")
+
+    return len(e)==0, e
+
     # ======================
     # MODO DE SIZING
     # ======================
