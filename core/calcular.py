@@ -1,13 +1,13 @@
 # calcular.py
 from __future__ import annotations
 
-from nucleo.modelo import modelo
-from nucleo.rutas import preparar_salida
-from nucleo.orquestador import ejecutar_evaluacion
+from core.modelo import modelo
+from core.rutas import preparar_salida
+from core.orquestador import ejecutar_evaluacion
 
-from informes.charts import generar_charts
-from informes.layout_paneles import generar_layout_paneles
-from informes.pdf.builder import generar_pdf_profesional
+from reportes.charts import generar_charts
+from reportes.layout_paneles import generar_layout_paneles
+from reportes.pdf.builder import generar_pdf_profesional
 
 
 def main():
