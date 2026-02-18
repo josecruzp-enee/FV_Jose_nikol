@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
-from nucleo.modelo import DatosProyecto
+from core.modelo import DatosProyecto
 
 
 def promedio(vals: List[float]) -> float:
