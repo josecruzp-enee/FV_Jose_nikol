@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Dict, List
 
-from .modelo import modelo
+from .modelo import Datosproyecto
 
 
 def consumo_anual(consumo_12m: List[float]) -> float:
