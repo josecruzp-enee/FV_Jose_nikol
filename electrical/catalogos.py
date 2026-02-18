@@ -2,12 +2,40 @@
 from __future__ import annotations
 from electrical.modelos import Panel, Inversor
 
-PANELES = {
-    "Genérico 550W": Panel("Genérico 550W", w=550, vmp=41.0, voc=50.0, imp=13.0, isc=13.8),
-    "Mono 610W":     Panel("Mono 610W",     w=610, vmp=42.2, voc=51.3, imp=14.5, isc=15.2),
-}
+def catalogo_paneles() -> list[dict]:
+    """
+    API para UI: lista de dicts con campos estándar.
+    """
+    out = []
+    for nombre, p in PANELES.items():
+        out.append({
+            "id": nombre,
+            "marca": "Genérico",
+            "modelo": p.nombre if hasattr(p, "nombre") else nombre,
+            "pmax_w": float(p.w),
+            "vmp_v": float(p.vmp),
+            "voc_v": float(p.voc),
+            "imp_a": float(p.imp),
+            "isc_a": float(p.isc),
+        })
+    return out
 
-INVERSORES = {
-    "10 kW 1F 240V (2 MPPT)": Inversor("10 kW 1F 240V (2 MPPT)", kw_ac=10.0, n_mppt=2, vmppt_min=200, vmppt_max=800, vdc_max=1000),
-    "8 kW 1F 240V (2 MPPT)":  Inversor("8 kW 1F 240V (2 MPPT)",  kw_ac=8.0,  n_mppt=2, vmppt_min=200, vmppt_max=800, vdc_max=1000),
-}
+
+def catalogo_inversores() -> list[dict]:
+    """
+    API para UI: lista de dicts con campos estándar.
+    """
+    out = []
+    for nombre, inv in INVERSORES.items():
+        out.append({
+            "id": nombre,
+            "marca": "Genérico",
+            "modelo": inv.nombre if hasattr(inv, "nombre") else nombre,
+            "pac_kw": float(inv.kw_ac),
+            "n_mppt": int(inv.n_mppt),
+            "mppt_min_v": float(inv.vmppt_min),
+            "mppt_max_v": float(inv.vmppt_max),
+            "vmax_dc_v": float(inv.vdc_max),
+        })
+    return out
+
