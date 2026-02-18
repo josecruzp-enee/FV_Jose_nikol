@@ -3,10 +3,10 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
-from electrical.catalogos import PANELES, INVERSORES
-from electrical.strings import calcular_strings_dc
-from electrical.cableado import calcular_cableado_referencial
-from electrical.modelos import ParametrosCableado
+from .catalogos import PANELES, INVERSORES
+from .strings import calcular_strings_dc
+from .cableado import calcular_cableado_referencial
+from .modelos import ParametrosCableado
 
 
 def construir_parametros_cableado_desde_state(state: Dict[str, Any]) -> ParametrosCableado:
