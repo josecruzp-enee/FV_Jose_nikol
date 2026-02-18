@@ -15,7 +15,7 @@ from core.modelo import Datosproyecto
 from core.rutas import preparar_salida, money_L, num
 from core.orquestador import ejecutar_evaluacion
 
-from reportes.charts import generar_charts
+from reportes.generar_charts import generar_charts
 from reportes.layout_paneles import generar_layout_paneles
 from reportes.pdf.builder import generar_pdf_profesional
 
