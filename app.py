@@ -115,14 +115,12 @@ def _calcular_strings_y_reflejar_ui(res: Dict[str, Any], datos: Datosproyecto) -
 def _generar_salidas(res: Dict[str, Any], datos: Datosproyecto) -> Dict[str, Any]:
     """
     Genera charts, layout y PDF. Devuelve paths.
+    Contrato: generar_charts(tabla_12m, out_dir)
     """
     paths = preparar_salida("salidas")
 
-    # Charts: algunas versiones esperan res completo; otras una tabla.
-    try:
-        generar_charts(res, paths["charts_dir"])
-    except TypeError:
-        generar_charts(res.get("tabla_12m"), paths["charts_dir"])
+    tabla_12m = res.get("tabla_12m") or []
+    generar_charts(tabla_12m, paths["charts_dir"])
 
     generar_layout_paneles(
         n_paneles=int(res["sizing"]["n_paneles"]),
@@ -135,6 +133,7 @@ def _generar_salidas(res: Dict[str, Any], datos: Datosproyecto) -> Dict[str, Any
     pdf_path = generar_pdf_profesional(res, datos, paths)
     paths["pdf_path"] = pdf_path
     return paths
+
 
 
 def _mostrar_resultados(res: Dict[str, Any], paths: Dict[str, Any]) -> None:
