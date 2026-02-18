@@ -5,7 +5,8 @@ import math
 from typing import Any, Dict, Optional
 
 from .modelo import Datosproyecto
-from .simulacion_12m import capex_L, consumo_anual, consumo_promedio
+from .simular_12_meses import capex_L, consumo_anual, consumo_promedio
+
 
 
 INVERSORES_COMERCIALES = [1, 2, 3, 5, 6, 8, 10, 12, 15, 20, 25, 30, 40, 50]
