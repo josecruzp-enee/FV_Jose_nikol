@@ -1,15 +1,23 @@
 # app.py
 from __future__ import annotations
 
+import sys
+from pathlib import Path
 import streamlit as st
 
-from nucleo.modelo import modelo
-from nucleo.rutas import preparar_salida, money_L, num
-from nucleo.orquestador import ejecutar_evaluacion
+# === FIX: asegurar que Python encuentre los paquetes (core, reportes) ===
+ROOT = Path(__file__).resolve().parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
-from informes.charts import generar_charts
-from informes.layout_paneles import generar_layout_paneles
-from informes.pdf.builder import generar_pdf_profesional
+# === IMPORTS CORRECTOS (tu repo usa core/ y reportes/) ===
+from core.modelo import DatosProyecto
+from core.rutas import preparar_salida, money_L, num
+from core.orquestador import ejecutar_evaluacion
+
+from reportes.charts import generar_charts
+from reportes.layout_paneles import generar_layout_paneles
+from reportes.pdf.builder import generar_pdf_profesional
 
 
 st.set_page_config(page_title="FV Engine", layout="wide")
