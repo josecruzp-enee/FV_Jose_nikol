@@ -159,6 +159,16 @@ def render(ctx) -> None:
 
     e["dos_aguas"] = st.checkbox("Techo dos aguas (reparte strings)", value=bool(e["dos_aguas"]))
 
+    # --- Overrides (UI) -> Config efectiva (core/electrical) ---
+    st.session_state["cfg_overrides"] = {
+        "tecnicos": {
+            "t_min_c": float(e["t_min_c"]),
+            "vdrop_obj_dc_pct": float(e["vdrop_obj_dc_pct"]),
+            "vdrop_obj_ac_pct": float(e["vdrop_obj_ac_pct"]),
+        }
+    }
+
+    
     st.divider()
 
     # --- Ejecutar pipeline ---
