@@ -16,8 +16,9 @@ from core.rutas import preparar_salida, money_L, num
 from core.orquestador import ejecutar_evaluacion
 
 from reportes.generar_charts import generar_charts
-from reportes.layout_paneles import generar_layout_paneles
-from reportes.pdf.builder import generar_pdf_profesional
+from reportes.generar_layout_paneles import generar_layout_paneles
+from reportes.generar_pdf_profesional import generar_pdf_profesional
+
 
 
 st.set_page_config(page_title="FV Engine", layout="wide")
@@ -52,7 +53,7 @@ with st.sidebar:
     run = st.button("Calcular y generar PDF")
 
 if run:
-    datos = DatosProyecto(
+    datos = Datosproyecto(
         cliente=cliente,
         ubicacion=ubicacion,
         consumo_12m=consumo_12m,
