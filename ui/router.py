@@ -7,6 +7,87 @@ from typing import Callable, List, Tuple
 import streamlit as st
 
 from ui.estado import ctx_get, ctx_set_paso
+# ui/router.py
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Callable, List, Tuple, Any, Optional
+
+import streamlit as st
+
+
+@dataclass(frozen=True)
+class PasoWizard:
+    id: int
+    titulo: str
+    render: Callable[[Any], None]
+    validar: Callable[[Any], Tuple[bool, List[str]]]
+    requiere: List[int]
+
+
+def _get_ctx():
+    """
+    Contexto simple en session_state.
+    Si ya tienes un ctx más elaborado, aquí solo debes retornarlo.
+    """
+    if "ctx" not in st.session_state:
+        # ctx mínimo; tu app ya mete atributos dinámicamente.
+        class Ctx: ...
+        st.session_state["ctx"] = Ctx()
+        st.session_state["ctx"].paso = 1
+        st.session_state["ctx"].artefactos = {}
+    return st.session_state["ctx"]
+
+
+def _sidebar_radio_pasos(pasos: List[PasoWizard], paso_actual: int) -> int:
+    labels = [f"{p.id}. {p.titulo}" for p in pasos]
+    ids = [p.id for p in pasos]
+
+    sel = st.sidebar.radio(
+        "FV Engine • Wizard",
+        options=ids,
+        format_func=lambda i: labels[ids.index(i)],
+        index=ids.index(paso_actual),
+    )
+    return int(sel)
+
+
+def _botones_nav(ctx, paso_actual: PasoWizard, pasos: List[PasoWizard]) -> None:
+    col1, col2 = st.columns([1, 1])
+
+    with col1:
+        if st.button("⬅ Atrás", disabled=int(ctx.paso) <= 1):
+            ctx.paso -= 1
+            st.rerun()
+
+    with col2:
+        ok, errores = paso_actual.validar(ctx)
+
+        if st.button("Siguiente ➡", disabled=not ok or int(ctx.paso) >= len(pasos)):
+            ctx.paso += 1
+            st.rerun()
+
+        if not ok and errores:
+            st.error("\n".join([f"• {e}" for e in errores]))
+
+
+def render_wizard(pasos: List[PasoWizard]) -> None:
+    """
+    Wizard profesional:
+    - Sidebar SIEMPRE navegable (no bloquea)
+    - Validación SOLO para avanzar con 'Siguiente'
+    """
+    ctx = _get_ctx()
+
+    # ✅ sidebar libre
+    ctx.paso = _sidebar_radio_pasos(pasos, int(getattr(ctx, "paso", 1)))
+
+    # Render paso seleccionado
+    paso_actual = next(p for p in pasos if p.id == int(ctx.paso))
+    paso_actual.render(ctx)
+
+    # ✅ navegación abajo (bloquea solo 'Siguiente')
+    _botones_nav(ctx, paso_actual, pasos)
 
 
 # ====== Contrato de un paso ======
