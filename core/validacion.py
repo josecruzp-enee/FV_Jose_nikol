@@ -1,7 +1,7 @@
 # nucleo/validacion.py
 from __future__ import annotations
 
-from nucleo.modelo import DatosProyecto
+from nucleo.modelo import modelo
 
 
 def validar_entradas(p: DatosProyecto) -> None:
