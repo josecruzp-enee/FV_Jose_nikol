@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from .modelo import DatosProyecto
+from .modelo import Datosproyecto
 from modelo.simulacion_12m import om_mensual
 
 
@@ -64,7 +64,7 @@ def _payback_descontado_anios(rate: float, cashflows: List[float]) -> Optional[f
 
 def proyectar_flujos_anuales(
     *,
-    datos: DatosProyecto,
+    datos: Datosproyecto,
     resultado: Dict[str, Any],
     horizonte_anios: int = 15,
     crecimiento_tarifa_anual: float = 0.06,
