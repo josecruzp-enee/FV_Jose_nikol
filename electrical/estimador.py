@@ -5,6 +5,7 @@ from typing import Any, Dict
 
 from .catalogos import get_panel, get_inversor
 
+
 from .strings import calcular_strings_dc
 from .cableado import calcular_cableado_referencial
 from .modelos import ParametrosCableado
