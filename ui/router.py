@@ -58,8 +58,29 @@ def _init_defaults(st_mod) -> None:
 
 
 def render_wizard(pasos: List[PasoWizard]) -> None:
+    # Defaults en session_state (tu init actual)
     _init_defaults(st)
+
+    # Contexto del wizard (puede traer su propio dict interno)
     ctx = ctx_get(st)
+
+    # ====== defaults también en el dict del contexto ======
+    # Algunos pasos usan ctx.state/ctx.data en vez de st.session_state.
+    s = None
+    for attr in ("state", "data", "datos", "vals", "inputs"):
+        if hasattr(ctx, attr):
+            cand = getattr(ctx, attr)
+            if isinstance(cand, dict):
+                s = cand
+                break
+
+    # Si no hay dict interno, usamos session_state
+    if s is None:
+        s = st.session_state
+
+    # Defaults críticos para evitar KeyError en validaciones (Paso 3)
+    s.setdefault("modo_sizing", st.session_state.get("modo_sizing", "offset"))
+    s.setdefault("offset_pct", st.session_state.get("offset_pct", 80.0))
 
     # ====== sidebar navegación ======
     st.sidebar.title("FV Engine • Wizard")
@@ -103,4 +124,6 @@ def render_wizard(pasos: List[PasoWizard]) -> None:
         if st.button("Siguiente ➡️", disabled=not ok):
             _marcar_completado(ctx, paso.id, True)
             ctx_set_paso(st, min(ctx.paso_actual + 1, total))
+            st.rerun()
+
             st.rerun()
