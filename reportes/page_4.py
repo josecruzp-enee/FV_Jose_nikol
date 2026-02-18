@@ -9,14 +9,6 @@ from reportes.utils import make_table, table_style_uniform, box_paragraph, money
 
 
 def tabla_impacto_mensual_anio1(resultado: Dict[str, Any], pal: dict, content_w: float) -> List:
-    """
-    Tabla comparativa año 1:
-    - Pago actual
-    - Con FV (ENEE)
-    - FV + cuota
-    - Ahorro mes
-    - Ahorro acumulado
-    """
     from reportlab.platypus import Spacer
 
     tabla = resultado.get("tabla_12m") or []
@@ -62,7 +54,6 @@ def tabla_impacto_mensual_anio1(resultado: Dict[str, Any], pal: dict, content_w:
             money_L(acum),
         ])
 
-    # Fila total
     rows.append([
         "TOTAL",
         money_L(total_pago_actual),
@@ -80,7 +71,7 @@ def tabla_impacto_mensual_anio1(resultado: Dict[str, Any], pal: dict, content_w:
     )
     t.setStyle(table_style_uniform(pal, font_header=9, font_body=9))
 
-    last_row = len(rows)  # índice dentro de la tabla (header=0, rows empiezan en 1)
+    last_row = len(rows)  # header=0, la última fila está en índice last_row
     t.setStyle(TableStyle([
         ("ALIGN", (0, 1), (0, -1), "CENTER"),
         ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
@@ -107,9 +98,6 @@ def build_page_4(
     styles,
     content_w: float,
 ):
-    """
-    Página 4: Tabla comparativa + bloques opcionales (config eléctrica y eléctrico referencial).
-    """
     story: List = []
 
     story.append(Paragraph("Tabla Comparativa de Pagos", styles["Title"]))
@@ -119,7 +107,6 @@ def build_page_4(
     story.append(Spacer(1, 6))
     story += tabla_impacto_mensual_anio1(resultado, pal, content_w)
 
-    # ===== Opcional: configuración eléctrica DC (strings) =====
     cfg_html = resultado.get("cfg_strings_html")
     if cfg_html:
         story.append(Paragraph("Configuración eléctrica (DC) — referencial", styles["H2b"]))
@@ -127,7 +114,6 @@ def build_page_4(
         story.append(box_paragraph(cfg_html, pal, content_w, font_size=9.5))
         story.append(Spacer(1, 8))
 
-    # ===== Opcional: eléctrico referencial (AC/DC calibres y caída) =====
     elect = resultado.get("electrico_ref") or {}
     texto_pdf = elect.get("texto_pdf") or []
     disclaimer = elect.get("disclaimer")
@@ -143,6 +129,5 @@ def build_page_4(
         story.append(Paragraph(disclaimer, styles["BodyText"]))
         story.append(Spacer(1, 8))
 
-    # Cierre de página
     story.append(PageBreak())
     return story
