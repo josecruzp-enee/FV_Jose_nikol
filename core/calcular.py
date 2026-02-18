@@ -11,7 +11,7 @@ from reportes.pdf.builder import generar_pdf_profesional
 
 
 def main():
-    datos = DatosProyecto(
+    datos = Datosproyecto(
         cliente="Cliente ejemplo",
         ubicacion="Honduras",
         consumo_12m=[1500,1800,2100,2200,2400,2300,900,950,1100,1200,1900,1700],
