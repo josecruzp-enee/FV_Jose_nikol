@@ -1,7 +1,7 @@
 # reportes/page_4.py
 from reportlab.platypus import Paragraph, Spacer, PageBreak
 
-def build_page_4(resultado, datos, paths, pal, styles):
+def build_page_4(resultado, datos, paths, pal, styles, content_w):
     story = []
 
     story.append(Paragraph("Ahorros y comparación", styles["Title"]))
