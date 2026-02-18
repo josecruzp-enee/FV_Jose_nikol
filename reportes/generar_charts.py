@@ -17,5 +17,4 @@ def generar_charts(resultado: Dict[str, Any], out_dir: Optional[str] = None) -> 
 
     # Stub: todavía no generamos nada
     return {}
-PY
 
