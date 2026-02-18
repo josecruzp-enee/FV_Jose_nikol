@@ -55,3 +55,16 @@ def box_paragraph(html_text, pal, content_w, font_size=10):
     ]))
 
     return t
+
+def money_L(x: float, dec: int = 0) -> str:
+    """
+    Formato monetario Lempiras consistente para tablas PDF.
+    dec=0 por defecto para tablas ejecutivas.
+    """
+    try:
+        v = float(x)
+    except Exception:
+        return "L 0"
+    fmt = f"{{:,.{int(dec)}f}}"
+    return f"L {fmt.format(v)}"
+
