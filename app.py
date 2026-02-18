@@ -5,6 +5,8 @@ import sys
 from pathlib import Path
 from typing import List, Tuple, Dict, Any
 from electrical.estimador import calcular_paquete_electrico
+import streamlit as st
+
 
 pkg = calcular_paquete_electrico(res=res, state=st.session_state)
 
