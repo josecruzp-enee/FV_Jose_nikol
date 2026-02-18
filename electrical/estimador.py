@@ -73,13 +73,15 @@ def calcular_paquete_electrico_desde_inputs(
     if "sizing" not in res or "n_paneles" not in res["sizing"]:
         raise KeyError("res debe incluir res['sizing']['n_paneles'].")
 
-    if not panel_nombre or panel_nombre not in PANELES:
-        raise KeyError("panel_nombre inválido o no existe en PANELES.")
-    if not inv_nombre or inv_nombre not in INVERSORES:
-        raise KeyError("inv_nombre inválido o no existe en INVERSORES.")
+    if not panel_nombre:
+        raise KeyError("panel_nombre vacío.")
+    
+    if not inv_nombre:
+        raise KeyError("inv_nombre vacío.")
 
-    panel = PANELES[panel_nombre]
-    inv = INVERSORES[inv_nombre]
+    panel = get_panel(panel_nombre)
+    inv = get_inversor(inv_nombre)
+
 
     n_paneles = int(res["sizing"]["n_paneles"])
 
