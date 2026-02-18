@@ -21,11 +21,13 @@ def generar_pdf_profesional(resultado, datos, paths):
 
     story = []
 
-    story += build_page_1(resultado, datos, paths, pal, styles)
-    story += build_page_2(resultado, datos, paths, pal, styles)
-    story += build_page_3(resultado, datos, paths, pal, styles)
-    story += build_page_4(resultado, datos, paths, pal, styles)
-    story += build_page_5(resultado, datos, paths, pal, styles)
+    content_w = doc.width
+    story += build_page_1(resultado, datos, paths, pal, styles, content_w)
+    story += build_page_2(resultado, datos, paths, pal, styles, content_w)
+    story += build_page_3(resultado, datos, paths, pal, styles, content_w)
+    story += build_page_4(resultado, datos, paths, pal, styles, content_w)
+    story += build_page_5(resultado, datos, paths, pal, styles, content_w)
+
 
     doc.build(story)
 
