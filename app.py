@@ -73,7 +73,7 @@ if run:
     paths = preparar_salida("salidas")
     res = ejecutar_evaluacion(datos)
 
-    generar_charts(res["tabla_12m"], paths)
+    generar_charts(res["tabla_12m"], paths["charts_dir"])
     generar_layout_paneles(
         n_paneles=int(res["sizing"]["n_paneles"]),
         out_path=paths["layout_paneles"],
