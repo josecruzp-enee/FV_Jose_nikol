@@ -1,0 +1,9 @@
+t_min_c: 10.0
+
+vdrop_obj_dc_pct: 2.0
+vdrop_obj_ac_pct: 2.0
+
+factor_seguridad_dc: 1.25
+factor_seguridad_ac: 1.25
+
+temp_stc_c: 25.0
