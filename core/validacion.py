@@ -1,10 +1,10 @@
 # nucleo/validacion.py
 from __future__ import annotations
 
-from .modelo import DatosProyecto
+from .modelo import Datosproyecto
 
 
-def validar_entradas(p: DatosProyecto) -> None:
+def validar_entradas(p: Datosproyecto) -> None:
     if len(p.consumo_12m) != 12:
         raise ValueError("consumo_12m debe tener 12 valores (Ene..Dic)")
     if len(p.factores_fv_12m) != 12:
