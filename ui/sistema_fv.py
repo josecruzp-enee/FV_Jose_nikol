@@ -109,74 +109,138 @@ def _render_radiacion(sf: Dict[str, Any]) -> None:
         disabled=disabled,
     )
 
-def _render_geometria(sf: Dict[str, Any]) -> None:
-    st.markdown("#### Geometría del arreglo")
+# ==========================================================
+# Helpers UI (geometría) — funciones cortas
+# ==========================================================
 
-    # -------- Orientación (azimut) --------
+def _sf_defaults_geometria(sf: Dict[str, Any]) -> None:
+    sf.setdefault("tipo_superficie", "Un plano (suelo/losa/estructura)")
+
+    # plano único
+    sf.setdefault("azimut_deg", 180)
+
+    # dos aguas
+    sf.setdefault("azimut_a_deg", 90)
+    sf.setdefault("azimut_b_deg", 270)
+    sf.setdefault("reparto_pct_a", 50.0)
+
+    # inclinación
+    sf.setdefault("tilt_modo", "auto")  # auto | manual
+    sf.setdefault("tilt_techo", "Techo residencial")
+    sf.setdefault("inclinacion_deg", 15)
+
+    # para resumen
+    sf.setdefault("orientacion_label", "Sur")
+
+
+def _ui_select_tipo_superficie(sf: Dict[str, Any]) -> None:
+    tipo = st.selectbox(
+        "Tipo de superficie",
+        options=["Un plano (suelo/losa/estructura)", "Techo dos aguas"],
+        index=0 if sf.get("tipo_superficie") != "Techo dos aguas" else 1,
+        key="sf_tipo_superficie",
+        help="Dos aguas: dos orientaciones + reparto de paneles por cada agua.",
+    )
+    sf["tipo_superficie"] = str(tipo)
+
+
+def _ui_select_orientacion(label_widget: str, az_actual: int, *, key: str) -> Tuple[str, int]:
     opciones = _opciones_orientacion()
     labels = [o["label"] for o in opciones]
 
-    az = int(sf.get("azimut_deg", 180))
     idx = 0
     for i, o in enumerate(opciones):
-        if int(o["azimut"]) == az:
+        if int(o["azimut"]) == int(az_actual):
             idx = i
             break
 
-    c1, c2 = st.columns(2)
+    sel_label = st.selectbox(label_widget, options=labels, index=idx, key=key)
+    sel = next(o for o in opciones if o["label"] == sel_label)
+    return str(sel_label), int(sel["azimut"])
 
-    with c1:
-        sel_label = st.selectbox("Orientación", options=labels, index=idx, key="sf_orientacion")
-        sel = next(o for o in opciones if o["label"] == sel_label)
-        sf["orientacion_label"] = str(sel_label)
-        sf["azimut_deg"] = int(sel["azimut"])
 
-    # -------- Inclinación (modo auto/manual) --------
-    with c2:
-        sf.setdefault("tilt_modo", "auto")
-        sf.setdefault("tilt_techo", "Techo residencial")
-        sf.setdefault("inclinacion_deg", 15)
+def _ui_orientacion_plano(sf: Dict[str, Any]) -> None:
+    label, az = _ui_select_orientacion(
+        "Orientación",
+        int(sf.get("azimut_deg", 180)),
+        key="sf_orientacion",
+    )
+    sf["azimut_deg"] = int(az)
+    sf["orientacion_label"] = str(label)
 
-        modo = st.radio(
-            "Definir inclinación",
-            options=["Automática (por tipo de techo)", "Manual (°)"],
-            index=0 if sf.get("tilt_modo") == "auto" else 1,
-            horizontal=True,
-            key="sf_tilt_modo",
+
+def _ui_orientacion_dos_aguas(sf: Dict[str, Any]) -> None:
+    st.caption("Agua A")
+    label_a, az_a = _ui_select_orientacion(
+        "Orientación agua A",
+        int(sf.get("azimut_a_deg", 90)),
+        key="sf_orient_a",
+    )
+    sf["azimut_a_deg"] = int(az_a)
+
+    st.caption("Agua B")
+    label_b, az_b = _ui_select_orientacion(
+        "Orientación agua B",
+        int(sf.get("azimut_b_deg", 270)),
+        key="sf_orient_b",
+    )
+    sf["azimut_b_deg"] = int(az_b)
+
+    sf["reparto_pct_a"] = float(
+        st.number_input(
+            "Reparto paneles en agua A (%)",
+            min_value=0.0,
+            max_value=100.0,
+            step=5.0,
+            value=float(sf.get("reparto_pct_a", 50.0)),
+            key="sf_reparto_a",
+            help="Porcentaje de paneles (o área) asignado al lado A.",
         )
-        sf["tilt_modo"] = "auto" if "Automática" in modo else "manual"
+    )
 
-        if sf["tilt_modo"] == "auto":
-            tipos = ["Techo plano", "Techo residencial", "Techo pronunciado"]
-            tipo_actual = str(sf.get("tilt_techo", "Techo residencial"))
-            if tipo_actual not in tipos:
-                tipo_actual = "Techo residencial"
+    reparto_b = 100.0 - float(sf["reparto_pct_a"])
+    st.write(f"Reparto agua B: **{reparto_b:.0f}%**")
 
-            tipo = st.selectbox("Tipo de techo", options=tipos, index=tipos.index(tipo_actual), key="sf_tilt_techo")
-            sf["tilt_techo"] = str(tipo)
+    # label para resumen/PDF
+    sf["orientacion_label"] = f"Dos aguas: {label_a} / {label_b}"
 
-            defaults = {
-                "Techo plano": 12,
-                "Techo residencial": 20,
-                "Techo pronunciado": 30,
-            }
-            sf["inclinacion_deg"] = int(defaults[tipo])
-            st.caption(f"Inclinación sugerida: {sf['inclinacion_deg']}° (modo manual para exactitud).")
+    # compat (hoy el resto espera un azimut único)
+    sf["azimut_deg"] = int(sf.get("azimut_a_deg", 90))
 
-        else:
-            sf["inclinacion_deg"] = int(
-                st.number_input(
-                    "Inclinación (°)",
-                    min_value=0,
-                    max_value=45,
-                    step=1,
-                    value=int(sf.get("inclinacion_deg", 15)),
-                    key="sf_inclinacion_manual",
-                )
+
+def _ui_inclinacion(sf: Dict[str, Any]) -> None:
+    modo = st.radio(
+        "Definir inclinación",
+        options=["Automática (por tipo de techo)", "Manual (°)"],
+        index=0 if sf.get("tilt_modo") == "auto" else 1,
+        horizontal=True,
+        key="sf_tilt_modo",
+    )
+    sf["tilt_modo"] = "auto" if "Automática" in modo else "manual"
+
+    if sf["tilt_modo"] == "auto":
+        tipos = ["Techo plano", "Techo residencial", "Techo pronunciado"]
+        actual = str(sf.get("tilt_techo", "Techo residencial"))
+        if actual not in tipos:
+            actual = "Techo residencial"
+
+        tipo_techo = st.selectbox("Tipo de techo", options=tipos, index=tipos.index(actual), key="sf_tilt_techo")
+        sf["tilt_techo"] = str(tipo_techo)
+
+        defaults = {"Techo plano": 12, "Techo residencial": 20, "Techo pronunciado": 30}
+        sf["inclinacion_deg"] = int(defaults[tipo_techo])
+        st.caption(f"Inclinación sugerida: {sf['inclinacion_deg']}° (modo manual si la quieres exacta).")
+    else:
+        sf["inclinacion_deg"] = int(
+            st.number_input(
+                "Inclinación (°)",
+                min_value=0,
+                max_value=45,
+                step=1,
+                value=int(sf.get("inclinacion_deg", 15)),
+                key="sf_inclinacion_manual",
             )
-
-
-
+        )
 
 
 
