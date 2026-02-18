@@ -4,3 +4,4 @@ pandas
 numpy
 matplotlib
 reportlab
+reportlab==4.0.9
