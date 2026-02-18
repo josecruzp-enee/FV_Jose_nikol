@@ -1,11 +1,18 @@
+# nucleo/orquestador.py
+from __future__ import annotations
+
+from typing import Any, Dict
+
 from nucleo.validacion import validar_entradas
 from nucleo.sizing import calcular_sizing_unificado
 from nucleo.simulacion_12m import simular_12_meses, calcular_cuota_mensual
 from nucleo.evaluacion import evaluar_viabilidad, resumen_decision_mensual, payback_simple
 from nucleo.finanzas_lp import proyectar_flujos_anuales
 from nucleo.electrico_ref import simular_electrico_fv_para_pdf
+from nucleo.modelo import DatosProyecto
 
-def ejecutar_evaluacion(p):
+
+def ejecutar_evaluacion(p: DatosProyecto) -> Dict[str, Any]:
     validar_entradas(p)
 
     sizing = calcular_sizing_unificado(p)
@@ -24,7 +31,6 @@ def ejecutar_evaluacion(p):
     ahorro_anual = sum(float(x["ahorro_L"]) for x in tabla)
     pb = payback_simple(float(sizing["capex_L"]), ahorro_anual)
 
-    # eléctrico (opcional)
     electrico = None
     cfg = sizing.get("cfg_strings") or {}
     strings = cfg.get("strings") or []
@@ -32,6 +38,7 @@ def ejecutar_evaluacion(p):
         vmp_string = max(float(s["vmp_string_v"]) for s in strings)
         imp = max(float(s["imp_a"]) for s in strings)
         isc = max(float(s["isc_a"]) for s in strings)
+
         electrico = simular_electrico_fv_para_pdf(
             v_ac=240.0,
             i_ac_estimado=float(cfg["iac_estimada_a"]),
@@ -42,6 +49,8 @@ def ejecutar_evaluacion(p):
             isc_a=isc,
             dist_dc_m=10.0,
             objetivo_vdrop_dc_pct=2.0,
+            incluye_neutro_ac=False,
+            otros_ccc_en_misma_tuberia=0,
         )
 
     finanzas_lp = proyectar_flujos_anuales(
