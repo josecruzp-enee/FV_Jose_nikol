@@ -1,7 +1,7 @@
-# electrical/orquestador.py
+# electrical/estimador.py
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 from .catalogos import PANELES, INVERSORES
 from .strings import calcular_strings_dc
@@ -12,6 +12,7 @@ from .modelos import ParametrosCableado
 def construir_parametros_cableado_desde_state(state: Dict[str, Any]) -> ParametrosCableado:
     """
     Construye ParametrosCableado desde un state (ej: st.session_state).
+    API legacy (compatible con UI vieja).
     """
     return ParametrosCableado(
         vac=float(state.get("vac", 240.0)),
@@ -41,50 +42,52 @@ def calcular_iac_estimado(inv_kw_ac: float, *, vac: float, fases: int = 1, fp: f
     return p_w / (float(vac) * float(fp))
 
 
-def calcular_paquete_electrico(
+def calcular_paquete_electrico_desde_inputs(
     *,
     res: Dict[str, Any],
-    state: Dict[str, Any],
-    panel_sel_key: str = "panel_sel",
-    inv_sel_key: str = "inv_sel",
-    dos_aguas_key: str = "dos_aguas",
+    panel_nombre: str,
+    inv_nombre: str,
+    dos_aguas: bool,
+    params: ParametrosCableado,
+    t_min_c: float = 10.0,
 ) -> Dict[str, Any]:
     """
-    Orquesta TODO lo eléctrico (DC strings + cableado AC/DC) y actualiza 'res'.
+    API pura (sin Streamlit): orquesta strings + cableado.
 
     Entradas:
       - res: dict del motor FV (debe traer res["sizing"]["n_paneles"])
-      - state: selections (ej st.session_state)
+      - panel_nombre, inv_nombre: keys del catálogo electrical/catalogos.py
+      - dos_aguas: bool para reparto de strings (si aplica)
+      - params: ParametrosCableado explícitos
+      - t_min_c: °C para cálculo de Voc en frío
 
     Salida:
       dict con:
         - cfg_strings
         - electrico_ref
-        - texto_ui: dict de listas de líneas (para streamlit)
+        - texto_ui: dict de listas de líneas (para UI / PDF)
+        - meta
     """
     if "sizing" not in res or "n_paneles" not in res["sizing"]:
         raise KeyError("res debe incluir res['sizing']['n_paneles'].")
 
-    panel_nombre = state.get(panel_sel_key)
-    inv_nombre = state.get(inv_sel_key)
     if not panel_nombre or panel_nombre not in PANELES:
-        raise KeyError(f"state['{panel_sel_key}'] inválido o no existe.")
+        raise KeyError("panel_nombre inválido o no existe en PANELES.")
     if not inv_nombre or inv_nombre not in INVERSORES:
-        raise KeyError(f"state['{inv_sel_key}'] inválido o no existe.")
+        raise KeyError("inv_nombre inválido o no existe en INVERSORES.")
 
     panel = PANELES[panel_nombre]
     inv = INVERSORES[inv_nombre]
 
     n_paneles = int(res["sizing"]["n_paneles"])
-    dos_aguas = bool(state.get(dos_aguas_key, True))
 
     # 1) Strings DC
     cfg = calcular_strings_dc(
         n_paneles=n_paneles,
         panel=panel,
         inversor=inv,
-        dos_aguas=dos_aguas,
-        t_min_c=float(state.get("t_min_c", 10.0)),
+        dos_aguas=bool(dos_aguas),
+        t_min_c=float(t_min_c),
     )
     res["cfg_strings"] = cfg
 
@@ -93,7 +96,6 @@ def calcular_paquete_electrico(
 
     # 2) Cableado referencial (usa el primer string)
     s0 = cfg["strings"][0]
-    params = construir_parametros_cableado_desde_state(state)
 
     iac = calcular_iac_estimado(inv.kw_ac, vac=params.vac, fases=params.fases, fp=params.fp)
 
@@ -106,7 +108,7 @@ def calcular_paquete_electrico(
     )
     res["electrico_ref"] = elect
 
-    # 3) Texto listo para UI (sin depender de streamlit)
+    # 3) Texto listo para UI/PDF (sin depender de streamlit)
     lineas_strings = [
         f"{s['etiqueta']} — {s['ns']}S: Vmp≈{s['vmp_V']:.0f} V | Voc frío≈{s['voc_frio_V']:.0f} V | Imp≈{s['imp_A']:.1f} A."
         for s in cfg.get("strings", [])
@@ -126,5 +128,48 @@ def calcular_paquete_electrico(
             "panel": panel_nombre,
             "inversor": inv_nombre,
             "iac_estimado_a": float(iac),
-        }
+        },
     }
+
+
+def calcular_paquete_electrico(
+    *,
+    res: Dict[str, Any],
+    state: Dict[str, Any],
+    panel_sel_key: str = "panel_sel",
+    inv_sel_key: str = "inv_sel",
+    dos_aguas_key: str = "dos_aguas",
+) -> Dict[str, Any]:
+    """
+    API legacy (compatible con UI vieja basada en state).
+    Wrapper sobre calcular_paquete_electrico_desde_inputs().
+
+    Entradas:
+      - res: dict del motor FV (debe traer res["sizing"]["n_paneles"])
+      - state: selections (ej st.session_state) + params de cableado
+      - panel_sel_key / inv_sel_key: keys para selección de catálogo
+      - dos_aguas_key: bool para reparto de strings
+
+    Salida:
+      dict con cfg_strings, electrico_ref, texto_ui, meta
+    """
+    panel_nombre = state.get(panel_sel_key)
+    inv_nombre = state.get(inv_sel_key)
+
+    if not panel_nombre or panel_nombre not in PANELES:
+        raise KeyError(f"state['{panel_sel_key}'] inválido o no existe.")
+    if not inv_nombre or inv_nombre not in INVERSORES:
+        raise KeyError(f"state['{inv_sel_key}'] inválido o no existe.")
+
+    params = construir_parametros_cableado_desde_state(state)
+    dos_aguas = bool(state.get(dos_aguas_key, True))
+    t_min_c = float(state.get("t_min_c", 10.0))
+
+    return calcular_paquete_electrico_desde_inputs(
+        res=res,
+        panel_nombre=panel_nombre,
+        inv_nombre=inv_nombre,
+        dos_aguas=dos_aguas,
+        params=params,
+        t_min_c=t_min_c,
+    )
