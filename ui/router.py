@@ -55,32 +55,29 @@ def _init_defaults(st_mod) -> None:
     s.setdefault("incluye_neutro_ac", False)
     s.setdefault("otros_ccc", 0)
 
-
-
 def render_wizard(pasos: List[PasoWizard]) -> None:
-    # Defaults en session_state (tu init actual)
+    # Defaults en session_state (si ya lo tienes)
     _init_defaults(st)
 
-    # Contexto del wizard (puede traer su propio dict interno)
+    # Contexto del wizard
     ctx = ctx_get(st)
 
-    # ====== defaults también en el dict del contexto ======
-    # Algunos pasos usan ctx.state/ctx.data en vez de st.session_state.
-    s = None
-    for attr in ("state", "data", "datos", "vals", "inputs"):
-        if hasattr(ctx, attr):
-            cand = getattr(ctx, attr)
-            if isinstance(cand, dict):
-                s = cand
-                break
+    # ====== INIT: dict específico de Paso 3 ======
+    # Paso 3 usa: s = ctx.sistema_fv
+    if not hasattr(ctx, "sistema_fv") or getattr(ctx, "sistema_fv") is None:
+        ctx.sistema_fv = {}
+    if not isinstance(ctx.sistema_fv, dict):
+        # Si alguien lo dejó como otra cosa, forzamos dict para evitar crashes
+        ctx.sistema_fv = {}
 
-    # Si no hay dict interno, usamos session_state
-    if s is None:
-        s = st.session_state
+    # Defaults críticos del Paso 3
+    ctx.sistema_fv.setdefault("modo_sizing", "offset")
+    ctx.sistema_fv.setdefault("offset_pct", 80.0)
+    ctx.sistema_fv.setdefault("kwp_objetivo", None)
 
-    # Defaults críticos para evitar KeyError en validaciones (Paso 3)
-    s.setdefault("modo_sizing", st.session_state.get("modo_sizing", "offset"))
-    s.setdefault("offset_pct", st.session_state.get("offset_pct", 80.0))
+    # (si tu UI los usa, deja listos también)
+    ctx.sistema_fv.setdefault("dos_aguas", True)
+    ctx.sistema_fv.setdefault("t_min_c", 10.0)
 
     # ====== sidebar navegación ======
     st.sidebar.title("FV Engine • Wizard")
@@ -126,4 +123,4 @@ def render_wizard(pasos: List[PasoWizard]) -> None:
             ctx_set_paso(st, min(ctx.paso_actual + 1, total))
             st.rerun()
 
-            st.rerun()
+
