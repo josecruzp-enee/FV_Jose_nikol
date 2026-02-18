@@ -109,4 +109,44 @@ def simular_electrico_fv_para_pdf(
     vdrop_dc_pct = _vdrop_pct_1ph_2wire(vmp_string_v, imp_a, dist_dc_m, g_final_dc)
     conduit_dc = "1/2\"" if g_final_dc in ["14","12","10"] else "3/4\""
 
-    retur
+    return {
+        "corrientes": {
+            "ac_estimada_a": round(i_ac_estimado, 2),
+            "ac_diseno_a": round(i_ac_diseno, 2),
+            "dc_imp_a": round(imp_a, 2),
+            "dc_isc_a": None if isc_a is None else round(isc_a, 2),
+            "dc_max_ref_a": round(i_dc_max, 2),
+        },
+        "ac": {
+            "voltaje_v": round(v_ac, 1),
+            "dist_m": round(dist_ac_m, 1),
+            "calibre_fases_awg": g_final_ac,
+            "calibre_tierra_awg": egc,
+            "tipo_cable": "Cu THHN/THWN-2 (referencial)",
+            "conduit_recomendado": conduit_ac + " EMT/PVC (referencial)",
+            "breaker_sugerido_a": breaker_a,
+            "vdrop_pct": round(vdrop_ac_pct, 2),
+            "objetivo_vdrop_pct": objetivo_vdrop_ac_pct,
+        },
+        "dc_string": {
+            "vmp_v": round(vmp_string_v, 1),
+            "dist_m": round(dist_dc_m, 1),
+            "calibre_awg": g_final_dc,
+            "tipo_cable": "PV Wire / USE-2 Cu (UV) (referencial)",
+            "conduit_recomendado": conduit_dc + " EMT/PVC UV (referencial)",
+            "vdrop_pct": round(vdrop_dc_pct, 2),
+            "objetivo_vdrop_pct": objetivo_vdrop_dc_pct,
+        },
+        "texto_pdf": [
+            f"Conductores DC (string): {g_final_dc} AWG Cu PV Wire/USE-2 (UV). Dist {dist_dc_m:.1f} m | caída {vdrop_dc_pct:.2f}% (obj {objetivo_vdrop_dc_pct:.1f}%).",
+            f"Conductores AC (salida inversor): {g_final_ac} AWG Cu THHN/THWN-2 (L1+L2)"
+            + (" + N" if incluye_neutro_ac else "")
+            + f" + tierra {egc} AWG. Dist {dist_ac_m:.1f} m | caída {vdrop_ac_pct:.2f}% (obj {objetivo_vdrop_ac_pct:.1f}%).",
+            f"Tubería AC sugerida: {conduit_ac} EMT/PVC (según cantidad de conductores y facilidad de jalado).",
+            f"Breaker AC sugerido (referencial): {breaker_a} A (validar contra datasheet del inversor).",
+        ],
+        "disclaimer": (
+            "Cálculo referencial para propuesta. Calibre final sujeto a: temperatura, agrupamiento (CCC), "
+            "factor de ajuste/corrección, fill real de tubería, terminales 75°C y normativa local/NEC aplicable."
+        ),
+    }
