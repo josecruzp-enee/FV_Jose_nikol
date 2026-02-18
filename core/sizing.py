@@ -4,8 +4,8 @@ from __future__ import annotations
 import math
 from typing import Any, Dict, Optional
 
-from nucleo.modelo import modelo
-from nucleo.simulacion_12m import capex_L, consumo_anual, consumo_promedio
+from core.modelo import modelo
+from core.simulacion_12m import capex_L, consumo_anual, consumo_promedio
 
 
 INVERSORES_COMERCIALES = [1, 2, 3, 5, 6, 8, 10, 12, 15, 20, 25, 30, 40, 50]
