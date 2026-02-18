@@ -4,6 +4,22 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 from typing import List, Tuple, Dict, Any
+from electrical.estimador import calcular_paquete_electrico
+
+pkg = calcular_paquete_electrico(res=res, state=st.session_state)
+
+st.subheader("Configuración eléctrica DC (strings) — referencial")
+for line in pkg["texto_ui"]["strings"]:
+    st.write("• " + line)
+
+checks = pkg["texto_ui"]["checks"]
+if checks:
+    st.warning("\n".join(checks))
+
+st.subheader("Cableado (AC/DC) — referencial")
+for line in pkg["texto_ui"]["cableado"]:
+    st.write("• " + line)
+st.caption(pkg["texto_ui"]["disclaimer"])
 
 import streamlit as st
 
