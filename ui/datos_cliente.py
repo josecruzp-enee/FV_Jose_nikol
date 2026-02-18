@@ -66,5 +66,14 @@ def validar(ctx) -> Tuple[bool, List[str]]:
             ubicacion=ubicacion,
             email=email,
         )
+        ok = (len(errores) == 0)
+    if ok:
+        from core.modelo import Datosproyecto
+        ctx.datos_proyecto = Datosproyecto(
+            cliente=cliente,
+            ubicacion=ubicacion,
+            email=email,
+        )
+    return ok, errores
 
     return ok, errores
