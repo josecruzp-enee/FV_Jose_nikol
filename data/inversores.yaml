@@ -1,0 +1,39 @@
+schema: 1
+inversores:
+
+  inv_generico_5kw_2mppt:
+    marca: "Genérico"
+    nombre: "Inversor 5kW 2MPPT"
+    codigo: "GEN-5KW-2MPPT"   # si no hay, inventas uno consistente
+
+    entrada_dc:  # OBLIGATORIO para validación
+      vdc_max_v: 550
+      vdc_min_v: 120               # opcional si tienes
+      mppt_min_v: 120
+      mppt_max_v: 480
+      n_mppt: 2
+      imppt_max_a: 13.0            # OBLIGATORIO (para no “adivinar”)
+
+    salida_ac:  # recomendado para protecciones
+      pac_kw: 5.0
+      vac_nominal_v: 240
+      fases: 1
+      iac_max_a: 25.0              # opcional si tienes
+
+    eficiencia:  # opcional
+      max_pct: null
+
+    protecciones:  # opcional
+      ip: "IP65"
+      seccionador_dc: true
+      afci: null
+
+    limites:  # opcional
+      temp_oper_min_c: null
+      temp_oper_max_c: null
+
+    fuente:
+      archivo: ""
+      pagina: null
+
+    extras: {}
