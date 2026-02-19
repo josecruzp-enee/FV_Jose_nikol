@@ -10,6 +10,10 @@ from .evaluacion import evaluar_viabilidad, resumen_decision_mensual, payback_si
 from .finanzas_lp import proyectar_flujos_anuales
 from .electrico_ref import simular_electrico_fv_para_pdf
 from .modelo import Datosproyecto
+from core.sistema_fv_mapper import construir_parametros_fv_desde_ctx
+
+params_fv = construir_parametros_fv_desde_ctx(ctx)
+# motor.consume(params_fv)   # aquí lo conectamos cuando me pegues el punto exacto
 
 
 def ejecutar_evaluacion(p: Datosproyecto) -> Dict[str, Any]:
