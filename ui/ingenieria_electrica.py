@@ -358,8 +358,24 @@ def render(ctx) -> None:
 
     # 5) Mostrar
     _mostrar_resultados(pkg)
-    _mostrar_validacion_string(validacion)
+    
+    from electrical.paquete_electrico import PanelDC, InversorAC, ParametrosCableado, calcular_paquete_nec_2023
+    from electrical.catalogos import get_panel, get_inversor
 
+    sz = ctx.resultado_core["sizing"]           # o donde guardes el sizing unificado
+    strings_auto = sz["strings_auto"]           # dict resumen
+
+    panel = get_panel(ctx.equipos["panel_id"])
+    inv = get_inversor(ctx.equipos["inversor_id"])
+
+    pkg = calcular_paquete_nec_2023(
+        panel=PanelDC(pmax_w=panel.w, vmp_v=panel.vmp, voc_v=panel.voc, imp_a=panel.imp, isc_a=panel.isc),
+        inversor=InversorAC(pac_kw=float(getattr(inv, "kw_ac", 5.0)), vac_nom_v=float(e["vac"]), fases=int(e["fases"]), fp=float(e["fp"])),
+        strings_auto=strings_auto,
+        params=params,               # tu ParametrosCableado actual
+        t_amb_c=30.0,                # luego lo sacamos de configuración
+    )
+    ctx.resultado_electrico = pkg
 
 def validar(ctx) -> Tuple[bool, List[str]]:
     errores: List[str] = []
