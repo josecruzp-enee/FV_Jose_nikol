@@ -43,7 +43,8 @@ def _build_tabla_strings_dc(
     strings = cfg.get("strings") or []
 
     story.append(Spacer(1, 12))
-    story.append(Paragraph("Configuración eléctrica referencial (Strings DC)", styles["H2"]))
+    story.append(Paragraph("Configuración eléctrica referencial (Strings DC)", styles["Heading2"]))
+
     story.append(Spacer(1, 6))
 
     if not strings:
