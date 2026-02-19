@@ -16,6 +16,7 @@ from core.configuracion import cargar_configuracion, construir_config_efectiva
 
 
 def main() -> None:
+    st.set_page_config(page_title="FV Engine • Wizard", layout="wide")
     st.title("FV Engine • Wizard")
     st.caption("Sistema FV • Ing. José Nikol Cruz 😄")
 
