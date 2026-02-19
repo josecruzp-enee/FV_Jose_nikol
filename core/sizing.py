@@ -2,15 +2,20 @@
 from __future__ import annotations
 
 import math
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 from .modelo import Datosproyecto
 from .simular_12_meses import capex_L, consumo_anual, consumo_promedio
 
+from electrical.catalogos import get_panel, get_inversor
 
 
 INVERSORES_COMERCIALES = [1, 2, 3, 5, 6, 8, 10, 12, 15, 20, 25, 30, 40, 50]
 
+
+# ==========================================================
+# Utilitarios básicos
+# ==========================================================
 
 def seleccionar_inversor_kw(valor_kw: float) -> float:
     for kw in INVERSORES_COMERCIALES:
@@ -18,6 +23,70 @@ def seleccionar_inversor_kw(valor_kw: float) -> float:
             return float(kw)
     return float(INVERSORES_COMERCIALES[-1])
 
+
+def _clamp(x: float, lo: float, hi: float) -> float:
+    return max(lo, min(hi, float(x)))
+
+
+def _pct_factor(pct: float) -> float:
+    return 1.0 - float(pct) / 100.0
+
+
+# ==========================================================
+# Lectura de entradas desde p (Paso 3 y Paso 4)
+# ==========================================================
+
+def _leer_fv_desde_p(p: Datosproyecto) -> Tuple[float, float]:
+    """
+    Retorna (hsp, pr) desde Paso 3:
+    - p.hsp (default 4.5)
+    - p.perdidas_sistema_pct (default 15)
+    - p.sombras_pct (default 0)
+    """
+    hsp = float(getattr(p, "hsp", 4.5))
+    perd = float(getattr(p, "perdidas_sistema_pct", 15.0))
+    sh = float(getattr(p, "sombras_pct", 0.0))
+
+    pr = _pct_factor(perd) * _pct_factor(sh)
+    pr = _clamp(pr, 0.10, 1.00)
+    hsp = _clamp(hsp, 0.5, 9.0)
+
+    return hsp, pr
+
+
+def _leer_equipos_desde_p(p: Datosproyecto) -> Dict[str, Any]:
+    """
+    Lee selección de equipos del Paso 4 (ctx.equipos consolidado a p.equipos).
+    """
+    eq = getattr(p, "equipos", None) or {}
+    if not isinstance(eq, dict):
+        eq = {}
+    return eq
+
+
+def _resolver_catalogo(eq: Dict[str, Any]) -> Tuple[Any, Any]:
+    """
+    Retorna (panel, inversor) desde catálogo.
+    """
+    panel_id = str(eq.get("panel_id") or "panel_550w")
+    inversor_id = str(eq.get("inversor_id") or "inv_5kw_2mppt")
+
+    panel = get_panel(panel_id)
+    inversor = get_inversor(inversor_id)
+    return panel, inversor
+
+
+def _resolver_dc_ac_obj(eq: Dict[str, Any]) -> float:
+    """
+    DC/AC objetivo desde UI.
+    """
+    dc_ac = float(eq.get("sobredimension_dc_ac") or 1.20)
+    return _clamp(dc_ac, 1.00, 2.00)
+
+
+# ==========================================================
+# Dimensionamiento energético (kWp, #paneles, inversor comercial)
+# ==========================================================
 
 def _validar_entrada_dimensionamiento(
     kwh_mes: float,
@@ -158,6 +227,10 @@ def dimensionar_para_ahorro(
     }
 
 
+# ==========================================================
+# Strings + verificación MPPT/Voc + Iac
+# ==========================================================
+
 def calcular_configuracion_strings(
     *,
     n_paneles: int,
@@ -290,45 +363,103 @@ def texto_config_electrica_pdf(cfg_strings: dict, *, etiqueta_izq="Techo izquier
     return "".join(lines)
 
 
+# ==========================================================
+# Resumen eléctrico para UI/PDF
+# ==========================================================
+
+def _resumen_electrico(cfg_strings: Dict[str, Any]) -> Dict[str, Any]:
+    strings = list(cfg_strings.get("strings") or [])
+    checks = list(cfg_strings.get("checks") or [])
+    iac = float(cfg_strings.get("iac_estimada_a") or 0.0)
+
+    if strings:
+        vmp_max = max(float(s["vmp_string_v"]) for s in strings)
+        voc_frio_max = max(float(s["voc_string_frio_v"]) for s in strings)
+        imp_max = max(float(s["imp_a"]) for s in strings)
+        isc_max = max(float(s["isc_a"]) for s in strings)
+    else:
+        vmp_max = voc_frio_max = imp_max = isc_max = 0.0
+
+    return {
+        "iac_estimada_a": iac,
+        "vmp_string_max_v": float(vmp_max),
+        "voc_frio_max_v": float(voc_frio_max),
+        "imp_max_a": float(imp_max),
+        "isc_max_a": float(isc_max),
+        "idc_diseno_a": float(1.25 * isc_max),
+        "checks": checks,
+    }
+
+
+# ==========================================================
+# ORQUESTA sizing (único punto público)
+# ==========================================================
+
 def calcular_sizing_unificado(p: Datosproyecto) -> Dict[str, Any]:
+    """
+    Dimensiona el sistema FV y genera configuración eléctrica de strings
+    basada en:
+      - Paso 3: hsp/pr (p.hsp, p.perdidas_sistema_pct, p.sombras_pct)
+      - Paso 4: catálogo (p.equipos.panel_id/inversor_id, dc_ac)
+    """
     kwh_mes_prom = consumo_promedio(p.consumo_12m)
 
+    # 1) Entradas FV (Paso 3)
+    hsp, pr = _leer_fv_desde_p(p)
+
+    # 2) Entradas Equipos (Paso 4)
+    eq = _leer_equipos_desde_p(p)
+    panel, inv = _resolver_catalogo(eq)
+    dc_ac_obj = _resolver_dc_ac_obj(eq)
+
+    # 3) Sizing energético (kWp, #paneles, inversor comercial por lista)
     sz = dimensionar_para_ahorro(
-        kwh_mes=kwh_mes_prom,
-        cobertura_obj=p.cobertura_objetivo,
-        hsp=4.5,
-        pr=0.80,
+        kwh_mes=float(kwh_mes_prom),
+        cobertura_obj=float(p.cobertura_objetivo),
+        hsp=float(hsp),
+        pr=float(pr),
         dias_mes=30.0,
-        panel_wp=550,
-        dc_ac_ratio=1.20,
+        panel_wp=int(panel.w),
+        dc_ac_ratio=float(dc_ac_obj),
         area_panel_m2=2.6,
         factor_pasillos=1.10,
     )
 
+    # 4) Strings + checks + Iac (catálogo real)
+    # Si tu Inversor no trae vac/fases/fp/imppt_max aún, se usan defaults.
     cfg_strings = calcular_configuracion_strings(
         n_paneles=int(sz["n_paneles"]),
-        vmp_mod=float(sz.get("vmp_mod", 41.0)),
-        voc_mod=float(sz.get("voc_mod", 49.5)),
-        imp_mod=float(sz.get("imp_mod", 13.2)),
-        isc_mod=float(sz.get("isc_mod", 14.0)),
+        vmp_mod=float(panel.vmp),
+        voc_mod=float(panel.voc),
+        imp_mod=float(panel.imp),
+        isc_mod=float(panel.isc),
+        tc_voc_frac_c=-0.0029,  # si luego lo agregas al dataclass Panel, lo conectamos aquí
         t_min_c=float(sz.get("t_min_c", 10.0)),
-        n_mppt=2,
+        n_mppt=int(inv.n_mppt),
         repartir_50_50=True,
-        vmppt_min=float(sz.get("inv_vmppt_min", 200)),
-        vmppt_max=float(sz.get("inv_vmppt_max", 800)),
-        vdc_max=float(sz.get("inv_vdc_max", 1000)),
-        imppt_max=float(sz.get("inv_imppt_max", 25)),
+        vmppt_min=float(inv.vmppt_min),
+        vmppt_max=float(inv.vmppt_max),
+        vdc_max=float(inv.vdc_max),
+        imppt_max=float(getattr(inv, "imppt_max", 25.0)),
         inv_kw_ac=float(sz["inv_kw_ac"]),
-        vac=float(sz.get("vac", 240)),
-        fases=int(sz.get("fases", 1)),
+        vac=float(getattr(inv, "vac", 240.0)),
+        fases=int(getattr(inv, "fases", 1)),
+        fp=float(getattr(inv, "fp", 1.0)),
     )
     sz["cfg_strings"] = cfg_strings
+    sz["electrico"] = _resumen_electrico(cfg_strings)
 
+    # 5) CAPEX + trazabilidad
     sz["capex_L"] = capex_L(float(sz["kwp_dc"]), p.costo_usd_kwp, p.tcambio)
 
     sz["kwp_recomendado"] = float(sz["kwp_dc"])
     sz["consumo_anual"] = consumo_anual(p.consumo_12m)
     sz["consumo_prom"] = float(kwh_mes_prom)
 
-    return sz
+    sz["hsp_usada"] = float(hsp)
+    sz["pr_usado"] = float(pr)
+    sz["panel_id"] = str(eq.get("panel_id") or "panel_550w")
+    sz["inversor_id"] = str(eq.get("inversor_id") or "inv_5kw_2mppt")
+    sz["dc_ac_objetivo"] = float(dc_ac_obj)
 
+    return sz
