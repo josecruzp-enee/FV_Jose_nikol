@@ -21,13 +21,23 @@ def _defaults_sistema_fv() -> Dict[str, Any]:
         "azimut_deg": 180,                 # 0=N, 90=E, 180=S, 270=O
         "orientacion_label": "Sur (óptimo)",
 
+        # Geometría (dos aguas)
+        "tipo_superficie": "Un plano (suelo/losa/estructura)",  # label UI
+        "azimut_a_deg": 90,
+        "azimut_b_deg": 270,
+        "reparto_pct_a": 50.0,
+
+        # Inclinación
+        "tilt_modo": "auto",  # auto | manual
+        "tilt_techo": "Techo residencial",
+
         # Condición de instalación
         "tipo_montaje": "Techo ventilado",
         "sombras_pct": 0.0,
         "perdidas_sistema_pct": 15.0,
 
-        # Legado
-        "produccion_base_kwh_kwp_mes": 145.0,
+        # Preview
+        "kwp_preview": 5.0,
     }
 
 
@@ -41,11 +51,37 @@ def _asegurar_dict(ctx, nombre: str) -> Dict[str, Any]:
     return d
 
 
+def _tipo_superficie_code(label: str) -> str:
+    return "dos_aguas" if str(label).strip() == "Techo dos aguas" else "plano"
+
+
+def _sync_campos_normalizados(sf: Dict[str, Any]) -> None:
+    """
+    Mantiene campos que el motor puede consumir, sin romper UI/compat.
+    - sf["hsp"] numérico
+    - sf["tipo_superficie_code"] = plano|dos_aguas
+    - sf["azimut_deg"] siempre existe
+    """
+    # HSP normalizada
+    hsp = sf.get("hsp")
+    if hsp is None:
+        hsp = float(sf.get("hsp_kwh_m2_d", 5.2))
+    sf["hsp"] = float(hsp)
+    sf["hsp_kwh_m2_d"] = float(sf["hsp"])
+
+    # tipo superficie code
+    sf["tipo_superficie_code"] = _tipo_superficie_code(sf.get("tipo_superficie", "Un plano (suelo/losa/estructura)"))
+
+    # compat azimut_deg
+    if sf.get("tipo_superficie") == "Techo dos aguas":
+        sf["azimut_deg"] = int(sf.get("azimut_a_deg", sf.get("azimut_deg", 180)))
+
+
 def _get_sf(ctx) -> Dict[str, Any]:
     sf = _asegurar_dict(ctx, "sistema_fv")
     for k, v in _defaults_sistema_fv().items():
         sf.setdefault(k, v)
-    _sf_defaults_geometria(sf)
+    _sync_campos_normalizados(sf)
     return sf
 
 
@@ -82,25 +118,8 @@ def _opciones_montaje() -> List[str]:
 
 
 # ==========================================================
-# Geometría — defaults + helpers cortos
+# Geometría — helpers UI
 # ==========================================================
-
-def _sf_defaults_geometria(sf: Dict[str, Any]) -> None:
-    sf.setdefault("tipo_superficie", "Un plano (suelo/losa/estructura)")
-
-    # plano único
-    sf.setdefault("azimut_deg", 180)
-
-    # dos aguas
-    sf.setdefault("azimut_a_deg", 90)
-    sf.setdefault("azimut_b_deg", 270)
-    sf.setdefault("reparto_pct_a", 50.0)
-
-    # inclinación
-    sf.setdefault("tilt_modo", "auto")  # auto | manual
-    sf.setdefault("tilt_techo", "Techo residencial")
-    sf.setdefault("inclinacion_deg", 15)
-
 
 def _ui_select_orientacion(label_widget: str, az_actual: int, *, key: str) -> Tuple[str, int]:
     opciones = _opciones_orientacion()
@@ -209,6 +228,8 @@ def _render_geometria(sf: Dict[str, Any]) -> None:
     with c2:
         _ui_inclinacion(sf)
 
+    _sync_campos_normalizados(sf)
+
 
 # ==========================================================
 # Render: otras secciones
@@ -234,7 +255,11 @@ def _render_radiacion(sf: Dict[str, Any]) -> None:
         step=0.1,
         value=float(sf["hsp_kwh_m2_d"]),
         disabled=not bool(sf["hsp_override"]),
+        key="sf_hsp",
     )
+
+    sf["hsp"] = float(sf["hsp_kwh_m2_d"])
+    _sync_campos_normalizados(sf)
 
 
 def _render_condiciones(sf: Dict[str, Any]) -> None:
@@ -245,14 +270,14 @@ def _render_condiciones(sf: Dict[str, Any]) -> None:
         opciones = _opciones_montaje()
         actual = str(sf.get("tipo_montaje", opciones[0]))
         idx = opciones.index(actual) if actual in opciones else 0
-        sf["tipo_montaje"] = st.selectbox("Tipo de montaje", options=opciones, index=idx)
+        sf["tipo_montaje"] = st.selectbox("Tipo de montaje", options=opciones, index=idx, key="sf_montaje")
 
     with c2:
         sombras = _opciones_sombras()
         labels = [x["label"] for x in sombras]
         pct = float(sf.get("sombras_pct", 0.0))
         idx = next((i for i, it in enumerate(sombras) if float(it["pct"]) == pct), 0)
-        sel_label = st.selectbox("Sombras (pérdida)", options=labels, index=idx)
+        sel_label = st.selectbox("Sombras (pérdida)", options=labels, index=idx, key="sf_sombras")
         sel = next(x for x in sombras if x["label"] == sel_label)
         sf["sombras_pct"] = float(sel["pct"])
 
@@ -263,7 +288,10 @@ def _render_condiciones(sf: Dict[str, Any]) -> None:
             max_value=30.0,
             step=0.5,
             value=float(sf["perdidas_sistema_pct"]),
+            key="sf_perdidas",
         )
+
+    _sync_campos_normalizados(sf)
 
 
 def _render_resumen(sf: Dict[str, Any]) -> None:
@@ -286,6 +314,63 @@ def _render_resumen(sf: Dict[str, Any]) -> None:
 
 
 # ==========================================================
+# NUEVO: gráfica teórica (preview)
+# ==========================================================
+
+def _render_grafica_teorica(ctx, sf: Dict[str, Any]) -> None:
+    st.divider()
+    st.markdown("#### Gráfica teórica de generación FV (preview)")
+
+    import matplotlib.pyplot as plt
+
+    kwp = float(sf.get("kwp_preview", 5.0))
+
+    c1, c2 = st.columns([1, 2])
+    with c1:
+        kwp = st.number_input(
+            "kWp DC para preview",
+            min_value=0.5,
+            max_value=100.0,
+            step=0.5,
+            value=float(kwp),
+            key="sf_kwp_preview",
+            help="Si todavía no seleccionaste equipos, usamos este valor provisional.",
+        )
+        sf["kwp_preview"] = float(kwp)
+
+        hsp = float(sf.get("hsp", sf.get("hsp_kwh_m2_d", 5.2)))
+        perd = float(sf.get("perdidas_sistema_pct", 15.0))
+        sh = float(sf.get("sombras_pct", 0.0))
+
+        pr = (1.0 - perd / 100.0) * (1.0 - sh / 100.0)
+        pr = max(0.10, min(1.00, pr))
+
+        prod_base_kwh_kwp_mes = hsp * 30.0 * pr
+
+    factores = sf.get("factores_fv_12m")
+    if not (isinstance(factores, list) and len(factores) == 12):
+        factores = [1.0] * 12
+
+    meses = list(range(1, 13))
+    gen = [float(kwp) * float(prod_base_kwh_kwp_mes) * float(f) for f in factores]
+    total = sum(gen)
+
+    with c2:
+        fig, ax = plt.subplots()
+        ax.plot(meses, gen, marker="o")
+        ax.set_xticks(meses)
+        ax.set_xlabel("Mes")
+        ax.set_ylabel("Generación estimada (kWh/mes)")
+        ax.set_title(f"Estimación anual: {total:,.0f} kWh/año")
+        st.pyplot(fig, clear_figure=True)
+
+    st.caption(
+        f"Base: HSP={hsp:.2f} h/día · PR={pr:.3f} (pérdidas {perd:.1f}% + sombras {sh:.1f}%). "
+        "Preview teórico; no reemplaza simulación detallada."
+    )
+
+
+# ==========================================================
 # API del paso
 # ==========================================================
 
@@ -297,6 +382,7 @@ def render(ctx) -> None:
     _render_geometria(sf)
     _render_condiciones(sf)
     _render_resumen(sf)
+    _render_grafica_teorica(ctx, sf)
 
 
 def _errores(sf: Dict[str, Any]) -> List[str]:
