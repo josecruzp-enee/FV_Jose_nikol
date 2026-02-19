@@ -13,15 +13,18 @@ from ui.router import PasoWizard, render_wizard
 from ui import datos_cliente, consumo_energetico, sistema_fv, seleccion_equipos
 import ui.ingenieria_electrica as ingenieria_electrica
 from core.configuracion import cargar_configuracion, construir_config_efectiva
-
+import streamlit as st
 
 
 
 from ui import resultados
 
 def main() -> None:
-    st.set_page_config(page_title="FV Engine", layout="wide")
-    st.title("FV Engine — Wizard profesional")
+    
+
+    
+    st.caption("Sistema FV • Ing. José Nikol Cruz 😄")
+
 
     pasos = [
         PasoWizard(1, "Datos cliente", datos_cliente.render, datos_cliente.validar, requiere=[]),
