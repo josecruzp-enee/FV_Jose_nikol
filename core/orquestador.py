@@ -10,15 +10,67 @@ from .evaluacion import evaluar_viabilidad, resumen_decision_mensual, payback_si
 from .finanzas_lp import proyectar_flujos_anuales
 from .electrico_ref import simular_electrico_fv_para_pdf
 from .modelo import Datosproyecto
-from core.sistema_fv_mapper import construir_parametros_fv_desde_ctx
 
-params_fv = construir_parametros_fv_desde_ctx(ctx)
-# motor.consume(params_fv)   # aquí lo conectamos cuando me pegues el punto exacto
+from core.sistema_fv_mapper import construir_parametros_fv_desde_dict
 
 
+# =========================
+# Helpers (locales y seguros)
+# =========================
+def _set_attr_safe(obj: Any, name: str, value: Any) -> None:
+    """Setea atributo si es posible; si el dataclass es frozen o no tiene campo, no revienta."""
+    try:
+        setattr(obj, name, value)
+    except Exception:
+        pass
+
+
+def _consolidar_parametros_fv_en_datos(p: Datosproyecto, params_fv: Dict[str, Any]) -> None:
+    """
+    Consolidación: aplica lo mínimo que el motor DEBE consumir, y guarda trazabilidad.
+    - Obligatorio para motor: prod_base_kwh_kwp_mes, factores_fv_12m
+    - Trazabilidad: hsp, pérdidas, sombras, geometría (y dos aguas si aplica)
+    """
+    # --- contrato mínimo motor ---
+    _set_attr_safe(p, "prod_base_kwh_kwp_mes", float(params_fv["prod_base_kwh_kwp_mes"]))
+    _set_attr_safe(p, "factores_fv_12m", list(params_fv["factores_fv_12m"]))
+
+    # --- trazabilidad útil ---
+    _set_attr_safe(p, "hsp", float(params_fv.get("hsp", 0.0)))
+    _set_attr_safe(p, "perdidas_sistema_pct", float(params_fv.get("perdidas_sistema_pct", 0.0)))
+    _set_attr_safe(p, "sombras_pct", float(params_fv.get("sombras_pct", 0.0)))
+    _set_attr_safe(p, "azimut_deg", float(params_fv.get("azimut_deg", 180.0)))
+    _set_attr_safe(p, "inclinacion_deg", float(params_fv.get("inclinacion_deg", 0.0)))
+    _set_attr_safe(p, "tipo_superficie", str(params_fv.get("tipo_superficie", "plano")))
+
+    # --- dos aguas (opcional) ---
+    if params_fv.get("tipo_superficie") == "dos_aguas":
+        _set_attr_safe(p, "azimut_a_deg", float(params_fv.get("azimut_a_deg", 180.0)))
+        _set_attr_safe(p, "azimut_b_deg", float(params_fv.get("azimut_b_deg", 0.0)))
+        _set_attr_safe(p, "reparto_pct_a", float(params_fv.get("reparto_pct_a", 50.0)))
+
+    # --- siempre guardamos el dict limpio (útil para PDF / debug / pruebas) ---
+    _set_attr_safe(p, "params_fv", dict(params_fv))
+
+
+# =========================
+# Orquestador (pipeline lineal)
+# =========================
 def ejecutar_evaluacion(p: Datosproyecto) -> Dict[str, Any]:
+    # 1) Entradas + Validación
     validar_entradas(p)
 
+    # 2) Cálculos (mapper UI->motor)
+    sfv = getattr(p, "sistema_fv", None) or {}
+    if not isinstance(sfv, dict):
+        sfv = {}
+
+    params_fv = construir_parametros_fv_desde_dict(sfv)
+
+    # 3) Consolidación (aplicar params FV al modelo)
+    _consolidar_parametros_fv_en_datos(p, params_fv)
+
+    # 4) Cálculos (sizing, cuota, simulación)
     sizing = calcular_sizing_unificado(p)
 
     cuota = calcular_cuota_mensual(
@@ -35,6 +87,7 @@ def ejecutar_evaluacion(p: Datosproyecto) -> Dict[str, Any]:
     ahorro_anual = sum(float(x["ahorro_L"]) for x in tabla)
     pb = payback_simple(float(sizing["capex_L"]), ahorro_anual)
 
+    # 5) Salidas auxiliares (eléctrico ref para PDF)
     electrico = None
     cfg = sizing.get("cfg_strings") or {}
     strings = cfg.get("strings") or []
@@ -57,6 +110,7 @@ def ejecutar_evaluacion(p: Datosproyecto) -> Dict[str, Any]:
             otros_ccc_en_misma_tuberia=0,
         )
 
+    # 6) Finanzas largo plazo
     finanzas_lp = proyectar_flujos_anuales(
         datos=p,
         resultado={"sizing": sizing, "cuota_mensual": cuota, "tabla_12m": tabla},
@@ -69,6 +123,7 @@ def ejecutar_evaluacion(p: Datosproyecto) -> Dict[str, Any]:
     )
 
     return {
+        "params_fv": params_fv,  # útil para debug / PDF
         "sizing": sizing,
         "cuota_mensual": cuota,
         "tabla_12m": tabla,
