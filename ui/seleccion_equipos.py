@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import List, Tuple, Dict, Any
 import streamlit as st
 
-from electrical.catalogos_yaml import cargar_paneles_yaml
+from electrical.catalogos_yaml import cargar_paneles_yaml, cargar_inversores_yaml
 from electrical.catalogos import catalogo_paneles, catalogo_inversores
 
 
@@ -21,34 +21,36 @@ def _safe_index(opciones: List[str], valor_actual: str | None) -> int:
 
 def _panel_yaml_to_ui(pid: str, p: Dict[str, Any]) -> Dict[str, Any]:
     stc = p.get("stc", p)
-    return {
-        "id": pid,
-        "marca": p.get("marca", "N/D"),
-        "modelo": p.get("modelo", p.get("pn", "Panel")),
-        "pmax_w": float(stc.get("pmax_w", 0.0)),
-        "vmp_v": float(stc.get("vmp_v", 0.0)),
-        "voc_v": float(stc.get("voc_v", 0.0)),
-        "imp_a": float(stc.get("imp_a", 0.0)),
-        "isc_a": float(stc.get("isc_a", 0.0)),
-    }
+    return {"id": pid, "marca": p.get("marca", "N/D"), "modelo": p.get("nombre", p.get("modelo", p.get("pn", "Panel"))),
+            "pmax_w": float(stc.get("pmax_w", 0.0)), "vmp_v": float(stc.get("vmp_v", 0.0)),
+            "voc_v": float(stc.get("voc_v", 0.0)), "imp_a": float(stc.get("imp_a", 0.0)), "isc_a": float(stc.get("isc_a", 0.0))}
 
 
-def _try_load_paneles_yaml() -> List[Dict[str, Any]]:
+def _inv_yaml_to_ui(iid: str, inv: Dict[str, Any]) -> Dict[str, Any]:
+    dc = inv.get("entrada_dc", inv)
+    ac = inv.get("salida_ac", inv)
+    return {"id": iid, "marca": inv.get("marca", "N/D"), "modelo": inv.get("nombre", inv.get("modelo", inv.get("codigo", "Inversor"))),
+            "pac_kw": float(ac.get("pac_kw", ac.get("pac_w", 0.0)) or 0.0), "n_mppt": int(dc.get("n_mppt", 1) or 1),
+            "mppt_min_v": float(dc.get("mppt_min_v", 0.0)), "mppt_max_v": float(dc.get("mppt_max_v", 0.0)),
+            "vmax_dc_v": float(dc.get("vdc_max_v", 0.0))}
+
+
+def _try_load_yaml(fn, map_fn) -> List[Dict[str, Any]]:
     try:
-        data = cargar_paneles_yaml()
-        return [_panel_yaml_to_ui(pid, spec) for pid, spec in (data or {}).items()]
+        data = fn() or {}
+        return [map_fn(k, v) for k, v in data.items()]
     except Exception:
         return []
 
 
 def _load_paneles() -> List[Dict[str, Any]]:
-    py = catalogo_paneles() or []
-    yml = _try_load_paneles_yaml()
-    return yml if yml else py
+    yml = _try_load_yaml(cargar_paneles_yaml, _panel_yaml_to_ui)
+    return yml if yml else (catalogo_paneles() or [])
 
 
 def _load_inversores() -> List[Dict[str, Any]]:
-    return catalogo_inversores() or []
+    yml = _try_load_yaml(cargar_inversores_yaml, _inv_yaml_to_ui)
+    return yml if yml else (catalogo_inversores() or [])
 
 
 def _map_por_id(items: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
@@ -57,10 +59,10 @@ def _map_por_id(items: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
 
 def _validar_catalogos(paneles: List[dict], inversores: List[dict]) -> bool:
     if not paneles:
-        st.error("Catálogo de paneles vacío. Revise YAML o electrical/catalogos.py.")
+        st.error("Catálogo de paneles vacío. Revise data/paneles.yaml o electrical/catalogos.py.")
         return False
     if not inversores:
-        st.error("Catálogo de inversores vacío. Revise electrical/catalogos.py.")
+        st.error("Catálogo de inversores vacío. Revise data/inversores.yaml o electrical/catalogos.py.")
         return False
     return True
 
@@ -70,7 +72,7 @@ def _ui_select_panel(eq: dict, panel_ids: List[str], panel_map: Dict[str, dict])
         "Panel FV",
         options=panel_ids,
         index=_safe_index(panel_ids, eq.get("panel_id")),
-        format_func=lambda pid: f'{panel_map[pid]["marca"]} {panel_map[pid]["modelo"]} ({panel_map[pid]["pmax_w"]} W)',
+        format_func=lambda pid: f'{panel_map[pid]["marca"]} {panel_map[pid]["modelo"]} ({panel_map[pid]["pmax_w"]:.0f} W)',
     )
 
 
@@ -79,7 +81,7 @@ def _ui_select_inversor(eq: dict, inv_ids: List[str], inv_map: Dict[str, dict]) 
         "Inversor",
         options=inv_ids,
         index=_safe_index(inv_ids, eq.get("inversor_id")),
-        format_func=lambda iid: f'{inv_map[iid]["marca"]} {inv_map[iid]["modelo"]} ({inv_map[iid]["pac_kw"]} kW)',
+        format_func=lambda iid: f'{inv_map[iid]["marca"]} {inv_map[iid]["modelo"]} ({inv_map[iid]["pac_kw"]:.1f} kW)',
     )
 
 
@@ -97,7 +99,7 @@ def _ui_resumen(eq: dict, panel_map: Dict[str, dict], inv_map: Dict[str, dict]) 
     st.markdown("#### Resumen técnico")
     p = panel_map[eq["panel_id"]]
     inv = inv_map[eq["inversor_id"]]
-    st.write(f"**Panel:** {p['marca']} {p['modelo']} — Pmax {p['pmax_w']:.0f} W | Voc {p['voc_v']:.1f} V | Vmp {p['vmp_v']:.1f} V")
+    st.write(f"**Panel:** {p['marca']} {p['modelo']} — Pmax {p['pmax_w']:.0f} W | Voc {p['voc_v']:.1f} V | Vmp {p['vmp_v']:.1f} V | Imp {p['imp_a']:.2f} A")
     st.write(f"**Inversor:** {inv['marca']} {inv['modelo']} — AC {inv['pac_kw']:.1f} kW | MPPT {inv['mppt_min_v']:.0f}-{inv['mppt_max_v']:.0f} V | Vdc max {inv['vmax_dc_v']:.0f} V | MPPTs {inv['n_mppt']}")
 
 
@@ -116,10 +118,10 @@ def render(ctx) -> None:
     inv_map = _map_por_id(inversores)
     panel_ids, inv_ids = list(panel_map.keys()), list(inv_map.keys())
 
-    col1, col2 = st.columns(2)
-    with col1:
+    c1, c2 = st.columns(2)
+    with c1:
         _ui_select_panel(eq, panel_ids, panel_map)
-    with col2:
+    with c2:
         _ui_select_inversor(eq, inv_ids, inv_map)
 
     _ui_criterios(eq)
