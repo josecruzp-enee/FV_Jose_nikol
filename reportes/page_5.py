@@ -1,28 +1,140 @@
 # reportes/page_5.py
-from reportlab.platypus import Paragraph, Spacer, PageBreak
+from __future__ import annotations
+
+from typing import Any, Dict, List
+
+from reportlab.platypus import Paragraph, Spacer, PageBreak, Table, TableStyle
+from reportlab.lib import colors
+
+
+def _get_sizing(resultado: Dict[str, Any]) -> Dict[str, Any]:
+    return (resultado or {}).get("sizing") or {}
+
+
+def _get_tabla_12m(resultado: Dict[str, Any]) -> List[Dict[str, Any]]:
+    t = (resultado or {}).get("tabla_12m") or []
+    return t if isinstance(t, list) else []
+
+
+def _sum_float(tabla: List[Dict[str, Any]], key: str) -> float:
+    s = 0.0
+    for r in tabla:
+        try:
+            s += float((r or {}).get(key, 0.0) or 0.0)
+        except Exception:
+            pass
+    return float(s)
+
+
+def _build_tabla_strings_dc(
+    resultado: Dict[str, Any],
+    pal,
+    styles,
+    content_w: float,
+) -> List[Any]:
+    """
+    Tabla: Configuración eléctrica referencial (Strings DC).
+    Fuente: resultado["sizing"]["cfg_strings"]["strings"]
+    """
+    story: List[Any] = []
+
+    sizing = _get_sizing(resultado)
+    cfg = sizing.get("cfg_strings") or {}
+    strings = cfg.get("strings") or []
+
+    story.append(Spacer(1, 12))
+    story.append(Paragraph("Configuración eléctrica referencial (Strings DC)", styles["H2"]))
+    story.append(Spacer(1, 6))
+
+    if not strings:
+        story.append(Paragraph("<i>No hay configuración de strings disponible.</i>", styles["BodyText"]))
+        return story
+
+    header = ["MPPT", "Serie (S)", "Paralelo (P)", "Vmp string (V)", "Voc frío (V)", "Imp (A)", "Isc (A)"]
+    rows = [header]
+
+    for s in strings:
+        def _f(x, d=0.0):
+            try:
+                return float(x)
+            except Exception:
+                return float(d)
+
+        def _i(x, d=0):
+            try:
+                return int(float(x))
+            except Exception:
+                return int(d)
+
+        rows.append([
+            str(_i(s.get("mppt", 0))),
+            str(_i(s.get("n_series", 0))),
+            str(_i(s.get("n_paralelo", 0))),
+            f"{_f(s.get('vmp_string_v', 0.0)):.0f}",
+            f"{_f(s.get('voc_string_frio_v', 0.0)):.0f}",
+            f"{_f(s.get('imp_a', 0.0)):.1f}",
+            f"{_f(s.get('isc_a', 0.0)):.1f}",
+        ])
+
+    col_widths = [
+        content_w * 0.10,
+        content_w * 0.12,
+        content_w * 0.12,
+        content_w * 0.16,
+        content_w * 0.16,
+        content_w * 0.17,
+        content_w * 0.17,
+    ]
+
+    tbl = Table(rows, colWidths=col_widths, hAlign="LEFT")
+    tbl.setStyle(TableStyle([
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, 0), 9),
+        ("BACKGROUND", (0, 0), (-1, 0), pal.get("SOFT", colors.HexColor("#F5F7FA"))),
+        ("TEXTCOLOR", (0, 0), (-1, 0), pal.get("PRIMARY", colors.HexColor("#0B2E4A"))),
+        ("ALIGN", (0, 0), (-1, 0), "CENTER"),
+
+        ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
+        ("FONTSIZE", (0, 1), (-1, -1), 9),
+        ("ALIGN", (0, 1), (-1, -1), "CENTER"),
+
+        ("GRID", (0, 0), (-1, -1), 0.3, pal.get("BORDER", colors.HexColor("#D7DCE3"))),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ]))
+
+    story.append(tbl)
+
+    checks = cfg.get("checks") or []
+    if checks:
+        story.append(Spacer(1, 8))
+        story.append(Paragraph("<b>Notas de verificación</b>", styles["BodyText"]))
+        for c in checks[:10]:
+            story.append(Paragraph(f"• {str(c)}", styles["BodyText"]))
+
+    return story
 
 
 def build_page_5(resultado, datos, paths, pal, styles, content_w):
     """
-    Página 5 — Resumen técnico (mínimo, robusto)
-    No asume atributos en `resultado` (es dict).
+    Página 5 — Resumen técnico + Strings DC (VISIBLE)
     """
-
-    story = []
+    story: List[Any] = []
 
     story.append(Paragraph("Resumen técnico", styles["Title"]))
     story.append(Spacer(1, 10))
 
-    sizing = resultado.get("sizing", {}) or {}
-    tabla_12m = resultado.get("tabla_12m", []) or []
+    sizing = _get_sizing(resultado)
+    tabla_12m = _get_tabla_12m(resultado)
 
-    kwp_dc = float(sizing.get("kwp_dc", 0.0))
+    kwp_dc = float(sizing.get("kwp_dc", 0.0) or 0.0)
     n_paneles = int(sizing.get("n_paneles", 0) or 0)
-    capex_L = float(sizing.get("capex_L", 0.0))
+    capex_L = float(sizing.get("capex_L", 0.0) or 0.0)
 
-    ahorro_anual_L = sum(float(r.get("ahorro_L", 0.0)) for r in tabla_12m)
-    fv_anual_kwh = sum(float(r.get("fv_kwh", 0.0)) for r in tabla_12m)
-    consumo_anual_kwh = sum(float(r.get("consumo_kwh", 0.0)) for r in tabla_12m)
+    ahorro_anual_L = _sum_float(tabla_12m, "ahorro_L")
+    fv_anual_kwh = _sum_float(tabla_12m, "fv_kwh")
+    consumo_anual_kwh = _sum_float(tabla_12m, "consumo_kwh")
 
     story.append(Paragraph(f"Sistema FV estimado: {kwp_dc:.2f} kWp DC", styles["BodyText"]))
     story.append(Paragraph(f"Número de paneles: {n_paneles}", styles["BodyText"]))
@@ -32,6 +144,9 @@ def build_page_5(resultado, datos, paths, pal, styles, content_w):
     story.append(Paragraph(f"Consumo anual (12m): {consumo_anual_kwh:,.0f} kWh", styles["BodyText"]))
     story.append(Paragraph(f"Generación FV útil (12m): {fv_anual_kwh:,.0f} kWh", styles["BodyText"]))
     story.append(Paragraph(f"Ahorro anual estimado (12m): L {ahorro_anual_L:,.2f}", styles["BodyText"]))
+
+    # ✅ NUEVO: Strings DC visibles en el PDF
+    story += _build_tabla_strings_dc(resultado, pal, styles, content_w)
 
     story.append(PageBreak())
     return story
