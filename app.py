@@ -10,20 +10,15 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from ui.router import PasoWizard, render_wizard
-from ui import datos_cliente, consumo_energetico, sistema_fv, seleccion_equipos
+from ui import datos_cliente, consumo_energetico, sistema_fv, seleccion_equipos, resultados
 import ui.ingenieria_electrica as ingenieria_electrica
 from core.configuracion import cargar_configuracion, construir_config_efectiva
-import streamlit as st
 
-
-
-from ui import resultados
 
 def main() -> None:
-    
-
-    
+    st.title("FV Engine • Wizard")
     st.caption("Sistema FV • Ing. José Nikol Cruz 😄")
+
 
 
     pasos = [
