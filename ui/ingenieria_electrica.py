@@ -1,13 +1,10 @@
 # ui/ingenieria_electrica.py
 from __future__ import annotations
-
 from typing import List, Tuple, Dict, Any
-
 import streamlit as st
-
 from electrical.modelos import ParametrosCableado
 from electrical.estimador import calcular_paquete_electrico_desde_inputs
-
+from electrical.validador_strings import (PanelFV, InversorFV, validar_string,)
 from core.orquestador import ejecutar_evaluacion
 from core.modelo import Datosproyecto
 from core.configuracion import cargar_configuracion, construir_config_efectiva
@@ -23,14 +20,6 @@ def _asegurar_dict(ctx, nombre: str) -> dict:
     if not isinstance(ctx.__dict__[nombre], dict):
         ctx.__dict__[nombre] = {}
     return ctx.__dict__[nombre]
-
-
-def _asegurar_subdict(d: dict, key: str) -> dict:
-    if key not in d or d[key] is None:
-        d[key] = {}
-    if not isinstance(d[key], dict):
-        d[key] = {}
-    return d[key]
 
 
 def _get_equipos(ctx) -> dict:
@@ -90,7 +79,6 @@ def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
     if not isinstance(consumo_12m, list) or len(consumo_12m) != 12:
         consumo_12m = [0.0] * 12
 
-    # Campos base esperados por tu motor financiero
     p = Datosproyecto(
         cliente=str(dc.get("cliente", "")).strip(),
         ubicacion=str(dc.get("ubicacion", "")).strip(),
@@ -99,13 +87,11 @@ def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
         tarifa_energia=float(c.get("tarifa_energia_L_kwh", 0.0)),
         cargos_fijos=float(c.get("cargos_fijos_L_mes", 0.0)),
 
-        # estos dos se sobreescriben por tu consolidación FV si ya la hiciste
         prod_base_kwh_kwp_mes=float(sf.get("produccion_base_kwh_kwp_mes", 145.0)),
         factores_fv_12m=[float(x) for x in sf.get("factores_fv_12m", [1.0] * 12)],
 
         cobertura_objetivo=float(sf.get("cobertura_objetivo", 0.80)),
 
-        # Finanzas
         costo_usd_kwp=float(sf.get("costo_usd_kwp", 1200.0)),
         tcambio=float(sf.get("tcambio", 27.0)),
         tasa_anual=float(sf.get("tasa_anual", 0.08)),
@@ -115,7 +101,6 @@ def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
     )
 
     # Adjuntar para sizing (catálogo) + FV (Paso 3)
-    # (si Datosproyecto tiene slots=True, esto habría que formalizarlo)
     setattr(p, "equipos", dict(eq))
     setattr(p, "sistema_fv", dict(sf))
 
@@ -127,7 +112,7 @@ def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
     if "sombras_pct" in sf:
         setattr(p, "sombras_pct", float(sf.get("sombras_pct", 0.0)))
 
-    # Geometría (por si luego la usas en factores o reporte)
+    # Geometría
     if "azimut_deg" in sf:
         setattr(p, "azimut_deg", float(sf.get("azimut_deg", 180)))
     if "inclinacion_deg" in sf:
@@ -176,7 +161,7 @@ def _config_tecnica_efectiva() -> Dict[str, Any]:
 
 
 # ==========================================================
-# UI: Render helpers (presentación)
+# UI: Presentación
 # ==========================================================
 
 def _mostrar_resultados(pkg: dict) -> None:
@@ -198,6 +183,64 @@ def _mostrar_resultados(pkg: dict) -> None:
     if disclaimer:
         st.caption(str(disclaimer))
 
+
+def _mostrar_validacion_string(validacion: dict) -> None:
+    st.divider()
+    st.subheader("Validación eléctrica del string")
+
+    if not validacion:
+        st.info("Sin validación disponible.")
+        return
+
+    if bool(validacion.get("string_valido")):
+        st.success(
+            f"✔ String válido | Voc frío {validacion.get('voc_frio_total')} V | "
+            f"MPPT OK | Corriente OK"
+        )
+    else:
+        st.error("⚠ Configuración de string no válida")
+
+    st.caption(
+        f"Voc frío: {validacion.get('voc_frio_total')} V | "
+        f"Vmp: {validacion.get('vmp_operativo')} V | "
+        f"I MPPT: {validacion.get('corriente_mppt')} A"
+    )
+
+
+# ==========================================================
+# Validador (temporal) — luego vendrá del catálogo real
+# ==========================================================
+
+def _validar_string_temporal(t_min_c: float) -> dict:
+    panel = PanelFV(
+        voc=49.5,
+        vmp=41.5,
+        isc=13.5,
+        imp=12.8,
+        coef_voc=-0.28,
+    )
+
+    inv = InversorFV(
+        vdc_max=550,
+        mppt_min=120,
+        mppt_max=480,
+        imppt_max=13,
+        n_mppt=2,
+    )
+
+    n_paneles_string = 10  # provisional
+
+    return validar_string(
+        panel,
+        inv,
+        n_paneles_string,
+        temp_min=float(t_min_c),
+    )
+
+
+# ==========================================================
+# UI Inputs
+# ==========================================================
 
 def _ui_inputs_electricos(e: dict) -> None:
     c1, c2, c3 = st.columns(3)
@@ -235,39 +278,16 @@ def _ui_inputs_electricos(e: dict) -> None:
 
 
 # ==========================================================
-# UI Paso 5
+# Pipeline de cálculo (funciones pequeñas)
 # ==========================================================
 
-def render(ctx) -> None:
-    e = _defaults_electrico(ctx)
-    eq = _get_equipos(ctx)
-
-    # Guardas de consistencia
-    if not (eq.get("panel_id") and eq.get("inversor_id")):
-        st.error("Complete la selección de equipos (Paso 4).")
-        return
-
-    st.markdown("### Ingeniería eléctrica automática")
-
-    _ui_inputs_electricos(e)
-
-    # Overrides técnicos (para cálculo de Voc frío / vdrop)
-    _guardar_overrides_tecnicos_en_session(e)
-
-    st.divider()
-
-    if not st.button("Generar ingeniería eléctrica", type="primary"):
-        return
-
-    # 1) Consolidar Datosproyecto
-    datos = _datosproyecto_desde_ctx(ctx)
-    ctx.datos_proyecto = datos  # requerido por Resultados/PDF
-
-    # 2) Ejecutar core (sizing + tabla 12m + etc)
+def _run_core(ctx, datos: Datosproyecto) -> dict:
     res = ejecutar_evaluacion(datos)
     ctx.resultado_core = res
+    return res
 
-    # 3) Ejecutar paquete eléctrico
+
+def _run_paquete_electrico(eq: dict, e: dict, res: dict) -> dict:
     params = _params_cableado_desde_ui(e)
     cfg_tecnicos = _config_tecnica_efectiva()
 
@@ -279,10 +299,48 @@ def render(ctx) -> None:
         params=params,
         cfg_tecnicos=cfg_tecnicos,
     )
+    return pkg
+
+
+# ==========================================================
+# UI Paso 5
+# ==========================================================
+
+def render(ctx) -> None:
+    e = _defaults_electrico(ctx)
+    eq = _get_equipos(ctx)
+
+    if not (eq.get("panel_id") and eq.get("inversor_id")):
+        st.error("Complete la selección de equipos (Paso 4).")
+        return
+
+    st.markdown("### Ingeniería eléctrica automática")
+
+    _ui_inputs_electricos(e)
+    _guardar_overrides_tecnicos_en_session(e)
+
+    st.divider()
+    if not st.button("Generar ingeniería eléctrica", type="primary"):
+        return
+
+    # 1) Consolidar Datosproyecto
+    datos = _datosproyecto_desde_ctx(ctx)
+    ctx.datos_proyecto = datos  # requerido por Resultados/PDF
+
+    # 2) Core
+    res = _run_core(ctx, datos)
+
+    # 3) Validación string (temporal)
+    validacion = _validar_string_temporal(t_min_c=e["t_min_c"])
+    ctx.validacion_string = validacion
+
+    # 4) Paquete eléctrico
+    pkg = _run_paquete_electrico(eq=eq, e=e, res=res)
     ctx.resultado_electrico = pkg
 
-    # 4) Mostrar
+    # 5) Mostrar
     _mostrar_resultados(pkg)
+    _mostrar_validacion_string(validacion)
 
 
 def validar(ctx) -> Tuple[bool, List[str]]:
