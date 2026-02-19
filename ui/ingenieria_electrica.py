@@ -14,7 +14,7 @@ from core.configuracion import cargar_configuracion, construir_config_efectiva
 
 
 # ==========================================================
-# Helpers (cortos y claros)
+# Helpers de estado (pequeños)
 # ==========================================================
 
 def _asegurar_dict(ctx, nombre: str) -> dict:
@@ -25,8 +25,31 @@ def _asegurar_dict(ctx, nombre: str) -> dict:
     return ctx.__dict__[nombre]
 
 
+def _asegurar_subdict(d: dict, key: str) -> dict:
+    if key not in d or d[key] is None:
+        d[key] = {}
+    if not isinstance(d[key], dict):
+        d[key] = {}
+    return d[key]
+
+
+def _get_equipos(ctx) -> dict:
+    eq = _asegurar_dict(ctx, "equipos")
+    # compat: tu UI guarda "inversor_id" (no "inv_id")
+    eq.setdefault("panel_id", None)
+    eq.setdefault("inversor_id", None)
+    eq.setdefault("sobredimension_dc_ac", 1.20)
+    eq.setdefault("tension_sistema", "1F_240V")
+    return eq
+
+
+# ==========================================================
+# Defaults paso 5 (solo UI)
+# ==========================================================
+
 def _defaults_electrico(ctx) -> dict:
     e = _asegurar_dict(ctx, "electrico")
+
     e.setdefault("vac", 240.0)
     e.setdefault("fases", 1)
     e.setdefault("fp", 1.0)
@@ -34,7 +57,6 @@ def _defaults_electrico(ctx) -> dict:
     e.setdefault("dist_dc_m", 15.0)
     e.setdefault("dist_ac_m", 25.0)
 
-    # estos 3 serán overrides (UI), pero los mantenemos aquí como inputs del paso
     e.setdefault("vdrop_obj_dc_pct", 2.0)
     e.setdefault("vdrop_obj_ac_pct", 2.0)
     e.setdefault("t_min_c", 10.0)
@@ -43,45 +65,86 @@ def _defaults_electrico(ctx) -> dict:
     e.setdefault("otros_ccc", 0)
 
     e.setdefault("dos_aguas", True)
+
     return e
 
 
+# ==========================================================
+# Consolidación: ctx -> Datosproyecto (mínimo consistente)
+# ==========================================================
+
 def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
     """
-    Consolida TODAS las entradas disponibles del wizard.
-    Si faltan campos, deben existir defaults en pasos previos.
+    Consolida entradas del wizard en Datosproyecto.
+    IMPORTANTE:
+    - Mantiene campos base que tu motor ya usa.
+    - Adjunta 'equipos' y 'sistema_fv' como atributos (para sizing y mapper).
     """
-    dc = ctx.datos_cliente
-    c = ctx.consumo
-    s = ctx.sistema_fv
+    dc = _asegurar_dict(ctx, "datos_cliente")
+    c = _asegurar_dict(ctx, "consumo")
+    sf = _asegurar_dict(ctx, "sistema_fv")
+    eq = _get_equipos(ctx)
 
-    return Datosproyecto(
+    # Consumo 12m
+    consumo_12m = c.get("kwh_12m", [0.0] * 12)
+    if not isinstance(consumo_12m, list) or len(consumo_12m) != 12:
+        consumo_12m = [0.0] * 12
+
+    # Campos base esperados por tu motor financiero
+    p = Datosproyecto(
         cliente=str(dc.get("cliente", "")).strip(),
         ubicacion=str(dc.get("ubicacion", "")).strip(),
 
-        consumo_12m=[float(x) for x in c.get("kwh_12m", [0.0] * 12)],
+        consumo_12m=[float(x) for x in consumo_12m],
         tarifa_energia=float(c.get("tarifa_energia_L_kwh", 0.0)),
         cargos_fijos=float(c.get("cargos_fijos_L_mes", 0.0)),
 
-        prod_base_kwh_kwp_mes=float(s.get("produccion_base", 145.0)),
-        factores_fv_12m=[float(x) for x in s.get("factores_fv_12m", [1.0] * 12)],
-        cobertura_objetivo=float(s.get("offset_pct", 80.0)) / 100.0,
+        # estos dos se sobreescriben por tu consolidación FV si ya la hiciste
+        prod_base_kwh_kwp_mes=float(sf.get("produccion_base_kwh_kwp_mes", 145.0)),
+        factores_fv_12m=[float(x) for x in sf.get("factores_fv_12m", [1.0] * 12)],
 
-        # Finanzas (defaults temporales; ideal mover a Paso Finanzas)
-        costo_usd_kwp=float(s.get("costo_usd_kwp", 1200.0)),
-        tcambio=float(s.get("tcambio", 27.0)),
-        tasa_anual=float(s.get("tasa_anual", 0.08)),
-        plazo_anios=int(s.get("plazo_anios", 10)),
-        porcentaje_financiado=float(s.get("porcentaje_financiado", 1.0)),
-        om_anual_pct=float(s.get("om_anual_pct", 0.01)),
+        cobertura_objetivo=float(sf.get("cobertura_objetivo", 0.80)),
+
+        # Finanzas
+        costo_usd_kwp=float(sf.get("costo_usd_kwp", 1200.0)),
+        tcambio=float(sf.get("tcambio", 27.0)),
+        tasa_anual=float(sf.get("tasa_anual", 0.08)),
+        plazo_anios=int(sf.get("plazo_anios", 10)),
+        porcentaje_financiado=float(sf.get("porcentaje_financiado", 1.0)),
+        om_anual_pct=float(sf.get("om_anual_pct", 0.01)),
     )
 
+    # Adjuntar para sizing (catálogo) + FV (Paso 3)
+    # (si Datosproyecto tiene slots=True, esto habría que formalizarlo)
+    setattr(p, "equipos", dict(eq))
+    setattr(p, "sistema_fv", dict(sf))
+
+    # FV directo desde Paso 3 (si están en sf)
+    if "hsp_kwh_m2_d" in sf:
+        setattr(p, "hsp", float(sf.get("hsp_kwh_m2_d", 4.5)))
+    if "perdidas_sistema_pct" in sf:
+        setattr(p, "perdidas_sistema_pct", float(sf.get("perdidas_sistema_pct", 15.0)))
+    if "sombras_pct" in sf:
+        setattr(p, "sombras_pct", float(sf.get("sombras_pct", 0.0)))
+
+    # Geometría (por si luego la usas en factores o reporte)
+    if "azimut_deg" in sf:
+        setattr(p, "azimut_deg", float(sf.get("azimut_deg", 180)))
+    if "inclinacion_deg" in sf:
+        setattr(p, "inclinacion_deg", float(sf.get("inclinacion_deg", 15)))
+    if sf.get("tipo_superficie") == "Techo dos aguas":
+        setattr(p, "azimut_a_deg", float(sf.get("azimut_a_deg", 90)))
+        setattr(p, "azimut_b_deg", float(sf.get("azimut_b_deg", 270)))
+        setattr(p, "reparto_pct_a", float(sf.get("reparto_pct_a", 50.0)))
+
+    return p
+
+
+# ==========================================================
+# Parametrización cableado (UI) -> modelo eléctrico
+# ==========================================================
 
 def _params_cableado_desde_ui(e: dict) -> ParametrosCableado:
-    """
-    ParametrosCableado = instalación/geométrico.
-    (Aún incluye vdrop/t_min en tu modelo actual; lo limpiaremos en el siguiente paso.)
-    """
     return ParametrosCableado(
         vac=float(e["vac"]),
         fases=int(e["fases"]),
@@ -97,9 +160,6 @@ def _params_cableado_desde_ui(e: dict) -> ParametrosCableado:
 
 
 def _guardar_overrides_tecnicos_en_session(e: dict) -> None:
-    """
-    UI decide overrides; core construye config efectiva.
-    """
     st.session_state["cfg_overrides"] = {
         "tecnicos": {
             "t_min_c": float(e["t_min_c"]),
@@ -110,14 +170,14 @@ def _guardar_overrides_tecnicos_en_session(e: dict) -> None:
 
 
 def _config_tecnica_efectiva() -> Dict[str, Any]:
-    """
-    Lee YAML base + aplica overrides de UI (si existen).
-    Retorna SOLO cfg.tecnicos (dict).
-    """
     cfg_base = cargar_configuracion()
     cfg = construir_config_efectiva(cfg_base, st.session_state.get("cfg_overrides"))
     return cfg.tecnicos
 
+
+# ==========================================================
+# UI: Render helpers (presentación)
+# ==========================================================
 
 def _mostrar_resultados(pkg: dict) -> None:
     st.success("Ingeniería eléctrica generada.")
@@ -139,26 +199,13 @@ def _mostrar_resultados(pkg: dict) -> None:
         st.caption(str(disclaimer))
 
 
-# ==========================================================
-# UI Paso 5
-# ==========================================================
-
-def render(ctx) -> None:
-    e = _defaults_electrico(ctx)
-
-    # Guardas de consistencia
-    if not (ctx.equipos.get("panel_id") and ctx.equipos.get("inversor_id")):
-        st.error("Complete la selección de equipos (Paso 4).")
-        return
-
-    st.markdown("### Ingeniería eléctrica automática")
-
-    # --- Inputs eléctricos ---
+def _ui_inputs_electricos(e: dict) -> None:
     c1, c2, c3 = st.columns(3)
     with c1:
         e["vac"] = st.number_input("VAC", min_value=100.0, step=1.0, value=float(e["vac"]))
     with c2:
-        e["fases"] = st.selectbox("Fases", options=[1, 3], index=[1, 3].index(int(e["fases"])))
+        fases_val = int(e["fases"])
+        e["fases"] = st.selectbox("Fases", options=[1, 3], index=[1, 3].index(fases_val))
     with c3:
         e["fp"] = st.number_input("FP", min_value=0.8, max_value=1.0, step=0.01, value=float(e["fp"]))
 
@@ -186,31 +233,48 @@ def render(ctx) -> None:
 
     e["dos_aguas"] = st.checkbox("Techo dos aguas (reparte strings)", value=bool(e["dos_aguas"]))
 
-    # ✅ overrides quedan definidos aquí (UI), pero NO se calcula nada aquí
+
+# ==========================================================
+# UI Paso 5
+# ==========================================================
+
+def render(ctx) -> None:
+    e = _defaults_electrico(ctx)
+    eq = _get_equipos(ctx)
+
+    # Guardas de consistencia
+    if not (eq.get("panel_id") and eq.get("inversor_id")):
+        st.error("Complete la selección de equipos (Paso 4).")
+        return
+
+    st.markdown("### Ingeniería eléctrica automática")
+
+    _ui_inputs_electricos(e)
+
+    # Overrides técnicos (para cálculo de Voc frío / vdrop)
     _guardar_overrides_tecnicos_en_session(e)
 
     st.divider()
 
-    # --- Ejecutar pipeline ---
     if not st.button("Generar ingeniería eléctrica", type="primary"):
         return
 
-    # 1) Consolidar modelo y guardarlo en ctx (esto resuelve Paso 6)
+    # 1) Consolidar Datosproyecto
     datos = _datosproyecto_desde_ctx(ctx)
-    ctx.datos_proyecto = datos  # ✅ requerido por Resultados/PDF
+    ctx.datos_proyecto = datos  # requerido por Resultados/PDF
 
-    # 2) Ejecutar core (sizing, etc.)
+    # 2) Ejecutar core (sizing + tabla 12m + etc)
     res = ejecutar_evaluacion(datos)
     ctx.resultado_core = res
 
-    # 3) Ejecutar eléctrico (cfg técnica efectiva)
+    # 3) Ejecutar paquete eléctrico
     params = _params_cableado_desde_ui(e)
     cfg_tecnicos = _config_tecnica_efectiva()
 
     pkg = calcular_paquete_electrico_desde_inputs(
         res=res,
-        panel_nombre=str(ctx.equipos["panel_id"]),
-        inv_nombre=str(ctx.equipos["inversor_id"]),
+        panel_nombre=str(eq["panel_id"]),
+        inv_nombre=str(eq["inversor_id"]),
         dos_aguas=bool(e["dos_aguas"]),
         params=params,
         cfg_tecnicos=cfg_tecnicos,
@@ -223,11 +287,12 @@ def render(ctx) -> None:
 
 def validar(ctx) -> Tuple[bool, List[str]]:
     errores: List[str] = []
+    eq = getattr(ctx, "equipos", None) or {}
 
-    if not (ctx.equipos.get("panel_id") and ctx.equipos.get("inversor_id")):
+    if not (eq.get("panel_id") and eq.get("inversor_id")):
         errores.append("Falta seleccionar panel e inversor (Paso 4).")
 
-    if ctx.resultado_electrico is None:
+    if getattr(ctx, "resultado_electrico", None) is None:
         errores.append("Debe generar la ingeniería eléctrica antes de continuar.")
 
     return (len(errores) == 0), errores
