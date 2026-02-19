@@ -8,6 +8,7 @@ from electrical.validador_strings import (PanelFV, InversorFV, validar_string,)
 from core.orquestador import ejecutar_evaluacion
 from core.modelo import Datosproyecto
 from core.configuracion import cargar_configuracion, construir_config_efectiva
+from electrical.catalogos import get_panel, get_inversor
 
 
 # ==========================================================
@@ -210,30 +211,40 @@ def _mostrar_validacion_string(validacion: dict) -> None:
 # ==========================================================
 # Validador (temporal) — luego vendrá del catálogo real
 # ==========================================================
+def _validar_string_desde_catalogo(*, panel_id: str, inversor_id: str, t_min_c: float, n_paneles_string: int) -> dict:
+    """
+    Valida string usando catálogo (fuente de verdad).
+    Nota: imppt_max aún no existe en tu modelo Inversor; lo manejamos con fallback seguro.
+    """
 
-def _validar_string_temporal(t_min_c: float) -> dict:
+    p = get_panel(panel_id)
+    inv = get_inversor(inversor_id)
+
     panel = PanelFV(
-        voc=49.5,
-        vmp=41.5,
-        isc=13.5,
-        imp=12.8,
-        coef_voc=-0.28,
+        voc=float(p.voc),
+        vmp=float(p.vmp),
+        isc=float(p.isc),
+        imp=float(p.imp),
+        # TODO: meter coef real por panel en catálogo; por ahora usa un default típico
+        coef_voc=float(getattr(p, "coef_voc", -0.28)),
     )
 
-    inv = InversorFV(
-        vdc_max=550,
-        mppt_min=120,
-        mppt_max=480,
-        imppt_max=13,
-        n_mppt=2,
-    )
+    # En tu modelo Inversor NO veo imppt_max.
+    # Fallback: si existe atributo lo usa, si no, usa Imp del panel como umbral (conservador).
+    imppt_max = float(getattr(inv, "imppt_max", panel.imp))
 
-    n_paneles_string = 10  # provisional
+    inversor = InversorFV(
+        vdc_max=float(inv.vdc_max),
+        mppt_min=float(inv.vmppt_min),
+        mppt_max=float(inv.vmppt_max),
+        imppt_max=imppt_max,
+        n_mppt=int(inv.n_mppt),
+    )
 
     return validar_string(
         panel,
-        inv,
-        n_paneles_string,
+        inversor,
+        int(n_paneles_string),
         temp_min=float(t_min_c),
     )
 
@@ -330,8 +341,15 @@ def render(ctx) -> None:
     # 2) Core
     res = _run_core(ctx, datos)
 
-    # 3) Validación string (temporal)
-    validacion = _validar_string_temporal(t_min_c=e["t_min_c"])
+    # 3) Validación string (desde catálogo)
+    # TODO: sustituir n_paneles_string por el valor real que sale del sizing.
+    n_paneles_string = int(getattr(res.get("sizing", {}), "n_paneles_string", 10)) if isinstance(res, dict) else 10
+    validacion = _validar_string_desde_catalogo(
+        panel_id=str(eq["panel_id"]),
+        inversor_id=str(eq["inversor_id"]),
+        t_min_c=float(e["t_min_c"]),
+        n_paneles_string=n_paneles_string,
+    )
     ctx.validacion_string = validacion
 
     # 4) Paquete eléctrico
