@@ -1,0 +1,11 @@
+trina_vertex_550w:
+  marca: "Trina Solar"
+  modelo: "Vertex 550W TSM-DEG19C.20"
+  pmax_w: 550.0
+  vmp_v: 31.8
+  voc_v: 38.1
+  imp_a: 17.29
+  isc_a: 18.39
+  coef_voc_pct_c: -0.25
+  fusible_max_a: 35.0
+  v_sistema_max_v: 1500
