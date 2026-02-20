@@ -268,7 +268,7 @@ def _calcular_strings(p, panel, inv, inv_id, pac_kw_fb, dc_ac, pdc):
     )
 
 
-def _build_electrico(panel, pac_kw, rec):
+def _build_electrico(p, panel, pac_kw, rec):
     r = (rec or {}).get("recomendacion") or {}
     return {
         "strings": {
@@ -283,6 +283,7 @@ def _build_electrico(panel, pac_kw, rec):
             "p_ac_w": float(pac_kw) * 1000.0,
             "v_ac": 240.0,
             "fases": 1,
+            "sistema_ac": getattr(p, "sistema_ac", None),
         },
     }
 
