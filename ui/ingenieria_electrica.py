@@ -193,6 +193,62 @@ def _mostrar_validacion_string(validacion: dict) -> None:
         f"I MPPT: {validacion.get('corriente_mppt')} A"
     )
 
+def _mostrar_nec(e_nec: dict) -> None:
+    st.divider()
+    st.subheader("Ingeniería NEC 2023 (corrientes, conductores, protecciones)")
+
+    if not e_nec:
+        st.info("Sin resultados NEC.")
+        return
+
+    if not bool(e_nec.get("ok", True)):
+        st.error("NEC no pudo calcularse.")
+        for err in (e_nec.get("errores") or e_nec.get("warnings") or []):
+            st.write("• " + str(err))
+        # útil para depurar mapeo
+        if e_nec.get("input"):
+            with st.expander("Input enviado a NEC"):
+                st.json(e_nec["input"])
+        return
+
+    dc = e_nec.get("dc", {})
+    ac = e_nec.get("ac", {})
+    ocpd = e_nec.get("ocpd", {})
+    cond = e_nec.get("conductores", {})
+
+    c1, c2 = st.columns(2)
+    with c1:
+        st.markdown("**Corrientes DC**")
+        st.write(f"I string máx (1.25·Isc): {dc.get('i_string_max_a')} A")
+        st.write(f"I array diseño (1.25·ΣIsc): {dc.get('i_array_design_a')} A")
+        st.write(f"Vmp string: {dc.get('vmp_string_v')} V")
+        st.write(f"Voc frío string: {dc.get('voc_frio_string_v')} V")
+    with c2:
+        st.markdown("**Corrientes AC**")
+        st.write(f"I AC nominal: {ac.get('i_ac_nom_a')} A")
+        st.write(f"I AC diseño (125%): {ac.get('i_ac_design_a')} A")
+        st.write(f"VAC: {ac.get('v_ll_v')} V | Fases: {ac.get('fases')}")
+
+    st.markdown("**Protecciones (OCPD)**")
+    st.write(f"Fusible string: {ocpd.get('fusible_string')}")
+    st.write(f"Breaker AC: {ocpd.get('breaker_ac')}")
+
+    st.markdown("**Conductores + caída**")
+    st.write(f"DC string: {cond.get('dc_string')}")
+    if cond.get("dc_trunk"):
+        st.write(f"DC trunk: {cond.get('dc_trunk')}")
+    st.write(f"AC salida: {cond.get('ac_out')}")
+
+    st.markdown("**SPD / Seccionamiento / Canalización**")
+    st.write(e_nec.get("spd"))
+    st.write(e_nec.get("seccionamiento"))
+    st.write(e_nec.get("canalizacion"))
+
+    resumen = e_nec.get("resumen_pdf") or []
+    if resumen:
+        st.markdown("**Resumen listo para PDF**")
+        for line in resumen:
+            st.write("• " + str(line))
 
 # ==========================================================
 # Validador string desde catálogo
@@ -344,6 +400,7 @@ def render(ctx) -> None:
     # 6) Mostrar
     _mostrar_resultados(pkg)
     _mostrar_validacion_string(validacion)
+    _mostrar_nec(res.get("electrico_nec") or {})
 
 
 def validar(ctx) -> Tuple[bool, List[str]]:
