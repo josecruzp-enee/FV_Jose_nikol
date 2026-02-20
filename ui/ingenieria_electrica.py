@@ -297,18 +297,38 @@ def render(ctx) -> None:
     _ui_inputs_electricos(e)
     _guardar_overrides_tecnicos_en_session(e)
 
+    # --- FIX CRÍTICO: validar catálogo ANTES de correr core/sizing ---
+    try:
+        _ = get_panel(str(eq.get("panel_id") or ""))
+    except Exception:
+        st.error(f"Panel no existe en catálogo: {eq.get('panel_id')}")
+        st.caption("Revise Paso 4: debe guardarse el ID (key) del panel, no el nombre/label.")
+        return
+
+    try:
+        _ = get_inversor(str(eq.get("inversor_id") or ""))
+    except Exception:
+        st.error(f"Inversor no existe en catálogo: {eq.get('inversor_id')}")
+        st.caption("Revise Paso 4: debe guardarse el ID (key) del inversor, no el nombre/label.")
+        return
+    # ---------------------------------------------------------------
+
     st.divider()
     if not st.button("Generar ingeniería eléctrica", type="primary"):
         return
 
+    # 1) Consolidar Datosproyecto
     datos = _datosproyecto_desde_ctx(ctx)
     ctx.datos_proyecto = datos
 
+    # 2) Core
     res = _run_core(ctx, datos)
 
+    # 3) n_paneles_string real desde sizing (fallback seguro)
     sz = res.get("sizing", {}) or {}
     n_paneles_string = int(sz.get("n_paneles_string", 10))
 
+    # 4) Validación string (desde catálogo)
     validacion = _validar_string_desde_catalogo(
         panel_id=str(eq["panel_id"]),
         inversor_id=str(eq["inversor_id"]),
@@ -317,9 +337,11 @@ def render(ctx) -> None:
     )
     ctx.validacion_string = validacion
 
+    # 5) Paquete eléctrico referencial (tu flujo actual)
     pkg = _run_paquete_electrico(eq=eq, e=e, res=res)
     ctx.resultado_electrico = pkg
 
+    # 6) Mostrar
     _mostrar_resultados(pkg)
     _mostrar_validacion_string(validacion)
 
