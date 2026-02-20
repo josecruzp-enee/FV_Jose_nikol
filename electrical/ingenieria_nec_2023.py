@@ -40,6 +40,15 @@ def calcular_paquete_electrico_nec(datos: Dict[str, Any]) -> Dict[str, Any]:
     d = _defaults(datos)
     warnings = _validar_minimos(d)
 
+    # ✅ NUEVO: contexto NEC para derating (no rompe nada si no se usa)
+    d["nec"] = {
+        "aplicar_derating": bool(d.get("aplicar_derating", True)),
+        "t_amb_c": float(d.get("t_amb_c", d.get("temp_amb_c", 30.0))),
+        "columna": str(d.get("columna_temp_nec", "75C")),
+        "ccc_ac": int(d.get("ccc_ac", 3)),
+        "ccc_dc": int(d.get("ccc_dc", 2)),
+    }
+
     sistema = parse_sistema_ac(d["tension_sistema"])
     dc = _calc_dc(d)
     ac = _calc_ac(d, sistema)
