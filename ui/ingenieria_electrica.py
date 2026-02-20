@@ -10,7 +10,7 @@ from core.modelo import Datosproyecto
 from core.configuracion import cargar_configuracion, construir_config_efectiva
 from electrical.catalogos import get_panel, get_inversor
 from ui.validaciones_ui import campos_faltantes_para_paso5
-from ui.state_helpers import ensure_dict, merge_defaults
+from ui.state_helpers import ensure_dict, merge_defaults, save_result_fingerprint
 
 
 # ==========================================================
@@ -223,6 +223,7 @@ def render(ctx):
         # NEC
         pkg = _obtener_pkg_nec(ctx)
         ctx.resultado_electrico = pkg
+        save_result_fingerprint(ctx)
 
         # UI
         st.success("Ingeniería eléctrica generada.")
@@ -231,6 +232,7 @@ def render(ctx):
     except Exception as exc:
         ctx.resultado_core = None
         ctx.resultado_electrico = None
+        setattr(ctx, "result_inputs_fingerprint", None)
         st.error(f"No se pudo generar ingeniería: {exc}")
 
 

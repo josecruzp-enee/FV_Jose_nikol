@@ -1,6 +1,13 @@
 import unittest
 
-from ui.state_helpers import ensure_dict, merge_defaults, sync_fields
+from ui.state_helpers import (
+    build_inputs_fingerprint,
+    ensure_dict,
+    is_result_stale,
+    merge_defaults,
+    save_result_fingerprint,
+    sync_fields,
+)
 
 
 class Ctx:
@@ -29,6 +36,21 @@ class TestUIStateHelpers(unittest.TestCase):
 
         sync_fields(d, cb)
         self.assertEqual(99, d["z"])
+
+    def test_result_fingerprint_detecta_stale(self):
+        ctx = Ctx()
+        ctx.datos_cliente = {"cliente": "A"}
+        ctx.consumo = {"kwh_12m": [100] * 12}
+        ctx.sistema_fv = {"cobertura_objetivo": 0.8}
+        ctx.equipos = {"panel_id": "p1", "inversor_id": "i1"}
+        ctx.electrico = {"dist_ac_m": 20}
+
+        fp = save_result_fingerprint(ctx)
+        self.assertEqual(fp, build_inputs_fingerprint(ctx))
+        self.assertFalse(is_result_stale(ctx))
+
+        ctx.consumo["kwh_12m"][0] = 150
+        self.assertTrue(is_result_stale(ctx))
 
 
 if __name__ == "__main__":

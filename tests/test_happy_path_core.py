@@ -42,6 +42,9 @@ class TestHappyPathCore(unittest.TestCase):
             "tabla_12m",
             "evaluacion",
             "decision",
+            "ahorro_anual_L",
+            "payback_simple_anios",
+            "electrico",
             "electrico_nec",
             "finanzas_lp",
         ]:

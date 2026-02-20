@@ -42,8 +42,13 @@ def preparar_salida(nombre_carpeta: str = "salidas") -> Dict[str, str]:
 
 
 
-def money_L(x: float) -> str:
-    return f"L {x:,.2f}"
+def money_L(x: float, dec: int = 2) -> str:
+    try:
+        v = float(x)
+    except Exception:
+        v = 0.0
+    fmt = f"{{:,.{int(dec)}f}}"
+    return f"L {fmt.format(v)}"
 
 
 def num(x: float, nd: int = 2) -> str:

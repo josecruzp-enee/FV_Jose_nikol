@@ -6,6 +6,15 @@ from reportlab.lib import colors
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.platypus import Paragraph, Table, TableStyle
 
+from core.rutas import money_L as _money_L_core
+
+
+
+
+def get_field(x: Any, key: str, default: Any = "") -> Any:
+    if isinstance(x, dict):
+        return x.get(key, default)
+    return getattr(x, key, default)
 
 def section_bar(texto: str, pal: Dict[str, Any], content_w: float):
     style = ParagraphStyle(
@@ -103,10 +112,5 @@ def box_paragraph(html_text: str, pal: Dict[str, Any], content_w: float, *, font
     return t
 
 
-def money_L(x: float, dec: int = 0) -> str:
-    try:
-        v = float(x)
-    except Exception:
-        return "L 0"
-    fmt = f"{{:,.{int(dec)}f}}"
-    return f"L {fmt.format(v)}"
+def money_L(x: float, dec: int = 2) -> str:
+    return _money_L_core(x, dec=dec)

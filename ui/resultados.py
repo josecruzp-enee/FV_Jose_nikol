@@ -9,6 +9,8 @@ import streamlit as st
 
 from core.rutas import preparar_salida, money_L, num
 from core.result_accessors import (
+    as_float,
+    as_int,
     get_capex_L,
     get_consumo_anual,
     get_kwp_dc,
@@ -16,6 +18,7 @@ from core.result_accessors import (
     get_sizing,
     get_tabla_12m,
 )
+from ui.state_helpers import is_result_stale
 from reportes.generar_charts import generar_charts
 from reportes.generar_layout_paneles import generar_layout_paneles
 from reportes.generar_pdf_profesional import generar_pdf_profesional
@@ -103,21 +106,13 @@ def _get_sizing(res: dict) -> Dict[str, Any]:
 
 
 def _as_float(x: Any, default: float = 0.0) -> float:
-    try:
-        if x is None:
-            return default
-        return float(x)
-    except Exception:
-        return default
+    """Compat wrapper: delega en accessor canónico."""
+    return as_float(x, default)
 
 
 def _as_int(x: Any, default: int = 0) -> int:
-    try:
-        if x is None:
-            return default
-        return int(x)
-    except Exception:
-        return default
+    """Compat wrapper: delega en accessor canónico."""
+    return as_int(x, default)
 
 
 def _kwp_dc_from_sizing(sizing: Dict[str, Any]) -> float:
@@ -251,11 +246,11 @@ def _render_resumen_electrico(pkg: dict) -> None:
 # ==========================================================
 
 
-def _ui_boton_pdf() -> bool:
+def _ui_boton_pdf(disabled: bool = False) -> bool:
     st.markdown("#### Generar propuesta (PDF)")
     col_a, col_b = st.columns([1, 2])
     with col_a:
-        run = st.button("Generar PDF", type="primary")
+        run = st.button("Generar PDF", type="primary", disabled=disabled)
     with col_b:
         st.caption("Genera charts, layout y PDF profesional usando los datos ya calculados.")
     return bool(run)
@@ -357,7 +352,11 @@ def render(ctx) -> None:
     _render_resumen_electrico(pkg)
     st.divider()
 
-    if not _ui_boton_pdf():
+    stale_inputs = is_result_stale(ctx)
+    if stale_inputs:
+        st.warning("Los datos de entrada cambiaron después del cálculo del Paso 5. Regenera la ingeniería antes del PDF.")
+
+    if not _ui_boton_pdf(disabled=stale_inputs):
         return
 
     # Evita mutar ctx.resultado_core (puede estar cacheado/reusado por otros pasos).
@@ -371,4 +370,6 @@ def validar(ctx) -> Tuple[bool, List[str]]:
         errores.append("No hay resultados del motor FV (genere en Paso 5).")
     if getattr(ctx, "resultado_electrico", None) is None:
         errores.append("No hay resultados eléctricos (genere en Paso 5).")
+    if is_result_stale(ctx):
+        errores.append("Los resultados están desactualizados. Regenera la ingeniería del Paso 5.")
     return (len(errores) == 0), errores
