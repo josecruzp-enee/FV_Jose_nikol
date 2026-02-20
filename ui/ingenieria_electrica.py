@@ -1,10 +1,12 @@
 # ui/ingenieria_electrica.py
 from __future__ import annotations
+
 from typing import List, Tuple, Dict, Any
 import streamlit as st
+
 from electrical.modelos import ParametrosCableado
 from electrical.estimador import calcular_paquete_electrico_desde_inputs
-from electrical.validador_strings import (PanelFV, InversorFV, validar_string,)
+from electrical.validador_strings import PanelFV, InversorFV, validar_string
 from core.orquestador import ejecutar_evaluacion
 from core.modelo import Datosproyecto
 from core.configuracion import cargar_configuracion, construir_config_efectiva
@@ -14,7 +16,6 @@ from electrical.catalogos import get_panel, get_inversor
 # ==========================================================
 # Helpers de estado (pequeños)
 # ==========================================================
-
 def _asegurar_dict(ctx, nombre: str) -> dict:
     if nombre not in ctx.__dict__ or ctx.__dict__[nombre] is None:
         ctx.__dict__[nombre] = {}
@@ -25,7 +26,6 @@ def _asegurar_dict(ctx, nombre: str) -> dict:
 
 def _get_equipos(ctx) -> dict:
     eq = _asegurar_dict(ctx, "equipos")
-    # compat: tu UI guarda "inversor_id" (no "inv_id")
     eq.setdefault("panel_id", None)
     eq.setdefault("inversor_id", None)
     eq.setdefault("sobredimension_dc_ac", 1.20)
@@ -36,7 +36,6 @@ def _get_equipos(ctx) -> dict:
 # ==========================================================
 # Defaults paso 5 (solo UI)
 # ==========================================================
-
 def _defaults_electrico(ctx) -> dict:
     e = _asegurar_dict(ctx, "electrico")
 
@@ -55,27 +54,18 @@ def _defaults_electrico(ctx) -> dict:
     e.setdefault("otros_ccc", 0)
 
     e.setdefault("dos_aguas", True)
-
     return e
 
 
 # ==========================================================
 # Consolidación: ctx -> Datosproyecto (mínimo consistente)
 # ==========================================================
-
 def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
-    """
-    Consolida entradas del wizard en Datosproyecto.
-    IMPORTANTE:
-    - Mantiene campos base que tu motor ya usa.
-    - Adjunta 'equipos' y 'sistema_fv' como atributos (para sizing y mapper).
-    """
     dc = _asegurar_dict(ctx, "datos_cliente")
     c = _asegurar_dict(ctx, "consumo")
     sf = _asegurar_dict(ctx, "sistema_fv")
     eq = _get_equipos(ctx)
 
-    # Consumo 12m
     consumo_12m = c.get("kwh_12m", [0.0] * 12)
     if not isinstance(consumo_12m, list) or len(consumo_12m) != 12:
         consumo_12m = [0.0] * 12
@@ -101,11 +91,9 @@ def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
         om_anual_pct=float(sf.get("om_anual_pct", 0.01)),
     )
 
-    # Adjuntar para sizing (catálogo) + FV (Paso 3)
     setattr(p, "equipos", dict(eq))
     setattr(p, "sistema_fv", dict(sf))
 
-    # FV directo desde Paso 3 (si están en sf)
     if "hsp_kwh_m2_d" in sf:
         setattr(p, "hsp", float(sf.get("hsp_kwh_m2_d", 4.5)))
     if "perdidas_sistema_pct" in sf:
@@ -113,11 +101,11 @@ def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
     if "sombras_pct" in sf:
         setattr(p, "sombras_pct", float(sf.get("sombras_pct", 0.0)))
 
-    # Geometría
     if "azimut_deg" in sf:
         setattr(p, "azimut_deg", float(sf.get("azimut_deg", 180)))
     if "inclinacion_deg" in sf:
         setattr(p, "inclinacion_deg", float(sf.get("inclinacion_deg", 15)))
+
     if sf.get("tipo_superficie") == "Techo dos aguas":
         setattr(p, "azimut_a_deg", float(sf.get("azimut_a_deg", 90)))
         setattr(p, "azimut_b_deg", float(sf.get("azimut_b_deg", 270)))
@@ -129,7 +117,6 @@ def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
 # ==========================================================
 # Parametrización cableado (UI) -> modelo eléctrico
 # ==========================================================
-
 def _params_cableado_desde_ui(e: dict) -> ParametrosCableado:
     return ParametrosCableado(
         vac=float(e["vac"]),
@@ -164,7 +151,6 @@ def _config_tecnica_efectiva() -> Dict[str, Any]:
 # ==========================================================
 # UI: Presentación
 # ==========================================================
-
 def _mostrar_resultados(pkg: dict) -> None:
     st.success("Ingeniería eléctrica generada.")
 
@@ -209,14 +195,9 @@ def _mostrar_validacion_string(validacion: dict) -> None:
 
 
 # ==========================================================
-# Validador (temporal) — luego vendrá del catálogo real
+# Validador string desde catálogo
 # ==========================================================
 def _validar_string_desde_catalogo(*, panel_id: str, inversor_id: str, t_min_c: float, n_paneles_string: int) -> dict:
-    """
-    Valida string usando catálogo (fuente de verdad).
-    Nota: imppt_max aún no existe en tu modelo Inversor; lo manejamos con fallback seguro.
-    """
-
     p = get_panel(panel_id)
     inv = get_inversor(inversor_id)
 
@@ -225,12 +206,9 @@ def _validar_string_desde_catalogo(*, panel_id: str, inversor_id: str, t_min_c: 
         vmp=float(p.vmp),
         isc=float(p.isc),
         imp=float(p.imp),
-        # TODO: meter coef real por panel en catálogo; por ahora usa un default típico
         coef_voc=float(getattr(p, "coef_voc", -0.28)),
     )
 
-    # En tu modelo Inversor NO veo imppt_max.
-    # Fallback: si existe atributo lo usa, si no, usa Imp del panel como umbral (conservador).
     imppt_max = float(getattr(inv, "imppt_max", panel.imp))
 
     inversor = InversorFV(
@@ -252,7 +230,6 @@ def _validar_string_desde_catalogo(*, panel_id: str, inversor_id: str, t_min_c: 
 # ==========================================================
 # UI Inputs
 # ==========================================================
-
 def _ui_inputs_electricos(e: dict) -> None:
     c1, c2, c3 = st.columns(3)
     with c1:
@@ -266,14 +243,10 @@ def _ui_inputs_electricos(e: dict) -> None:
     d1, d2 = st.columns(2)
     with d1:
         e["dist_dc_m"] = st.number_input("Distancia DC (m)", min_value=1.0, step=1.0, value=float(e["dist_dc_m"]))
-        e["vdrop_obj_dc_pct"] = st.number_input(
-            "Vdrop objetivo DC (%)", min_value=0.5, step=0.1, value=float(e["vdrop_obj_dc_pct"])
-        )
+        e["vdrop_obj_dc_pct"] = st.number_input("Vdrop objetivo DC (%)", min_value=0.5, step=0.1, value=float(e["vdrop_obj_dc_pct"]))
     with d2:
         e["dist_ac_m"] = st.number_input("Distancia AC (m)", min_value=1.0, step=1.0, value=float(e["dist_ac_m"]))
-        e["vdrop_obj_ac_pct"] = st.number_input(
-            "Vdrop objetivo AC (%)", min_value=0.5, step=0.1, value=float(e["vdrop_obj_ac_pct"])
-        )
+        e["vdrop_obj_ac_pct"] = st.number_input("Vdrop objetivo AC (%)", min_value=0.5, step=0.1, value=float(e["vdrop_obj_ac_pct"]))
 
     k1, k2, k3 = st.columns(3)
     with k1:
@@ -281,9 +254,7 @@ def _ui_inputs_electricos(e: dict) -> None:
     with k2:
         e["otros_ccc"] = st.number_input("Otros CCC (agrupamiento)", min_value=0, step=1, value=int(e["otros_ccc"]))
     with k3:
-        e["t_min_c"] = st.number_input(
-            "T mínima (°C) para Voc frío", min_value=-10.0, step=1.0, value=float(e["t_min_c"])
-        )
+        e["t_min_c"] = st.number_input("T mínima (°C) para Voc frío", min_value=-10.0, step=1.0, value=float(e["t_min_c"]))
 
     e["dos_aguas"] = st.checkbox("Techo dos aguas (reparte strings)", value=bool(e["dos_aguas"]))
 
@@ -291,7 +262,6 @@ def _ui_inputs_electricos(e: dict) -> None:
 # ==========================================================
 # Pipeline de cálculo (funciones pequeñas)
 # ==========================================================
-
 def _run_core(ctx, datos: Datosproyecto) -> dict:
     res = ejecutar_evaluacion(datos)
     ctx.resultado_core = res
@@ -302,7 +272,7 @@ def _run_paquete_electrico(eq: dict, e: dict, res: dict) -> dict:
     params = _params_cableado_desde_ui(e)
     cfg_tecnicos = _config_tecnica_efectiva()
 
-    pkg = calcular_paquete_electrico_desde_inputs(
+    return calcular_paquete_electrico_desde_inputs(
         res=res,
         panel_nombre=str(eq["panel_id"]),
         inv_nombre=str(eq["inversor_id"]),
@@ -310,13 +280,11 @@ def _run_paquete_electrico(eq: dict, e: dict, res: dict) -> dict:
         params=params,
         cfg_tecnicos=cfg_tecnicos,
     )
-    return pkg
 
 
 # ==========================================================
 # UI Paso 5
 # ==========================================================
-
 def render(ctx) -> None:
     e = _defaults_electrico(ctx)
     eq = _get_equipos(ctx)
@@ -326,7 +294,6 @@ def render(ctx) -> None:
         return
 
     st.markdown("### Ingeniería eléctrica automática")
-
     _ui_inputs_electricos(e)
     _guardar_overrides_tecnicos_en_session(e)
 
@@ -334,16 +301,14 @@ def render(ctx) -> None:
     if not st.button("Generar ingeniería eléctrica", type="primary"):
         return
 
-    # 1) Consolidar Datosproyecto
     datos = _datosproyecto_desde_ctx(ctx)
-    ctx.datos_proyecto = datos  # requerido por Resultados/PDF
+    ctx.datos_proyecto = datos
 
-    # 2) Core
     res = _run_core(ctx, datos)
 
-    # 3) Validación string (desde catálogo)
-    # TODO: sustituir n_paneles_string por el valor real que sale del sizing.
-    n_paneles_string = int(getattr(res.get("sizing", {}), "n_paneles_string", 10)) if isinstance(res, dict) else 10
+    sz = res.get("sizing", {}) or {}
+    n_paneles_string = int(sz.get("n_paneles_string", 10))
+
     validacion = _validar_string_desde_catalogo(
         panel_id=str(eq["panel_id"]),
         inversor_id=str(eq["inversor_id"]),
@@ -352,30 +317,12 @@ def render(ctx) -> None:
     )
     ctx.validacion_string = validacion
 
-    # 4) Paquete eléctrico
     pkg = _run_paquete_electrico(eq=eq, e=e, res=res)
     ctx.resultado_electrico = pkg
 
-    # 5) Mostrar
     _mostrar_resultados(pkg)
-    
-    from electrical.paquete_electrico import PanelDC, InversorAC, ParametrosCableado, calcular_paquete_nec_2023
-    from electrical.catalogos import get_panel, get_inversor
+    _mostrar_validacion_string(validacion)
 
-    sz = ctx.resultado_core["sizing"]           # o donde guardes el sizing unificado
-    strings_auto = sz["strings_auto"]           # dict resumen
-
-    panel = get_panel(ctx.equipos["panel_id"])
-    inv = get_inversor(ctx.equipos["inversor_id"])
-
-    pkg = calcular_paquete_nec_2023(
-        panel=PanelDC(pmax_w=panel.w, vmp_v=panel.vmp, voc_v=panel.voc, imp_a=panel.imp, isc_a=panel.isc),
-        inversor=InversorAC(pac_kw=float(getattr(inv, "kw_ac", 5.0)), vac_nom_v=float(e["vac"]), fases=int(e["fases"]), fp=float(e["fp"])),
-        strings_auto=strings_auto,
-        params=params,               # tu ParametrosCableado actual
-        t_amb_c=30.0,                # luego lo sacamos de configuración
-    )
-    ctx.resultado_electrico = pkg
 
 def validar(ctx) -> Tuple[bool, List[str]]:
     errores: List[str] = []
