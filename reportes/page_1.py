@@ -10,6 +10,7 @@ from reportlab.platypus import Paragraph, Spacer, PageBreak
 
 # OJO: estos helpers deben existir en tu repo en reportes/helpers_pdf.py
 # Ajusta el import si tu archivo se llama distinto.
+from core.result_accessors import get_sizing, get_kwp_dc, get_capex_L
 from .helpers_pdf import (
     section_bar,
     tabla_4cols,
@@ -177,14 +178,14 @@ def build_page_1(resultado: Dict[str, Any], datos, paths, pal, styles, content_w
 
     story = []
 
-    sizing = (resultado or {}).get("sizing", {}) or {}
+    sizing = get_sizing(resultado)
     eval_ = (resultado or {}).get("evaluacion", {}) or {}
     decision = (resultado or {}).get("decision", {}) or {}
 
     fecha = datetime.now().strftime("%Y-%m-%d")
 
-    kwp = float(sizing.get("kwp_recomendado", 0.0) or 0.0)
-    capex = float(sizing.get("capex_L", 0.0) or 0.0)
+    kwp = get_kwp_dc(resultado)
+    capex = get_capex_L(resultado)
 
     ds = float(eval_.get("dscr", 0.0) or 0.0)
     impacto = float(decision.get("ahorro_mensual", 0.0) or 0.0)

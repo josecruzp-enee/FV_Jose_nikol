@@ -6,12 +6,13 @@ from typing import Any, Dict, List
 from reportlab.platypus import Paragraph, Spacer, TableStyle, PageBreak
 
 from reportes.utils import make_table, table_style_uniform, box_paragraph, money_L
+from core.result_accessors import get_tabla_12m
 
 
 def tabla_impacto_mensual_anio1(resultado: Dict[str, Any], pal: dict, content_w: float) -> List:
     from reportlab.platypus import Spacer
 
-    tabla = resultado.get("tabla_12m") or []
+    tabla = get_tabla_12m(resultado)
     cuota_m = float(resultado.get("cuota_mensual", 0.0))
 
     header = [
