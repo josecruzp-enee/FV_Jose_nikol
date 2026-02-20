@@ -5,12 +5,8 @@ from reportlab.lib.pagesizes import letter
 from reportlab.platypus import Spacer, Paragraph, Image, Table, TableStyle, PageBreak
 from reportlab.lib.units import inch
 
-from .helpers_pdf import make_table, table_style_uniform, box_paragraph
-def _getcampo(x, k, default=""):
-    if isinstance(x, dict):
-        return x.get(k, default)
-    return getattr(x, k, default)
-
+from .helpers_pdf import make_table, table_style_uniform, box_paragraph, get_field
+from core.result_accessors import get_tabla_12m
 def build_page_2(resultado, datos, paths, pal, styles, content_w):
     # content width estándar carta con márgenes típicos
     page_w, _ = letter
@@ -26,9 +22,10 @@ def build_page_2(resultado, datos, paths, pal, styles, content_w):
     story.append(Spacer(1, 6))
 
     header = ["Mes", "Consumo (kWh)", "FV útil (kWh)", "ENEE (kWh)"]
+    tabla_12m = get_tabla_12m(resultado)
     rows = [
-        [r["mes"], f"{r['consumo_kwh']:,.0f}", f"{r['fv_kwh']:,.0f}", f"{r['kwh_enee']:,.0f}"]
-        for r in resultado["tabla_12m"]
+        [r.get("mes", ""), f"{float(r.get('consumo_kwh', 0.0)):,.0f}", f"{float(r.get('fv_kwh', 0.0)):,.0f}", f"{float(r.get('kwh_enee', 0.0)):,.0f}"]
+        for r in tabla_12m
     ]
 
     t = make_table([header] + rows, content_w, ratios=[0.65, 2.1, 2.1, 2.1], repeatRows=1)
@@ -67,7 +64,7 @@ def build_page_2(resultado, datos, paths, pal, styles, content_w):
         "<b>Interpretación</b><br/>"
         "• Esta página muestra energía (kWh).<br/>"
         "• El dimensionamiento evita sobredimensionar en meses de baja demanda.<br/>"
-        f"• Cobertura objetivo: <b>{float(_getcampo(datos,'cobertura_objetivo',0.0))*100:.0f}%</b>."
+        f"• Cobertura objetivo: <b>{float(get_field(datos,'cobertura_objetivo',0.0))*100:.0f}%</b>."
     )
     story.append(box_paragraph(interp, pal, content_w, font_size=9))
 

@@ -9,17 +9,16 @@ from core.orquestador import ejecutar_evaluacion
 from core.modelo import Datosproyecto
 from core.configuracion import cargar_configuracion, construir_config_efectiva
 from electrical.catalogos import get_panel, get_inversor
+from ui.validaciones_ui import campos_faltantes_para_paso5
+from ui.state_helpers import ensure_dict, merge_defaults, save_result_fingerprint
 
 
 # ==========================================================
 # Helpers estado
 # ==========================================================
 def _asegurar_dict(ctx, nombre: str) -> dict:
-    if nombre not in ctx.__dict__ or ctx.__dict__[nombre] is None:
-        ctx.__dict__[nombre] = {}
-    if not isinstance(ctx.__dict__[nombre], dict):
-        ctx.__dict__[nombre] = {}
-    return ctx.__dict__[nombre]
+    # compat wrapper
+    return ensure_dict(ctx, nombre, dict)
 
 
 def _get_equipos(ctx) -> dict:
@@ -36,22 +35,19 @@ def _get_equipos(ctx) -> dict:
 # ==========================================================
 def _defaults_electrico(ctx) -> dict:
     e = _asegurar_dict(ctx, "electrico")
-
-    e.setdefault("vac", 240.0)
-    e.setdefault("fases", 1)
-    e.setdefault("fp", 1.0)
-
-    e.setdefault("dist_dc_m", 15.0)
-    e.setdefault("dist_ac_m", 25.0)
-
-    e.setdefault("vdrop_obj_dc_pct", 2.0)
-    e.setdefault("vdrop_obj_ac_pct", 2.0)
-    e.setdefault("t_min_c", 10.0)
-
-    e.setdefault("incluye_neutro_ac", False)
-    e.setdefault("otros_ccc", 0)
-    e.setdefault("dos_aguas", True)
-
+    merge_defaults(e, {
+        "vac": 240.0,
+        "fases": 1,
+        "fp": 1.0,
+        "dist_dc_m": 15.0,
+        "dist_ac_m": 25.0,
+        "vdrop_obj_dc_pct": 2.0,
+        "vdrop_obj_ac_pct": 2.0,
+        "t_min_c": 10.0,
+        "incluye_neutro_ac": False,
+        "otros_ccc": 0,
+        "dos_aguas": True,
+    })
     return e
 
 
@@ -205,28 +201,39 @@ def render(ctx):
     st.markdown("### Ingeniería eléctrica automática")
     _ui_inputs_electricos(e)
 
+    faltantes = campos_faltantes_para_paso5(ctx)
+    if faltantes:
+        st.warning("Complete estos datos antes de generar ingeniería:\n- " + "\n- ".join(faltantes))
+
     st.divider()
-    if not st.button("Generar ingeniería eléctrica", type="primary"):
+    if not st.button("Generar ingeniería eléctrica", type="primary", disabled=bool(faltantes)):
         return
 
-    # CORE
-    res = _ejecutar_core(ctx)
+    try:
+        # CORE
+        res = _ejecutar_core(ctx)
 
-    # sizing
-    n_paneles = int((res.get("sizing") or {}).get("n_paneles_string",10))
+        # sizing
+        n_paneles = int((res.get("sizing") or {}).get("n_paneles_string", 10))
 
-    # validación
-    validacion = _validar_string_catalogo(eq, e, n_paneles)
-    ctx.validacion_string = validacion
+        # validación
+        validacion = _validar_string_catalogo(eq, e, n_paneles)
+        ctx.validacion_string = validacion
 
-    # NEC
-    pkg = _obtener_pkg_nec(ctx)
-    ctx.resultado_electrico = pkg
+        # NEC
+        pkg = _obtener_pkg_nec(ctx)
+        ctx.resultado_electrico = pkg
+        save_result_fingerprint(ctx)
 
-    # UI
-    st.success("Ingeniería eléctrica generada.")
-    st.write(validacion)
-    _mostrar_nec(pkg)
+        # UI
+        st.success("Ingeniería eléctrica generada.")
+        st.write(validacion)
+        _mostrar_nec(pkg)
+    except Exception as exc:
+        ctx.resultado_core = None
+        ctx.resultado_electrico = None
+        setattr(ctx, "result_inputs_fingerprint", None)
+        st.error(f"No se pudo generar ingeniería: {exc}")
 
 
 # ==========================================================

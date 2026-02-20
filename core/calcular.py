@@ -1,13 +1,18 @@
 # calcular.py
 from __future__ import annotations
 
-from .modelo import modelo
+import logging
+
+from .modelo import Datosproyecto
 from .rutas import preparar_salida
 from .orquestador import ejecutar_evaluacion
+from .result_accessors import get_n_paneles, get_tabla_12m
 
-from reportes.charts import generar_charts
-from reportes.layout_paneles import generar_layout_paneles
-from reportes.pdf.builder import generar_pdf_profesional
+from reportes.generar_charts import generar_charts
+from reportes.generar_layout_paneles import generar_layout_paneles
+from reportes.generar_pdf_profesional import generar_pdf_profesional
+
+logger = logging.getLogger(__name__)
 
 
 def main():
@@ -31,9 +36,9 @@ def main():
     paths = preparar_salida("salidas")
     resultado = ejecutar_evaluacion(datos)
 
-    generar_charts(resultado["tabla_12m"], paths)
+    generar_charts(get_tabla_12m(resultado), paths)
     generar_layout_paneles(
-        n_paneles=int(resultado["sizing"]["n_paneles"]),
+        n_paneles=int(get_n_paneles(resultado)),
         out_path=paths["layout_paneles"],
         max_cols=7,
         dos_aguas=True,
@@ -41,7 +46,7 @@ def main():
     )
 
     pdf = generar_pdf_profesional(resultado, datos, paths)
-    print("✅ PDF:", pdf)
+    logger.debug("PDF generado en %s", pdf)
 
 
 if __name__ == "__main__":

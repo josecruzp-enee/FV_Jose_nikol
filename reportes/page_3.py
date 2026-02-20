@@ -5,6 +5,7 @@ from reportlab.platypus import Paragraph, Spacer, PageBreak, TableStyle
 
 # Ajusta este import a donde realmente estén tus helpers:
 from .utils import make_table, table_style_uniform, box_paragraph
+from core.result_accessors import get_capex_L
 
 
 
@@ -48,7 +49,7 @@ def build_page_3(resultado, datos, paths, pal, styles, content_w):
     story.append(Spacer(1, 10))
 
     # ===== Entradas =====
-    capex = float(resultado["sizing"]["capex_L"])
+    capex = float(get_capex_L(resultado))
     pct_fin = float(getattr(datos, "porcentaje_financiado", 1.0))
     principal = capex * pct_fin
 
