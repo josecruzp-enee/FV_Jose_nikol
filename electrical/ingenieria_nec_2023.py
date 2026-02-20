@@ -36,12 +36,10 @@ def _map_sistemas_ac() -> Dict[str, SistemaAC]:
 # ==========================================================
 # API pública
 # ==========================================================
-def calcular_paquete_electrico_nec(datos: Dict[str, Any]) -> Dict[str, Any]:
-    d = _defaults(datos)
-    warnings = _validar_minimos(d)
+from typing import Any, Dict
 
-    # ✅ NUEVO: contexto NEC para derating (no rompe nada si no se usa)
-    d["nec"] = {
+def _ctx_nec(d: Dict[str, Any]) -> Dict[str, Any]:
+    return {
         "aplicar_derating": bool(d.get("aplicar_derating", True)),
         "t_amb_c": float(d.get("t_amb_c", d.get("temp_amb_c", 30.0))),
         "columna": str(d.get("columna_temp_nec", "75C")),
@@ -49,29 +47,20 @@ def calcular_paquete_electrico_nec(datos: Dict[str, Any]) -> Dict[str, Any]:
         "ccc_dc": int(d.get("ccc_dc", 2)),
     }
 
-    sistema = parse_sistema_ac(d["tension_sistema"])
-    dc = _calc_dc(d)
-    ac = _calc_ac(d, sistema)
+def _post_dc(d: Dict[str, Any], dc: Dict[str, Any]) -> None:
+    ns = int(dc.get("n_strings", 0))
+    d["has_combiner"] = bool(d.get("has_combiner", ns >= 3))
+    dc["config_strings"] = {"n_strings": ns, "modulos_por_string": int(d.get("n_modulos_serie", 0)),
+                            "tipo": "string directo a inversor" if ns <= 2 else "con combiner box"}
 
-    ocpd = _calc_ocpd(d, dc, ac)
-    conductores = _calc_conductores_y_vd(d, sistema, dc, ac)
-    spd = _recomendar_spd(d)
-    secc = _recomendar_seccionamiento(d)
-    canal = _recomendar_canalizacion(conductores)
-
-    paquete = {
-        "dc": dc,
-        "ac": ac,
-        "ocpd": ocpd,
-        "conductores": conductores,
-        "spd": spd,
-        "seccionamiento": secc,
-        "canalizacion": canal,
-        "warnings": warnings + dc.get("warnings", []) + ac.get("warnings", []),
-    }
-    paquete["resumen_pdf"] = _armar_resumen_pdf(paquete, sistema)
-    return paquete
-
+def calcular_paquete_electrico_nec(datos: Dict[str, Any]) -> Dict[str, Any]:
+    d = _defaults(datos); warnings = _validar_minimos(d); d["nec"] = _ctx_nec(d)
+    s = parse_sistema_ac(d["tension_sistema"]); dc = _calc_dc(d); _post_dc(d, dc); ac = _calc_ac(d, s)
+    ocpd = _calc_ocpd(d, dc, ac); cond = _calc_conductores_y_vd(d, s, dc, ac)
+    paq = {"dc": dc, "ac": ac, "ocpd": ocpd, "conductores": cond, "spd": _recomendar_spd(d),
+           "seccionamiento": _recomendar_seccionamiento(d), "canalizacion": _recomendar_canalizacion(cond),
+           "warnings": warnings + dc.get("warnings", []) + ac.get("warnings", [])}
+    paq["resumen_pdf"] = _armar_resumen_pdf(paq, s); return paq
 
 # ==========================================================
 # Defaults + validación (corto y robusto)
