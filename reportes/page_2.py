@@ -6,7 +6,10 @@ from reportlab.platypus import Spacer, Paragraph, Image, Table, TableStyle, Page
 from reportlab.lib.units import inch
 
 from .helpers_pdf import make_table, table_style_uniform, box_paragraph
-
+def _getcampo(x, k, default=""):
+    if isinstance(x, dict):
+        return x.get(k, default)
+    return getattr(x, k, default)
 
 def build_page_2(resultado, datos, paths, pal, styles, content_w):
     # content width estándar carta con márgenes típicos
