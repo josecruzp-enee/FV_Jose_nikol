@@ -164,156 +164,78 @@ def generar_layout_paneles(
             edgecolor="none",
             facecolor="#FFFFFF"
         ))
-
-    # ===== 3) Dibujo de paneles (ordenado) =====
-    def _dibujar_grid(n_local: int, cols_local: int, rows_local: int, x0: float, y0: float, start_num: int):
-        """
-        Rellena de arriba->abajo, izquierda->derecha, para que visualmente quede limpio.
-        """
+ 
+       # ===== 3) Dibujo de paneles =====
+    def _dibujar_grid(n_local, cols_local, rows_local, x0, y0, start_num):
         k = 0
         for r in range(rows_local):
             for c in range(cols_local):
                 if k >= n_local:
                     return start_num + k
+
                 x = x0 + c * (panel_w_m + gap_m)
                 y = y0 + (rows_local - 1 - r) * (panel_h_m + gap_m)
 
                 ax.add_patch(Rectangle(
-                    (x, y), panel_w_m, panel_h_m,
+                    (x, y),
+                    panel_w_m,
+                    panel_h_m,
                     linewidth=0.8,
                     edgecolor="#0B2E4A",
                     facecolor="#1F2A37"
                 ))
+
                 ax.text(
                     x + panel_w_m / 2,
                     y + panel_h_m / 2,
                     str(start_num + k),
-                    ha="center", va="center",
+                    ha="center",
+                    va="center",
                     fontsize=7,
                     color="white"
                 )
                 k += 1
         return start_num + k
 
-    # Izquierda
-    x0_izq = off_x
-    y0_izq = off_y
-    next_num = _dibujar_grid(n_izq, cols_izq, rows_izq, x0_izq, y0_izq, start_num=1)
 
-    # Derecha
-    if dos_aguas and n_der > 0:
-        x0_der = off_x + W_izq + gap_cumbrera_m
-        y0_der = off_y
-        _dibujar_grid(n_der, cols_der, rows_obj, x0_der, y0_der, start_num=next_num)
-
-    # ===== 4) Norte =====
-    if norte:
-        nx = roof_W - 0.35
-        ny = roof_H - 0.20
-        ax.text(nx, ny, "N", ha="center", va="bottom", fontsize=10, fontweight="bold", color="#0B2E4A")
-        ax.arrow(nx, ny - 0.15, 0, 0.22, head_width=0.12, head_length=0.10, fc="#0B2E4A", ec="#0B2E4A")
-
-    # ===== 5) Texto superior =====
-    area_arreglo = W * H
-    area_techo_ref = roof_W * roof_H
-
-    if dos_aguas and n_der > 0:
-        info = f"{n} módulos | Izq: {n_izq} ({cols_izq}x{rows_izq})  Der: {n_der} ({cols_der}x{rows_obj})"
-    else:
-        info = f"{n} módulos | {cols_izq}×{rows_izq}"
-
-    ax.text(
-        0.02, roof_H + 0.18,
-        f"{info} | Área módulos aprox: {area_arreglo:,.1f} m² | Techo ref: {area_techo_ref:,.1f} m²",
-        ha="left", va="bottom",
-        fontsize=8,
-        color="#344054"
+    # Izquierda o único plano
+    next_num = _dibujar_grid(
+        n_izq,
+        cols_izq,
+        rows_izq,
+        off_x,
+        off_y,
+        start_num=1
     )
 
-    # ejes limpios
-    ax.set_xticks([])
-    ax.set_yticks([])
-    for spine in ax.spines.values():
-        spine.set_visible(False)
+    # Derecha si es dos aguas
+    if dos_aguas and n_der > 0:
+        x0_der = off_x + W_izq + gap_cumbrera_m
+        _dibujar_grid(
+            n_der,
+            cols_der,
+            rows_obj,
+            x0_der,
+            off_y,
+            start_num=next_num
+        )
 
-    fig.tight_layout()
-    fig.savefig(out_path, bbox_inches="tight")
-    plt.close(fig)
-
-
-    # ===== 3) Dibujo de paneles =====
-    k = 0
-
-    def dibujar_bloque(n_bloque: int, cols_b: int, rows_b: int, base_x: float, base_y: float):
-        nonlocal k
-        if n_bloque <= 0:
-            return
-        start_k = k
-        for r in range(rows_b):
-            for c in range(cols_b):
-                if (k - start_k) >= n_bloque:
-                    return
-                x = base_x + c * (panel_w_m + gap_m)
-                y = base_y + (rows_b - 1 - r) * (panel_h_m + gap_m)
-
-                ax.add_patch(Rectangle(
-                    (x, y), panel_w_m, panel_h_m,
-                    linewidth=0.8,
-                    edgecolor="#0B2E4A",
-                    facecolor="#1F2A37"
-                ))
-                ax.text(
-                    x + panel_w_m / 2,
-                    y + panel_h_m / 2,
-                    str(k + 1),
-                    ha="center", va="center",
-                    fontsize=7,
-                    color="white"
-                )
-                k += 1
-
-    if dos_aguas:
-        # Izquierda
-        dibujar_bloque(n_izq, cols_izq, rows_izq, off_x, off_y)
-
-        # Derecha
-        if n_der > 0:
-            off_x_der = off_x + W_izq + gap_cumbrera_m
-            dibujar_bloque(n_der, cols_der, rows_der, off_x_der, off_y)
-    else:
-        dibujar_bloque(n_izq, cols, rows, off_x, off_y)
-
-    # ===== 4) Norte =====
+    # ===== Norte =====
     if norte:
         nx = roof_W - 0.35
         ny = roof_H - 0.20
-        ax.text(nx, ny, "N", ha="center", va="bottom", fontsize=10, fontweight="bold", color="#0B2E4A")
-        ax.arrow(nx, ny - 0.15, 0, 0.22, head_width=0.12, head_length=0.10, fc="#0B2E4A", ec="#0B2E4A")
+        ax.text(nx, ny, "N", ha="center", va="bottom",
+                fontsize=10, fontweight="bold", color="#0B2E4A")
+        ax.arrow(nx, ny - 0.15, 0, 0.22,
+                 head_width=0.12, head_length=0.10,
+                 fc="#0B2E4A", ec="#0B2E4A")
 
-    # ===== 5) Texto superior =====
-    area_arreglo = W * H
-    area_techo_ref = roof_W * roof_H
-
-    if dos_aguas:
-        ax.text(
-            0.02, roof_H + 0.18,
-            f"{n} módulos | Izq: {n_izq} ({cols_izq}x{rows_izq})  Der: {n_der} ({cols_der}x{rows_der}) | "
-            f"Área módulos aprox: {area_arreglo:,.1f} m² | Techo ref: {area_techo_ref:,.1f} m²",
-            ha="left", va="bottom", fontsize=8, color="#344054"
-        )
-    else:
-        ax.text(
-            0.02, roof_H + 0.18,
-            f"{n} módulos | {cols}×{rows} | Área módulos aprox: {area_arreglo:,.1f} m² | Techo ref: {area_techo_ref:,.1f} m²",
-            ha="left", va="bottom", fontsize=8, color="#344054"
-        )
-
-    # ===== 6) Limpieza ejes y salida =====
+    # ===== Limpieza y guardado =====
     ax.set_xticks([])
     ax.set_yticks([])
     for spine in ax.spines.values():
         spine.set_visible(False)
 
     fig.tight_layout()
-    fig.savefig(out_path, bbox_inches="tight")
+    fig.savefig(out_path, dpi=200, bbox_inches="tight")
     plt.close(fig)
