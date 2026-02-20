@@ -1,68 +1,9 @@
-# nucleo/electrico_ref.py
+# nucleo/electrico_ref.py  (WRAPPER TEMPORAL)
 from __future__ import annotations
+from typing import Any, Dict, Optional
 
-from typing import Any, Dict, List, Optional
-
-
-AMP_CU_75C = {
-    "14": 20, "12": 25, "10": 35, "8": 50, "6": 65, "4": 85, "3": 100,
-    "2": 115, "1": 130, "1/0": 150,
-}
-
-AMP_PV_90C = {"14": 25, "12": 30, "10": 40, "8": 55, "6": 75}
-
-R_OHM_KM_CU = {
-    "14": 8.286, "12": 5.211, "10": 3.277, "8": 2.061, "6": 1.296,
-    "4": 0.815, "3": 0.647, "2": 0.513, "1": 0.407, "1/0": 0.323,
-}
-
-GAUGES_CU = ["14","12","10","8","6","4","3","2","1","1/0"]
-GAUGES_PV = ["14","12","10","8","6"]
-
-
-def _vdrop_pct_1ph_2wire(V: float, I: float, L_m: float, gauge: str) -> float:
-    R_km = R_OHM_KM_CU[gauge]
-    R_m = R_km / 1000.0
-    vdrop = 2.0 * I * R_m * L_m
-    return (vdrop / V) * 100.0
-
-
-def _pick_gauge_by_ampacity(table: Dict[str, float], I_design: float, gauges: List[str]) -> str:
-    for g in gauges:
-        if table.get(g, 0) >= I_design:
-            return g
-    return gauges[-1]
-
-
-def _pick_gauge_by_vdrop(V: float, I: float, L_m: float, target_pct: float, gauges: List[str]) -> str:
-    for g in gauges:
-        pct = _vdrop_pct_1ph_2wire(V, I, L_m, g)
-        if pct <= target_pct:
-            return g
-    return gauges[-1]
-
-
-def _max_gauge(g1: str, g2: str, gauges: List[str]) -> str:
-    i1, i2 = gauges.index(g1), gauges.index(g2)
-    return g1 if i1 > i2 else g2
-
-
-def _recomendar_conduit(ac_gauge: str, incluye_neutro: bool, extra_ccc: int = 0) -> str:
-    ccc = 2 + (1 if incluye_neutro else 0) + max(0, extra_ccc)
-    if ac_gauge in ["14","12","10","8"]:
-        base = "1/2\""
-    elif ac_gauge == "6":
-        base = "3/4\""
-    else:
-        base = "1\""
-
-    if ccc >= 4:
-        if base == "1/2\"":
-            return "3/4\""
-        if base == "3/4\"":
-            return "1\""
-        return "1-1/4\""
-    return base
+from electrical.modelos import ParametrosCableado
+from electrical.paquete_ref import calcular_paquete_electrico_ref
 
 
 def simular_electrico_fv_para_pdf(
@@ -79,74 +20,23 @@ def simular_electrico_fv_para_pdf(
     incluye_neutro_ac: bool = False,
     otros_ccc_en_misma_tuberia: int = 0,
 ) -> Dict[str, Any]:
+    p = ParametrosCableado(
+        vac=float(v_ac),
+        dist_dc_m=float(dist_dc_m),
+        dist_ac_m=float(dist_ac_m),
+        vdrop_obj_dc_pct=float(objetivo_vdrop_dc_pct),
+        vdrop_obj_ac_pct=float(objetivo_vdrop_ac_pct),
+        incluye_neutro_ac=bool(incluye_neutro_ac),
+        otros_ccc=int(otros_ccc_en_misma_tuberia),
+    )
 
-    i_ac_diseno = 1.25 * i_ac_estimado
-    if isc_a is not None:
-        i_dc_max = 1.25 * isc_a
-    else:
-        i_dc_max = 1.25 * imp_a
-
-    g_amp_ac = _pick_gauge_by_ampacity(AMP_CU_75C, i_ac_diseno, GAUGES_CU)
-    g_vd_ac  = _pick_gauge_by_vdrop(v_ac, i_ac_estimado, dist_ac_m, objetivo_vdrop_ac_pct, GAUGES_CU)
-    g_final_ac = _max_gauge(g_amp_ac, g_vd_ac, GAUGES_CU)
-    vdrop_ac_pct = _vdrop_pct_1ph_2wire(v_ac, i_ac_estimado, dist_ac_m, g_final_ac)
-
-    conduit_ac = _recomendar_conduit(g_final_ac, incluye_neutro_ac, otros_ccc_en_misma_tuberia)
-    egc = "10" if GAUGES_CU.index(g_final_ac) >= GAUGES_CU.index("6") else "12"
-
-    if i_ac_diseno <= 50:
-        breaker_a = 50
-    elif i_ac_diseno <= 60:
-        breaker_a = 60
-    elif i_ac_diseno <= 70:
-        breaker_a = 70
-    else:
-        breaker_a = 80
-
-    g_amp_dc = _pick_gauge_by_ampacity(AMP_PV_90C, i_dc_max, GAUGES_PV)
-    g_vd_dc  = _pick_gauge_by_vdrop(vmp_string_v, imp_a, dist_dc_m, objetivo_vdrop_dc_pct, GAUGES_PV)
-    g_final_dc = _max_gauge(g_amp_dc, g_vd_dc, GAUGES_PV)
-    vdrop_dc_pct = _vdrop_pct_1ph_2wire(vmp_string_v, imp_a, dist_dc_m, g_final_dc)
-    conduit_dc = "1/2\"" if g_final_dc in ["14","12","10"] else "3/4\""
-
-    return {
-        "corrientes": {
-            "ac_estimada_a": round(i_ac_estimado, 2),
-            "ac_diseno_a": round(i_ac_diseno, 2),
-            "dc_imp_a": round(imp_a, 2),
-            "dc_isc_a": None if isc_a is None else round(isc_a, 2),
-            "dc_max_ref_a": round(i_dc_max, 2),
-        },
-        "ac": {
-            "voltaje_v": round(v_ac, 1),
-            "dist_m": round(dist_ac_m, 1),
-            "calibre_fases_awg": g_final_ac,
-            "calibre_tierra_awg": egc,
-            "tipo_cable": "Cu THHN/THWN-2 (referencial)",
-            "conduit_recomendado": conduit_ac + " EMT/PVC (referencial)",
-            "breaker_sugerido_a": breaker_a,
-            "vdrop_pct": round(vdrop_ac_pct, 2),
-            "objetivo_vdrop_pct": objetivo_vdrop_ac_pct,
-        },
-        "dc_string": {
-            "vmp_v": round(vmp_string_v, 1),
-            "dist_m": round(dist_dc_m, 1),
-            "calibre_awg": g_final_dc,
-            "tipo_cable": "PV Wire / USE-2 Cu (UV) (referencial)",
-            "conduit_recomendado": conduit_dc + " EMT/PVC UV (referencial)",
-            "vdrop_pct": round(vdrop_dc_pct, 2),
-            "objetivo_vdrop_pct": objetivo_vdrop_dc_pct,
-        },
-        "texto_pdf": [
-            f"Conductores DC (string): {g_final_dc} AWG Cu PV Wire/USE-2 (UV). Dist {dist_dc_m:.1f} m | caída {vdrop_dc_pct:.2f}% (obj {objetivo_vdrop_dc_pct:.1f}%).",
-            f"Conductores AC (salida inversor): {g_final_ac} AWG Cu THHN/THWN-2 (L1+L2)"
-            + (" + N" if incluye_neutro_ac else "")
-            + f" + tierra {egc} AWG. Dist {dist_ac_m:.1f} m | caída {vdrop_ac_pct:.2f}% (obj {objetivo_vdrop_ac_pct:.1f}%).",
-            f"Tubería AC sugerida: {conduit_ac} EMT/PVC (según cantidad de conductores y facilidad de jalado).",
-            f"Breaker AC sugerido (referencial): {breaker_a} A (validar contra datasheet del inversor).",
-        ],
-        "disclaimer": (
-            "Cálculo referencial para propuesta. Calibre final sujeto a: temperatura, agrupamiento (CCC), "
-            "factor de ajuste/corrección, fill real de tubería, terminales 75°C y normativa local/NEC aplicable."
-        ),
-    }
+    pkg = calcular_paquete_electrico_ref(
+        params=p,
+        vmp_string_v=float(vmp_string_v),
+        imp_a=float(imp_a),
+        isc_a=None if isc_a is None else float(isc_a),
+        iac_estimado_a=float(i_ac_estimado),
+        fases_ac=1,
+        cfg_tecnicos=None,
+    )
+    return pkg
