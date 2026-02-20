@@ -325,17 +325,11 @@ def _run_core(ctx, datos: Datosproyecto) -> dict:
 
 
 def _run_paquete_electrico(eq: dict, e: dict, res: dict) -> dict:
-    params = _params_cableado_desde_ui(e)
-    cfg_tecnicos = _config_tecnica_efectiva()
+    datos = _datosproyecto_desde_ctx(st.session_state.ctx)
 
-    return calcular_paquete_electrico_desde_inputs(
-        res=res,
-        panel_nombre=str(eq["panel_id"]),
-        inv_nombre=str(eq["inversor_id"]),
-        dos_aguas=bool(e["dos_aguas"]),
-        params=params,
-        cfg_tecnicos=cfg_tecnicos,
-    )
+    resultado = ejecutar_evaluacion(datos)
+
+    return resultado.get("electrico_nec", {})
 
 
 # ==========================================================
