@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import copy
+from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 import streamlit as st
@@ -226,7 +227,6 @@ def _generar_pdf_safe(res: dict, ctx, paths: dict) -> str | None:
         datos_pdf = _datos_pdf_from_ctx(ctx, res)
         pdf_path = generar_pdf_profesional(res, datos_pdf, paths)
 
-        # Guarda artefacto si existe el contenedor
         if hasattr(ctx, "artefactos") and isinstance(ctx.artefactos, dict):
             ctx.artefactos["pdf"] = pdf_path
 
@@ -250,10 +250,14 @@ def _render_descarga_pdf(pdf_path: str) -> None:
 def _ejecutar_pipeline_pdf(ctx, res: dict, vista: Dict[str, Any]) -> None:
     paths = preparar_salida("salidas")
 
-    # ✅ CLAVE: asegurar n_paneles/kwp/capex antes de generar artefactos
+    # ✅ asegurar n_paneles/kwp/capex antes de generar artefactos
     _ensure_res_pdf_keys(res, ctx)
 
-    out_dir = paths.get("out_dir") or paths.get("base_dir") or paths.get("salida_dir") or "salidas"
+    # ✅ CLAVE: meter la ingeniería eléctrica NEC dentro del dict que va al PDF
+    if getattr(ctx, "resultado_electrico", None) is not None:
+        res["electrico"] = ctx.resultado_electrico
+
+    out_dir = paths.get("out_dir") or paths.get("base_dir") or "salidas"
 
     # dos_aguas: intenta leer de varias ubicaciones
     dos_aguas = True
@@ -271,8 +275,10 @@ def _ejecutar_pipeline_pdf(ctx, res: dict, vista: Dict[str, Any]) -> None:
         )
         paths.update(arte)
 
-        # Debug temporal (puedes quitarlo luego)
-        st.write("DEBUG layout_paneles:", paths.get("layout_paneles"))
+        # Debug temporal (quítalo cuando ya esté)
+        lp = paths.get("layout_paneles", "")
+        st.write("DEBUG layout_paneles:", lp)
+        st.write("DEBUG layout exists:", bool(lp) and Path(lp).exists())
         st.write("DEBUG n_paneles:", _n_paneles_from_sizing(_get_sizing(res)))
 
     except Exception as e:
@@ -317,7 +323,7 @@ def render(ctx) -> None:
     if not _ui_boton_pdf(disabled=stale_inputs):
         return
 
-    # Evita mutar ctx.resultado_core (puede estar cacheado/reusado por otros pasos).
+    # Evita mutar ctx.resultado_core
     res_pdf = copy.deepcopy(res)
     _ejecutar_pipeline_pdf(ctx, res_pdf, vista)
 
