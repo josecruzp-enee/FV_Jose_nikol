@@ -169,6 +169,21 @@ def _validar_datos_para_pdf(ctx) -> bool:
 
 
 def _generar_pdf(res: dict, ctx, paths: dict) -> str:
+    # --- Normalización para compatibilidad con reportes ---
+    sizing = res.get("sizing") or {}
+
+    kwp_dc = float(
+        sizing.get("kwp_dc")
+        or sizing.get("kwp")
+        or sizing.get("pdc_kw")
+        or 0.0
+    )
+    # reportes antiguos esperan 'kwp_recomendado'
+    sizing.setdefault("kwp_recomendado", kwp_dc)
+
+    # asegúrate de escribirlo de vuelta en res
+    res["sizing"] = sizing
+
     pdf_path = generar_pdf_profesional(res, ctx.datos_proyecto, paths)
     ctx.artefactos["pdf"] = pdf_path
     return str(pdf_path)
