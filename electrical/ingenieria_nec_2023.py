@@ -69,7 +69,7 @@ def calcular_paquete_electrico_nec(datos: Dict[str, Any]) -> Dict[str, Any]:
 # ==========================================================
 def _defaults(d: Dict[str, Any]) -> Dict[str, Any]:
     x = dict(d or {})
-    x.setdefault("tension_sistema", "1F_240V")
+    x.setdefault("tension_sistema", "2F+N_120/240")
     x.setdefault("pf_ac", 1.0)
 
     x.setdefault("vd_max_dc_pct", 2.0)
