@@ -1,7 +1,7 @@
 # electrical/adaptador_nec.py
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from electrical.ingenieria_nec_2023 import calcular_paquete_electrico_nec
 
@@ -9,33 +9,35 @@ from electrical.ingenieria_nec_2023 import calcular_paquete_electrico_nec
 def generar_electrico_nec(*, p: Any, sizing: Dict[str, Any]) -> Dict[str, Any]:
     """
     Adaptador core -> NEC.
-    Retorna dict estable:
+
+    Retorna SIEMPRE un dict estable:
       - ok: bool
       - errores: list[str]
-      - (si ok) payload devuelto por calcular_paquete_electrico_nec()
-    Nunca rompe el pipeline.
+      - input: dict (debug)
+      - (si ok) paq: dict (salida de calcular_paquete_electrico_nec)
+    Nunca rompe el pipeline aunque falten datos.
     """
     d, errores = _build_input_nec(p, sizing)
     if errores:
-        return {"ok": False, "errores": errores, "input": d}
+        return {"ok": False, "errores": errores, "input": d, "paq": {}}
 
     try:
         paq = calcular_paquete_electrico_nec(d)
-        # el módulo NEC ya suele incluir "resumen_pdf" y bloques dc/ac/protecciones/canalizacion
-        return {"ok": True, "errores": [], **paq}
+        return {"ok": True, "errores": [], "input": d, "paq": paq}
     except Exception as e:
-        return {"ok": False, "errores": [f"NEC: {type(e).__name__}: {e}"], "input": d}
+        return {"ok": False, "errores": [f"NEC: {type(e).__name__}: {e}"], "input": d, "paq": {}}
 
 
-# ------------------------
+# ==========================================================
 # Builders (pequeños)
-# ------------------------
+# ==========================================================
 
-def _build_input_nec(p: Any, sizing: Dict[str, Any]) -> tuple[Dict[str, Any], List[str]]:
+def _build_input_nec(p: Any, sizing: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str]]:
     d: Dict[str, Any] = {}
+
     d.update(_from_cfg_strings(sizing))
-    d.update(_from_inversor_sizing(sizing))
-    d.update(_defaults_proyecto(p))
+    d.update(_from_p_ac_w(sizing))
+    d.update(_defaults_desde_proyecto(p, sizing))
 
     errores = _validar_minimos_nec(d)
     return d, errores
@@ -47,106 +49,119 @@ def _from_cfg_strings(sizing: Dict[str, Any]) -> Dict[str, Any]:
     if not strings:
         return {}
 
-    # tu patrón actual: max() por seguridad
-    vmp_string_v = _max_num(strings, "vmp_string_v")
-    voc_string_v = _max_num(strings, "voc_string_v") or _max_num(strings, "voc_frio_v")  # fallback por si cambió key
-    imp_a = _max_num(strings, "imp_a")
-    isc_a = _max_num(strings, "isc_a")
+    # tus strings suelen venir como dicts con estas keys:
+    vmp = _max_num(strings, "vmp_string_v")
+    imp = _max_num(strings, "imp_a")
+    isc = _max_num(strings, "isc_a")
 
-    # cantidad de strings totales (en tu data actual: lista de strings)
-    n_strings_total = len(strings)
-
-    # iac estimada ya existe en cfg (la usas en electrico_ref)
-    iac_estimada_a = cfg.get("iac_estimada_a", None)
+    # voc frío: intenta varias keys por compat
+    voc_frio = (
+        _max_num(strings, "voc_frio_string_v")
+        or _max_num(strings, "voc_frio_v")
+        or _max_num(strings, "voc_string_v")
+        or _max_num(strings, "voc_v")
+    )
 
     out: Dict[str, Any] = {
-        "vmp_string_v": vmp_string_v,
-        "voc_string_v": voc_string_v,
-        "imp_a": imp_a,
-        "isc_a": isc_a,
-        "n_strings_total": n_strings_total,
+        # NEC espera esto:
+        "n_strings": len(strings),
+        "isc_mod_a": isc,
+        "imp_mod_a": imp,
+        "vmp_string_v": vmp,
+        "voc_frio_string_v": voc_frio,
     }
-    if isinstance(iac_estimada_a, (int, float)) and float(iac_estimada_a) > 0:
-        out["iac_estimada_a"] = float(iac_estimada_a)
+
+    # opcional: tu core usa iac_estimada_a a veces
+    iac = cfg.get("iac_estimada_a", None)
+    if isinstance(iac, (int, float)) and float(iac) > 0:
+        out["iac_estimada_a"] = float(iac)
 
     return out
 
 
-def _from_inversor_sizing(sizing: Dict[str, Any]) -> Dict[str, Any]:
+def _from_p_ac_w(sizing: Dict[str, Any]) -> Dict[str, Any]:
     """
-    NEC requiere pac_w para calcular AC (si no viene iac directo).
-    Intentamos encontrarlo en sizing con varios nombres sin romper.
+    NEC requiere p_ac_w para calcular Iac.
+    Lo buscamos en sizing con nombres típicos.
     """
     s = sizing or {}
 
-    # casos típicos: pac_kw, inv_kw_ac, kw_ac, etc.
+    p_ac_w = _first_num(s, ["p_ac_w", "pac_w"])
     pac_kw = _first_num(s, ["pac_kw", "pac_kw_ac", "inv_kw_ac", "kw_ac", "p_ac_kw"])
-    pac_w = _first_num(s, ["pac_w", "p_ac_w"])
 
-    if pac_w is None and pac_kw is not None:
-        pac_w = pac_kw * 1000.0
+    if p_ac_w is None and pac_kw is not None:
+        p_ac_w = pac_kw * 1000.0
 
-    out: Dict[str, Any] = {}
-    if pac_w is not None and pac_w > 0:
-        out["pac_w"] = float(pac_w)
-
-    # opcional: si sizing trae sistema AC o fases
-    sistema_ac = s.get("sistema_ac", None)
-    if isinstance(sistema_ac, str) and sistema_ac.strip():
-        out["sistema_ac"] = sistema_ac.strip()
-
-    return out
+    return {"p_ac_w": float(p_ac_w)} if (p_ac_w is not None and p_ac_w > 0) else {}
 
 
-def _defaults_proyecto(p: Any) -> Dict[str, Any]:
+def _defaults_desde_proyecto(p: Any, sizing: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Defaults seguros. Si mañana los mapeas desde UI/config, aquí es el único lugar.
+    Defaults seguros. Aquí es el ÚNICO lugar que luego conectás a config/UI.
+    Todo lo que no venga, se setea sin romper.
     """
+    eq = getattr(p, "equipos", None) or {}
+
+    # preferimos la tensión del eq UI si existe
+    tension = (
+        eq.get("tension_sistema")
+        or getattr(p, "tension_sistema", None)
+        or getattr(p, "sistema_ac", None)
+        or "1F_240V"
+    )
+
     return {
-        "sistema_ac": getattr(p, "sistema_ac", "1F-240V"),
-        "pf": float(getattr(p, "fp", 1.0) or 1.0),
+        # NEC parsea estas tags: 1F_240V, 2F+N_120/240, 3F+N_120/208, ...
+        "tension_sistema": _normalizar_tag_sistema_ac(str(tension)),
 
-        "dist_dc_m": float(getattr(p, "dist_dc_m", 10.0) or 10.0),
-        "dist_ac_m": float(getattr(p, "dist_ac_m", 15.0) or 15.0),
-        "vd_obj_dc_pct": float(getattr(p, "vd_obj_dc_pct", 2.0) or 2.0),
-        "vd_obj_ac_pct": float(getattr(p, "vd_obj_ac_pct", 2.0) or 2.0),
+        "pf_ac": float(getattr(p, "fp", 1.0) or 1.0),
 
-        "t_amb_c": float(getattr(p, "t_amb_c", 30.0) or 30.0),
+        "vd_max_dc_pct": float(getattr(p, "vd_obj_dc_pct", 2.0) or 2.0),
+        "vd_max_ac_pct": float(getattr(p, "vd_obj_ac_pct", 2.0) or 2.0),
+
+        "L_dc_string_m": float(getattr(p, "dist_dc_m", 10.0) or 10.0),
+        "L_dc_trunk_m": float(getattr(p, "L_dc_trunk_m", 0.0) or 0.0),
+        "L_ac_m": float(getattr(p, "dist_ac_m", 15.0) or 15.0),
+
         "material": getattr(p, "material_conductor", "Cu") or "Cu",
+        "temp_amb_c": float(getattr(p, "t_amb_c", 30.0) or 30.0),
 
-        # flags opcionales (si tu NEC los usa internamente)
-        "spd": getattr(p, "spd", True),
-        "seccionamiento": getattr(p, "seccionamiento", True),
+        "has_combiner": bool(getattr(p, "has_combiner", False)),
+        "dc_arch": getattr(p, "dc_arch", "string_to_inverter") or "string_to_inverter",
     }
 
 
-# ------------------------
+# ==========================================================
 # Validación mínima
-# ------------------------
+# ==========================================================
 
 def _validar_minimos_nec(d: Dict[str, Any]) -> List[str]:
     req = [
-        "vmp_string_v", "voc_string_v", "imp_a", "isc_a", "n_strings_total",
-        "dist_dc_m", "vd_obj_dc_pct",
-        "dist_ac_m", "vd_obj_ac_pct",
-        "sistema_ac",
+        "tension_sistema",
+        "n_strings",
+        "isc_mod_a",
+        "imp_mod_a",
+        "vmp_string_v",
+        "voc_frio_string_v",
+        "p_ac_w",
+        "L_dc_string_m",
+        "L_ac_m",
+        "vd_max_dc_pct",
+        "vd_max_ac_pct",
     ]
 
     errores: List[str] = []
     for k in req:
-        if d.get(k, None) in (None, "", 0):
+        v = d.get(k, None)
+        if v in (None, "", 0):
             errores.append(f"NEC: falta '{k}'")
-
-    # AC: o pac_w o iac_estimada_a (para que NEC calcule conductor/protección AC)
-    if (d.get("pac_w") in (None, 0)) and (d.get("iac_estimada_a") in (None, 0)):
-        errores.append("NEC: falta 'pac_w' o 'iac_estimada_a'")
 
     return errores
 
 
-# ------------------------
+# ==========================================================
 # Helpers pequeños
-# ------------------------
+# ==========================================================
 
 def _max_num(items: List[Dict[str, Any]], key: str) -> Optional[float]:
     vals: List[float] = []
@@ -163,3 +178,23 @@ def _first_num(d: Dict[str, Any], keys: List[str]) -> Optional[float]:
         if isinstance(v, (int, float)) and float(v) > 0:
             return float(v)
     return None
+
+
+def _normalizar_tag_sistema_ac(tag: str) -> str:
+    """
+    Normaliza variaciones típicas para que coincidan con parse_sistema_ac().
+    """
+    t = (tag or "").strip()
+
+    # Variantes comunes
+    if t in ("1F-240V", "1F_240", "1F240", "240V_1F"):
+        return "1F_240V"
+    if t in ("2F+N-120/240", "2F+N_120/240", "120/240", "1F_120/240"):
+        return "2F+N_120/240"
+    if t in ("3F+N-120/208", "3F+N_120/208", "208Y/120", "3F_208Y120V"):
+        return "3F+N_120/208"
+    if t in ("3F_480Y277", "3F+N_480Y277", "480Y/277"):
+        return "3F_480Y277V"
+
+    # Si ya viene en formato esperado, lo devolvemos
+    return t if t else "1F_240V"
