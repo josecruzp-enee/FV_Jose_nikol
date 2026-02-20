@@ -283,7 +283,7 @@ def _build_electrico(p, panel, pac_kw, rec):
             "p_ac_w": float(pac_kw) * 1000.0,
             "v_ac": 240.0,
             "fases": 1,
-            "sistema_ac": getattr(p, "sistema_ac", None),
+            "tension_sistema": getattr(p, "sistema_ac", None),
         },
     }
 
