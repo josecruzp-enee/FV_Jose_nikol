@@ -16,6 +16,19 @@ from ui.state_helpers import ensure_dict, merge_defaults, save_result_fingerprin
 # ==========================================================
 # Helpers estado
 # ==========================================================
+import pandas as pd
+
+def _yn(ok: bool) -> str:
+    return "✅ OK" if ok else "❌ NO CUMPLE"
+
+def _fmt(v, unit=""):
+    if v is None:
+        return "—"
+    if isinstance(v, (int, float)):
+        s = f"{v:.3f}".rstrip("0").rstrip(".")
+        return f"{s}{unit}"
+    return str(v)
+    
 def _asegurar_dict(ctx, nombre: str) -> dict:
     # compat wrapper
     return ensure_dict(ctx, nombre, dict)
@@ -158,6 +171,40 @@ def _validar_string_catalogo(eq, e, n_paneles):
 # ==========================================================
 # UI NEC display
 # ==========================================================
+import pandas as pd
+import streamlit as st
+
+def _yn(ok: bool) -> str:
+    return "✅ OK" if ok else "❌ NO CUMPLE"
+
+def _fmt(v, unit=""):
+    if v is None:
+        return "—"
+    if isinstance(v, (int, float)):
+        s = f"{v:.3f}".rstrip("0").rstrip(".")
+        return f"{s}{unit}"
+    return str(v)
+
+def _kv_df(d: dict, rename: dict | None = None, units: dict | None = None):
+    rename = rename or {}
+    units = units or {}
+    rows = []
+    for k, v in (d or {}).items():
+        if isinstance(v, (dict, list)):
+            continue
+        label = rename.get(k, k)
+        unit = units.get(k, "")
+        rows.append((label, _fmt(v, unit)))
+    return pd.DataFrame(rows, columns=["Parámetro", "Valor"])
+
+def _render_warnings(warnings: list):
+    if not warnings:
+        st.success("Sin warnings ✅")
+        return
+    st.warning("Warnings")
+    for w in warnings:
+        st.write(f"• {w}")
+
 def _mostrar_nec(pkg: dict):
     st.divider()
     st.subheader("Ingeniería NEC 2023")
@@ -166,27 +213,118 @@ def _mostrar_nec(pkg: dict):
         st.info("Sin resultados NEC.")
         return
 
-    dc = pkg.get("dc",{})
-    ac = pkg.get("ac",{})
-    cond = pkg.get("conductores",{})
-    ocpd = pkg.get("ocpd",{})
+    dc = pkg.get("dc", {}) or {}
+    ac = pkg.get("ac", {}) or {}
+    cond = pkg.get("conductores", {}) or {}
+    ocpd = pkg.get("ocpd", {}) or {}
 
-    c1,c2 = st.columns(2)
+    tabs = st.tabs(["⚡ DC", "🔌 AC", "🛡️ Protecciones", "🧵 Conductores", "🔎 Datos crudos"])
 
-    with c1:
-        st.markdown("**Corrientes DC**")
-        st.write(dc)
+    # ---------------- DC ----------------
+    with tabs[0]:
+        st.markdown("### Corrientes DC")
 
-    with c2:
-        st.markdown("**Corrientes AC**")
-        st.write(ac)
+        # Métricas principales (si existen)
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Strings", _fmt(dc.get("n_strings")))
+        c2.metric("I string oper.", _fmt(dc.get("i_string_oper_a"), " A"))
+        c3.metric("I diseño", _fmt(dc.get("i_array_design_a"), " A"))
+        c4.metric("Voc frío string", _fmt(dc.get("voc_frio_string_v"), " V"))
 
-    st.markdown("**Protecciones**")
-    st.write(ocpd)
+        df_dc = pd.DataFrame([
+            ("I string operativa", _fmt(dc.get("i_string_oper_a"), " A")),
+            ("I string máxima", _fmt(dc.get("i_string_max_a"), " A")),
+            ("I array Isc", _fmt(dc.get("i_array_isc_a"), " A")),
+            ("I array diseño", _fmt(dc.get("i_array_design_a"), " A")),
+            ("Vmp string", _fmt(dc.get("vmp_string_v"), " V")),
+            ("Voc frío string", _fmt(dc.get("voc_frio_string_v"), " V")),
+        ], columns=["Parámetro", "Valor"])
+        st.table(df_dc)
 
-    st.markdown("**Conductores**")
-    st.write(cond)
+        cfg = dc.get("config_strings", {}) or {}
+        if cfg:
+            st.markdown("#### Configuración de strings")
+            df_cfg = _kv_df(cfg, rename={
+                "n_strings": "Número de strings",
+                "modulos_por_string": "Módulos por string",
+                "tipo": "Tipo",
+            })
+            st.table(df_cfg)
 
+        _render_warnings(dc.get("warnings", []) or [])
+
+    # ---------------- AC ----------------
+    with tabs[1]:
+        st.markdown("### Corrientes AC")
+
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("P AC", _fmt(ac.get("p_ac_w"), " W"))
+        c2.metric("Voltaje", _fmt(ac.get("v_ll_v"), " V"))
+        c3.metric("I nominal", _fmt(ac.get("i_ac_nom_a"), " A"))
+        c4.metric("I diseño", _fmt(ac.get("i_ac_design_a"), " A"))
+
+        df_ac = pd.DataFrame([
+            ("Fases", _fmt(ac.get("fases"))),
+            ("FP", _fmt(ac.get("pf"))),
+            ("I nominal", _fmt(ac.get("i_ac_nom_a"), " A")),
+            ("I diseño", _fmt(ac.get("i_ac_design_a"), " A")),
+        ], columns=["Parámetro", "Valor"])
+        st.table(df_ac)
+
+        _render_warnings(ac.get("warnings", []) or [])
+
+    # ---------------- Protecciones ----------------
+    with tabs[2]:
+        st.markdown("### Protecciones")
+
+        br = (ocpd.get("breaker_ac") or {})
+        fs = (ocpd.get("fusible_string") or {})
+
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown("#### Breaker AC")
+            st.metric("I diseño", _fmt(br.get("i_diseno_a"), " A"))
+            st.metric("Tamaño seleccionado", _fmt(br.get("tamano_a"), " A"))
+
+        with col2:
+            st.markdown("#### Fusible por string")
+            req = bool(fs.get("requerido", False))
+            st.write("**Requerido:**", "Sí" if req else "No")
+            nota = fs.get("nota")
+            if nota:
+                st.info(nota)
+
+    # ---------------- Conductores ----------------
+    with tabs[3]:
+        st.markdown("### Conductores")
+        st.caption(f"Material: **{_fmt(cond.get('material'))}**")
+
+        rows = []
+        for key in ["dc_string", "dc_trunk", "ac_out"]:
+            c = cond.get(key)
+            if not c or c is None:
+                continue
+            rows.append({
+                "Circuito": c.get("nombre", key),
+                "I diseño": _fmt(c.get("i_a"), " A"),
+                "L": _fmt(c.get("l_m"), " m"),
+                "V base": _fmt(c.get("v_base_v"), " V"),
+                "AWG": _fmt(c.get("awg")),
+                "Amp. ajustada": _fmt(c.get("amp_ajustada_a"), " A"),
+                "VD %": _fmt(c.get("vd_pct"), "%"),
+                "Objetivo": _fmt(c.get("vd_obj_pct"), "%"),
+                "OK": "✅" if c.get("ok") else "❌",
+            })
+
+        if rows:
+            st.dataframe(pd.DataFrame(rows), use_container_width=True)
+        else:
+            st.info("Sin datos de conductores.")
+
+    # ---------------- Datos crudos ----------------
+    with tabs[4]:
+        st.markdown("### Datos crudos (para depurar)")
+        st.json(pkg)
 
 # ==========================================================
 # RENDER
@@ -229,7 +367,20 @@ def render(ctx):
 
         # UI
         st.success("Ingeniería eléctrica generada.")
-        st.write(validacion)
+        v = validacion or {}
+    st.subheader("Validación de string (catálogo)")
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Voc frío total", _fmt(v.get("voc_frio_total"), " V"))
+    c2.metric("Vmp operativo", _fmt(v.get("vmp_operativo"), " V"))
+    c3.metric("Corriente MPPT", _fmt(v.get("corriente_mppt"), " A"))
+    c4.write("**Estado**")
+    c4.write(f"- Vdc: {_yn(bool(v.get('ok_vdc')))}")
+    c4.write(f"- MPPT: {_yn(bool(v.get('ok_mppt')))}")
+    c4.write(f"- Corriente: {_yn(bool(v.get('ok_corriente')))}")
+    c4.write(f"- String: {_yn(bool(v.get('string_valido')))}")
+
+with st.expander("Ver validación (crudo)"):
+    st.json(v)
         _mostrar_nec(pkg)
     except Exception as exc:
         ctx.resultado_core = None
