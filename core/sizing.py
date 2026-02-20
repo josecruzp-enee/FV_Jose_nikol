@@ -270,6 +270,7 @@ def _calcular_strings(p, panel, inv, inv_id, pac_kw_fb, dc_ac, pdc):
 
 def _build_electrico(p, panel, pac_kw, rec):
     r = (rec or {}).get("recomendacion") or {}
+    print("DEBUG sistema_ac:", getattr(p, "sistema_ac", None))
     return {
         "strings": {
             "n_serie": int(r.get("n_paneles_string", 0)),
