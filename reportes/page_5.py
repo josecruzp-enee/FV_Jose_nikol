@@ -34,18 +34,26 @@ def _int(x, d=0):
     try: return int(float(x))
     except Exception: return int(d)
 
-def _dc_cfg(resultado: Dict[str, Any]) -> Dict[str, Any]:
-    e = resultado.get("electrico") or resultado
-    dc = (e.get("dc") or {})
-    return dc.get("config_strings") or {}
+def _get_dc(resultado: Dict[str, Any]) -> Dict[str, Any]:
+    for k in ("electrico", "electrico_nec", "paquete_electrico", "ingenieria_electrica"):
+        e = (resultado or {}).get(k)
+        if isinstance(e, dict) and isinstance(e.get("dc"), dict):
+            return e["dc"] or {}
+    return (resultado or {}).get("dc") or {}
 
 # ==== helpers cortos (<=10 líneas cada uno) ====
 
 def _strings_desde_sizing(resultado: Dict[str, Any]):
-    sizing = _get_sizing(resultado)
-    cfg = sizing.get("cfg_strings") or {}
-    return cfg, (cfg.get("strings") or [])
-
+    sizing = _get_sizing(resultado); cfg = sizing.get("cfg_strings") or {}
+    strings = cfg.get("strings") or []
+    if strings: return cfg, strings
+    dc = _get_dc(resultado); c = (dc.get("config_strings") or {})
+    if c.get("n_strings", 0) <= 0: return cfg, []
+    s = {"mppt": 1, "n_series": c.get("modulos_por_string", 0), "n_paralelo": c.get("n_strings", 0),
+         "vmp_string_v": dc.get("vmp_string_v", 0.0), "voc_string_frio_v": dc.get("voc_frio_string_v", 0.0),
+         "imp_a": dc.get("i_string_oper_a", 0.0), "isc_a": dc.get("i_array_isc_a", 0.0)}
+    return cfg, [s]
+    
 def _titulo_strings(styles):
     return [Spacer(1, 12),
             Paragraph("Configuración eléctrica referencial (Strings DC)", styles["Heading2"]),
@@ -101,6 +109,7 @@ def _build_tabla_strings_dc(resultado: Dict[str, Any], pal, styles, content_w: f
         return story + _resumen_strings(resultado, styles)
     story.append(_tabla_strings(strings, pal, content_w))
     return story + _notas_strings(cfg, styles)
+
 
 def build_page_5(resultado, datos, paths, pal, styles, content_w):
     """
