@@ -19,7 +19,7 @@ class SistemaAC:
 
 def parse_sistema_ac(tag: str) -> SistemaAC:
     m = _map_sistemas_ac()
-    return m.get(str(tag), m["1F_240V"])
+    return m.get(str(tag), m["2F+N_120/240"])
 
 
 def _map_sistemas_ac() -> Dict[str, SistemaAC]:
