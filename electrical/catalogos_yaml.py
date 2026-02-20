@@ -1,112 +1,100 @@
-# electrical/catalogos.py
+# electrical/catalogos_yaml.py
 from __future__ import annotations
 
-from typing import Dict, List, Optional
+from pathlib import Path
+from typing import Any, Dict
+import yaml
 
 from .modelos import Panel, Inversor
-from electrical.catalogos_yaml import cargar_paneles_yaml, cargar_inversores_yaml
+
+DATA_DIR = Path("data")
 
 
-_PANELES: Dict[str, Panel] = {
-    "panel_550w": Panel(
-        nombre="Panel 550 W (genérico)",
-        w=550.0,
-        vmp=41.5,
-        voc=49.5,
-        imp=13.25,
-        isc=14.10,
-    ),
-}
-
-_INVERSORES: Dict[str, Inversor] = {
-    "inv_5kw_2mppt": Inversor(
-        nombre="Inversor 5 kW (2 MPPT) genérico",
-        kw_ac=5.0,
-        n_mppt=2,
-        vmppt_min=120.0,
-        vmppt_max=480.0,
-        vdc_max=550.0,
-    ),
-}
+def _read_yaml(path: Path) -> Dict[str, Any]:
+    if not path.exists():
+        return {}
+    return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
 
 
-_PANELES_YAML: Optional[Dict[str, Panel]] = None
-_INVERSORES_YAML: Optional[Dict[str, Inversor]] = None
+def _req(d: Dict[str, Any], k: str, ctx: str) -> Any:
+    if k not in d or d[k] is None:
+        raise ValueError(f"Falta '{k}' en {ctx}")
+    return d[k]
 
 
-def _paneles_yaml() -> Dict[str, Panel]:
-    global _PANELES_YAML
-    if _PANELES_YAML is None:
-        _PANELES_YAML = cargar_paneles_yaml("paneles.yaml")
-    return _PANELES_YAML
+def _req_num(d: Dict[str, Any], k: str, ctx: str) -> float:
+    v = _req(d, k, ctx)
+    try:
+        return float(v)
+    except Exception as e:
+        raise ValueError(f"'{k}' debe ser numérico en {ctx}. Valor={v!r}") from e
 
 
-def _inversores_yaml() -> Dict[str, Inversor]:
-    global _INVERSORES_YAML
-    if _INVERSORES_YAML is None:
-        _INVERSORES_YAML = cargar_inversores_yaml("inversores.yaml")
-    return _INVERSORES_YAML
+def _validate_panel(pid: str, p: Dict[str, Any]) -> None:
+    _req(p, "marca", f"paneles.{pid}")
+    _req(p, "nombre", f"paneles.{pid}")
+    _req(p, "codigo", f"paneles.{pid}")
+
+    stc = _req(p, "stc", f"paneles.{pid}")
+    for k in ("pmax_w", "vmp_v", "imp_a", "voc_v", "isc_a"):
+        _req_num(stc, k, f"paneles.{pid}.stc")
+
+    co = _req(p, "coeficientes_pct_c", f"paneles.{pid}")
+    _req_num(co, "voc", f"paneles.{pid}.coeficientes_pct_c")
 
 
-def get_panel(panel_id: str) -> Panel:
-    paneles = _paneles_yaml()
-    if panel_id in paneles:
-        return paneles[panel_id]
-    if panel_id in _PANELES:
-        return _PANELES[panel_id]
-    raise KeyError(f"Panel no existe en catálogo: {panel_id}")
+def _validate_inversor(iid: str, inv: Dict[str, Any]) -> None:
+    _req(inv, "marca", f"inversores.{iid}")
+    _req(inv, "nombre", f"inversores.{iid}")
+    _req(inv, "codigo", f"inversores.{iid}")
+
+    dc = _req(inv, "entrada_dc", f"inversores.{iid}")
+    for k in ("vdc_max_v", "mppt_min_v", "mppt_max_v", "n_mppt"):
+        _req_num(dc, k, f"inversores.{iid}.entrada_dc")
+
+    # opcional
+    if "imppt_max_a" in dc and dc["imppt_max_a"] is not None:
+        _req_num(dc, "imppt_max_a", f"inversores.{iid}.entrada_dc")
 
 
-def get_inversor(inv_id: str) -> Inversor:
-    inversores = _inversores_yaml()
-    if inv_id in inversores:
-        return inversores[inv_id]
-    if inv_id in _INVERSORES:
-        return _INVERSORES[inv_id]
-    raise KeyError(f"Inversor no existe en catálogo: {inv_id}")
+def cargar_paneles_yaml(path: str = "paneles.yaml") -> Dict[str, Panel]:
+    doc = _read_yaml(DATA_DIR / path)
+    paneles = (doc.get("paneles") or {}) if isinstance(doc, dict) else {}
 
-
-def ids_paneles() -> List[str]:
-    y = list(_paneles_yaml().keys())
-    return sorted(y) if y else sorted(_PANELES.keys())
-
-
-def ids_inversores() -> List[str]:
-    y = list(_inversores_yaml().keys())
-    return sorted(y) if y else sorted(_INVERSORES.keys())
-
-
-def catalogo_paneles() -> List[dict]:
-    paneles = _paneles_yaml() or _PANELES
-    out: List[dict] = []
-    for pid in sorted(paneles.keys()):
-        p = paneles[pid]
-        out.append({
-            "id": pid,
-            "marca": "YAML",
-            "modelo": p.nombre,
-            "pmax_w": float(p.w),
-            "vmp_v": float(p.vmp),
-            "voc_v": float(p.voc),
-            "imp_a": float(p.imp),
-            "isc_a": float(p.isc),
-        })
+    out: Dict[str, Panel] = {}
+    for pid, p in paneles.items():
+        _validate_panel(pid, p)
+        stc = p["stc"]
+        out[pid] = Panel(
+            nombre=str(p["nombre"]).strip(),
+            w=float(stc["pmax_w"]),
+            vmp=float(stc["vmp_v"]),
+            voc=float(stc["voc_v"]),
+            imp=float(stc["imp_a"]),
+            isc=float(stc["isc_a"]),
+        )
     return out
 
 
-def catalogo_inversores() -> List[dict]:
-    inversores = _inversores_yaml() or _INVERSORES
-    out: List[dict] = []
-    for iid in sorted(inversores.keys()):
-        inv = inversores[iid]
-        out.append({
-            "id": iid,
-            "marca": "YAML",
-            "modelo": inv.nombre,
-            "pac_kw": float(inv.kw_ac),
-            "n_mppt": int(inv.n_mppt),
-            "mppt_min_v": float(inv.vmppt_min),
-            "mppt_max_v": float(inv.vmppt_max),
-            "vmax_dc_v": float(inv.vdc_max),
-        })
+def cargar_inversores_yaml(path: str = "inversores.yaml") -> Dict[str, Inversor]:
+    doc = _read_yaml(DATA_DIR / path)
+    inversores = (doc.get("inversores") or {}) if isinstance(doc, dict) else {}
+
+    out: Dict[str, Inversor] = {}
+    for iid, inv in inversores.items():
+        _validate_inversor(iid, inv)
+        dc = inv["entrada_dc"]
+
+        # pac_kw: intenta leer salida_ac.pac_kw, si no existe usa inv.pac_kw, si no 0.0
+        salida = inv.get("salida_ac", {}) if isinstance(inv, dict) else {}
+        pac_kw = float(salida.get("pac_kw", inv.get("pac_kw", 0.0)) or 0.0)
+
+        out[iid] = Inversor(
+            nombre=str(inv["nombre"]).strip(),
+            kw_ac=pac_kw,
+            n_mppt=int(dc["n_mppt"]),
+            vmppt_min=float(dc["mppt_min_v"]),
+            vmppt_max=float(dc["mppt_max_v"]),
+            vdc_max=float(dc["vdc_max_v"]),
+        )
     return out
