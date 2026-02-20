@@ -6,7 +6,7 @@ import streamlit as st
 import pandas as pd
 
 from electrical.validador_strings import PanelFV, InversorFV, validar_string
-from core.orquestador import ejecutar_evaluacion
+from core.orquestador import ejecutar_estudio  # ✅ nuevo entrypoint
 from core.modelo import Datosproyecto
 from electrical.catalogos import get_panel, get_inversor
 from ui.validaciones_ui import campos_faltantes_para_paso5
@@ -218,26 +218,26 @@ def _ui_inputs_electricos(e: dict):
 
 
 # ==========================================================
-# CORE + NEC
+# CORE (ResultadoProyecto)
 # ==========================================================
-def _ejecutar_core(ctx):
+def _ejecutar_core(ctx) -> Dict[str, Any]:
     datos = _datosproyecto_desde_ctx(ctx)
     ctx.datos_proyecto = datos
-    res = ejecutar_evaluacion(datos)
-    ctx.resultado_core = res
-    return res
 
+    # ✅ Contrato central: ResultadoProyecto único
+    res_proy = ejecutar_estudio(datos)
 
-def _obtener_pkg_nec(ctx, res: Dict[str, Any] | None = None):
-    """Extrae paquete NEC; compat: si no se provee `res`, ejecuta core."""
-    if res is None:
-        datos = _datosproyecto_desde_ctx(ctx)
-        res = ejecutar_evaluacion(datos)
-    return ((res or {}).get("electrico_nec") or {}).get("paq", {})
+    # Fuente de verdad
+    ctx.resultado_proyecto = res_proy
+
+    # Compat: si otras pantallas siguen leyendo resultado_core (plano)
+    ctx.resultado_core = res_proy.get("_compat", {}) or {}
+
+    return res_proy
 
 
 # ==========================================================
-# Validación string (catálogo)
+# Validación string (catálogo) - temporal (luego mover a core/electrical)
 # ==========================================================
 def _validar_string_catalogo(eq, e, n_paneles):
     p = get_panel(eq["panel_id"])
@@ -245,9 +245,6 @@ def _validar_string_catalogo(eq, e, n_paneles):
 
     panel = PanelFV(p.voc, p.vmp, p.isc, p.imp, getattr(p, "coef_voc", -0.28))
 
-    # ⚠️ No uses p.imp como fallback de imppt_max del inversor.
-    # Si no existe en catálogo, ponemos un valor alto para no falsear "NO CUMPLE",
-    # y avisamos vía warning UI (abajo).
     imppt_max = getattr(inv, "imppt_max", None)
     imppt_max_fallback = False
     if imppt_max is None:
@@ -279,7 +276,6 @@ def _mostrar_nec(pkg: dict):
 
     tabs = st.tabs(["⚡ DC", "🔌 AC", "🛡️ Protecciones", "🧵 Conductores", "🔎 Datos crudos"])
 
-    # ---------------- DC ----------------
     with tabs[0]:
         st.markdown("### Corrientes DC")
 
@@ -323,7 +319,6 @@ def _mostrar_nec(pkg: dict):
 
         _render_warnings(dc.get("warnings", []) or [])
 
-    # ---------------- AC ----------------
     with tabs[1]:
         st.markdown("### Corrientes AC")
 
@@ -349,7 +344,6 @@ def _mostrar_nec(pkg: dict):
 
         _render_warnings(ac.get("warnings", []) or [])
 
-    # ---------------- Protecciones ----------------
     with tabs[2]:
         st.markdown("### Protecciones")
 
@@ -370,7 +364,6 @@ def _mostrar_nec(pkg: dict):
             if nota:
                 st.info(nota)
 
-    # ---------------- Conductores ----------------
     with tabs[3]:
         st.markdown("### Conductores")
         st.caption(f"Material: **{_fmt(cond.get('material'))}**")
@@ -403,7 +396,6 @@ def _mostrar_nec(pkg: dict):
         else:
             st.info("Sin datos de conductores.")
 
-    # ---------------- Datos crudos ----------------
     with tabs[4]:
         st.markdown("### Datos crudos (para depurar)")
         st.json(pkg)
@@ -426,7 +418,9 @@ def _mostrar_validacion_string(validacion: dict):
         st.write(f"- String: {_yn(bool(v.get('string_valido')))}")
 
     if v.get("_imppt_max_fallback"):
-        st.warning("El inversor no trae `imppt_max` en el catálogo. Se usó un fallback (muy alto) para no falsear la validación de corriente.")
+        st.warning(
+            "El inversor no trae `imppt_max` en el catálogo. Se usó un fallback (muy alto) para no falsear la validación de corriente."
+        )
 
     with st.expander("Ver validación (crudo)"):
         st.json(v)
@@ -455,19 +449,24 @@ def render(ctx):
         return
 
     try:
-        # CORE
+        # CORE (ResultadoProyecto)
         res = _ejecutar_core(ctx)
 
-        # sizing
-        n_paneles = int((res.get("sizing") or {}).get("n_paneles_string", 10))
+        # sizing desde contrato central
+        sizing = (res.get("tecnico") or {}).get("sizing") or {}
+        n_paneles = int(sizing.get("n_paneles_string") or 10)
 
-        # validación
+        # validación catálogo (temporal en UI)
         validacion = _validar_string_catalogo(eq, e, n_paneles)
         ctx.validacion_string = validacion
 
-        # NEC
-        pkg = _obtener_pkg_nec(ctx, res=res)
+        # NEC package desde contrato central
+        electrico_nec = (res.get("tecnico") or {}).get("electrico_nec") or {}
+        pkg = (electrico_nec.get("paq") or {})
+
+        # compat con validar(ctx) legacy
         ctx.resultado_electrico = pkg
+
         save_result_fingerprint(ctx)
 
         # UI
@@ -476,6 +475,7 @@ def render(ctx):
         _mostrar_nec(pkg)
 
     except Exception as exc:
+        ctx.resultado_proyecto = None
         ctx.resultado_core = None
         ctx.resultado_electrico = None
         setattr(ctx, "result_inputs_fingerprint", None)
@@ -492,7 +492,8 @@ def validar(ctx) -> Tuple[bool, List[str]]:
     if not (eq.get("panel_id") and eq.get("inversor_id")):
         errores.append("Falta seleccionar equipos.")
 
-    if getattr(ctx, "resultado_electrico", None) is None:
+    # ✅ nuevo contrato (pero mantenemos compat con resultado_electrico)
+    if getattr(ctx, "resultado_proyecto", None) is None and getattr(ctx, "resultado_electrico", None) is None:
         errores.append("Debe generar ingeniería.")
 
     return len(errores) == 0, errores
