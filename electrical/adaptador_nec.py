@@ -2,8 +2,11 @@
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Tuple
+import logging
 
 from electrical.ingenieria_nec_2023 import calcular_paquete_electrico_nec
+
+logger = logging.getLogger(__name__)
 
 
 # ==========================================================
@@ -15,7 +18,7 @@ def generar_electrico_nec(*, p: Any, sizing: Dict[str, Any]) -> Dict[str, Any]:
 
     if errores:
         return {"ok": False, "errores": errores, "input": datos, "paq": {}}
-    print("DEBUG ELECTRICO:", sizing.get("electrico"))
+    logger.debug("DEBUG ELECTRICO: %s", sizing.get("electrico"))
     return _ejecutar_nec(datos)
 
 

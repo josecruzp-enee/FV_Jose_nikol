@@ -6,14 +6,14 @@ from typing import Any, Dict, List
 from reportlab.platypus import Paragraph, Spacer, PageBreak, Table, TableStyle
 from reportlab.lib import colors
 
-
-def _get_sizing(resultado: Dict[str, Any]) -> Dict[str, Any]:
-    return (resultado or {}).get("sizing") or {}
-
-
-def _get_tabla_12m(resultado: Dict[str, Any]) -> List[Dict[str, Any]]:
-    t = (resultado or {}).get("tabla_12m") or []
-    return t if isinstance(t, list) else []
+from core.result_accessors import (
+    get_capex_L,
+    get_kwp_dc,
+    get_n_paneles,
+    get_sizing,
+    get_strings,
+    get_tabla_12m,
+)
 
 
 def _sum_float(tabla: List[Dict[str, Any]], key: str) -> float:
@@ -42,15 +42,10 @@ def _get_dc(resultado: Dict[str, Any]) -> Dict[str, Any]:
     return (resultado or {}).get("dc") or {}
 
 def _strings_desde_sizing(resultado: Dict[str, Any]):
-    sizing = _get_sizing(resultado); cfg = sizing.get("cfg_strings") or {}
-    strings = cfg.get("strings") or []
-    if strings: return cfg, strings
-    dc = _get_dc(resultado); c = (dc.get("config_strings") or {})
-    if c.get("n_strings", 0) <= 0: return cfg, []
-    s = {"mppt": 1, "n_series": c.get("modulos_por_string", 0), "n_paralelo": c.get("n_strings", 0),
-         "vmp_string_v": dc.get("vmp_string_v", 0.0), "voc_string_frio_v": dc.get("voc_frio_string_v", 0.0),
-         "imp_a": dc.get("i_string_oper_a", 0.0), "isc_a": dc.get("i_array_isc_a", 0.0)}
-    return cfg, [s]
+    sizing = get_sizing(resultado)
+    cfg = sizing.get("cfg_strings") or {}
+    strings = get_strings(resultado)
+    return cfg, strings
 
 def _titulo_strings(styles):
     return [Spacer(1, 12),
@@ -114,12 +109,12 @@ def build_page_5(resultado, datos, paths, pal, styles, content_w):
     story.append(Paragraph("Resumen técnico", styles["Title"]))
     story.append(Spacer(1, 10))
 
-    sizing = _get_sizing(resultado)
-    tabla_12m = _get_tabla_12m(resultado)
+    sizing = get_sizing(resultado)
+    tabla_12m = get_tabla_12m(resultado)
 
-    kwp_dc = float(sizing.get("kwp_dc", 0.0) or 0.0)
-    n_paneles = int(sizing.get("n_paneles", 0) or 0)
-    capex_L = float(sizing.get("capex_L", 0.0) or 0.0)
+    kwp_dc = get_kwp_dc(resultado)
+    n_paneles = get_n_paneles(resultado)
+    capex_L = get_capex_L(resultado)
 
     ahorro_anual_L = _sum_float(tabla_12m, "ahorro_L")
     fv_anual_kwh = _sum_float(tabla_12m, "fv_kwh")
@@ -134,19 +129,7 @@ def build_page_5(resultado, datos, paths, pal, styles, content_w):
     story.append(Paragraph(f"Generación FV útil (12m): {fv_anual_kwh:,.0f} kWh", styles["BodyText"]))
     story.append(Paragraph(f"Ahorro anual estimado (12m): L {ahorro_anual_L:,.2f}", styles["BodyText"]))
 
-    story.append(Paragraph(f"Ahorro anual estimado (12m): L {ahorro_anual_L:,.2f}", styles["BodyText"]))
-
-    # ---- DEBUG TEMPORAL ----
-    dc_debug = _get_dc(resultado)
-    story.append(Spacer(1, 6))
-    story.append(Paragraph(f"DEBUG DC keys: {list(dc_debug.keys())}", styles["BodyText"]))
-    story.append(Paragraph(f"DEBUG config_strings: {dc_debug.get('config_strings')}", styles["BodyText"]))
-    # ------------------------
-
-    # ✅ Strings DC
-    story += _build_tabla_strings_dc(resultado, pal, styles, content_w)
-
-    # ✅ NUEVO: Strings DC visibles en el PDF
+    # Strings DC
     story += _build_tabla_strings_dc(resultado, pal, styles, content_w)
 
     story.append(PageBreak())

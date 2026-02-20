@@ -1,11 +1,24 @@
 # ui/resultados.py
 from __future__ import annotations
 
+import copy
+
 from typing import Any, Dict, List, Tuple
 
 import streamlit as st
 
 from core.rutas import preparar_salida, money_L, num
+from core.result_accessors import (
+    as_float,
+    as_int,
+    get_capex_L,
+    get_consumo_anual,
+    get_kwp_dc,
+    get_n_paneles,
+    get_sizing,
+    get_tabla_12m,
+)
+from ui.state_helpers import is_result_stale
 from reportes.generar_charts import generar_charts
 from reportes.generar_layout_paneles import generar_layout_paneles
 from reportes.generar_pdf_profesional import generar_pdf_profesional
@@ -88,77 +101,42 @@ def _validar_datos_para_pdf(ctx) -> bool:
 
 
 def _get_sizing(res: dict) -> Dict[str, Any]:
-    sizing = res.get("sizing")
-    if not isinstance(sizing, dict):
-        sizing = {}
-        res["sizing"] = sizing
-    return sizing
+    """Compat wrapper: delega al accessor canónico sin mutar entrada."""
+    return get_sizing(res)
 
 
 def _as_float(x: Any, default: float = 0.0) -> float:
-    try:
-        if x is None:
-            return default
-        return float(x)
-    except Exception:
-        return default
+    """Compat wrapper: delega en accessor canónico."""
+    return as_float(x, default)
 
 
 def _as_int(x: Any, default: int = 0) -> int:
-    try:
-        if x is None:
-            return default
-        return int(x)
-    except Exception:
-        return default
+    """Compat wrapper: delega en accessor canónico."""
+    return as_int(x, default)
 
 
 def _kwp_dc_from_sizing(sizing: Dict[str, Any]) -> float:
-    return _as_float(
-        sizing.get("kwp_dc")
-        or sizing.get("kwp_recomendado")
-        or sizing.get("kwp")
-        or sizing.get("pdc_kw")
-        or 0.0
-    )
+    # compat: conserva firma anterior
+    return get_kwp_dc({"sizing": dict(sizing or {})})
 
 
 def _capex_L_from_sizing(sizing: Dict[str, Any]) -> float:
-    return _as_float(sizing.get("capex_L") or sizing.get("capex") or 0.0)
+    # compat: conserva firma anterior
+    return get_capex_L({"sizing": dict(sizing or {})})
 
 
 def _n_paneles_from_sizing(sizing: Dict[str, Any]) -> int:
-    n = sizing.get("n_paneles")
-    if n:
-        return _as_int(n, 0)
-
-    cfg = sizing.get("cfg_strings") or {}
-    # heurísticos comunes
-    return _as_int(cfg.get("n_paneles") or cfg.get("n_modulos") or cfg.get("n_paneles_total") or 0, 0)
+    # compat: conserva firma anterior
+    return get_n_paneles({"sizing": dict(sizing or {})})
 
 
 def _consumo_anual_from_tabla_12m(res: dict) -> float:
-    tabla = res.get("tabla_12m") or []
-    if not isinstance(tabla, list) or not tabla:
-        return 0.0
-
-    total = 0.0
-    for row in tabla:
-        if not isinstance(row, dict):
-            continue
-        total += _as_float(row.get("consumo_kwh") or row.get("consumo_mes_kwh") or 0.0)
-    return float(total)
+    # compat: conserva firma anterior
+    return get_consumo_anual(res, datos=None)
 
 
 def _consumo_anual_from_datos_proyecto(ctx) -> float:
-    dp = getattr(ctx, "datos_proyecto", None)
-    if dp is None:
-        return 0.0
-
-    consumo_12m = getattr(dp, "consumo_12m", None) or getattr(dp, "consumo_mensual_kwh", None)
-    if isinstance(consumo_12m, list) and consumo_12m:
-        return float(sum(_as_float(x) for x in consumo_12m))
-    return 0.0
+    return get_consumo_anual({}, datos=getattr(ctx, "datos_proyecto", None))
 
 
 def _ensure_res_pdf_keys(res: dict, ctx) -> None:
@@ -180,9 +158,7 @@ def _ensure_res_pdf_keys(res: dict, ctx) -> None:
     sizing.setdefault("capex_L", capex_L)
 
     if "consumo_anual" not in res:
-        consumo_anual = _consumo_anual_from_tabla_12m(res)
-        if consumo_anual <= 0:
-            consumo_anual = _consumo_anual_from_datos_proyecto(ctx)
+        consumo_anual = get_consumo_anual(res, datos=getattr(ctx, "datos_proyecto", None))
         res["consumo_anual"] = float(consumo_anual)
 
 
@@ -270,11 +246,11 @@ def _render_resumen_electrico(pkg: dict) -> None:
 # ==========================================================
 
 
-def _ui_boton_pdf() -> bool:
+def _ui_boton_pdf(disabled: bool = False) -> bool:
     st.markdown("#### Generar propuesta (PDF)")
     col_a, col_b = st.columns([1, 2])
     with col_a:
-        run = st.button("Generar PDF", type="primary")
+        run = st.button("Generar PDF", type="primary", disabled=disabled)
     with col_b:
         st.caption("Genera charts, layout y PDF profesional usando los datos ya calculados.")
     return bool(run)
@@ -376,10 +352,16 @@ def render(ctx) -> None:
     _render_resumen_electrico(pkg)
     st.divider()
 
-    if not _ui_boton_pdf():
+    stale_inputs = is_result_stale(ctx)
+    if stale_inputs:
+        st.warning("Los datos de entrada cambiaron después del cálculo del Paso 5. Regenera la ingeniería antes del PDF.")
+
+    if not _ui_boton_pdf(disabled=stale_inputs):
         return
 
-    _ejecutar_pipeline_pdf(ctx, res, vista)
+    # Evita mutar ctx.resultado_core (puede estar cacheado/reusado por otros pasos).
+    res_pdf = copy.deepcopy(res)
+    _ejecutar_pipeline_pdf(ctx, res_pdf, vista)
 
 
 def validar(ctx) -> Tuple[bool, List[str]]:
@@ -388,4 +370,6 @@ def validar(ctx) -> Tuple[bool, List[str]]:
         errores.append("No hay resultados del motor FV (genere en Paso 5).")
     if getattr(ctx, "resultado_electrico", None) is None:
         errores.append("No hay resultados eléctricos (genere en Paso 5).")
+    if is_result_stale(ctx):
+        errores.append("Los resultados están desactualizados. Regenera la ingeniería del Paso 5.")
     return (len(errores) == 0), errores

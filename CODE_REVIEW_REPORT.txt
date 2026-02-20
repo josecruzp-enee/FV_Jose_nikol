@@ -1,0 +1,275 @@
+CODE REVIEW PROFUNDO — FV_Jose_nikol
+Fecha: 2026-02-20
+Alcance: revisión del estado actual del repo y PR reciente de deduplicación/estabilidad.
+
+============================================================
+1) RESUMEN EJECUTIVO
+============================================================
+- El PR mejora la base técnica en tres frentes valiosos: accessors canónicos, consolidación de helpers PDF y guardrail anti-stale.
+- La app mantiene arranque e imports principales, y la suite actual valida smoke mínimo y happy-path del orquestador.
+- Persisten riesgos funcionales en el flujo Paso 5→Paso 6 por doble ejecución del orquestador y posible divergencia entre resultados mostrados y resultados guardados.
+- Hay un posible desalineamiento de contrato de clave eléctrica en salida (`electrico` vs `electrico_ref`) que puede degradar contenido del PDF sin crashear.
+- La mutación de `datos_proyecto` dentro de `ui/resultados.py` sigue introduciendo side-effects innecesarios entre pasos.
+- `core/result_accessors.py` está bien orientado (funciones puras), pero la coexistencia de aliases internos y wrappers UI mantiene deuda de transición.
+- Se resolvió parte de la duplicación, aunque aún hay conversiones locales en reportes (`page_5`) y eléctrico (`ingenieria_nec_2023`) fuera de la estrategia canónica.
+- La capa de formato monetario quedó más consistente, pero conviene blindarla con tests de localización, redondeo y decimales negativos/None.
+- No se observan problemas críticos de seguridad; los principales riesgos son de consistencia de datos y regressions silenciosas (P1).
+
+============================================================
+2) HALLAZGOS POR SEVERIDAD
+============================================================
+
+-------------------------
+P0 (crash / corrupción / seguridad / resultados incorrectos)
+-------------------------
+
+P0-1) Divergencia de resultado por doble ejecución del core en Paso 5
+- Archivos/funciones:
+  - ui/ingenieria_electrica.py::_ejecutar_core
+  - ui/ingenieria_electrica.py::_obtener_pkg_nec
+  - ui/ingenieria_electrica.py::render
+- Por qué importa:
+  - Se ejecuta `ejecutar_evaluacion(datos)` dos veces por click: una para `ctx.resultado_core` y otra para extraer NEC.
+  - Si hay no determinismo (futuro: timestamp, defaults mutables, catálogos dinámicos), puede quedar `ctx.resultado_core` y `ctx.resultado_electrico` desalineados.
+  - También duplica tiempo de cómputo y superficie de fallo.
+- Cómo reproducir:
+  1) Instrumentar contador/log temporal alrededor de `ejecutar_evaluacion`.
+  2) Pulsar “Generar ingeniería eléctrica” una sola vez.
+  3) Verificar dos ejecuciones del pipeline.
+- Fix sugerido:
+  - Reusar el `res` ya calculado en `_ejecutar_core` para tomar NEC: `pkg = (res.get("electrico_nec") or {}).get("paq", {})`.
+  - Mantener `_obtener_pkg_nec` como wrapper retrocompatible, pero evitar segunda corrida en flujo normal.
+- Test recomendado:
+  - Test unitario con mock/spies de `ejecutar_evaluacion` que garantice “1 click => 1 ejecución”.
+
+P0-2) Riesgo de resultados PDF incoherentes por side-effect en `datos_proyecto`
+- Archivos/funciones:
+  - ui/resultados.py::_datos_pdf_from_ctx
+- Por qué importa:
+  - Aunque se usa deepcopy para `res`, el método hace `setattr(dp, "consumo_anual", ...)` sobre el objeto compartido en contexto.
+  - Ese side-effect puede alterar pasos posteriores o comparaciones de fingerprint si se amplía el scope.
+- Cómo reproducir:
+  1) Generar ingeniería.
+  2) Entrar a Paso 6 y generar PDF.
+  3) Inspeccionar `ctx.datos_proyecto.__dict__` antes/después para observar atributo inyectado.
+- Fix sugerido:
+  - No mutar `dp`; usar solo `datos_pdf` local con fallback explícito.
+- Test recomendado:
+  - Test que valide inmutabilidad de `ctx.datos_proyecto` tras `_datos_pdf_from_ctx`.
+
+-------------------------
+P1 (regresiones probables / inconsistencias / deuda alta)
+-------------------------
+
+P1-1) Clave de contrato eléctrica potencialmente derivada (`electrico` vs `electrico_ref`)
+- Archivos/funciones:
+  - core/orquestador.py::_armar_salida (usa `"electrico"`)
+  - reportes/page_4.py::build_page_4 (lee `resultado.get("electrico_ref")`)
+- Por qué importa:
+  - Si `electrico_ref` no existe, la sección referencial del PDF puede quedar vacía sin error explícito.
+- Cómo reproducir:
+  1) Ejecutar flujo completo y abrir PDF.
+  2) Validar bloque de conductores referenciales en Page 4.
+- Fix sugerido:
+  - Acordar clave canónica y añadir fallback robusto: `resultado.get("electrico_ref") or resultado.get("electrico")`.
+  - Documentar contrato en un único archivo.
+- Test recomendado:
+  - Test de page_4 con fixtures para ambas claves y assertions de contenido esperado.
+
+P1-2) Fingerprint anti-stale no se aplica en Paso 5 (solo en Paso 6)
+- Archivos/funciones:
+  - ui/state_helpers.py::build_inputs_fingerprint/is_result_stale
+  - ui/resultados.py::render/validar
+  - ui/ingenieria_electrica.py::render
+- Por qué importa:
+  - El guardrail bloquea PDF, pero no evita navegar con resultados stale ni muestra estado global temprano.
+- Cómo reproducir:
+  1) Generar ingeniería.
+  2) Cambiar inputs en pasos previos.
+  3) Navegar pasos sin regenerar; solo se avisa en Paso 6.
+- Fix sugerido:
+  - Añadir aviso global de stale en encabezado del wizard o en Paso 5 al entrar.
+- Test recomendado:
+  - Test de integración de navegación: stale detectado al retornar a Paso 5/Paso 6.
+
+P1-3) Estrategia de conversiones aún fragmentada
+- Archivos/funciones:
+  - core/result_accessors.py::as_float/as_int
+  - reportes/page_5.py::_flt/_int
+  - electrical/ingenieria_nec_2023.py::_as_float/_as_int (mencionado por alcance)
+- Por qué importa:
+  - Duplicación de conversiones aumenta riesgo de divergencia de comportamiento en bordes (None, str vacía, NaN textual).
+- Cómo reproducir:
+  - Buscar funciones homólogas y correr casos límite con valores no numéricos.
+- Fix sugerido:
+  - Definir utilidades por dominio (core data vs presentación), con imports explícitos y wrappers de compatibilidad.
+- Test recomendado:
+  - Matriz parametrizada de conversiones para 20 casos límite reutilizable en core/reportes/electrical.
+
+P1-4) Dependencia implícita de shape flexible en reportes
+- Archivos/funciones:
+  - reportes/page_1.py, page_2.py, page_5.py
+  - core/result_accessors.py
+- Por qué importa:
+  - Se mezcla acceso directo con accessors; el shape real de `res` no está versionado y puede derivar silenciosamente.
+- Cómo reproducir:
+  - Alterar key secundaria (ej. `pdc_kw`/`kwp_dc`) y comprobar diferencias entre páginas.
+- Fix sugerido:
+  - Forzar consumo vía accessors y contratos explícitos para campos de reporte.
+- Test recomendado:
+  - Fixture único de `res` + validación snapshot de datos de entrada a cada page builder.
+
+-------------------------
+P2 (mantenibilidad / style / mejoras)
+-------------------------
+
+P2-1) Deuda de wrappers legacy en UI resultados
+- Archivos/funciones:
+  - ui/resultados.py::_get_sizing, _as_float, _as_int, _kwp_dc_from_sizing, etc.
+- Por qué importa:
+  - Mejoran compatibilidad hoy, pero aumentan superficie de mantenimiento.
+- Cómo reproducir:
+  - Inspección estática: wrappers 1:1 sin lógica adicional.
+- Fix sugerido:
+  - Marcar wrappers con TODO + fecha objetivo de remoción.
+- Test recomendado:
+  - Test de backward compatibility mientras existan; eliminar junto con callers legacy.
+
+P2-2) Falta de tipado fuerte en shape de salida
+- Archivos/funciones:
+  - core/orquestador.py::ejecutar_evaluacion
+  - core/result_accessors.py
+- Por qué importa:
+  - Dicts anidados sin TypedDict/dataclass de contrato hacen difícil prevenir deriva.
+- Cómo reproducir:
+  - Introducir key typo en un módulo y observar que no falla hasta UI/PDF.
+- Fix sugerido:
+  - Introducir TypedDict gradual para `ResultadoCore`/`SizingOut`.
+- Test recomendado:
+  - mypy/pyright gate básico + tests de esquema mínimo.
+
+P2-3) Cobertura de smoke UI todavía limitada
+- Archivos/funciones:
+  - tests/test_smoke_import_app.py
+- Por qué importa:
+  - Cubre import, pero no transición real Paso 1→Paso 6.
+- Cómo reproducir:
+  - Romper una key usada solo en Paso 6; import smoke seguirá pasando.
+- Fix sugerido:
+  - Añadir smoke funcional con Playwright o pruebas de capa pura sobre ctx mock.
+- Test recomendado:
+  - Test e2e headless mínimo de generación en Paso 5 + render Paso 6 sin excepción.
+
+============================================================
+3) ARQUITECTURA Y DEPENDENCIAS
+============================================================
+
+Diagrama textual (capas)
+- Capa App:
+  - app.py
+- Capa UI:
+  - ui/router.py, ui/estado.py, ui/datos_cliente.py, ui/consumo_energetico.py, ui/sistema_fv.py, ui/seleccion_equipos.py, ui/ingenieria_electrica.py, ui/resultados.py
+- Capa Core:
+  - core/orquestador.py, core/sizing.py, core/simular_12_meses.py, core/evaluacion.py, core/finanzas_lp.py, core/result_accessors.py, core/rutas.py
+- Capa Eléctrica:
+  - electrical/adaptador_nec.py, electrical/ingenieria_nec_2023.py, electrical/paquete_electrico.py, electrical/tramos_base.py
+- Capa Reportes:
+  - reportes/generar_pdf_profesional.py, reportes/page_1..page_5.py, reportes/pdf_utils.py (+ reexports helpers_pdf.py/utils.py)
+
+Riesgos de imports/ciclos/side-effects
+- No se detectaron ciclos obvios graves en esta revisión.
+- Riesgo moderado de side-effects por mutación de objetos de contexto compartidos (no por imports pesados).
+- Reexports en reportes están bien para compatibilidad, pero deben vigilarse para evitar import-path drift.
+- `app.py -> ui.ingenieria_electrica -> core.orquestador -> electrical.*` sigue siendo cadena crítica de arranque.
+
+============================================================
+4) CONTRATOS DE DATOS
+============================================================
+
+Shape esperado de `res` (mínimo operativo)
+- params_fv: dict
+- sizing: dict (kwp_dc/capex_L/n_paneles o equivalentes soportados por accessors)
+- cuota_mensual: float
+- tabla_12m: list[dict] (12 filas esperadas)
+- evaluacion: dict
+- decision: dict
+- electrico: dict|None (referencial)
+- electrico_nec: dict (espera `paq` para vistas NEC)
+- finanzas_lp: dict
+
+Shape esperado de `ctx` (wizard)
+- datos_cliente: dict
+- consumo: dict (`kwh_12m`, tarifa, cargos)
+- sistema_fv: dict
+- equipos: dict (panel_id, inversor_id, etc.)
+- electrico: dict
+- resultado_core: dict|None
+- resultado_electrico: dict|None
+- datos_proyecto: objeto Datosproyecto
+- result_inputs_fingerprint: str|None (nuevo guardrail)
+
+Riesgos de deriva UI↔core↔reportes
+- Diferencias de naming (`electrico` vs `electrico_ref`), campos duplicados (`kwp_dc` vs `pdc_kw`) y mutación de estado en UI pueden generar inconsistencias silenciosas.
+- Accessors mitigan parte de la deriva, pero no todo: reportes aún combina acceso directo + accessor.
+
+============================================================
+5) TESTS
+============================================================
+
+Qué cubren hoy (alto nivel)
+- Smoke de import de app/módulos críticos.
+- Happy path de orquestador con contrato mínimo.
+- Accessors: tipos, tolerancia a parcial y no mutación de `res`.
+- Helpers UI de estado (incluyendo stale fingerprint).
+- Consistencia básica de money_L core/reportes y wrappers UI→accessors.
+
+Qué falta (brechas)
+- Integración end-to-end de pasos del wizard.
+- Pruebas de regresión de contenido PDF por página.
+- Pruebas específicas para contratos de claves eléctricas alternativas.
+- Casos límite de conversiones homogéneas en todas las capas.
+
+10 casos adicionales priorizados
+1) Paso 5 ejecuta `ejecutar_evaluacion` exactamente una vez por click.
+2) page_4 renderiza bloque referencial con `electrico` y con `electrico_ref`.
+3) `_datos_pdf_from_ctx` no muta `ctx.datos_proyecto`.
+4) Stale fingerprint: cambia `equipos.panel_id` y bloquea PDF.
+5) Stale fingerprint: cambia `electrico.dist_ac_m` y bloquea PDF.
+6) money_L con None/str inválido/negativos/dec=0/dec=3 consistente core-reportes.
+7) page_5 usa accessors para fallback de strings NEC si sizing no trae `cfg_strings`.
+8) Compat shim `electrical.paquete_ref` exporta callable en import directo.
+9) Smoke funcional paso6: render KPIs con `res` parcial sin excepción.
+10) Contrato de `res`: schema test (keys mínimas + tipos) en salida de orquestador.
+
+============================================================
+6) PLAN INCREMENTAL SUGERIDO (3-5 PRs PEQUEÑOS)
+============================================================
+
+PR-1 (estabilidad funcional inmediata)
+- Eliminar doble ejecución del orquestador en Paso 5.
+- Quitar mutación de `datos_proyecto` en generación PDF.
+- Añadir tests: “single execution” + “no mutation dp”.
+
+PR-2 (contratos de datos)
+- Normalizar clave referencial eléctrica (`electrico_ref` fallback explícito).
+- Añadir contrato documentado de `res` (README técnico o docstring de orquestador).
+- Tests de contrato y regressions de page_4/page_5.
+
+PR-3 (deduplicación conversiones)
+- Reducir `_flt/_int` locales donde proceda (reportes/electrical) con estrategia por dominio.
+- Mantener wrappers para compatibilidad temporal.
+- Añadir suite parametrizada de conversiones límite.
+
+PR-4 (robustez UI/wizard)
+- Elevar señal stale a nivel de navegación (banner global o Paso 5) y reforzar UX.
+- Tests de flujo wizard con ctx mock/e2e mínimo.
+
+PR-5 (calidad sostenida)
+- Añadir check de contrato/smoke en CI (import app + escenario mínimo de render Paso 6).
+- Revisar y retirar wrappers legacy no usados con deprecación explícita.
+
+============================================================
+Notas finales
+============================================================
+- Este reporte no introduce cambios funcionales en código; se centra en análisis técnico y ruta de estabilización incremental.
+- Prioridad operativa recomendada: atacar primero P0-1 y P0-2 por impacto directo en coherencia de resultados.

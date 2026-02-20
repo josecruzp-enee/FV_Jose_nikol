@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional
 
 from electrical.factores_nec import ampacidad_ajustada_nec
 from electrical.protecciones import armar_ocpd
+from electrical.tramos_base import caida_tension_pct, mejorar_por_vd as _mejorar_por_vd_base
 
 
 # ==========================================================
@@ -326,26 +327,20 @@ def _mejorar_por_vd(
     *,
     n_hilos: int,
 ) -> Dict[str, Any]:
-    idx = _idx_awg(cand["awg"], tabla)
-    while idx < len(tabla) - 1:
-        vd = _vdrop_pct(i_a, tabla[idx]["r_ohm_km"], l_m, v_base, n_hilos=n_hilos)
-        if vd <= float(vd_obj_pct):
-            break
-        idx += 1
-    return dict(tabla[idx])
-
-
-def _idx_awg(awg: str, tabla: List[Dict[str, Any]]) -> int:
-    for i, t in enumerate(tabla):
-        if str(t["awg"]) == str(awg):
-            return i
-    return 0
+    awg = _mejorar_por_vd_base(
+        tabla,
+        awg=str(cand["awg"]),
+        i_a=float(i_a),
+        v_v=float(v_base),
+        l_m=float(l_m),
+        vd_obj_pct=float(vd_obj_pct),
+        n_hilos=int(n_hilos),
+    )
+    return next((dict(t) for t in tabla if str(t.get("awg")) == str(awg)), dict(tabla[-1]))
 
 
 def _vdrop_pct(i_a: float, r_ohm_km: float, l_m: float, v_base: float, *, n_hilos: int = 2) -> float:
-    r_total = float(r_ohm_km) * (float(l_m) / 1000.0) * float(n_hilos)
-    vdrop = float(i_a) * r_total
-    return 100.0 * (vdrop / float(v_base))
+    return caida_tension_pct(v=float(v_base), i=float(i_a), l_m=float(l_m), r_ohm_km=float(r_ohm_km), n_hilos=int(n_hilos))
 
 
 def _tabla_conductores_base(material: str) -> List[Dict[str, Any]]:

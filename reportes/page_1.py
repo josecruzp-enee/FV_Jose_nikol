@@ -10,6 +10,7 @@ from reportlab.platypus import Paragraph, Spacer, PageBreak
 
 # OJO: estos helpers deben existir en tu repo en reportes/helpers_pdf.py
 # Ajusta el import si tu archivo se llama distinto.
+from core.result_accessors import get_sizing, get_kwp_dc, get_capex_L
 from .helpers_pdf import (
     section_bar,
     tabla_4cols,
@@ -17,16 +18,12 @@ from .helpers_pdf import (
     make_table,
     table_style_uniform,
     box_paragraph,
+    get_field,
 )
 
 # Si money_L / num están en core/rutas.py (como tu app.py), importalos así:
 from core.rutas import money_L, num
 
-
-def _getcampo(x, k, default=""):
-    if isinstance(x, dict):
-        return x.get(k, default)
-    return getattr(x, k, default)
 
 
 # ---------------------------
@@ -38,11 +35,11 @@ def p1_tabla_cliente(datos, sizing, fecha, pal, content_w):
     story.append(Spacer(1, 6))
 
     consumo_anual = float((sizing or {}).get("consumo_anual", 0.0) or 0.0)
-    tarifa_energia = float(_getcampo(datos, "tarifa_energia", 0.0) or 0.0)
-    cargos_fijos = float(_getcampo(datos, "cargos_fijos", 0.0) or 0.0)
+    tarifa_energia = float(get_field(datos, "tarifa_energia", 0.0) or 0.0)
+    cargos_fijos = float(get_field(datos, "cargos_fijos", 0.0) or 0.0)
 
     rows = [
-        ["Cliente", _getcampo(datos, "cliente", ""), "Ubicación", _getcampo(datos, "ubicacion", "")],
+        ["Cliente", get_field(datos, "cliente", ""), "Ubicación", get_field(datos, "ubicacion", "")],
         ["Fecha", fecha, "Consumo anual", f"{consumo_anual:,.0f} kWh/año"],
         ["Tarifa energía", f"{tarifa_energia:.3f} L/kWh", "Cargos fijos", f"{money_L(cargos_fijos)}/mes"],
     ]
@@ -62,11 +59,11 @@ def p1_tabla_cliente(datos, sizing, fecha, pal, content_w):
 def p1_tabla_solucion_unica(datos, kwp, capex, ds, estado, pal, content_w):
     from reportlab.platypus import TableStyle, Spacer
 
-    prod_base_kwh_kwp_mes = float(_getcampo(datos, "prod_base_kwh_kwp_mes", 0.0) or 0.0)
-    tasa_anual = float(_getcampo(datos, "tasa_anual", 0.0) or 0.0)
-    plazo_anios = int(_getcampo(datos, "plazo_anios", 0) or 0)
-    porcentaje_financiado = float(_getcampo(datos, "porcentaje_financiado", 0.0) or 0.0)
-    cobertura_objetivo = float(_getcampo(datos, "cobertura_objetivo", 0.0) or 0.0)
+    prod_base_kwh_kwp_mes = float(get_field(datos, "prod_base_kwh_kwp_mes", 0.0) or 0.0)
+    tasa_anual = float(get_field(datos, "tasa_anual", 0.0) or 0.0)
+    plazo_anios = int(get_field(datos, "plazo_anios", 0) or 0)
+    porcentaje_financiado = float(get_field(datos, "porcentaje_financiado", 0.0) or 0.0)
+    cobertura_objetivo = float(get_field(datos, "cobertura_objetivo", 0.0) or 0.0)
 
     prod_anual = float(kwp) * prod_base_kwh_kwp_mes * 12.0
     n_paneles = int(math.ceil(float(kwp) * 1000.0 / 550.0)) if float(kwp) > 0 else 0
@@ -177,22 +174,22 @@ def build_page_1(resultado: Dict[str, Any], datos, paths, pal, styles, content_w
 
     story = []
 
-    sizing = (resultado or {}).get("sizing", {}) or {}
+    sizing = get_sizing(resultado)
     eval_ = (resultado or {}).get("evaluacion", {}) or {}
     decision = (resultado or {}).get("decision", {}) or {}
 
     fecha = datetime.now().strftime("%Y-%m-%d")
 
-    kwp = float(sizing.get("kwp_recomendado", 0.0) or 0.0)
-    capex = float(sizing.get("capex_L", 0.0) or 0.0)
+    kwp = get_kwp_dc(resultado)
+    capex = get_capex_L(resultado)
 
     ds = float(eval_.get("dscr", 0.0) or 0.0)
     impacto = float(decision.get("ahorro_mensual", 0.0) or 0.0)
     peor = float(eval_.get("peor_mes", 0.0) or 0.0)
     estado = str(eval_.get("estado", "") or "")
 
-    plazo_anios = int(_getcampo(datos, "plazo_anios", 0) or 0)
-    cobertura_objetivo = float(_getcampo(datos, "cobertura_objetivo", 0.0) or 0.0)
+    plazo_anios = int(get_field(datos, "plazo_anios", 0) or 0)
+    cobertura_objetivo = float(get_field(datos, "cobertura_objetivo", 0.0) or 0.0)
 
     story.append(Paragraph("Reporte Ejecutivo — Evaluación Fotovoltaica", styles["Title"]))
     story.append(Spacer(1, 10))
@@ -200,7 +197,7 @@ def build_page_1(resultado: Dict[str, Any], datos, paths, pal, styles, content_w
     story += p1_tabla_cliente(datos, sizing, fecha, pal, content_w)
     story += p1_tabla_solucion_unica(datos, kwp, capex, ds, estado, pal, content_w)
     story += p1_tabla_decision(decision, (resultado or {}).get("cuota_mensual", 0.0), plazo_anios, pal, content_w)
-    story += p1_conclusion(impacto, ds, peor, kwp, float(_getcampo(datos,"cobertura_objetivo",0.0)), estado, pal, content_w)
+    story += p1_conclusion(impacto, ds, peor, kwp, float(get_field(datos,"cobertura_objetivo",0.0)), estado, pal, content_w)
 
     story.append(PageBreak())
     return story
