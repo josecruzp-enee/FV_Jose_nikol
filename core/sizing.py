@@ -270,24 +270,20 @@ def _calcular_strings(p, panel, inv, inv_id, pac_kw_fb, dc_ac, pdc):
 
 def _build_electrico(p, panel, pac_kw, rec):
     r = (rec or {}).get("recomendacion") or {}
-    print("DEBUG sistema_ac:", getattr(p, "sistema_ac", None))
-    return {
-        "strings": {
-            "n_serie": int(r.get("n_paneles_string", 0)),
-            "n_strings": int(r.get("n_strings_total", 0)),
-            "vmp_string_v": float(r.get("vmp_string_v", 0.0)),
-            "voc_frio_string_v": float(r.get("voc_frio_string_v", 0.0)),
-            "imp_mod_a": float(panel.imp),
-            "isc_mod_a": float(panel.isc),
-        },
-        "ac": {
-            "p_ac_w": float(pac_kw) * 1000.0,
-            "v_ac": 240.0,
-            "fases": 1,
-            "tension_sistema": "2F+N_120/240",
-        },
-    }
 
+    return {
+        "n_strings": int(r.get("n_strings_total", 0)),
+        "n_modulos_serie": int(r.get("n_paneles_string", 0)),
+        "vmp_string_v": float(r.get("vmp_string_v", 0.0)),
+        "voc_frio_string_v": float(r.get("voc_frio_string_v", 0.0)),
+        "imp_mod_a": float(panel.imp),
+        "isc_mod_a": float(panel.isc),
+
+        "p_ac_w": float(pac_kw) * 1000.0,
+        "v_ac": 240.0,
+        "fases": 1,
+        "tension_sistema": "2F+N_120/240",
+    }
 
 def _armar_resultado(
     p, eq, panel, inv_id, dc_ac, hsp, pr,
