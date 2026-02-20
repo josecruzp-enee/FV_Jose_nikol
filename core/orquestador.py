@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from typing import Any, Dict
-
+from typing import Any, Dict, Tuple
 from .validacion import validar_entradas
 from .sizing import calcular_sizing_unificado
 from .simular_12_meses import simular_12_meses, calcular_cuota_mensual
@@ -56,8 +56,8 @@ def _consolidar_parametros_fv_en_datos(p: Datosproyecto, params_fv: Dict[str, An
 # =========================
 # Orquestador (pipeline lineal)
 # =========================
-from __future__ import annotations
-from typing import Any, Dict, Tuple
+
+
 
 
 def ejecutar_evaluacion(p: Datosproyecto) -> Dict[str, Any]:
