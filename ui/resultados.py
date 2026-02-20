@@ -22,7 +22,7 @@ from ui.state_helpers import is_result_stale
 from reportes.generar_charts import generar_charts
 from reportes.generar_layout_paneles import generar_layout_paneles
 from reportes.generar_pdf_profesional import generar_pdf_profesional
-
+from reportes.imagenes import generar_artefactos
 
 # ==========================================================
 # Vista (controles UI)
@@ -310,9 +310,21 @@ def _render_descarga_pdf(pdf_path: str) -> None:
 def _ejecutar_pipeline_pdf(ctx, res: dict, vista: Dict[str, Any]) -> None:
     paths = preparar_salida("salidas")
 
-    _generar_charts_safe(res, paths, vista)
-    _generar_layout_paneles_safe(res, ctx, paths)
+    # OJO: preparar_salida devuelve dict con out_dir/charts_dir? si no, usa paths["out_dir"]
+    out_dir = paths.get("out_dir") or paths.get("base_dir") or "salidas"
 
+    dos_aguas = True
+    if hasattr(ctx, "electrico") and isinstance(ctx.electrico, dict):
+        dos_aguas = bool(ctx.electrico.get("dos_aguas", True))
+
+    paths.update(
+        generar_artefactos(
+            res=res,
+            out_dir=out_dir,
+            vista_resultados=vista,
+            dos_aguas=dos_aguas,
+    )    
+    )
     if not _validar_datos_para_pdf(ctx):
         return
 
