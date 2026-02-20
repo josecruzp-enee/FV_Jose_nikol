@@ -326,6 +326,24 @@ def _mostrar_nec(pkg: dict):
         st.markdown("### Datos crudos (para depurar)")
         st.json(pkg)
 
+def _mostrar_validacion_string(validacion: dict):
+    v = validacion or {}
+
+    st.subheader("Validación de string (catálogo)")
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Voc frío total", _fmt(v.get("voc_frio_total"), " V"))
+    c2.metric("Vmp operativo", _fmt(v.get("vmp_operativo"), " V"))
+    c3.metric("Corriente MPPT", _fmt(v.get("corriente_mppt"), " A"))
+
+    c4.write("**Estado**")
+    c4.write(f"- Vdc: {_yn(bool(v.get('ok_vdc')))}")
+    c4.write(f"- MPPT: {_yn(bool(v.get('ok_mppt')))}")
+    c4.write(f"- Corriente: {_yn(bool(v.get('ok_corriente')))}")
+    c4.write(f"- String: {_yn(bool(v.get('string_valido')))}")
+
+    with st.expander("Ver validación (crudo)"):
+        st.json(v)
+
 # ==========================================================
 # RENDER
 # ==========================================================
@@ -367,27 +385,14 @@ def render(ctx):
 
         # UI
         st.success("Ingeniería eléctrica generada.")
-        v = validacion or {}
-    st.subheader("Validación de string (catálogo)")
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Voc frío total", _fmt(v.get("voc_frio_total"), " V"))
-    c2.metric("Vmp operativo", _fmt(v.get("vmp_operativo"), " V"))
-    c3.metric("Corriente MPPT", _fmt(v.get("corriente_mppt"), " A"))
-    c4.write("**Estado**")
-    c4.write(f"- Vdc: {_yn(bool(v.get('ok_vdc')))}")
-    c4.write(f"- MPPT: {_yn(bool(v.get('ok_mppt')))}")
-    c4.write(f"- Corriente: {_yn(bool(v.get('ok_corriente')))}")
-    c4.write(f"- String: {_yn(bool(v.get('string_valido')))}")
+        _mostrar_validacion_string(validacion)  # <-- bonito
+        _mostrar_nec(pkg)                      # <-- bonito (tabs/tablas)
 
-with st.expander("Ver validación (crudo)"):
-    st.json(v)
-        _mostrar_nec(pkg)
     except Exception as exc:
         ctx.resultado_core = None
         ctx.resultado_electrico = None
         setattr(ctx, "result_inputs_fingerprint", None)
         st.error(f"No se pudo generar ingeniería: {exc}")
-
 
 # ==========================================================
 # VALIDAR PASO
