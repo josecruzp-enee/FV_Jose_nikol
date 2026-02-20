@@ -134,6 +134,18 @@ def build_page_5(resultado, datos, paths, pal, styles, content_w):
     story.append(Paragraph(f"Generación FV útil (12m): {fv_anual_kwh:,.0f} kWh", styles["BodyText"]))
     story.append(Paragraph(f"Ahorro anual estimado (12m): L {ahorro_anual_L:,.2f}", styles["BodyText"]))
 
+    story.append(Paragraph(f"Ahorro anual estimado (12m): L {ahorro_anual_L:,.2f}", styles["BodyText"]))
+
+    # ---- DEBUG TEMPORAL ----
+    dc_debug = _get_dc(resultado)
+    story.append(Spacer(1, 6))
+    story.append(Paragraph(f"DEBUG DC keys: {list(dc_debug.keys())}", styles["BodyText"]))
+    story.append(Paragraph(f"DEBUG config_strings: {dc_debug.get('config_strings')}", styles["BodyText"]))
+    # ------------------------
+
+    # ✅ Strings DC
+    story += _build_tabla_strings_dc(resultado, pal, styles, content_w)
+
     # ✅ NUEVO: Strings DC visibles en el PDF
     story += _build_tabla_strings_dc(resultado, pal, styles, content_w)
 
