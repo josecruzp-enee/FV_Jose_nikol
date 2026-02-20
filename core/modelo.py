@@ -26,3 +26,4 @@ class Datosproyecto:
     porcentaje_financiado: float      # 0..1
 
     om_anual_pct: float = 0.0         # ej 0.01 (1% anual CAPEX)
+    instalacion_electrica: dict | None = None
