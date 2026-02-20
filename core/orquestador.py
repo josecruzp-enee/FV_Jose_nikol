@@ -12,7 +12,7 @@ from .electrico_ref import simular_electrico_fv_para_pdf
 from .modelo import Datosproyecto
 from electrical.adaptador_nec import generar_electrico_nec
 from core.sistema_fv_mapper import construir_parametros_fv_desde_dict
-
+from electrical.adaptador_nec import generar_electrico_nec
 
 # =========================
 # Helpers (locales y seguros)
