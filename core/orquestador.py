@@ -77,13 +77,12 @@ def ejecutar_evaluacion(p: Datosproyecto) -> Dict[str, Any]:
     electrico_nec = generar_electrico_nec(p=p, sizing=sizing)
     # ===============================
 
-cuota = calcular_cuota_mensual(
     cuota = calcular_cuota_mensual(
         capex_L_=float(sizing["capex_L"]),
         tasa_anual=p.tasa_anual,
         plazo_anios=p.plazo_anios,
         pct_fin=p.porcentaje_financiado,
-    )
+        )
     
     tabla = simular_12_meses(p, float(sizing["kwp_dc"]), cuota, float(sizing["capex_L"]))
     eval_ = evaluar_viabilidad(tabla, cuota)
