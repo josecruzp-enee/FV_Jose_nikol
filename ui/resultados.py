@@ -25,7 +25,6 @@ from reportes.imagenes import generar_artefactos
 # ==========================================================
 # Vista (controles UI)
 # ==========================================================
-
 def _vista_defaults() -> Dict[str, Any]:
     return {
         "mostrar_teorica": False,
@@ -66,21 +65,79 @@ def _render_ajustes_vista(v: Dict[str, Any]) -> None:
 
 
 # ==========================================================
-# Lectura de ctx + validaciones
+# Lectura de ctx + validaciones (nuevo contrato)
 # ==========================================================
-
 def _validar_ctx(ctx) -> bool:
-    if getattr(ctx, "resultado_core", None) is None:
-        st.error("No hay resultados del motor FV. Genere primero la ingeniería eléctrica (Paso 5).")
+    if getattr(ctx, "resultado_proyecto", None) is None:
+        st.error("No hay resultados del estudio. Genere primero la ingeniería eléctrica (Paso 5).")
         return False
-    if getattr(ctx, "resultado_electrico", None) is None:
-        st.error("No hay resultados eléctricos. Genere primero la ingeniería eléctrica (Paso 5).")
+    if not hasattr(ctx, "datos_proyecto") or ctx.datos_proyecto is None:
+        st.error("Falta ctx.datos_proyecto. En Paso 5 debes guardar Datosproyecto en ctx.datos_proyecto.")
         return False
     return True
 
 
-def _get_res_y_pkg(ctx) -> Tuple[dict, dict]:
-    return ctx.resultado_core, ctx.resultado_electrico
+def _get_resultado_proyecto(ctx) -> dict:
+    rp = getattr(ctx, "resultado_proyecto", None) or {}
+    if not isinstance(rp, dict):
+        return {}
+    return rp
+
+
+def _res_plano_para_ui_y_pdf(resultado_proyecto: dict) -> dict:
+    """
+    Mientras pages/charts/layout sigan esperando el dict plano legacy,
+    usamos el `_compat` que ya trae el orquestador, y si no existe,
+    reconstruimos lo básico desde el contrato.
+    """
+    if not isinstance(resultado_proyecto, dict):
+        return {}
+
+    compat = resultado_proyecto.get("_compat")
+    if isinstance(compat, dict) and compat:
+        return compat
+
+    tecnico = (resultado_proyecto.get("tecnico") or {})
+    energetico = (resultado_proyecto.get("energetico") or {})
+    financiero = (resultado_proyecto.get("financiero") or {})
+
+    out: dict = {}
+    out["params_fv"] = tecnico.get("params_fv")
+    out["sizing"] = tecnico.get("sizing")
+    out["electrico_ref"] = tecnico.get("electrico_ref")
+    out["electrico_nec"] = tecnico.get("electrico_nec")
+    out["tabla_12m"] = energetico.get("tabla_12m")
+
+    out["cuota_mensual"] = financiero.get("cuota_mensual")
+    out["evaluacion"] = financiero.get("evaluacion")
+    out["decision"] = financiero.get("decision")
+    out["ahorro_anual_L"] = financiero.get("ahorro_anual_L")
+    out["payback_simple_anios"] = financiero.get("payback_simple_anios")
+    out["finanzas_lp"] = financiero.get("finanzas_lp")
+
+    return out
+
+
+def _get_pkg_electrico_para_ui(resultado_proyecto: dict) -> dict:
+    """
+    UI legacy de resultados mostraba un 'pkg' referencial (texto_ui, etc.).
+    Ese 'pkg' estaba en ctx.resultado_electrico antes.
+    Ahora intentamos sacarlo del contrato o del compat.
+    """
+    # 1) si alguien ya guardó un paquete listo en tecnico.electrico_ref
+    tecnico = (resultado_proyecto.get("tecnico") or {})
+    elec_ref = tecnico.get("electrico_ref")
+    if isinstance(elec_ref, dict) and elec_ref:
+        return elec_ref
+
+    # 2) si no, mira en compat
+    compat = resultado_proyecto.get("_compat") or {}
+    if isinstance(compat, dict):
+        maybe = compat.get("electrico_ref") or compat.get("electrico")
+        if isinstance(maybe, dict) and maybe:
+            return maybe
+
+    return {}
 
 
 def _validar_datos_para_pdf(ctx) -> bool:
@@ -93,7 +150,6 @@ def _validar_datos_para_pdf(ctx) -> bool:
 # ==========================================================
 # Helpers de normalización (contrato UI/PDF tolerante)
 # ==========================================================
-
 def _get_sizing(res: dict) -> Dict[str, Any]:
     return get_sizing(res)
 
@@ -120,7 +176,7 @@ def _n_paneles_from_sizing(sizing: Dict[str, Any]) -> int:
 
 def _ensure_res_pdf_keys(res: dict, ctx) -> None:
     """
-    Asegura llaves que suelen pedir reportes.
+    Asegura llaves que suelen pedir reportes/artefactos.
     - sizing: kwp_dc, kwp_recomendado, n_paneles, capex_L
     - res: consumo_anual
     """
@@ -162,7 +218,6 @@ def _debug_pdf_sanity(res: dict) -> None:
 # ==========================================================
 # Render: KPIs y bloques
 # ==========================================================
-
 def _render_kpis(res: dict) -> None:
     sizing = _get_sizing(res)
     evaluacion = res.get("evaluacion") or {}
@@ -201,6 +256,9 @@ def _render_cableado(pkg: dict) -> None:
 
 
 def _render_resumen_electrico(pkg: dict) -> None:
+    if not pkg:
+        st.info("Sin resumen eléctrico referencial disponible.")
+        return
     _render_strings(pkg)
     _render_cableado(pkg)
 
@@ -208,7 +266,6 @@ def _render_resumen_electrico(pkg: dict) -> None:
 # ==========================================================
 # Acciones: PDF
 # ==========================================================
-
 def _ui_boton_pdf(disabled: bool = False) -> bool:
     st.markdown("#### Generar propuesta (PDF)")
     col_a, col_b = st.columns([1, 2])
@@ -225,6 +282,8 @@ def _generar_pdf_safe(res: dict, ctx, paths: dict) -> str | None:
         _debug_pdf_sanity(res)
 
         datos_pdf = _datos_pdf_from_ctx(ctx, res)
+
+        # ✅ res puede ser plano o ResultadoProyecto; el builder ya adapta.
         pdf_path = generar_pdf_profesional(res, datos_pdf, paths)
 
         if hasattr(ctx, "artefactos") and isinstance(ctx.artefactos, dict):
@@ -247,24 +306,31 @@ def _render_descarga_pdf(pdf_path: str) -> None:
         )
 
 
-def _ejecutar_pipeline_pdf(ctx, res: dict, vista: Dict[str, Any]) -> None:
+def _ejecutar_pipeline_pdf(ctx, res: dict, vista: Dict[str, Any], resultado_proyecto: dict) -> None:
     paths = preparar_salida("salidas")
 
     # ✅ asegurar n_paneles/kwp/capex antes de generar artefactos
     _ensure_res_pdf_keys(res, ctx)
 
-    # ✅ CLAVE: meter la ingeniería eléctrica NEC dentro del dict que va al PDF
-    if getattr(ctx, "resultado_electrico", None) is not None:
-        res["electrico"] = ctx.resultado_electrico
+    # ✅ CLAVE: meter ingeniería NEC dentro del dict plano que consumen páginas legacy (sin recalcular)
+    tecnico = (resultado_proyecto.get("tecnico") or {})
+    electrico_nec = (tecnico.get("electrico_nec") or {})
+    paq_nec = electrico_nec.get("paq")
+
+    if isinstance(paq_nec, dict) and paq_nec:
+        # pages legacy esperan res["electrico"] como “paquete eléctrico”
+        res["electrico"] = paq_nec
 
     out_dir = paths.get("out_dir") or paths.get("base_dir") or "salidas"
 
-    # dos_aguas: intenta leer de varias ubicaciones
+    # dos_aguas: intenta leer de varias ubicaciones (inputs del proyecto)
     dos_aguas = True
     if hasattr(ctx, "electrico") and isinstance(ctx.electrico, dict):
         dos_aguas = bool(ctx.electrico.get("dos_aguas", True))
-    elif hasattr(ctx, "resultado_electrico") and isinstance(ctx.resultado_electrico, dict):
-        dos_aguas = bool(ctx.resultado_electrico.get("dos_aguas", True))
+    elif hasattr(ctx, "datos_proyecto") and hasattr(ctx.datos_proyecto, "electrico"):
+        e = getattr(ctx.datos_proyecto, "electrico", {}) or {}
+        if isinstance(e, dict):
+            dos_aguas = bool(e.get("dos_aguas", True))
 
     try:
         arte = generar_artefactos(
@@ -288,6 +354,7 @@ def _ejecutar_pipeline_pdf(ctx, res: dict, vista: Dict[str, Any]) -> None:
     if not _validar_datos_para_pdf(ctx):
         return
 
+    # ✅ builder tolera ResultadoProyecto; pero aquí seguimos pasando res plano legacy
     pdf_path = _generar_pdf_safe(res, ctx, paths)
     if pdf_path:
         _render_descarga_pdf(pdf_path)
@@ -297,14 +364,19 @@ def _ejecutar_pipeline_pdf(ctx, res: dict, vista: Dict[str, Any]) -> None:
 # ==========================================================
 # Paso 6 (render + validar)
 # ==========================================================
-
 def render(ctx) -> None:
     st.markdown("### Resultados y propuesta")
 
     if not _validar_ctx(ctx):
         return
 
-    res, pkg = _get_res_y_pkg(ctx)
+    resultado_proyecto = _get_resultado_proyecto(ctx)
+
+    # res plano legacy (para KPIs/artefactos/páginas mientras migras)
+    res = _res_plano_para_ui_y_pdf(resultado_proyecto)
+
+    # paquete referencial para UI (si existe)
+    pkg = _get_pkg_electrico_para_ui(resultado_proyecto)
 
     _render_kpis(res)
     st.divider()
@@ -323,17 +395,15 @@ def render(ctx) -> None:
     if not _ui_boton_pdf(disabled=stale_inputs):
         return
 
-    # Evita mutar ctx.resultado_core
+    # Evita mutar el resultado en ctx
     res_pdf = copy.deepcopy(res)
-    _ejecutar_pipeline_pdf(ctx, res_pdf, vista)
+    _ejecutar_pipeline_pdf(ctx, res_pdf, vista, resultado_proyecto)
 
 
 def validar(ctx) -> Tuple[bool, List[str]]:
     errores: List[str] = []
-    if getattr(ctx, "resultado_core", None) is None:
-        errores.append("No hay resultados del motor FV (genere en Paso 5).")
-    if getattr(ctx, "resultado_electrico", None) is None:
-        errores.append("No hay resultados eléctricos (genere en Paso 5).")
+    if getattr(ctx, "resultado_proyecto", None) is None:
+        errores.append("No hay resultados del estudio (genere en Paso 5).")
     if is_result_stale(ctx):
         errores.append("Los resultados están desactualizados. Regenera la ingeniería del Paso 5.")
     return (len(errores) == 0), errores
