@@ -1,4 +1,4 @@
-# nucleo/sizing.py
+# core/sizing.py
 from __future__ import annotations
 
 import math
