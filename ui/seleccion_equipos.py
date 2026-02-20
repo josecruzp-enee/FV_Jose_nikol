@@ -87,12 +87,57 @@ def _ui_select_inversor(eq: dict, inv_ids: List[str], inv_map: Dict[str, dict]) 
 
 def _ui_criterios(eq: dict) -> None:
     st.markdown("#### Criterios")
+
     a, b = st.columns(2)
+
+    # ======================================================
+    # Objetivo DC/AC
+    # ======================================================
     with a:
-        eq["sobredimension_dc_ac"] = st.number_input("Objetivo DC/AC", 1.0, 1.6, 0.05, float(eq.get("sobredimension_dc_ac", 1.20)))
+        # valor seguro (evita StreamlitValueBelowMinError)
+        try:
+            v = float(eq.get("sobredimension_dc_ac", 1.20) or 1.20)
+        except Exception:
+            v = 1.20
+
+        # clamp ingenieril
+        v = max(1.0, min(1.6, v))
+
+        eq["sobredimension_dc_ac"] = st.number_input(
+            "Objetivo DC/AC",
+            min_value=1.0,
+            max_value=1.6,
+            value=v,
+            step=0.05,
+            format="%.2f",
+            help="Relación potencia DC del arreglo / potencia AC del inversor.",
+        )
+
+    # ======================================================
+    # Tensión del sistema AC
+    # ======================================================
     with b:
-        ops = ["1F_240V", "3F_208Y120V", "3F_480Y277V"]
-        eq["tension_sistema"] = st.selectbox("Tensión del sistema", options=ops, index=_safe_index(ops, eq.get("tension_sistema", "1F_240V")))
+        ops = [
+            "1F_240V",
+            "2F+N_120/240",
+            "3F+N_120/240",
+            "3F+N_120/208",
+            "3F+N_240/480",        
+        ]
+
+        # índice seguro
+        valor_actual = eq.get("tension_sistema", "2F+N_120/240")
+        try:
+            idx = ops.index(valor_actual)
+        except ValueError:
+            idx = 0
+
+        eq["tension_sistema"] = st.selectbox(
+            "Tensión del sistema",
+            options=ops,
+            index=idx,
+            help="Define el nivel de tensión AC para cálculos eléctricos NEC.",
+        )
 
 
 def _ui_resumen(eq: dict, panel_map: Dict[str, dict], inv_map: Dict[str, dict]) -> None:
