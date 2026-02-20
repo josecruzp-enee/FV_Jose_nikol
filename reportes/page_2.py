@@ -40,8 +40,7 @@ def build_page_2(resultado, datos, paths, pal, styles, content_w):
     story.append(Paragraph("Reporte de Demanda / Energía", styles["Title"]))
     story.append(Spacer(1, 8))
 
-    # ✅ Layout paneles aquí (arriba de la tabla y charts)
-    _append_layout_paneles(story, paths, styles, content_w)
+    
 
     story.append(Paragraph("Energía mensual (Consumo vs FV útil vs ENEE)", styles["H2b"]))
     story.append(Spacer(1, 6))
