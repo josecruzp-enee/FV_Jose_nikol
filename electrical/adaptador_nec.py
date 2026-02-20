@@ -6,27 +6,66 @@ from typing import Any, Dict, List, Optional, Tuple
 from electrical.ingenieria_nec_2023 import calcular_paquete_electrico_nec
 
 
+# ==========================================================
+# Adapter core -> NEC
+# ==========================================================
+
 def generar_electrico_nec(*, p: Any, sizing: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Adaptador core -> NEC.
+    datos, errores = _extraer_input_desde_sizing(sizing)
 
-    Retorna SIEMPRE un dict estable:
-      - ok: bool
-      - errores: list[str]
-      - input: dict (debug)
-      - (si ok) paq: dict (salida de calcular_paquete_electrico_nec)
-    Nunca rompe el pipeline aunque falten datos.
-    """
-    d, errores = _build_input_nec(p, sizing)
     if errores:
-        return {"ok": False, "errores": errores, "input": d, "paq": {}}
+        return {"ok": False, "errores": errores, "input": datos, "paq": {}}
 
+    return _ejecutar_nec(datos)
+
+
+# ==========================================================
+# 1) Construcción input NEC (≤10 líneas)
+# ==========================================================
+
+def _extraer_input_desde_sizing(sizing: Dict[str, Any]):
+    electrico = sizing.get("electrico")
+    if not electrico:
+        return {}, ["NEC: sizing sin bloque 'electrico'"]
+
+    datos = {
+        **(electrico.get("strings") or {}),
+        **(electrico.get("ac") or {}),
+    }
+
+    faltantes = [
+        k for k in (
+            "n_strings",
+            "isc_mod_a",
+            "imp_mod_a",
+            "vmp_string_v",
+            "voc_frio_string_v",
+            "p_ac_w",
+        )
+        if k not in datos or datos[k] in (None, 0)
+    ]
+
+    if faltantes:
+        return datos, [f"NEC: falta '{k}'" for k in faltantes]
+
+    return datos, []
+
+
+# ==========================================================
+# 2) Ejecución NEC segura (≤10 líneas)
+# ==========================================================
+
+def _ejecutar_nec(datos: Dict[str, Any]) -> Dict[str, Any]:
     try:
-        paq = calcular_paquete_electrico_nec(d)
-        return {"ok": True, "errores": [], "input": d, "paq": paq}
+        paq = calcular_paquete_electrico_nec(datos)
+        return {"ok": True, "errores": [], "input": datos, "paq": paq}
     except Exception as e:
-        return {"ok": False, "errores": [f"NEC: {type(e).__name__}: {e}"], "input": d, "paq": {}}
-
+        return {
+            "ok": False,
+            "errores": [f"NEC: {type(e).__name__}: {e}"],
+            "input": datos,
+            "paq": {},
+        }
 
 # ==========================================================
 # Builders (pequeños)
