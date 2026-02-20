@@ -53,14 +53,38 @@ def _post_dc(d: Dict[str, Any], dc: Dict[str, Any]) -> None:
     dc["config_strings"] = {"n_strings": ns, "modulos_por_string": int(d.get("n_modulos_serie", 0)),
                             "tipo": "string directo a inversor" if ns <= 2 else "con combiner box"}
 
-def calcular_paquete_electrico_nec(datos: Dict[str, Any]) -> Dict[str, Any]:
-    d = _defaults(datos); warnings = _validar_minimos(d); d["nec"] = _ctx_nec(d)
-    s = parse_sistema_ac(d["tension_sistema"]); dc = _calc_dc(d); _post_dc(d, dc); ac = _calc_ac(d, s)
+from typing import Any, Dict
+
+def _prep_d(datos: Dict[str, Any]):
+    d = _defaults(datos)
+    return d, _validar_minimos(d)
+
+def _calc_dc_ac(d: Dict[str, Any]):
+    s = parse_sistema_ac(d["tension_sistema"])
+    dc = _calc_dc(d); _post_dc(d, dc)
+    ac = _calc_ac(d, s)
+    return s, dc, ac
+
+def _compat_strings_en_sizing(d: Dict[str, Any], dc: Dict[str, Any]) -> None:
+    d.setdefault("sizing", {}); d["sizing"].setdefault("cfg_strings", {})
+    d["sizing"]["cfg_strings"]["strings"] = [{
+        "mppt": 1, "n_series": int(d.get("n_modulos_serie", 0)), "n_paralelo": int(dc.get("n_strings", 0)),
+        "vmp_string_v": dc.get("vmp_string_v", 0.0), "voc_string_frio_v": dc.get("voc_frio_string_v", 0.0),
+        "imp_a": dc.get("i_string_oper_a", 0.0), "isc_a": dc.get("i_array_isc_a", 0.0),
+    }]
+
+def _ensamblar_paq(d: Dict[str, Any], s, dc: Dict[str, Any], ac: Dict[str, Any], warnings):
     ocpd = _calc_ocpd(d, dc, ac); cond = _calc_conductores_y_vd(d, s, dc, ac)
     paq = {"dc": dc, "ac": ac, "ocpd": ocpd, "conductores": cond, "spd": _recomendar_spd(d),
            "seccionamiento": _recomendar_seccionamiento(d), "canalizacion": _recomendar_canalizacion(cond),
            "warnings": warnings + dc.get("warnings", []) + ac.get("warnings", [])}
-    paq["resumen_pdf"] = _armar_resumen_pdf(paq, s); return paq
+    paq["resumen_pdf"] = _armar_resumen_pdf(paq, s)
+    return paq
+
+def calcular_paquete_electrico_nec(datos: Dict[str, Any]) -> Dict[str, Any]:
+    d, warnings = _prep_d(datos); d["nec"] = _ctx_nec(d)
+    s, dc, ac = _calc_dc_ac(d); _compat_strings_en_sizing(d, dc)
+    return _ensamblar_paq(d, s, dc, ac, warnings)
 
 # ==========================================================
 # Defaults + validación (corto y robusto)
