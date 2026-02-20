@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import copy
-
 from typing import Any, Dict, List, Tuple
 
 import streamlit as st
@@ -16,16 +15,15 @@ from core.result_accessors import (
     get_kwp_dc,
     get_n_paneles,
     get_sizing,
-    get_tabla_12m,
 )
 from ui.state_helpers import is_result_stale
 from reportes.generar_pdf_profesional import generar_pdf_profesional
 from reportes.imagenes import generar_artefactos
 
+
 # ==========================================================
 # Vista (controles UI)
 # ==========================================================
-
 
 def _vista_defaults() -> Dict[str, Any]:
     return {
@@ -61,7 +59,6 @@ def _render_ajustes_vista(v: Dict[str, Any]) -> None:
 
         with c3:
             opciones = ["Norte", "Sur", "Este", "Oeste", "NE", "NO", "SE", "SO"]
-            # protege el index si el valor no existe
             actual = str(v.get("orientacion", "Sur"))
             idx = opciones.index(actual) if actual in opciones else opciones.index("Sur")
             v["orientacion"] = st.selectbox("Orientación", options=opciones, index=idx)
@@ -70,7 +67,6 @@ def _render_ajustes_vista(v: Dict[str, Any]) -> None:
 # ==========================================================
 # Lectura de ctx + validaciones
 # ==========================================================
-
 
 def _validar_ctx(ctx) -> bool:
     if getattr(ctx, "resultado_core", None) is None:
@@ -97,44 +93,28 @@ def _validar_datos_para_pdf(ctx) -> bool:
 # Helpers de normalización (contrato UI/PDF tolerante)
 # ==========================================================
 
-
 def _get_sizing(res: dict) -> Dict[str, Any]:
-    """Compat wrapper: delega al accessor canónico sin mutar entrada."""
     return get_sizing(res)
 
 
 def _as_float(x: Any, default: float = 0.0) -> float:
-    """Compat wrapper: delega en accessor canónico."""
     return as_float(x, default)
 
 
 def _as_int(x: Any, default: int = 0) -> int:
-    """Compat wrapper: delega en accessor canónico."""
     return as_int(x, default)
 
 
 def _kwp_dc_from_sizing(sizing: Dict[str, Any]) -> float:
-    # compat: conserva firma anterior
     return get_kwp_dc({"sizing": dict(sizing or {})})
 
 
 def _capex_L_from_sizing(sizing: Dict[str, Any]) -> float:
-    # compat: conserva firma anterior
     return get_capex_L({"sizing": dict(sizing or {})})
 
 
 def _n_paneles_from_sizing(sizing: Dict[str, Any]) -> int:
-    # compat: conserva firma anterior
     return get_n_paneles({"sizing": dict(sizing or {})})
-
-
-def _consumo_anual_from_tabla_12m(res: dict) -> float:
-    # compat: conserva firma anterior
-    return get_consumo_anual(res, datos=None)
-
-
-def _consumo_anual_from_datos_proyecto(ctx) -> float:
-    return get_consumo_anual({}, datos=getattr(ctx, "datos_proyecto", None))
 
 
 def _ensure_res_pdf_keys(res: dict, ctx) -> None:
@@ -161,17 +141,10 @@ def _ensure_res_pdf_keys(res: dict, ctx) -> None:
 
 
 def _datos_pdf_from_ctx(ctx, res: dict) -> Dict[str, Any]:
-    """
-    Reportes a veces tratan `datos` como dict (datos["..."]).
-    Convertimos el objeto (dataclass) a dict y le inyectamos llaves requeridas.
-    """
     dp = ctx.datos_proyecto
     datos_pdf = dict(getattr(dp, "__dict__", {}))
-
-    # Inyectar llaves típicas que han estado rompiendo
     if "consumo_anual" in res:
         datos_pdf.setdefault("consumo_anual", _as_float(res.get("consumo_anual"), 0.0))
-
     return datos_pdf
 
 
@@ -188,7 +161,6 @@ def _debug_pdf_sanity(res: dict) -> None:
 # ==========================================================
 # Render: KPIs y bloques
 # ==========================================================
-
 
 def _render_kpis(res: dict) -> None:
     sizing = _get_sizing(res)
@@ -233,9 +205,8 @@ def _render_resumen_electrico(pkg: dict) -> None:
 
 
 # ==========================================================
-# Acciones: Charts / Layout / PDF
+# Acciones: PDF
 # ==========================================================
-
 
 def _ui_boton_pdf(disabled: bool = False) -> bool:
     st.markdown("#### Generar propuesta (PDF)")
@@ -247,39 +218,6 @@ def _ui_boton_pdf(disabled: bool = False) -> bool:
     return bool(run)
 
 
-def _generar_charts_safe(res: dict, paths: dict, vista: Dict[str, Any]) -> None:
-    try:
-        charts = generar_charts(
-            res["tabla_12m"],
-            paths["charts_dir"],
-            vista_resultados=vista,
-        )
-        res["charts"] = charts
-        paths.update(charts)
-    except Exception as e:
-        st.warning(f"No se pudieron generar charts: {e}")
-
-
-def _generar_layout_paneles_safe(res: dict, ctx, paths: dict) -> None:
-    try:
-        sizing = _get_sizing(res)
-        n_paneles = _n_paneles_from_sizing(sizing)
-        if n_paneles <= 0:
-            st.warning("No se pudo generar layout: falta n_paneles en sizing.")
-            return
-
-        dos_aguas = bool(getattr(ctx, "electrico", {}).get("dos_aguas", True)) if hasattr(ctx, "electrico") else True
-        generar_layout_paneles(
-            n_paneles=int(n_paneles),
-            out_path=paths["layout_paneles"],
-            max_cols=7,
-            dos_aguas=dos_aguas,
-            gap_cumbrera_m=0.35,
-        )
-    except Exception as e:
-        st.warning(f"No se pudo generar layout de paneles: {e}")
-
-
 def _generar_pdf_safe(res: dict, ctx, paths: dict) -> str | None:
     try:
         _ensure_res_pdf_keys(res, ctx)
@@ -288,10 +226,14 @@ def _generar_pdf_safe(res: dict, ctx, paths: dict) -> str | None:
         datos_pdf = _datos_pdf_from_ctx(ctx, res)
         pdf_path = generar_pdf_profesional(res, datos_pdf, paths)
 
-        ctx.artefactos["pdf"] = pdf_path
+        # Guarda artefacto si existe el contenedor
+        if hasattr(ctx, "artefactos") and isinstance(ctx.artefactos, dict):
+            ctx.artefactos["pdf"] = pdf_path
+
         return str(pdf_path)
     except Exception as e:
-        st.warning(f"No se pudo generar PDF aún: {e}")
+        st.exception(e)
+        st.warning("No se pudo generar PDF aún.")
         return None
 
 
@@ -308,21 +250,35 @@ def _render_descarga_pdf(pdf_path: str) -> None:
 def _ejecutar_pipeline_pdf(ctx, res: dict, vista: Dict[str, Any]) -> None:
     paths = preparar_salida("salidas")
 
-    # OJO: preparar_salida devuelve dict con out_dir/charts_dir? si no, usa paths["out_dir"]
-    out_dir = paths.get("out_dir") or paths.get("base_dir") or "salidas"
+    # ✅ CLAVE: asegurar n_paneles/kwp/capex antes de generar artefactos
+    _ensure_res_pdf_keys(res, ctx)
 
+    out_dir = paths.get("out_dir") or paths.get("base_dir") or paths.get("salida_dir") or "salidas"
+
+    # dos_aguas: intenta leer de varias ubicaciones
     dos_aguas = True
     if hasattr(ctx, "electrico") and isinstance(ctx.electrico, dict):
         dos_aguas = bool(ctx.electrico.get("dos_aguas", True))
+    elif hasattr(ctx, "resultado_electrico") and isinstance(ctx.resultado_electrico, dict):
+        dos_aguas = bool(ctx.resultado_electrico.get("dos_aguas", True))
 
-    paths.update(
-        generar_artefactos(
+    try:
+        arte = generar_artefactos(
             res=res,
             out_dir=out_dir,
             vista_resultados=vista,
             dos_aguas=dos_aguas,
-    )    
-    )
+        )
+        paths.update(arte)
+
+        # Debug temporal (puedes quitarlo luego)
+        st.write("DEBUG layout_paneles:", paths.get("layout_paneles"))
+        st.write("DEBUG n_paneles:", _n_paneles_from_sizing(_get_sizing(res)))
+
+    except Exception as e:
+        st.exception(e)
+        st.warning("No se pudieron generar artefactos (charts/layout). Se intentará generar el PDF igual.")
+
     if not _validar_datos_para_pdf(ctx):
         return
 
@@ -335,7 +291,6 @@ def _ejecutar_pipeline_pdf(ctx, res: dict, vista: Dict[str, Any]) -> None:
 # ==========================================================
 # Paso 6 (render + validar)
 # ==========================================================
-
 
 def render(ctx) -> None:
     st.markdown("### Resultados y propuesta")
