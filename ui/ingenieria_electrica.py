@@ -384,7 +384,7 @@ def render(ctx) -> None:
     ctx.validacion_string = validacion
 
     # 5) Paquete eléctrico referencial (tu flujo actual)
-    pkg = _run_paquete_electrico(eq=eq, e=e, res=res)
+    pkg = _run_paquete_electrico(ctx, eq=eq, e=e, res=res)
     ctx.resultado_electrico = pkg
 
     # 6) Mostrar
