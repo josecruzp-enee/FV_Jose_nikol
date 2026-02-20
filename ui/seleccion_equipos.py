@@ -4,10 +4,17 @@ from typing import List, Tuple, Dict, Any
 import streamlit as st
 from electrical.catalogos import catalogo_paneles, catalogo_inversores
 from electrical.catalogos_yaml import cargar_paneles_yaml, cargar_inversores_yaml
+from ui.state_helpers import ensure_dict, merge_defaults
 
 def _defaults(ctx) -> None:
-    if not getattr(ctx, "equipos", None):
-        ctx.equipos = {"panel_id": None, "inversor_id": None, "sobredimension_dc_ac": 1.20, "tension_sistema": "2F+N_120/240"}
+    eq = ensure_dict(ctx, "equipos", dict)
+    merge_defaults(eq, {
+        "panel_id": None,
+        "inversor_id": None,
+        "sobredimension_dc_ac": 1.20,
+        "tension_sistema": "2F+N_120/240",
+    })
+    ctx.equipos = eq
 
 
 def _safe_index(opciones: List[str], valor_actual: str | None) -> int:

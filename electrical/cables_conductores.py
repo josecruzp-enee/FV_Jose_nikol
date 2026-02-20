@@ -109,3 +109,24 @@ def idx_calibre(awg: str, *, tipo: str = "CU") -> int:
     t = str(tipo).strip().upper()
     lista = CALIBRES_PV if t == "PV" else CALIBRES_CU
     return lista.index(str(awg)) if str(awg) in lista else -1
+
+
+# ==========================================================
+# Compatibilidad legacy (no romper imports antiguos)
+# ==========================================================
+
+def calibres(tipo: str = "CU") -> List[str]:
+    """Compat: retorna lista de calibres por tipo legacy ('CU'|'PV')."""
+    t = str(tipo).strip().upper()
+    return calibres_pv() if t == "PV" else calibres_cu()
+
+
+def ampacidad(awg: str, *, tipo: str = "CU") -> int:
+    """Compat: ampacidad por tipo legacy ('CU'|'PV')."""
+    t = str(tipo).strip().upper()
+    return ampacidad_pv_90c(awg) if t == "PV" else ampacidad_cu_75c(awg)
+
+
+def tabla_base(material: str = "Cu") -> List[Dict[str, float]]:
+    """Compat: alias legacy de tabla_base_conductores."""
+    return tabla_base_conductores(material)
