@@ -85,7 +85,7 @@ def ejecutar_evaluacion(p: Datosproyecto) -> Dict[str, Any]:
         )
     
     kwp_dc = float(sizing.get("kwp_dc") or sizing.get("kwp") or sizing.get("pdc_kw") or 0.0)
-    capex_L = float(sizing.get("capex_L") or sizing.get("capex") or 0.0)
+    capex_L_=float(sizing.get("capex_L") or sizing.get("capex") or 0.0),
     if kwp_dc <= 0 or capex_L <= 0:
         raise KeyError(f"sizing incompleto: kwp_dc={kwp_dc}, capex_L={capex_L}. keys={sorted(list(sizing.keys()))}")
     tabla = simular_12_meses(p, kwp_dc, cuota, capex_L)
