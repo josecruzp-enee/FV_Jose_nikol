@@ -4,7 +4,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
-
+from electrical.factores_nec import ampacidad_ajustada_nec
 
 # ==========================================================
 # Modelos mínimos
@@ -206,8 +206,9 @@ def _siguiente_ocpd(a: float) -> int:
 # ==========================================================
 # Conductores + caída de voltaje (modo referencial robusto)
 # ==========================================================
-def _calc_conductores_y_vd(d: Dict[str, Any], s: SistemaAC, dc: Dict[str, Any], ac: Dict[str, Any]) -> Dict[str, Any]:
+ddef _calc_conductores_y_vd(d: Dict[str, Any], s: SistemaAC, dc: Dict[str, Any], ac: Dict[str, Any]) -> Dict[str, Any]:
     tab = _tabla_conductores_base(d.get("material", "Cu"))
+    nec_base = d.get("nec", {})  # ✅ contexto NEC (si no existe, cae a {})
 
     dc_string = _tramo_conductor(
         nombre="DC string",
@@ -217,6 +218,7 @@ def _calc_conductores_y_vd(d: Dict[str, Any], s: SistemaAC, dc: Dict[str, Any], 
         vd_obj_pct=_as_float(d.get("vd_max_dc_pct", 2.0)),
         tabla=tab,
         n_hilos=2,
+        nec={**nec_base, "ccc": int(nec_base.get("ccc_dc", 2))},
     )
 
     dc_trunk = None
@@ -229,6 +231,7 @@ def _calc_conductores_y_vd(d: Dict[str, Any], s: SistemaAC, dc: Dict[str, Any], 
             vd_obj_pct=_as_float(d.get("vd_max_dc_pct", 2.0)),
             tabla=tab,
             n_hilos=2,
+            nec={**nec_base, "ccc": int(nec_base.get("ccc_dc", 2))},
         )
 
     ac_out = _tramo_conductor(
@@ -239,10 +242,10 @@ def _calc_conductores_y_vd(d: Dict[str, Any], s: SistemaAC, dc: Dict[str, Any], 
         vd_obj_pct=_as_float(d.get("vd_max_ac_pct", 2.0)),
         tabla=tab,
         n_hilos=2 if s.fases == 1 else 3,  # referencial (sin neutro explícito)
+        nec={**nec_base, "ccc": int(nec_base.get("ccc_ac", 3))},
     )
 
     return {"dc_string": dc_string, "dc_trunk": dc_trunk, "ac_out": ac_out, "material": str(d.get("material", "Cu"))}
-
 
 def _tramo_conductor(
     *,
@@ -253,26 +256,29 @@ def _tramo_conductor(
     vd_obj_pct: float,
     tabla: List[Dict[str, Any]],
     n_hilos: int,
+    nec: Dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
     if i_a <= 0 or l_m <= 0 or v_base <= 0:
         return {"nombre": nombre, "ok": False, "nota": "Datos insuficientes para conductor/VD."}
 
-    cand = _seleccionar_por_ampacidad(i_a, tabla)
+    t_amb_c = float((nec or {}).get("t_amb_c", 30.0))
+    aplicar = bool((nec or {}).get("aplicar_derating", True))
+    ccc = int((nec or {}).get("ccc", n_hilos))
+
+    cand = _seleccionar_por_ampacidad_nec(i_a, tabla, t_amb_c=t_amb_c, ccc=ccc, aplicar=aplicar)
     best = _mejorar_por_vd(cand, i_a, v_base, l_m, vd_obj_pct, tabla, n_hilos=n_hilos)
+
+    amp_adj, f_t, f_c = ampacidad_ajustada_nec(float(best["amp_a"]), t_amb_c, ccc, aplicar=aplicar)
     vd = _vdrop_pct(i_a, best["r_ohm_km"], l_m, v_base, n_hilos=n_hilos)
 
     return {
-        "nombre": nombre,
-        "ok": True,
-        "i_a": round(float(i_a), 2),
-        "l_m": round(float(l_m), 2),
-        "v_base_v": round(float(v_base), 2),
-        "awg": best["awg"],
-        "amp_base_a": best["amp_a"],
-        "vd_pct": round(float(vd), 3),
-        "vd_obj_pct": float(vd_obj_pct),
-        "n_hilos": int(n_hilos),
+        "nombre": nombre, "ok": True,
+        "i_a": round(float(i_a), 2), "l_m": round(float(l_m), 2), "v_base_v": round(float(v_base), 2),
+        "awg": best["awg"], "amp_base_a": best["amp_a"],
+        "amp_ajustada_a": round(float(amp_adj), 2), "fac_temp": round(float(f_t), 3), "fac_ccc": round(float(f_c), 3),
+        "vd_pct": round(float(vd), 3), "vd_obj_pct": float(vd_obj_pct), "n_hilos": int(n_hilos),
     }
+
 def _seleccionar_por_ampacidad(i_a: float, tabla: List[Dict[str, Any]]) -> Dict[str, Any]:
     x = float(i_a)
     for t in tabla:
@@ -280,6 +286,21 @@ def _seleccionar_por_ampacidad(i_a: float, tabla: List[Dict[str, Any]]) -> Dict[
             return dict(t)
     return dict(tabla[-1])
 
+def _seleccionar_por_ampacidad_nec(
+    i_a: float,
+    tabla: List[Dict[str, Any]],
+    *,
+    t_amb_c: float,
+    ccc: int,
+    aplicar: bool,
+) -> Dict[str, Any]:
+    x = float(i_a)
+    ccc = max(1, int(ccc))
+    for t in tabla:
+        amp_adj, _, _ = ampacidad_ajustada_nec(float(t["amp_a"]), float(t_amb_c), ccc, aplicar=aplicar)
+        if x <= amp_adj:
+            return dict(t)
+    return dict(tabla[-1])
 
 def _mejorar_por_vd(
     cand: Dict[str, Any],
