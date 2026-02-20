@@ -178,16 +178,31 @@ def _generar_pdf(res: dict, ctx, paths: dict) -> str:
         or sizing.get("pdc_kw")
         or 0.0
     )
-    # reportes antiguos esperan 'kwp_recomendado'
     sizing.setdefault("kwp_recomendado", kwp_dc)
-
-    # asegúrate de escribirlo de vuelta en res
     res["sizing"] = sizing
+
+    # ---- consumo_anual (fallback desde tabla_12m o consumo_12m) ----
+    if "consumo_anual" not in res:
+        tabla = res.get("tabla_12m") or []
+        if isinstance(tabla, list) and tabla:
+            # intenta sumar consumo mensual desde la tabla
+            consumo_sum = 0.0
+            for row in tabla:
+                if isinstance(row, dict):
+                    consumo_sum += float(row.get("consumo_kwh", row.get("consumo_mes_kwh", 0.0)) or 0.0)
+            if consumo_sum > 0:
+                res["consumo_anual"] = consumo_sum
+
+    # si sigue faltando, intenta desde Datosproyecto (ctx.datos_proyecto)
+    if "consumo_anual" not in res and getattr(ctx, "datos_proyecto", None) is not None:
+        p = ctx.datos_proyecto
+        consumo_12m = getattr(p, "consumo_12m", None) or getattr(p, "consumo_mensual_kwh", None)
+        if isinstance(consumo_12m, list) and consumo_12m:
+            res["consumo_anual"] = sum(float(x or 0.0) for x in consumo_12m)
 
     pdf_path = generar_pdf_profesional(res, ctx.datos_proyecto, paths)
     ctx.artefactos["pdf"] = pdf_path
     return str(pdf_path)
-
 
 def _render_descarga_pdf(pdf_path: str) -> None:
     with open(pdf_path, "rb") as f:
