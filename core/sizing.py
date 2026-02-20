@@ -9,6 +9,8 @@ from .modelo import Datosproyecto
 from .simular_12_meses import capex_L, consumo_anual, consumo_promedio
 
 from electrical.catalogos import get_panel, get_inversor, catalogo_inversores
+from electrical.sizing import SizingInput, InversorCandidato, ejecutar_sizing
+from electrical.strings_auto import PanelSpec, InversorSpec, recomendar_string
 
 
 
