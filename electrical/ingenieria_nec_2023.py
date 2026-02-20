@@ -206,7 +206,7 @@ def _siguiente_ocpd(a: float) -> int:
 # ==========================================================
 # Conductores + caída de voltaje (modo referencial robusto)
 # ==========================================================
-ddef _calc_conductores_y_vd(d: Dict[str, Any], s: SistemaAC, dc: Dict[str, Any], ac: Dict[str, Any]) -> Dict[str, Any]:
+def _calc_conductores_y_vd(d: Dict[str, Any], s: SistemaAC, dc: Dict[str, Any], ac: Dict[str, Any]) -> Dict[str, Any]:
     tab = _tabla_conductores_base(d.get("material", "Cu"))
     nec_base = d.get("nec", {})  # ✅ contexto NEC (si no existe, cae a {})
 
