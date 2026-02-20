@@ -208,29 +208,69 @@ def _trazabilidad(eq: Dict[str, Any], panel_id: str, inv_id: str, dc_ac: float, 
 # ==========================================================
 # API pública: ORQUESTA sizing unificado
 # ==========================================================
+# ==========================================================
+# API pública: ORQUESTA sizing unificado (refactor ≤10 líneas)
+# ==========================================================
+
 def calcular_sizing_unificado(p: Datosproyecto) -> Dict[str, Any]:
     eq = _leer_equipos(p)
+    panel, hsp, pr, dc_ac = _base_inputs(p, eq)
+    kwh_mes, kwp_req, n_pan, pdc = _sizing_energetico(p, panel, hsp, pr)
+    inv, inv_id, pac_kw_fb, sizing_inv = _resolver_inversor(p, eq, panel, dc_ac, hsp, pr)
+    rec = _calcular_strings(p, panel, inv, inv_id, pac_kw_fb, dc_ac, pdc)
+    electrico = _build_electrico(panel, pac_kw_fb, rec)
+
+    return _armar_resultado(
+        p, eq, panel, inv_id, dc_ac, hsp, pr,
+        kwh_mes, kwp_req, n_pan, pdc,
+        sizing_inv, rec, electrico
+    )
+
+
+# ==========================================================
+# Helpers (≤10 líneas cada uno)
+# ==========================================================
+
+def _base_inputs(p, eq):
     hsp, pr = _leer_hsp(p), _leer_pr(p)
     dc_ac = _dc_ac_obj(eq)
-
     panel = get_panel(_panel_id(eq))
-    prod_anual_kwp = _prod_anual_por_kwp(hsp, pr)
+    return panel, hsp, pr, dc_ac
 
+
+def _sizing_energetico(p, panel, hsp, pr):
     kwh_mes = _kwh_mes_prom(p)
-    kwp_req = _kwp_req(_kwh_obj_mes(kwh_mes, float(p.cobertura_objetivo)), hsp, pr)
-    n_pan = _n_paneles(kwp_req, float(panel.w))
-    pdc = _pdc_kw(n_pan, float(panel.w))
+    kwp_req = _kwp_req(_kwh_obj_mes(kwh_mes, p.cobertura_objetivo), hsp, pr)
+    n_pan = _n_paneles(kwp_req, panel.w)
+    pdc = _pdc_kw(n_pan, panel.w)
+    return kwh_mes, kwp_req, n_pan, pdc
 
-    sizing_inv = _recomendar_inversor(p, float(panel.w), dc_ac, prod_anual_kwp)
+
+def _resolver_inversor(p, eq, panel, dc_ac, hsp, pr):
+    prod = _prod_anual_por_kwp(hsp, pr)
+    sizing_inv = _recomendar_inversor(p, panel.w, dc_ac, prod)
     inv_id_rec = sizing_inv.get("inversor_recomendado")
     inv_id = _inv_final(eq, inv_id_rec)
-
     inv = get_inversor(inv_id)
-    pac_kw_fb = _pac_kw_desde_reco(sizing_inv.get("inversor_recomendado_meta", {}), inv_id) or float(getattr(inv, "kw_ac", 0.0) or 0.0)
+    pac_kw_fb = _pac_kw_desde_reco(
+        sizing_inv.get("inversor_recomendado_meta", {}), inv_id
+    ) or float(getattr(inv, "kw_ac", 0.0) or 0.0)
+    return inv, inv_id, pac_kw_fb, sizing_inv
 
-    rec = recomendar_string(
+
+def _calcular_strings(p, panel, inv, inv_id, pac_kw_fb, dc_ac, pdc):
+    return recomendar_string(
+        panel=_panel_spec(panel),
+        inversor=_inv_spec(inv, inv_id, pac_kw_fb),
+        t_min_c=_safe_float(getattr(p, "t_min_c", 10.0), 10.0),
+        objetivo_dc_ac=float(dc_ac),
+        pdc_kw_objetivo=float(pdc),
+    )
+
+
+def _build_electrico(panel, pac_kw, rec):
     r = (rec or {}).get("recomendacion") or {}
-    electrico = {
+    return {
         "strings": {
             "n_serie": int(r.get("n_paneles_string", 0)),
             "n_strings": int(r.get("n_strings_total", 0)),
@@ -240,12 +280,18 @@ def calcular_sizing_unificado(p: Datosproyecto) -> Dict[str, Any]:
             "isc_mod_a": float(panel.isc),
         },
         "ac": {
-            "p_ac_w": float(pac_kw_fb) * 1000.0,
+            "p_ac_w": float(pac_kw) * 1000.0,
             "v_ac": 240.0,
             "fases": 1,
         },
     }
 
+
+def _armar_resultado(
+    p, eq, panel, inv_id, dc_ac, hsp, pr,
+    kwh_mes, kwp_req, n_pan, pdc,
+    sizing_inv, rec, electrico
+):
     return {
         "kwh_mes_prom": float(kwh_mes),
         "consumo_anual_kwh": float(consumo_anual(p.consumo_12m)),
@@ -253,8 +299,9 @@ def calcular_sizing_unificado(p: Datosproyecto) -> Dict[str, Any]:
         "n_paneles": int(n_pan),
         "pdc_kw": round(float(pdc), 3),
         "capex_L": capex_L(float(pdc), p.costo_usd_kwp, p.tcambio),
-        "inversor_recomendado": inv_id_rec,
+        "inversor_recomendado": inv_id,
         "inversor_recomendado_meta": sizing_inv.get("inversor_recomendado_meta", {}),
         "strings_auto": _resumen_strings(rec),
         "traza": _trazabilidad(eq, _panel_id(eq), inv_id, dc_ac, hsp, pr),
+        "electrico": electrico,
     }
