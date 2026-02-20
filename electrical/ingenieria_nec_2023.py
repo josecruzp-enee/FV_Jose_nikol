@@ -24,7 +24,7 @@ def parse_sistema_ac(tag: str) -> SistemaAC:
 
 def _map_sistemas_ac() -> Dict[str, SistemaAC]:
     return {
-        "1F_240V":          SistemaAC(1, 240.0, None,  False),
+        
         "2F+N_120/240":     SistemaAC(1, 240.0, 120.0, True),
         "3F+N_120/240":     SistemaAC(3, 240.0, 120.0, True),
         "3F+N_120/208":     SistemaAC(3, 208.0, 120.0, True),
@@ -249,22 +249,21 @@ def _tramo_conductor(
         return {"nombre": nombre, "ok": False, "nota": "Datos insuficientes para conductor/VD."}
 
     cand = _seleccionar_por_ampacidad(i_a, tabla)
-    best = _mejorar_por_vd(cand, i_a, v_base, l_m, vd_obj_pct, tabla)
-    vd = _vdrop_pct(i_a, best["r_ohm_km"], l_m, v_base, n_hilos=2)
+    best = _mejorar_por_vd(cand, i_a, v_base, l_m, vd_obj_pct, tabla, n_hilos=n_hilos)
+    vd = _vdrop_pct(i_a, best["r_ohm_km"], l_m, v_base, n_hilos=n_hilos)
 
     return {
         "nombre": nombre,
         "ok": True,
-        "i_a": round(i_a, 2),
-        "l_m": round(l_m, 2),
-        "v_base_v": round(v_base, 2),
+        "i_a": round(float(i_a), 2),
+        "l_m": round(float(l_m), 2),
+        "v_base_v": round(float(v_base), 2),
         "awg": best["awg"],
         "amp_base_a": best["amp_a"],
-        "vd_pct": round(vd, 3),
+        "vd_pct": round(float(vd), 3),
         "vd_obj_pct": float(vd_obj_pct),
+        "n_hilos": int(n_hilos),
     }
-
-
 def _seleccionar_por_ampacidad(i_a: float, tabla: List[Dict[str, Any]]) -> Dict[str, Any]:
     x = float(i_a)
     for t in tabla:
@@ -273,10 +272,19 @@ def _seleccionar_por_ampacidad(i_a: float, tabla: List[Dict[str, Any]]) -> Dict[
     return dict(tabla[-1])
 
 
-def _mejorar_por_vd(cand: Dict[str, Any], i_a: float, v_base: float, l_m: float, vd_obj_pct: float, tabla: List[Dict[str, Any]]) -> Dict[str, Any]:
+def _mejorar_por_vd(
+    cand: Dict[str, Any],
+    i_a: float,
+    v_base: float,
+    l_m: float,
+    vd_obj_pct: float,
+    tabla: List[Dict[str, Any]],
+    *,
+    n_hilos: int,
+) -> Dict[str, Any]:
     idx = _idx_awg(cand["awg"], tabla)
     while idx < len(tabla) - 1:
-        vd = _vdrop_pct(i_a, tabla[idx]["r_ohm_km"], l_m, v_base, n_hilos=2)
+        vd = _vdrop_pct(i_a, tabla[idx]["r_ohm_km"], l_m, v_base, n_hilos=n_hilos)
         if vd <= float(vd_obj_pct):
             break
         idx += 1
