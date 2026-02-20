@@ -1,10 +1,7 @@
 # ui/seleccion_equipos.py
 from __future__ import annotations
-
 from typing import List, Tuple, Dict, Any
 import streamlit as st
-
-from electrical.catalogos_yaml import cargar_paneles_yaml, cargar_inversores_yaml
 from electrical.catalogos import catalogo_paneles, catalogo_inversores
 
 
