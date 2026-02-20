@@ -7,7 +7,7 @@ from electrical.catalogos_yaml import cargar_paneles_yaml, cargar_inversores_yam
 
 def _defaults(ctx) -> None:
     if not getattr(ctx, "equipos", None):
-        ctx.equipos = {"panel_id": None, "inversor_id": None, "sobredimension_dc_ac": 1.20, "tension_sistema": "1F_240V"}
+        ctx.equipos = {"panel_id": None, "inversor_id": None, "sobredimension_dc_ac": 1.20, "tension_sistema": "2F+N_120/240"}
 
 
 def _safe_index(opciones: List[str], valor_actual: str | None) -> int:
