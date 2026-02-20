@@ -21,6 +21,10 @@ from .helpers_pdf import (
 
 # Si money_L / num están en core/rutas.py (como tu app.py), importalos así:
 from core.rutas import money_L, num
+def _getcampo(x, k, default=""):
+    if isinstance(x, dict):
+        return x.get(k, default)
+    return getattr(x, k, default)
 
 
 # ---------------------------
@@ -32,7 +36,7 @@ def p1_tabla_cliente(datos, sizing, fecha, pal, content_w):
     story.append(Spacer(1, 6))
 
     rows = [
-        ["Cliente", datos.cliente, "Ubicación", datos.ubicacion],
+        ["Cliente", _getcampo(datos, "cliente", ""), "Ubicación", _getcampo(datos, "ubicacion", "")],
         ["Fecha", fecha, "Consumo anual", f"{float(sizing['consumo_anual']):,.0f} kWh/año"],
         ["Tarifa energía", f"{float(datos.tarifa_energia):.3f} L/kWh", "Cargos fijos", f"{money_L(float(datos.cargos_fijos))}/mes"],
     ]
