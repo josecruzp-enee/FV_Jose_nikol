@@ -1,6 +1,8 @@
 # =========================================================
 # 8B) Layout paneles (igual que el tuyo)
 # =========================================================
+import matplotlib
+matplotlib.use("Agg")
 import math
 def elegir_cols_compacto(n: int, max_cols: int) -> int:
     """
