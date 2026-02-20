@@ -270,8 +270,14 @@ def _calcular_strings(p, panel, inv, inv_id, pac_kw_fb, dc_ac, pdc):
 
 def _build_electrico(p, panel, pac_kw, rec):
     r = (rec or {}).get("recomendacion") or {}
+    ui_e = getattr(p, "electrico", {}) or {}
+
+    vac = float(ui_e.get("vac", 240.0))
+    fases = int(ui_e.get("fases", 1))
+    tension = str(getattr(p, "equipos", {}).get("tension_sistema", "2F+N_120/240"))
 
     return {
+        # DC desde strings_auto + catálogo
         "n_strings": int(r.get("n_strings_total", 0)),
         "n_modulos_serie": int(r.get("n_paneles_string", 0)),
         "vmp_string_v": float(r.get("vmp_string_v", 0.0)),
@@ -279,12 +285,22 @@ def _build_electrico(p, panel, pac_kw, rec):
         "imp_mod_a": float(panel.imp),
         "isc_mod_a": float(panel.isc),
 
+        # AC desde inversor + UI
         "p_ac_w": float(pac_kw) * 1000.0,
-        "v_ac": 240.0,
-        "fases": 1,
-        "tension_sistema": "2F+N_120/240",
-    }
+        "v_ac": vac,
+        "fases": fases,
+        "tension_sistema": tension,
 
+        # Cableado / targets desde UI (para NEC)
+        "L_dc_string_m": float(ui_e.get("dist_dc_m", 10.0)),
+        "L_ac_m": float(ui_e.get("dist_ac_m", 15.0)),
+        "vd_max_dc_pct": float(ui_e.get("vdrop_obj_dc_pct", 2.0)),
+        "vd_max_ac_pct": float(ui_e.get("vdrop_obj_ac_pct", 2.0)),
+        "temp_amb_c": float(ui_e.get("t_min_c", 30.0)),
+        "pf_ac": float(ui_e.get("fp", 1.0)),
+        "otros_ccc": int(ui_e.get("otros_ccc", 0)),
+        "incluye_neutro_ac": bool(ui_e.get("incluye_neutro_ac", False)),
+    }
 def _armar_resultado(
     p, eq, panel, inv_id, dc_ac, hsp, pr,
     kwh_mes, kwp_req, n_pan, pdc,
