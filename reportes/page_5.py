@@ -26,96 +26,81 @@ def _sum_float(tabla: List[Dict[str, Any]], key: str) -> float:
     return float(s)
 
 
-def _build_tabla_strings_dc(
-    resultado: Dict[str, Any],
-    pal,
-    styles,
-    content_w: float,
-) -> List[Any]:
-    """
-    Tabla: Configuración eléctrica referencial (Strings DC).
-    Fuente: resultado["sizing"]["cfg_strings"]["strings"]
-    """
-    story: List[Any] = []
+def _flt(x, d=0.0):
+    try: return float(x)
+    except Exception: return float(d)
 
+def _int(x, d=0):
+    try: return int(float(x))
+    except Exception: return int(d)
+
+def _dc_cfg(resultado: Dict[str, Any]) -> Dict[str, Any]:
+    e = resultado.get("electrico") or resultado
+    dc = (e.get("dc") or {})
+    return dc.get("config_strings") or {}
+
+# ==== helpers cortos (<=10 líneas cada uno) ====
+
+def _strings_desde_sizing(resultado: Dict[str, Any]):
     sizing = _get_sizing(resultado)
     cfg = sizing.get("cfg_strings") or {}
-    strings = cfg.get("strings") or []
+    return cfg, (cfg.get("strings") or [])
 
-    story.append(Spacer(1, 12))
-    story.append(Paragraph("Configuración eléctrica referencial (Strings DC)", styles["Heading2"]))
+def _titulo_strings(styles):
+    return [Spacer(1, 12),
+            Paragraph("Configuración eléctrica referencial (Strings DC)", styles["Heading2"]),
+            Spacer(1, 6)]
 
-    story.append(Spacer(1, 6))
+def _resumen_strings(resultado, styles):
+    c = _dc_cfg(resultado)
+    if c.get("n_strings", 0) > 0:
+        txt = f"{_int(c.get('n_strings'))} string(s) × {_int(c.get('modulos_por_string'))} módulos | {c.get('tipo','')}"
+        return [Paragraph(txt, styles["BodyText"])]
+    return [Paragraph("<i>No hay configuración de strings disponible.</i>", styles["BodyText"])]
 
-    if not strings:
-        story.append(Paragraph("<i>No hay configuración de strings disponible.</i>", styles["BodyText"]))
-        return story
+def _fila_header_strings():
+    return ["MPPT","Serie (S)","Paralelo (P)","Vmp (V)","Voc frío (V)","Imp (A)","Isc (A)"]
 
-    header = ["MPPT", "Serie (S)", "Paralelo (P)", "Vmp string (V)", "Voc frío (V)", "Imp (A)", "Isc (A)"]
-    rows = [header]
+def _fila_string(s):
+    return [str(_int(s.get("mppt", 0))), str(_int(s.get("n_series", 0))), str(_int(s.get("n_paralelo", 0))),
+            f"{_flt(s.get('vmp_string_v', 0.0)):.0f}", f"{_flt(s.get('voc_string_frio_v', 0.0)):.0f}",
+            f"{_flt(s.get('imp_a', 0.0)):.1f}", f"{_flt(s.get('isc_a', 0.0)):.1f}"]
 
-    for s in strings:
-        def _f(x, d=0.0):
-            try:
-                return float(x)
-            except Exception:
-                return float(d)
+def _colw_strings(content_w):
+    return [content_w*0.10,content_w*0.12,content_w*0.12,content_w*0.16,content_w*0.16,content_w*0.17,content_w*0.17]
 
-        def _i(x, d=0):
-            try:
-                return int(float(x))
-            except Exception:
-                return int(d)
+def _estilo_tabla_strings(pal):
+    return TableStyle([
+        ("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"), ("FONTSIZE",(0,0),(-1,-1),9),
+        ("BACKGROUND",(0,0),(-1,0),pal.get("SOFT",colors.HexColor("#F5F7FA"))),
+        ("TEXTCOLOR",(0,0),(-1,0),pal.get("PRIMARY",colors.HexColor("#0B2E4A"))),
+        ("ALIGN",(0,0),(-1,-1),"CENTER"),
+        ("GRID",(0,0),(-1,-1),0.3,pal.get("BORDER",colors.HexColor("#D7DCE3"))),
+        ("VALIGN",(0,0),(-1,-1),"MIDDLE"), ("TOPPADDING",(0,0),(-1,-1),6), ("BOTTOMPADDING",(0,0),(-1,-1),6),
+    ])
 
-        rows.append([
-            str(_i(s.get("mppt", 0))),
-            str(_i(s.get("n_series", 0))),
-            str(_i(s.get("n_paralelo", 0))),
-            f"{_f(s.get('vmp_string_v', 0.0)):.0f}",
-            f"{_f(s.get('voc_string_frio_v', 0.0)):.0f}",
-            f"{_f(s.get('imp_a', 0.0)):.1f}",
-            f"{_f(s.get('isc_a', 0.0)):.1f}",
-        ])
+def _tabla_strings(strings, pal, content_w):
+    rows = [_fila_header_strings()] + [_fila_string(s) for s in strings]
+    tbl = Table(rows, colWidths=_colw_strings(content_w), hAlign="LEFT")
+    tbl.setStyle(_estilo_tabla_strings(pal))
+    return tbl
 
-    col_widths = [
-        content_w * 0.10,
-        content_w * 0.12,
-        content_w * 0.12,
-        content_w * 0.16,
-        content_w * 0.16,
-        content_w * 0.17,
-        content_w * 0.17,
-    ]
-
-    tbl = Table(rows, colWidths=col_widths, hAlign="LEFT")
-    tbl.setStyle(TableStyle([
-        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-        ("FONTSIZE", (0, 0), (-1, 0), 9),
-        ("BACKGROUND", (0, 0), (-1, 0), pal.get("SOFT", colors.HexColor("#F5F7FA"))),
-        ("TEXTCOLOR", (0, 0), (-1, 0), pal.get("PRIMARY", colors.HexColor("#0B2E4A"))),
-        ("ALIGN", (0, 0), (-1, 0), "CENTER"),
-
-        ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
-        ("FONTSIZE", (0, 1), (-1, -1), 9),
-        ("ALIGN", (0, 1), (-1, -1), "CENTER"),
-
-        ("GRID", (0, 0), (-1, -1), 0.3, pal.get("BORDER", colors.HexColor("#D7DCE3"))),
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("TOPPADDING", (0, 0), (-1, -1), 6),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-    ]))
-
-    story.append(tbl)
-
+def _notas_strings(cfg, styles):
     checks = cfg.get("checks") or []
-    if checks:
-        story.append(Spacer(1, 8))
-        story.append(Paragraph("<b>Notas de verificación</b>", styles["BodyText"]))
-        for c in checks[:10]:
-            story.append(Paragraph(f"• {str(c)}", styles["BodyText"]))
+    if not checks: return []
+    out = [Spacer(1, 8), Paragraph("<b>Notas de verificación</b>", styles["BodyText"])]
+    return out + [Paragraph(f"• {str(c)}", styles["BodyText"]) for c in checks[:10]]
 
-    return story
+# ==== función principal ====
 
+def _build_tabla_strings_dc(resultado: Dict[str, Any], pal, styles, content_w: float) -> List[Any]:
+    cfg, strings = _strings_desde_sizing(resultado)
+    story: List[Any] = []
+    story += _titulo_strings(styles)
+    if not strings:
+        return story + _resumen_strings(resultado, styles)
+    story.append(_tabla_strings(strings, pal, content_w))
+    return story + _notas_strings(cfg, styles)
 
 def build_page_5(resultado, datos, paths, pal, styles, content_w):
     """
