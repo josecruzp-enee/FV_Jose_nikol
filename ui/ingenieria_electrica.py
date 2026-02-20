@@ -29,7 +29,7 @@ def _get_equipos(ctx) -> dict:
     eq.setdefault("panel_id", None)
     eq.setdefault("inversor_id", None)
     eq.setdefault("sobredimension_dc_ac", 1.20)
-    eq.setdefault("tension_sistema", "1F_240V")
+    eq.setdefault("tension_sistema", "2F+N_120/240")
     return eq
 
 
