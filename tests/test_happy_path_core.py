@@ -45,12 +45,15 @@ class TestHappyPathCore(unittest.TestCase):
             "ahorro_anual_L",
             "payback_simple_anios",
             "electrico",
+            "electrico_ref",
             "electrico_nec",
             "finanzas_lp",
         ]:
             self.assertIn(key, resultado)
 
         self.assertEqual(12, len(resultado["tabla_12m"]))
+
+        self.assertEqual(resultado.get("electrico"), resultado.get("electrico_ref"))
 
         electrico_nec = resultado.get("electrico_nec") or {}
         self.assertIn("paq", electrico_nec)

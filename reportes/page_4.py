@@ -115,7 +115,7 @@ def build_page_4(
         story.append(box_paragraph(cfg_html, pal, content_w, font_size=9.5))
         story.append(Spacer(1, 8))
 
-    elect = resultado.get("electrico_ref") or {}
+    elect = resultado.get("electrico_ref") or resultado.get("electrico") or {}
     texto_pdf = elect.get("texto_pdf") or []
     disclaimer = elect.get("disclaimer")
 

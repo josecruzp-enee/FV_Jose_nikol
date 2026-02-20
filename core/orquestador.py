@@ -126,7 +126,9 @@ def _armar_salida(
         "decision": decision,
         "ahorro_anual_L": ahorro_anual,
         "payback_simple_anios": pb,
+        # Compat: mantenemos `electrico` y exponemos alias `electrico_ref` para reportes legacy.
         "electrico": electrico,
+        "electrico_ref": electrico,
         "electrico_nec": electrico_nec,
         "finanzas_lp": finanzas_lp,
     }

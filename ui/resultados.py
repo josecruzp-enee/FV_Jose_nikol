@@ -174,13 +174,6 @@ def _datos_pdf_from_ctx(ctx, res: dict) -> Dict[str, Any]:
     if "consumo_anual" in res:
         datos_pdf.setdefault("consumo_anual", _as_float(res.get("consumo_anual"), 0.0))
 
-    # También setear como atributo por compatibilidad (si algún reporte usa datos.consumo_anual)
-    try:
-        if "consumo_anual" in datos_pdf:
-            setattr(dp, "consumo_anual", datos_pdf["consumo_anual"])
-    except Exception:
-        pass
-
     return datos_pdf
 
 

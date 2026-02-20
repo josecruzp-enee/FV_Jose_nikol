@@ -133,10 +133,12 @@ def _ejecutar_core(ctx):
     return res
 
 
-def _obtener_pkg_nec(ctx):
-    datos = _datosproyecto_desde_ctx(ctx)
-    res = ejecutar_evaluacion(datos)
-    return (res.get("electrico_nec") or {}).get("paq", {})
+def _obtener_pkg_nec(ctx, res: Dict[str, Any] | None = None):
+    """Extrae paquete NEC; compat: si no se provee `res`, ejecuta core."""
+    if res is None:
+        datos = _datosproyecto_desde_ctx(ctx)
+        res = ejecutar_evaluacion(datos)
+    return ((res or {}).get("electrico_nec") or {}).get("paq", {})
 
 
 # ==========================================================
@@ -221,7 +223,7 @@ def render(ctx):
         ctx.validacion_string = validacion
 
         # NEC
-        pkg = _obtener_pkg_nec(ctx)
+        pkg = _obtener_pkg_nec(ctx, res=res)
         ctx.resultado_electrico = pkg
         save_result_fingerprint(ctx)
 
