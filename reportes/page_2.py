@@ -64,7 +64,7 @@ def build_page_2(resultado, datos, paths, pal, styles, content_w):
         "<b>Interpretación</b><br/>"
         "• Esta página muestra energía (kWh).<br/>"
         "• El dimensionamiento evita sobredimensionar en meses de baja demanda.<br/>"
-        f"• Cobertura objetivo: <b>{datos.cobertura_objetivo*100:.0f}%</b>."
+        f"• Cobertura objetivo: <b>{float(_getcampo(datos,'cobertura_objetivo',0.0))*100:.0f}%</b>."
     )
     story.append(box_paragraph(interp, pal, content_w, font_size=9))
 
