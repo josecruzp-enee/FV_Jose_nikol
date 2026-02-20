@@ -19,8 +19,6 @@ from core.result_accessors import (
     get_tabla_12m,
 )
 from ui.state_helpers import is_result_stale
-from reportes.generar_charts import generar_charts
-from reportes.generar_layout_paneles import generar_layout_paneles
 from reportes.generar_pdf_profesional import generar_pdf_profesional
 from reportes.imagenes import generar_artefactos
 
