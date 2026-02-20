@@ -1,11 +1,10 @@
 # electrical/catalogos.py
 from __future__ import annotations
-
 from dataclasses import replace
 from typing import Dict, List
-
 from .modelos import Panel, Inversor
-
+from electrical.catalogos_yaml import cargar_paneles_yaml, cargar_inversores_yaml
+from pathlib import Path
 
 # ==========================================================
 # Fuente de verdad: catálogos en objetos (NO UI dicts)
@@ -39,17 +38,27 @@ _INVERSORES: Dict[str, Inversor] = {
 # API pública para el resto del sistema
 # ==========================================================
 
-def get_panel(panel_id: str) -> Panel:
+def get_panel(panel_id):
     try:
-        return _PANELES[panel_id]
-    except KeyError as e:
+        return PANELES[panel_id]
+    except Exception as e:
+        # fallback a YAML
+        if _YAML_PANELES.exists():
+            paneles = cargar_paneles_yaml(_YAML_PANELES)
+            if panel_id in paneles:
+                return paneles[panel_id]
         raise KeyError(f"Panel no existe en catálogo: {panel_id}") from e
 
-
-def get_inversor(inv_id: str) -> Inversor:
+def get_inversor(inv_id: str):
     try:
-        return _INVERSORES[inv_id]
-    except KeyError as e:
+        return INVERSORES[inv_id]
+    except Exception as e:
+        # fallback YAML
+        if _YAML_INVERSORES.exists():
+            inversores = cargar_inversores_yaml(_YAML_INVERSORES)
+            if inv_id in inversores:
+                return inversores[inv_id]
+
         raise KeyError(f"Inversor no existe en catálogo: {inv_id}") from e
 
 
