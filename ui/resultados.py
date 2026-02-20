@@ -79,11 +79,27 @@ def _get_res_y_pkg(ctx) -> Tuple[dict, dict]:
 # ==========================================================
 
 def _render_kpis(res: dict) -> None:
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Sistema (kWp DC)", num(float(res["sizing"]["kwp_dc"]), 2))
-    c2.metric("Cuota mensual", money_L(float(res["cuota_mensual"])))
-    c3.metric("Estado", str(res["evaluacion"]["estado"]))
+    sizing = res.get("sizing") or {}
+    evaluacion = res.get("evaluacion") or {}
 
+    kwp_dc = float(
+        sizing.get("kwp_dc")
+        or sizing.get("kwp")
+        or sizing.get("pdc_kw")
+        or 0.0
+    )
+
+    cuota = float(res.get("cuota_mensual") or 0.0)
+    estado = str(evaluacion.get("estado") or evaluacion.get("dictamen") or "N/D")
+
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Sistema (kWp DC)", num(kwp_dc, 2))
+    c2.metric("Cuota mensual", money_L(cuota))
+    c3.metric("Estado", estado)
+
+    # Debug útil si kwp_dc vino vacío
+    if kwp_dc <= 0:
+        st.warning(f"Sizing incompleto: keys={sorted(list(sizing.keys()))}")
 
 def _render_strings(pkg: dict) -> None:
     st.subheader("Strings DC (referencial)")
