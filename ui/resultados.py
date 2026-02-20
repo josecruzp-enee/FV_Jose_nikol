@@ -204,6 +204,7 @@ def _generar_pdf(res: dict, ctx, paths: dict) -> str:
     ctx.artefactos["pdf"] = pdf_path
     return str(pdf_path)
 
+
 def _render_descarga_pdf(pdf_path: str) -> None:
     with open(pdf_path, "rb") as f:
         st.download_button(
