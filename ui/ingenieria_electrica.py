@@ -327,7 +327,7 @@ def _run_core(ctx, datos: Datosproyecto) -> dict:
 def _run_paquete_electrico(ctx, eq: dict, e: dict, res: dict) -> dict:
     datos = _datosproyecto_desde_ctx(ctx)
     resultado = ejecutar_evaluacion(datos)
-    return resultado.get("electrico_nec", {})
+    return (resultado.get("electrico_nec") or {}).get("paq", {})
 # ==========================================================
 # UI Paso 5
 # ==========================================================
