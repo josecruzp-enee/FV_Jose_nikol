@@ -15,6 +15,20 @@ from core.result_accessors import (
     get_tabla_12m,
 )
 
+from pathlib import Path
+from reportlab.platypus import Spacer, Paragraph, Image
+
+def _append_layout_paneles(story, paths, styles, content_w):
+    layout = paths.get("layout_paneles")
+    if layout and Path(layout).exists():
+        story.append(Spacer(1, 10))
+        img = Image(str(layout), width=content_w, height=content_w * 0.45)
+        img.hAlign = "CENTER"
+        story.append(img)
+        story.append(Spacer(1, 8))
+    else:
+        story.append(Paragraph("Layout de paneles no disponible.", styles["BodyText"]))
+        story.append(Spacer(1, 8))
 
 def _sum_float(tabla: List[Dict[str, Any]], key: str) -> float:
     s = 0.0
@@ -131,6 +145,8 @@ def build_page_5(resultado, datos, paths, pal, styles, content_w):
 
     # Strings DC
     story += _build_tabla_strings_dc(resultado, pal, styles, content_w)
+    # ✅ Layout paneles aquí (arriba de la tabla y charts)
+    _append_layout_paneles(story, paths, styles, content_w)
 
     story.append(PageBreak())
     return story
