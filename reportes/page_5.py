@@ -41,8 +41,6 @@ def _get_dc(resultado: Dict[str, Any]) -> Dict[str, Any]:
             return e["dc"] or {}
     return (resultado or {}).get("dc") or {}
 
-# ==== helpers cortos (<=10 líneas cada uno) ====
-
 def _strings_desde_sizing(resultado: Dict[str, Any]):
     sizing = _get_sizing(resultado); cfg = sizing.get("cfg_strings") or {}
     strings = cfg.get("strings") or []
@@ -53,14 +51,14 @@ def _strings_desde_sizing(resultado: Dict[str, Any]):
          "vmp_string_v": dc.get("vmp_string_v", 0.0), "voc_string_frio_v": dc.get("voc_frio_string_v", 0.0),
          "imp_a": dc.get("i_string_oper_a", 0.0), "isc_a": dc.get("i_array_isc_a", 0.0)}
     return cfg, [s]
-    
+
 def _titulo_strings(styles):
     return [Spacer(1, 12),
             Paragraph("Configuración eléctrica referencial (Strings DC)", styles["Heading2"]),
             Spacer(1, 6)]
 
 def _resumen_strings(resultado, styles):
-    c = _dc_cfg(resultado)
+    dc = _get_dc(resultado); c = (dc.get("config_strings") or {})
     if c.get("n_strings", 0) > 0:
         txt = f"{_int(c.get('n_strings'))} string(s) × {_int(c.get('modulos_por_string'))} módulos | {c.get('tipo','')}"
         return [Paragraph(txt, styles["BodyText"])]
@@ -99,14 +97,10 @@ def _notas_strings(cfg, styles):
     out = [Spacer(1, 8), Paragraph("<b>Notas de verificación</b>", styles["BodyText"])]
     return out + [Paragraph(f"• {str(c)}", styles["BodyText"]) for c in checks[:10]]
 
-# ==== función principal ====
-
 def _build_tabla_strings_dc(resultado: Dict[str, Any], pal, styles, content_w: float) -> List[Any]:
     cfg, strings = _strings_desde_sizing(resultado)
-    story: List[Any] = []
-    story += _titulo_strings(styles)
-    if not strings:
-        return story + _resumen_strings(resultado, styles)
+    story: List[Any] = []; story += _titulo_strings(styles)
+    if not strings: return story + _resumen_strings(resultado, styles)
     story.append(_tabla_strings(strings, pal, content_w))
     return story + _notas_strings(cfg, styles)
 
