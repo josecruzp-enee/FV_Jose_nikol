@@ -218,7 +218,7 @@ def calcular_sizing_unificado(p: Datosproyecto) -> Dict[str, Any]:
     kwh_mes, kwp_req, n_pan, pdc = _sizing_energetico(p, panel, hsp, pr)
     inv, inv_id, pac_kw_fb, sizing_inv = _resolver_inversor(p, eq, panel, dc_ac, hsp, pr)
     rec = _calcular_strings(p, panel, inv, inv_id, pac_kw_fb, dc_ac, pdc)
-    electrico = _build_electrico(panel, pac_kw_fb, rec)
+    electrico = _build_electrico(p, panel, pac_kw_fb, rec)
 
     return _armar_resultado(
         p, eq, panel, inv_id, dc_ac, hsp, pr,
