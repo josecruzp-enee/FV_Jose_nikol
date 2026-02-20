@@ -10,7 +10,7 @@ from .evaluacion import evaluar_viabilidad, resumen_decision_mensual, payback_si
 from .finanzas_lp import proyectar_flujos_anuales
 from .electrico_ref import simular_electrico_fv_para_pdf
 from .modelo import Datosproyecto
-
+from electrical.adaptador_nec import generar_electrico_nec
 from core.sistema_fv_mapper import construir_parametros_fv_desde_dict
 
 
@@ -132,5 +132,6 @@ def ejecutar_evaluacion(p: Datosproyecto) -> Dict[str, Any]:
         "ahorro_anual_L": ahorro_anual,
         "payback_simple_anios": pb,
         "electrico": electrico,
+        "electrico_nec": electrico_nec,
         "finanzas_lp": finanzas_lp,
     }
