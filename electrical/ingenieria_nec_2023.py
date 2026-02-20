@@ -3,8 +3,11 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
+
 from electrical.factores_nec import ampacidad_ajustada_nec
+from electrical.protecciones import armar_ocpd
+
 
 # ==========================================================
 # Modelos mínimos
@@ -24,20 +27,17 @@ def parse_sistema_ac(tag: str) -> SistemaAC:
 
 def _map_sistemas_ac() -> Dict[str, SistemaAC]:
     return {
-        
-        "2F+N_120/240":     SistemaAC(1, 240.0, 120.0, True),
-        "3F+N_120/240":     SistemaAC(3, 240.0, 120.0, True),
-        "3F+N_120/208":     SistemaAC(3, 208.0, 120.0, True),
-        "3F_208Y120V":      SistemaAC(3, 208.0, 120.0, True),
-        "3F_480Y277V":      SistemaAC(3, 480.0, 277.0, True),
+        "2F+N_120/240": SistemaAC(1, 240.0, 120.0, True),
+        "3F+N_120/240": SistemaAC(3, 240.0, 120.0, True),
+        "3F+N_120/208": SistemaAC(3, 208.0, 120.0, True),
+        "3F_208Y120V":  SistemaAC(3, 208.0, 120.0, True),
+        "3F_480Y277V":  SistemaAC(3, 480.0, 277.0, True),
     }
 
 
 # ==========================================================
-# API pública
+# Contexto NEC + orquestación
 # ==========================================================
-from typing import Any, Dict
-
 def _ctx_nec(d: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "aplicar_derating": bool(d.get("aplicar_derating", True)),
@@ -47,47 +47,78 @@ def _ctx_nec(d: Dict[str, Any]) -> Dict[str, Any]:
         "ccc_dc": int(d.get("ccc_dc", 2)),
     }
 
+
 def _post_dc(d: Dict[str, Any], dc: Dict[str, Any]) -> None:
     ns = int(dc.get("n_strings", 0))
     d["has_combiner"] = bool(d.get("has_combiner", ns >= 3))
-    dc["config_strings"] = {"n_strings": ns, "modulos_por_string": int(d.get("n_modulos_serie", 0)),
-                            "tipo": "string directo a inversor" if ns <= 2 else "con combiner box"}
+    dc["config_strings"] = {
+        "n_strings": ns,
+        "modulos_por_string": int(d.get("n_modulos_serie", 0)),
+        "tipo": "string directo a inversor" if ns <= 2 else "con combiner box",
+    }
 
-from typing import Any, Dict
 
 def _prep_d(datos: Dict[str, Any]):
     d = _defaults(datos)
     return d, _validar_minimos(d)
 
+
 def _calc_dc_ac(d: Dict[str, Any]):
     s = parse_sistema_ac(d["tension_sistema"])
-    dc = _calc_dc(d); _post_dc(d, dc)
+    dc = _calc_dc(d)
+    _post_dc(d, dc)
     ac = _calc_ac(d, s)
     return s, dc, ac
 
+
 def _compat_strings_en_sizing(d: Dict[str, Any], dc: Dict[str, Any]) -> None:
-    d.setdefault("sizing", {}); d["sizing"].setdefault("cfg_strings", {})
+    d.setdefault("sizing", {})
+    d["sizing"].setdefault("cfg_strings", {})
     d["sizing"]["cfg_strings"]["strings"] = [{
-        "mppt": 1, "n_series": int(d.get("n_modulos_serie", 0)), "n_paralelo": int(dc.get("n_strings", 0)),
-        "vmp_string_v": dc.get("vmp_string_v", 0.0), "voc_string_frio_v": dc.get("voc_frio_string_v", 0.0),
-        "imp_a": dc.get("i_string_oper_a", 0.0), "isc_a": dc.get("i_array_isc_a", 0.0),
+        "mppt": 1,
+        "n_series": int(d.get("n_modulos_serie", 0)),
+        "n_paralelo": int(dc.get("n_strings", 0)),
+        "vmp_string_v": dc.get("vmp_string_v", 0.0),
+        "voc_string_frio_v": dc.get("voc_frio_string_v", 0.0),
+        "imp_a": dc.get("i_string_oper_a", 0.0),
+        "isc_a": dc.get("i_array_isc_a", 0.0),
     }]
 
-def _ensamblar_paq(d: Dict[str, Any], s, dc: Dict[str, Any], ac: Dict[str, Any], warnings):
-    ocpd = _calc_ocpd(d, dc, ac); cond = _calc_conductores_y_vd(d, s, dc, ac)
-    paq = {"dc": dc, "ac": ac, "ocpd": ocpd, "conductores": cond, "spd": _recomendar_spd(d),
-           "seccionamiento": _recomendar_seccionamiento(d), "canalizacion": _recomendar_canalizacion(cond),
-           "warnings": warnings + dc.get("warnings", []) + ac.get("warnings", [])}
+
+def _ensamblar_paq(d: Dict[str, Any], s: SistemaAC, dc: Dict[str, Any], ac: Dict[str, Any], warnings: List[str]):
+    # ✅ OCPD ahora viene del módulo electrical/protecciones.py (sin duplicar NEC aquí)
+    ocpd = armar_ocpd(
+        iac_nom_a=float(ac.get("i_ac_nom_a", 0.0)),
+        n_strings=int(dc.get("n_strings", 0)),
+        isc_mod_a=float(d.get("isc_mod_a", 0.0)),
+        has_combiner=bool(d.get("has_combiner", False)),
+    )
+
+    cond = _calc_conductores_y_vd(d, s, dc, ac)
+    paq = {
+        "dc": dc,
+        "ac": ac,
+        "ocpd": ocpd,
+        "conductores": cond,
+        "spd": _recomendar_spd(d),
+        "seccionamiento": _recomendar_seccionamiento(d),
+        "canalizacion": _recomendar_canalizacion(cond),
+        "warnings": warnings + dc.get("warnings", []) + ac.get("warnings", []),
+    }
     paq["resumen_pdf"] = _armar_resumen_pdf(paq, s)
     return paq
 
+
 def calcular_paquete_electrico_nec(datos: Dict[str, Any]) -> Dict[str, Any]:
-    d, warnings = _prep_d(datos); d["nec"] = _ctx_nec(d)
-    s, dc, ac = _calc_dc_ac(d); _compat_strings_en_sizing(d, dc)
+    d, warnings = _prep_d(datos)
+    d["nec"] = _ctx_nec(d)
+    s, dc, ac = _calc_dc_ac(d)
+    _compat_strings_en_sizing(d, dc)
     return _ensamblar_paq(d, s, dc, ac, warnings)
 
+
 # ==========================================================
-# Defaults + validación (corto y robusto)
+# Defaults + validación
 # ==========================================================
 def _defaults(d: Dict[str, Any]) -> Dict[str, Any]:
     x = dict(d or {})
@@ -97,15 +128,15 @@ def _defaults(d: Dict[str, Any]) -> Dict[str, Any]:
     x.setdefault("vd_max_dc_pct", 2.0)
     x.setdefault("vd_max_ac_pct", 2.0)
 
-    x.setdefault("material", "Cu")          # "Cu" o "Al"
+    x.setdefault("material", "Cu")  # "Cu" o "Al"
     x.setdefault("temp_amb_c", 30.0)
 
     x.setdefault("L_dc_string_m", 10.0)
-    x.setdefault("L_dc_trunk_m",  0.0)
+    x.setdefault("L_dc_trunk_m", 0.0)
     x.setdefault("L_ac_m", 15.0)
 
     x.setdefault("has_combiner", False)
-    x.setdefault("dc_arch", "string_to_inverter")  # o "strings_to_combiner_to_inverter"
+    x.setdefault("dc_arch", "string_to_inverter")
     return x
 
 
@@ -183,45 +214,11 @@ def _iac(p_w: float, v_ll: float, pf: float, fases: int) -> float:
 
 
 # ==========================================================
-# OCPD (fusibles/breaker) — base referencial
-# ==========================================================
-def _calc_ocpd(d: Dict[str, Any], dc: Dict[str, Any], ac: Dict[str, Any]) -> Dict[str, Any]:
-    fuse = _calc_fusible_string(d, dc)
-    brk = _calc_breaker_ac(d, ac)
-    return {"fusible_string": fuse, "breaker_ac": brk}
-
-
-def _calc_fusible_string(d: Dict[str, Any], dc: Dict[str, Any]) -> Dict[str, Any]:
-    n = int(dc.get("n_strings", 0))
-    isc = _as_float(d.get("isc_mod_a", 0.0))
-    req = bool(d.get("has_combiner", False)) and n >= 3
-    i_min = 1.25 * isc
-
-    if not req:
-        return {"requerido": False, "nota": "Sin combiner o <3 strings en paralelo (verificar caso real)."}
-    return {"requerido": True, "i_min_a": round(i_min, 2), "tamano_sugerido_a": _siguiente_ocpd(i_min)}
-
-
-def _calc_breaker_ac(d: Dict[str, Any], ac: Dict[str, Any]) -> Dict[str, Any]:
-    i_design = _as_float(ac.get("i_ac_design_a", 0.0))
-    return {"i_design_a": round(i_design, 2), "tamano_sugerido_a": _siguiente_ocpd(i_design)}
-
-
-def _siguiente_ocpd(a: float) -> int:
-    std = [15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100, 110, 125, 150, 175, 200]
-    x = float(a)
-    for s in std:
-        if x <= s:
-            return int(s)
-    return int(std[-1])
-
-
-# ==========================================================
-# Conductores + caída de voltaje (modo referencial robusto)
+# Conductores + caída de voltaje
 # ==========================================================
 def _calc_conductores_y_vd(d: Dict[str, Any], s: SistemaAC, dc: Dict[str, Any], ac: Dict[str, Any]) -> Dict[str, Any]:
     tab = _tabla_conductores_base(d.get("material", "Cu"))
-    nec_base = d.get("nec", {})  # ✅ contexto NEC (si no existe, cae a {})
+    nec_base = d.get("nec", {})
 
     dc_string = _tramo_conductor(
         nombre="DC string",
@@ -254,11 +251,12 @@ def _calc_conductores_y_vd(d: Dict[str, Any], s: SistemaAC, dc: Dict[str, Any], 
         l_m=_as_float(d.get("L_ac_m", 0.0)),
         vd_obj_pct=_as_float(d.get("vd_max_ac_pct", 2.0)),
         tabla=tab,
-        n_hilos=2 if s.fases == 1 else 3,  # referencial (sin neutro explícito)
+        n_hilos=2 if s.fases == 1 else 3,
         nec={**nec_base, "ccc": int(nec_base.get("ccc_ac", 3))},
     )
 
     return {"dc_string": dc_string, "dc_trunk": dc_trunk, "ac_out": ac_out, "material": str(d.get("material", "Cu"))}
+
 
 def _tramo_conductor(
     *,
@@ -285,19 +283,21 @@ def _tramo_conductor(
     vd = _vdrop_pct(i_a, best["r_ohm_km"], l_m, v_base, n_hilos=n_hilos)
 
     return {
-        "nombre": nombre, "ok": True,
-        "i_a": round(float(i_a), 2), "l_m": round(float(l_m), 2), "v_base_v": round(float(v_base), 2),
-        "awg": best["awg"], "amp_base_a": best["amp_a"],
-        "amp_ajustada_a": round(float(amp_adj), 2), "fac_temp": round(float(f_t), 3), "fac_ccc": round(float(f_c), 3),
-        "vd_pct": round(float(vd), 3), "vd_obj_pct": float(vd_obj_pct), "n_hilos": int(n_hilos),
+        "nombre": nombre,
+        "ok": True,
+        "i_a": round(float(i_a), 2),
+        "l_m": round(float(l_m), 2),
+        "v_base_v": round(float(v_base), 2),
+        "awg": best["awg"],
+        "amp_base_a": best["amp_a"],
+        "amp_ajustada_a": round(float(amp_adj), 2),
+        "fac_temp": round(float(f_t), 3),
+        "fac_ccc": round(float(f_c), 3),
+        "vd_pct": round(float(vd), 3),
+        "vd_obj_pct": float(vd_obj_pct),
+        "n_hilos": int(n_hilos),
     }
 
-def _seleccionar_por_ampacidad(i_a: float, tabla: List[Dict[str, Any]]) -> Dict[str, Any]:
-    x = float(i_a)
-    for t in tabla:
-        if x <= float(t["amp_a"]):
-            return dict(t)
-    return dict(tabla[-1])
 
 def _seleccionar_por_ampacidad_nec(
     i_a: float,
@@ -314,6 +314,7 @@ def _seleccionar_por_ampacidad_nec(
         if x <= amp_adj:
             return dict(t)
     return dict(tabla[-1])
+
 
 def _mejorar_por_vd(
     cand: Dict[str, Any],
@@ -348,7 +349,6 @@ def _vdrop_pct(i_a: float, r_ohm_km: float, l_m: float, v_base: float, *, n_hilo
 
 
 def _tabla_conductores_base(material: str) -> List[Dict[str, Any]]:
-    # Referencial: R @20°C aprox + ampacidad base típica (ajustable luego por NEC 310/690)
     cu = [
         {"awg": "14",  "amp_a": 20,  "r_ohm_km": 8.286},
         {"awg": "12",  "amp_a": 25,  "r_ohm_km": 5.211},
@@ -399,7 +399,6 @@ def _recomendar_seccionamiento(d: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _recomendar_canalizacion(conductores: Dict[str, Any]) -> Dict[str, Any]:
-    # Heurística simple: luego se reemplaza por fill NEC real.
     def sug(n: int) -> str:
         if n <= 3:
             return '1/2"'
@@ -409,7 +408,6 @@ def _recomendar_canalizacion(conductores: Dict[str, Any]) -> Dict[str, Any]:
             return '1"'
         return '1-1/4"'
 
-    # Conteos referenciales (sin neutro/EGC explícito todavía)
     return {
         "dc_string": {"tuberia": sug(2), "nota": "2 conductores (±) referencial."},
         "dc_trunk":  {"tuberia": sug(2), "nota": "2 conductores (±) referencial."},
@@ -423,24 +421,40 @@ def _recomendar_canalizacion(conductores: Dict[str, Any]) -> Dict[str, Any]:
 def _armar_resumen_pdf(paq: Dict[str, Any], s: SistemaAC) -> List[str]:
     dc = paq["conductores"]["dc_string"]
     ac = paq["conductores"]["ac_out"]
-    fuse = paq["ocpd"]["fusible_string"]
-    brk = paq["ocpd"]["breaker_ac"]
+    fuse = (paq.get("ocpd") or {}).get("fusible_string", {}) or {}
+    brk = (paq.get("ocpd") or {}).get("breaker_ac", {}) or {}
+
+    brk_a = brk.get("tamano_sugerido_a") or brk.get("tamano_a") or 0
+    fuse_a = fuse.get("tamano_sugerido_a") or fuse.get("tamano_a") or 0
 
     out: List[str] = []
     if dc.get("ok"):
-        out.append(f"Conductores DC (string): {dc['awg']} {paq['conductores']['material']} | Dist {dc['l_m']} m | caída {dc['vd_pct']}% (obj {dc['vd_obj_pct']}%).")
+        out.append(
+            f"Conductores DC (string): {dc['awg']} {paq['conductores']['material']} | "
+            f"Dist {dc['l_m']} m | caída {dc['vd_pct']}% (obj {dc['vd_obj_pct']}%)."
+        )
+
     if paq["conductores"]["dc_trunk"] and paq["conductores"]["dc_trunk"].get("ok"):
         t = paq["conductores"]["dc_trunk"]
-        out.append(f"Conductores DC (trunk): {t['awg']} {paq['conductores']['material']} | Dist {t['l_m']} m | caída {t['vd_pct']}% (obj {t['vd_obj_pct']}%).")
+        out.append(
+            f"Conductores DC (trunk): {t['awg']} {paq['conductores']['material']} | "
+            f"Dist {t['l_m']} m | caída {t['vd_pct']}% (obj {t['vd_obj_pct']}%)."
+        )
 
-    if fuse.get("requerido"):
-        out.append(f"Fusible por string: mínimo {fuse['i_min_a']} A | sugerido {fuse['tamano_sugerido_a']} A (validar 'series fuse rating' del módulo).")
+    if bool(fuse.get("requerido")):
+        out.append(
+            f"Fusible por string: mínimo {fuse.get('i_min_a', 0)} A | "
+            f"sugerido {fuse_a} A (validar 'series fuse rating' del módulo)."
+        )
 
     out.append(f"Corriente AC diseño: {paq['ac']['i_ac_design_a']} A @ {s.v_ll} V ({'3F' if s.fases==3 else '1F'}).")
-    out.append(f"Breaker AC sugerido: {brk['tamano_sugerido_a']} A (125% de Iac).")
+    out.append(f"Breaker AC sugerido: {brk_a} A (según OCPD).")
 
     if ac.get("ok"):
-        out.append(f"Conductores AC: {ac['awg']} {paq['conductores']['material']} | Dist {ac['l_m']} m | caída {ac['vd_pct']}% (obj {ac['vd_obj_pct']}%).")
+        out.append(
+            f"Conductores AC: {ac['awg']} {paq['conductores']['material']} | "
+            f"Dist {ac['l_m']} m | caída {ac['vd_pct']}% (obj {ac['vd_obj_pct']}%)."
+        )
 
     out.append("SPD: " + paq["spd"]["dc"] + " | " + paq["spd"]["ac"] + ".")
     out.append("Seccionamiento: " + paq["seccionamiento"]["dc"] + " | " + paq["seccionamiento"]["ac"] + ".")
