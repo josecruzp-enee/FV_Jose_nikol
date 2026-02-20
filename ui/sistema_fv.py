@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Tuple
 
 import streamlit as st
+from ui.state_helpers import ensure_dict, merge_defaults, sync_fields
 
 
 # ==========================================================
@@ -42,13 +43,8 @@ def _defaults_sistema_fv() -> Dict[str, Any]:
 
 
 def _asegurar_dict(ctx, nombre: str) -> Dict[str, Any]:
-    if not hasattr(ctx, nombre) or getattr(ctx, nombre) is None:
-        setattr(ctx, nombre, {})
-    d = getattr(ctx, nombre)
-    if not isinstance(d, dict):
-        setattr(ctx, nombre, {})
-        d = getattr(ctx, nombre)
-    return d
+    # compat wrapper
+    return ensure_dict(ctx, nombre, dict)
 
 
 def _tipo_superficie_code(label: str) -> str:
@@ -79,9 +75,8 @@ def _sync_campos_normalizados(sf: Dict[str, Any]) -> None:
 
 def _get_sf(ctx) -> Dict[str, Any]:
     sf = _asegurar_dict(ctx, "sistema_fv")
-    for k, v in _defaults_sistema_fv().items():
-        sf.setdefault(k, v)
-    _sync_campos_normalizados(sf)
+    merge_defaults(sf, _defaults_sistema_fv())
+    sync_fields(sf, _sync_campos_normalizados)
     return sf
 
 

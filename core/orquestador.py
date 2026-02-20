@@ -1,7 +1,6 @@
 # nucleo/orquestador.py
 from __future__ import annotations
 
-from typing import Any, Dict
 from typing import Any, Dict, Tuple
 from .validacion import validar_entradas
 from .sizing import calcular_sizing_unificado
@@ -11,8 +10,8 @@ from .finanzas_lp import proyectar_flujos_anuales
 from .electrico_ref import simular_electrico_fv_para_pdf
 from .modelo import Datosproyecto
 from electrical.adaptador_nec import generar_electrico_nec
+from .result_accessors import get_capex_L, get_kwp_dc
 from core.sistema_fv_mapper import construir_parametros_fv_desde_dict
-from electrical.adaptador_nec import generar_electrico_nec
 
 # =========================
 # Helpers (locales y seguros)
@@ -127,7 +126,9 @@ def _armar_salida(
         "decision": decision,
         "ahorro_anual_L": ahorro_anual,
         "payback_simple_anios": pb,
+        # Compat: mantenemos `electrico` y exponemos alias `electrico_ref` para reportes legacy.
         "electrico": electrico,
+        "electrico_ref": electrico,
         "electrico_nec": electrico_nec,
         "finanzas_lp": finanzas_lp,
     }
@@ -149,8 +150,9 @@ def _build_electrico_nec_safe(p: Datosproyecto, sizing: Dict[str, Any]) -> Dict[
 
 
 def _extraer_kwp_y_capex(sizing: Dict[str, Any]) -> Tuple[float, float]:
-    kwp_dc = float(sizing.get("kwp_dc") or sizing.get("kwp") or sizing.get("pdc_kw") or 0.0)
-    capex_L = float(sizing.get("capex_L") or sizing.get("capex") or 0.0)
+    res_tmp = {"sizing": dict(sizing or {})}
+    kwp_dc = float(get_kwp_dc(res_tmp))
+    capex_L = float(get_capex_L(res_tmp))
     if kwp_dc <= 0 or capex_L <= 0:
         raise KeyError(
             f"sizing incompleto: kwp_dc={kwp_dc}, capex_L={capex_L}. keys={sorted(list((sizing or {}).keys()))}"
