@@ -66,7 +66,7 @@ def p1_tabla_solucion_unica(datos, kwp, capex, ds, estado, pal, content_w):
     tasa_anual = float(_getcampo(datos, "tasa_anual", 0.0) or 0.0)
     plazo_anios = int(_getcampo(datos, "plazo_anios", 0) or 0)
     porcentaje_financiado = float(_getcampo(datos, "porcentaje_financiado", 0.0) or 0.0)
-    cobertura_objetivo = float(_getcampo(datos, "cobertura_objetivo", 0.0) or 0.0)
+    ["Cobertura objetivo", f"{float(_getcampo(datos,'cobertura_objetivo',0.0))*100:.0f}%",
 
     prod_anual = float(kwp) * prod_base_kwh_kwp_mes * 12.0
     n_paneles = int(math.ceil(float(kwp) * 1000.0 / 550.0)) if float(kwp) > 0 else 0
@@ -201,7 +201,7 @@ def build_page_1(resultado: Dict[str, Any], datos, paths, pal, styles, content_w
     story += p1_tabla_cliente(datos, sizing, fecha, pal, content_w)
     story += p1_tabla_solucion_unica(datos, kwp, capex, ds, estado, pal, content_w)
     story += p1_tabla_decision(decision, (resultado or {}).get("cuota_mensual", 0.0), plazo_anios, pal, content_w)
-    story += p1_conclusion(impacto, ds, peor, kwp, cobertura_objetivo, estado, pal, content_w)
+    story += p1_conclusion(impacto, ds, peor, kwp, float(_getcampo(datos,"cobertura_objetivo",0.0)), estado, pal, content_w)
 
     story.append(PageBreak())
     return story
