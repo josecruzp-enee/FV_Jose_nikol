@@ -324,14 +324,10 @@ def _run_core(ctx, datos: Datosproyecto) -> dict:
     return res
 
 
-def _run_paquete_electrico(eq: dict, e: dict, res: dict) -> dict:
-    datos = _datosproyecto_desde_ctx(st.session_state.ctx)
-
+def _run_paquete_electrico(ctx, eq: dict, e: dict, res: dict) -> dict:
+    datos = _datosproyecto_desde_ctx(ctx)
     resultado = ejecutar_evaluacion(datos)
-
     return resultado.get("electrico_nec", {})
-
-
 # ==========================================================
 # UI Paso 5
 # ==========================================================
