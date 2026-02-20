@@ -229,12 +229,22 @@ def calcular_sizing_unificado(p: Datosproyecto) -> Dict[str, Any]:
     pac_kw_fb = _pac_kw_desde_reco(sizing_inv.get("inversor_recomendado_meta", {}), inv_id) or float(getattr(inv, "kw_ac", 0.0) or 0.0)
 
     rec = recomendar_string(
-        panel=_panel_spec(panel),
-        inversor=_inv_spec(inv, inv_id, pac_kw_fb),
-        t_min_c=_safe_float(getattr(p, "t_min_c", 10.0), 10.0),
-        objetivo_dc_ac=float(dc_ac),
-        pdc_kw_objetivo=float(pdc),
-    )
+    r = (rec or {}).get("recomendacion") or {}
+    electrico = {
+        "strings": {
+            "n_serie": int(r.get("n_paneles_string", 0)),
+            "n_strings": int(r.get("n_strings_total", 0)),
+            "vmp_string_v": float(r.get("vmp_string_v", 0.0)),
+            "voc_frio_string_v": float(r.get("voc_frio_string_v", 0.0)),
+            "imp_mod_a": float(panel.imp),
+            "isc_mod_a": float(panel.isc),
+        },
+        "ac": {
+            "p_ac_w": float(pac_kw_fb) * 1000.0,
+            "v_ac": 240.0,
+            "fases": 1,
+        },
+    }
 
     return {
         "kwh_mes_prom": float(kwh_mes),
