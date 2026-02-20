@@ -28,10 +28,7 @@ def _extraer_input_desde_sizing(sizing: Dict[str, Any]):
     if not electrico:
         return {}, ["NEC: sizing sin bloque 'electrico'"]
 
-    datos = {
-        **(electrico.get("strings") or {}),
-        **(electrico.get("ac") or {}),
-    }
+    datos = dict(electrico or {})
 
     faltantes = [
         k for k in (
