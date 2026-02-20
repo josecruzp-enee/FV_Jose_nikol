@@ -169,37 +169,65 @@ def _validar_datos_para_pdf(ctx) -> bool:
 
 
 def _generar_pdf(res: dict, ctx, paths: dict) -> str:
-    # --- Normalización para compatibilidad con reportes ---
+    # =========================
+    # Normalización (compat PDF)
+    # =========================
     sizing = res.get("sizing") or {}
+    res["sizing"] = sizing  # asegura dict
 
+    # --- kwp (todos los alias) ---
     kwp_dc = float(
         sizing.get("kwp_dc")
+        or sizing.get("kwp_recomendado")
         or sizing.get("kwp")
         or sizing.get("pdc_kw")
         or 0.0
     )
+    sizing.setdefault("kwp_dc", kwp_dc)
     sizing.setdefault("kwp_recomendado", kwp_dc)
-    res["sizing"] = sizing
 
-    # ---- consumo_anual (fallback desde tabla_12m o consumo_12m) ----
+    # --- n_paneles ---
+    if "n_paneles" not in sizing:
+        # intenta deducir desde sizing o cfg_strings
+        n_paneles = sizing.get("n_paneles")
+        if not n_paneles:
+            cfg = sizing.get("cfg_strings") or {}
+            n_paneles = cfg.get("n_paneles") or cfg.get("n_modulos") or 0
+        sizing["n_paneles"] = int(n_paneles or 0)
+
+    # --- capex_L ---
+    capex_L = float(sizing.get("capex_L") or sizing.get("capex") or 0.0)
+    sizing.setdefault("capex_L", capex_L)
+
+    # --- consumo_anual (para PDF) ---
     if "consumo_anual" not in res:
+        consumo_anual = 0.0
+
+        # 1) desde tabla_12m
         tabla = res.get("tabla_12m") or []
         if isinstance(tabla, list) and tabla:
-            # intenta sumar consumo mensual desde la tabla
-            consumo_sum = 0.0
             for row in tabla:
                 if isinstance(row, dict):
-                    consumo_sum += float(row.get("consumo_kwh", row.get("consumo_mes_kwh", 0.0)) or 0.0)
-            if consumo_sum > 0:
-                res["consumo_anual"] = consumo_sum
+                    consumo_anual += float(row.get("consumo_kwh", row.get("consumo_mes_kwh", 0.0)) or 0.0)
 
-    # si sigue faltando, intenta desde Datosproyecto (ctx.datos_proyecto)
-    if "consumo_anual" not in res and getattr(ctx, "datos_proyecto", None) is not None:
-        p = ctx.datos_proyecto
-        consumo_12m = getattr(p, "consumo_12m", None) or getattr(p, "consumo_mensual_kwh", None)
-        if isinstance(consumo_12m, list) and consumo_12m:
-            res["consumo_anual"] = sum(float(x or 0.0) for x in consumo_12m)
+        # 2) fallback desde Datosproyecto
+        if consumo_anual <= 0 and getattr(ctx, "datos_proyecto", None) is not None:
+            p = ctx.datos_proyecto
+            consumo_12m = getattr(p, "consumo_12m", None) or getattr(p, "consumo_mensual_kwh", None)
+            if isinstance(consumo_12m, list) and consumo_12m:
+                consumo_anual = sum(float(x or 0.0) for x in consumo_12m)
 
+        res["consumo_anual"] = float(consumo_anual)
+
+    # Debug visible si algo crítico quedó en 0
+    if sizing.get("kwp_dc", 0) <= 0:
+        st.warning(f"PDF: sizing sin kwp_dc. keys={sorted(list(sizing.keys()))}")
+    if res.get("consumo_anual", 0) <= 0:
+        st.warning("PDF: consumo_anual quedó en 0. Verifique consumo_12m / tabla_12m.")
+
+    # =========================
+    # Generación PDF
+    # =========================
     pdf_path = generar_pdf_profesional(res, ctx.datos_proyecto, paths)
     ctx.artefactos["pdf"] = pdf_path
     return str(pdf_path)
