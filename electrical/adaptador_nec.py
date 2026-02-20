@@ -15,7 +15,7 @@ def generar_electrico_nec(*, p: Any, sizing: Dict[str, Any]) -> Dict[str, Any]:
 
     if errores:
         return {"ok": False, "errores": errores, "input": datos, "paq": {}}
-
+    print("DEBUG ELECTRICO:", sizing.get("electrico"))
     return _ejecutar_nec(datos)
 
 
