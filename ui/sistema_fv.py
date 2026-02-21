@@ -235,9 +235,11 @@ def _render_radiacion(sf: Dict[str, Any]) -> None:
 
     c1, c2 = st.columns([1, 2])
     with c1:
+        # ✅ key estable para que Streamlit no “pegue” estados raros
         sf["hsp_override"] = st.checkbox(
             "Editar manualmente HSP",
-            value=bool(sf["hsp_override"]),
+            value=bool(sf.get("hsp_override", False)),
+            key="sf_hsp_override",
             help="Si no, este valor debería venir de la ubicación (modelo futuro).",
         )
     with c2:
@@ -248,11 +250,12 @@ def _render_radiacion(sf: Dict[str, Any]) -> None:
         min_value=3.0,
         max_value=7.0,
         step=0.1,
-        value=float(sf["hsp_kwh_m2_d"]),
-        disabled=not bool(sf["hsp_override"]),
+        value=float(sf.get("hsp_kwh_m2_d", 5.2)),
+        disabled=not bool(sf.get("hsp_override", False)),
         key="sf_hsp",
     )
 
+    # ✅ Normalización: si NO está en override, no dejamos “hsp” manual pegado
     sf["hsp"] = float(sf["hsp_kwh_m2_d"])
     _sync_campos_normalizados(sf)
 
@@ -282,7 +285,7 @@ def _render_condiciones(sf: Dict[str, Any]) -> None:
             min_value=5.0,
             max_value=30.0,
             step=0.5,
-            value=float(sf["perdidas_sistema_pct"]),
+            value=float(sf.get("perdidas_sistema_pct", 15.0)),
             key="sf_perdidas",
         )
 
@@ -295,7 +298,7 @@ def _render_resumen(sf: Dict[str, Any]) -> None:
 
     st.write(
         f"• HSP: **{sf['hsp_kwh_m2_d']:.1f}** h/día "
-        f"{'(manual)' if sf['hsp_override'] else '(estimado)'}"
+        f"{'(manual)' if sf.get('hsp_override', False) else '(estimado)'}"
     )
     st.write(f"• Superficie: **{sf['tipo_superficie']}**")
     st.write(f"• Orientación: **{sf['orientacion_label']}** (azimut compat {int(sf['azimut_deg'])}°)")
@@ -317,9 +320,6 @@ def _render_grafica_teorica(ctx, sf: Dict[str, Any]) -> None:
     st.markdown("#### Gráfica teórica de generación FV (preview)")
 
     import matplotlib.pyplot as plt
-
-    # Importamos la fuente de HSP mensual (modelo conservador)
-    # (solo usamos el helper; no corremos el sizing completo aquí)
     from electrical.sizing_panel import _hsp_honduras_conservador_12m
 
     DIAS_MES = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
@@ -340,15 +340,13 @@ def _render_grafica_teorica(ctx, sf: Dict[str, Any]) -> None:
         )
         sf["kwp_preview"] = float(kwp)
 
-        # pérdidas y sombras -> PR simple para preview
         perd = float(sf.get("perdidas_sistema_pct", 15.0))
         sh = float(sf.get("sombras_pct", 0.0))
         pr = (1.0 - perd / 100.0) * (1.0 - sh / 100.0)
         pr = max(0.10, min(1.00, pr))
 
-        # Si el usuario fuerza HSP manual (un número), hacemos curva “plana” a propósito
-        hsp_manual = float(sf.get("hsp", sf.get("hsp_kwh_m2_d", 5.2)))
         usar_hsp_manual = bool(sf.get("hsp_override", False))
+        hsp_manual = float(sf.get("hsp_kwh_m2_d", 5.2))
 
         if usar_hsp_manual:
             hsp_12m = [hsp_manual] * 12
@@ -357,11 +355,8 @@ def _render_grafica_teorica(ctx, sf: Dict[str, Any]) -> None:
             hsp_12m = _hsp_honduras_conservador_12m()
             st.caption("Preview usando HSP mensual (modelo Honduras conservador).")
 
-        # kWh/mes = kWp * HSP(día) * PR * días
         gen = [float(kwp) * float(h) * float(pr) * float(d) for h, d in zip(hsp_12m, DIAS_MES)]
         total = sum(gen)
-
-        # Promedio diario por mes (para referencia)
         gen_dia = [(g / d) if d else 0.0 for g, d in zip(gen, DIAS_MES)]
 
     with c2:
@@ -382,6 +377,7 @@ def _render_grafica_teorica(ctx, sf: Dict[str, Any]) -> None:
     with st.expander("Ver HSP y promedio diario (preview)", expanded=False):
         st.write({"hsp_12m": hsp_12m})
         st.write({"kwh_dia_prom_12m": [round(x, 2) for x in gen_dia]})
+
 
 # ==========================================================
 # API del paso
