@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 
 # ==========================================================
@@ -15,6 +15,9 @@ class SizingInput:
     cobertura_obj: float
     dc_ac_obj: float
     pmax_panel_w: float  # trazabilidad (v1 no lo usa para ranking)
+
+    # NUEVO (opcional): si core ya calculó Pdc objetivo (por paneles), úsalo
+    pdc_obj_kw: Optional[float] = None
 
 
 @dataclass(frozen=True)
@@ -34,37 +37,36 @@ def ejecutar_sizing(*, inp: SizingInput, inversores_catalogo: List[InversorCandi
     """
     Selección automática de inversor (v1, robusta):
 
-    1) Calcula Pdc requerido por energía:
-       Pdc_req = (Consumo_anual * cobertura) / (Prod_anual_por_kwp)
+    Si inp.pdc_obj_kw viene definido:
+      - Usa ese Pdc como "Pdc requerido" (una sola fuente de verdad)
+    Si no:
+      - Calcula Pdc requerido por energía:
+        Pdc_req = (Consumo_anual * cobertura) / (Prod_anual_por_kwp)
 
-    2) Define Pac objetivo por DC/AC:
-       Pac_obj = Pdc_req / dc_ac_obj
+    Luego define Pac objetivo por DC/AC:
+      Pac_obj = Pdc_req / dc_ac_obj
 
-    3) Rankea candidatos:
-       - Penaliza fuerte si pac_kw < Pac_obj
-       - Prefiere el más cercano por encima (oversize pequeño)
-       - Bonus por #MPPT
-
-    Retorna:
-      {
-        "inversor_recomendado": <id>,
-        "inversor_recomendado_meta": {
-            "pdc_req_kw": ...,
-            "pac_obj_kw": ...,
-            "dc_ac_obj": ...,
-            "candidatos": [ {id, pac_kw, n_mppt, ... , score}, ... ]
-        }
-      }
+    Rankea candidatos:
+      - Penaliza fuerte si pac_kw < Pac_obj
+      - Prefiere el más cercano por encima (oversize pequeño)
+      - Bonus por #MPPT
     """
     invs = list(inversores_catalogo or [])
     if not invs:
         raise ValueError("Catálogo de inversores vacío.")
 
-    pdc_req_kw = _pdc_req_kw(
-        consumo_anual_kwh=inp.consumo_anual_kwh,
-        produccion_anual_por_kwp_kwh=inp.produccion_anual_por_kwp_kwh,
-        cobertura_obj=inp.cobertura_obj,
-    )
+    # ----------------------------------------------------------
+    # NUEVO: si core ya definió Pdc objetivo, usarlo.
+    # ----------------------------------------------------------
+    if inp.pdc_obj_kw is not None:
+        pdc_req_kw = float(inp.pdc_obj_kw)
+    else:
+        pdc_req_kw = _pdc_req_kw(
+            consumo_anual_kwh=inp.consumo_anual_kwh,
+            produccion_anual_por_kwp_kwh=inp.produccion_anual_por_kwp_kwh,
+            cobertura_obj=inp.cobertura_obj,
+        )
+
     dc_ac = _clamp(inp.dc_ac_obj, 1.0, 2.0)
     pac_obj_kw = pdc_req_kw / dc_ac if dc_ac > 0 else 0.0
 
