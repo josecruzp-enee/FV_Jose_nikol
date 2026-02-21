@@ -1,3 +1,9 @@
+# reportes/generar_pdf_profesional.py
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any, Dict
+
 from reportlab.platypus import SimpleDocTemplate
 from reportlab.lib.pagesizes import letter
 
@@ -6,7 +12,7 @@ from .page_1 import build_page_1
 from .page_2 import build_page_2
 from .page_3 import build_page_3
 from .page_4 import build_page_4
-from .page_5 import build_page_5
+from .page_5 import build_page_5  # ✅ FIX: typo
 
 
 def _compat_resultado_plano(resultado_proyecto: dict) -> dict:
@@ -21,13 +27,13 @@ def _compat_resultado_plano(resultado_proyecto: dict) -> dict:
     if "sizing" in resultado_proyecto and "tabla_12m" in resultado_proyecto:
         return resultado_proyecto
 
-    tecnico = (resultado_proyecto.get("tecnico") or {})
-    energetico = (resultado_proyecto.get("energetico") or {})
-    financiero = (resultado_proyecto.get("financiero") or {})
+    tecnico = (resultado_proyecto.get("tecnico") or {}) if isinstance(resultado_proyecto.get("tecnico"), dict) else {}
+    energetico = (resultado_proyecto.get("energetico") or {}) if isinstance(resultado_proyecto.get("energetico"), dict) else {}
+    financiero = (resultado_proyecto.get("financiero") or {}) if isinstance(resultado_proyecto.get("financiero"), dict) else {}
 
     # Si el orquestador incluyó _compat, úsalo como base (cero riesgo)
-    base = (resultado_proyecto.get("_compat") or {})
-    out = dict(base)
+    base = resultado_proyecto.get("_compat")
+    out = dict(base) if isinstance(base, dict) else {}
 
     # Asegurar llaves planas importantes
     out.setdefault("params_fv", tecnico.get("params_fv"))
@@ -47,23 +53,42 @@ def _compat_resultado_plano(resultado_proyecto: dict) -> dict:
     return out
 
 
-def generar_pdf_profesional(resultado_proyecto, datos, paths):
+def _ensure_pdf_path(paths: Dict[str, Any]) -> str:
     """
-    `resultado_proyecto` debe ser el objeto único del orquestador (ResultadoProyecto).
+    Garantiza que exista paths["pdf_path"] y que su carpeta exista.
+    """
+    if not isinstance(paths, dict):
+        raise TypeError("`paths` debe ser dict y contener 'pdf_path'.")
+
+    pdf_path = paths.get("pdf_path")
+    if not pdf_path:
+        # fallback razonable si no viene definido
+        out_dir = paths.get("out_dir") or paths.get("base_dir") or "salidas"
+        pdf_path = str(Path(out_dir) / "reporte_evaluacion_fv.pdf")
+        paths["pdf_path"] = pdf_path
+
+    p = Path(str(pdf_path))
+    p.parent.mkdir(parents=True, exist_ok=True)
+    return str(p)
+
+
+def generar_pdf_profesional(resultado_proyecto: dict, datos: Any, paths: Dict[str, Any]):
+    """
+    `resultado_proyecto` = objeto único del orquestador (ResultadoProyecto) o dict legacy.
     `datos` = Datosproyecto (o equivalente) para datos del cliente/inputs.
+    `paths` = dict de rutas (pdf_path, charts_dir, layout_paneles, etc.)
     """
     pal = pdf_palette()
     styles = pdf_styles()
 
-    doc = SimpleDocTemplate(
-        str(paths["pdf_path"]),
-        pagesize=letter
-    )
+    pdf_path = _ensure_pdf_path(paths)
+
+    doc = SimpleDocTemplate(str(pdf_path), pagesize=letter)
 
     story = []
-    content_w = doc.width
+    content_w = doc.width  # ✅ se pasa a páginas (no deberían recalcularlo)
 
-    # ✅ Compat: tus páginas actuales pueden seguir esperando dict plano
+    # ✅ Compat: páginas actuales pueden seguir esperando dict plano
     resultado = _compat_resultado_plano(resultado_proyecto)
 
     story += build_page_1(resultado, datos, paths, pal, styles, content_w)
@@ -73,4 +98,4 @@ def generar_pdf_profesional(resultado_proyecto, datos, paths):
     story += build_page_5(resultado, datos, paths, pal, styles, content_w)
 
     doc.build(story)
-    return paths["pdf_path"]
+    return str(pdf_path)
