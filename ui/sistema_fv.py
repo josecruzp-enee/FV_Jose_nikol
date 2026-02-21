@@ -318,6 +318,13 @@ def _render_grafica_teorica(ctx, sf: Dict[str, Any]) -> None:
 
     import matplotlib.pyplot as plt
 
+    # Importamos la fuente de HSP mensual (modelo conservador)
+    # (solo usamos el helper; no corremos el sizing completo aquí)
+    from electrical.sizing_panel import _hsp_honduras_conservador_12m
+
+    DIAS_MES = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+    MESES = list(range(1, 13))
+
     kwp = float(sf.get("kwp_preview", 5.0))
 
     c1, c2 = st.columns([1, 2])
@@ -333,37 +340,48 @@ def _render_grafica_teorica(ctx, sf: Dict[str, Any]) -> None:
         )
         sf["kwp_preview"] = float(kwp)
 
-        hsp = float(sf.get("hsp", sf.get("hsp_kwh_m2_d", 5.2)))
+        # pérdidas y sombras -> PR simple para preview
         perd = float(sf.get("perdidas_sistema_pct", 15.0))
         sh = float(sf.get("sombras_pct", 0.0))
-
         pr = (1.0 - perd / 100.0) * (1.0 - sh / 100.0)
         pr = max(0.10, min(1.00, pr))
 
-        prod_base_kwh_kwp_mes = hsp * 30.0 * pr
+        # Si el usuario fuerza HSP manual (un número), hacemos curva “plana” a propósito
+        hsp_manual = float(sf.get("hsp", sf.get("hsp_kwh_m2_d", 5.2)))
+        usar_hsp_manual = bool(sf.get("hsp_override", False))
 
-    factores = sf.get("factores_fv_12m")
-    if not (isinstance(factores, list) and len(factores) == 12):
-        factores = [1.0] * 12
+        if usar_hsp_manual:
+            hsp_12m = [hsp_manual] * 12
+            st.caption("Preview usando HSP manual (mismo valor todos los meses).")
+        else:
+            hsp_12m = _hsp_honduras_conservador_12m()
+            st.caption("Preview usando HSP mensual (modelo Honduras conservador).")
 
-    meses = list(range(1, 13))
-    gen = [float(kwp) * float(prod_base_kwh_kwp_mes) * float(f) for f in factores]
-    total = sum(gen)
+        # kWh/mes = kWp * HSP(día) * PR * días
+        gen = [float(kwp) * float(h) * float(pr) * float(d) for h, d in zip(hsp_12m, DIAS_MES)]
+        total = sum(gen)
+
+        # Promedio diario por mes (para referencia)
+        gen_dia = [(g / d) if d else 0.0 for g, d in zip(gen, DIAS_MES)]
 
     with c2:
         fig, ax = plt.subplots()
-        ax.plot(meses, gen, marker="o")
-        ax.set_xticks(meses)
+        ax.plot(MESES, gen, marker="o")
+        ax.set_xticks(MESES)
         ax.set_xlabel("Mes")
         ax.set_ylabel("Generación estimada (kWh/mes)")
         ax.set_title(f"Estimación anual: {total:,.0f} kWh/año")
         st.pyplot(fig, clear_figure=True)
 
     st.caption(
-        f"Base: HSP={hsp:.2f} h/día · PR={pr:.3f} (pérdidas {perd:.1f}% + sombras {sh:.1f}%). "
+        f"Modelo: kWh/mes = kWp·HSP_mes·PR·días. "
+        f"PR={pr:.3f} (pérdidas {perd:.1f}% + sombras {sh:.1f}%). "
         "Preview teórico; no reemplaza simulación detallada."
     )
 
+    with st.expander("Ver HSP y promedio diario (preview)", expanded=False):
+        st.write({"hsp_12m": hsp_12m})
+        st.write({"kwh_dia_prom_12m": [round(x, 2) for x in gen_dia]})
 
 # ==========================================================
 # API del paso
