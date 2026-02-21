@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
 from .modelo import Datosproyecto
@@ -11,7 +10,6 @@ from .simular_12_meses import capex_L, consumo_anual, consumo_promedio
 from electrical.catalogos import get_panel, get_inversor, catalogo_inversores
 from electrical.sizing_electric import SizingInput, InversorCandidato, ejecutar_sizing
 from electrical.strings_auto import PanelSpec, InversorSpec, recomendar_string
-
 
 
 # ==========================================================
@@ -154,7 +152,14 @@ def _inv_final(eq: Dict[str, Any], inv_rec: Optional[str]) -> str:
 # ==========================================================
 def _panel_spec(panel: Any) -> PanelSpec:
     coef = float(getattr(panel, "coef_voc_pct_c", getattr(panel, "coef_voc", -0.28)))
-    return PanelSpec(pmax_w=panel.w, vmp_v=panel.vmp, voc_v=panel.voc, imp_a=panel.imp, isc_a=panel.isc, coef_voc_pct_c=coef)
+    return PanelSpec(
+        pmax_w=panel.w,
+        vmp_v=panel.vmp,
+        voc_v=panel.voc,
+        imp_a=panel.imp,
+        isc_a=panel.isc,
+        coef_voc_pct_c=coef,
+    )
 
 
 def _inv_spec(inv: Any, inv_ui_id: str, pac_kw_fallback: float) -> InversorSpec:
@@ -208,10 +213,6 @@ def _trazabilidad(eq: Dict[str, Any], panel_id: str, inv_id: str, dc_ac: float, 
 # ==========================================================
 # API pública: ORQUESTA sizing unificado
 # ==========================================================
-# ==========================================================
-# API pública: ORQUESTA sizing unificado (refactor ≤10 líneas)
-# ==========================================================
-
 def calcular_sizing_unificado(p: Datosproyecto) -> Dict[str, Any]:
     eq = _leer_equipos(p)
     panel, hsp, pr, dc_ac = _base_inputs(p, eq)
@@ -230,7 +231,6 @@ def calcular_sizing_unificado(p: Datosproyecto) -> Dict[str, Any]:
 # ==========================================================
 # Helpers (≤10 líneas cada uno)
 # ==========================================================
-
 def _base_inputs(p, eq):
     hsp, pr = _leer_hsp(p), _leer_pr(p)
     dc_ac = _dc_ac_obj(eq)
@@ -269,38 +269,68 @@ def _calcular_strings(p, panel, inv, inv_id, pac_kw_fb, dc_ac, pdc):
 
 
 def _build_electrico(p, panel, pac_kw, rec):
+    """
+    Este dict es el puente SIZING → NEC.
+    Debe contener:
+      - mínimos NEC: n_strings, isc_mod_a, imp_mod_a, vmp_string_v, voc_frio_string_v, p_ac_w
+      - y además parámetros AC/cableado targets (vd%, L, pf, sistema)
+    """
     r = (rec or {}).get("recomendacion") or {}
     ui_e = getattr(p, "electrico", {}) or {}
+    if not isinstance(ui_e, dict):
+        ui_e = {}
 
     vac = float(ui_e.get("vac", 240.0))
     fases = int(ui_e.get("fases", 1))
-    tension = str(getattr(p, "equipos", {}).get("tension_sistema", "2F+N_120/240"))
+
+    eq = getattr(p, "equipos", {}) or {}
+    if not isinstance(eq, dict):
+        eq = {}
+    tension = str(eq.get("tension_sistema", "2F+N_120/240"))
+
+    # Importante: temp_amb_c NO es t_min_c (t_min es para Voc frío)
+    temp_amb_c = float(ui_e.get("t_amb_c", 30.0)) if "t_amb_c" in ui_e else 30.0
 
     return {
-        # DC desde strings_auto + catálogo
-        "n_strings": int(r.get("n_strings_total", 0)),
-        "n_modulos_serie": int(r.get("n_paneles_string", 0)),
-        "vmp_string_v": float(r.get("vmp_string_v", 0.0)),
-        "voc_frio_string_v": float(r.get("voc_frio_string_v", 0.0)),
-        "imp_mod_a": float(panel.imp),
-        "isc_mod_a": float(panel.isc),
-
-        # AC desde inversor + UI
+        # -------------------------
+        # Mínimos NEC (tu adapter los exige)
+        # -------------------------
+        "n_strings": int(r.get("n_strings_total", 0) or 0),
+        "isc_mod_a": float(getattr(panel, "isc", 0.0) or 0.0),
+        "imp_mod_a": float(getattr(panel, "imp", 0.0) or 0.0),
+        "vmp_string_v": float(r.get("vmp_string_v", 0.0) or 0.0),
+        "voc_frio_string_v": float(r.get("voc_frio_string_v", 0.0) or 0.0),
         "p_ac_w": float(pac_kw) * 1000.0,
+
+        # -------------------------
+        # AC / sistema
+        # -------------------------
         "v_ac": vac,
         "fases": fases,
         "tension_sistema": tension,
+        "pf_ac": float(ui_e.get("fp", 1.0)),
 
-        # Cableado / targets desde UI (para NEC)
+        # -------------------------
+        # Cableado / targets (para NEC)
+        # -------------------------
         "L_dc_string_m": float(ui_e.get("dist_dc_m", 10.0)),
+        "L_dc_trunk_m": float(ui_e.get("dist_dc_trunk_m", 0.0)),  # opcional
         "L_ac_m": float(ui_e.get("dist_ac_m", 15.0)),
         "vd_max_dc_pct": float(ui_e.get("vdrop_obj_dc_pct", 2.0)),
         "vd_max_ac_pct": float(ui_e.get("vdrop_obj_ac_pct", 2.0)),
-        "temp_amb_c": float(ui_e.get("t_min_c", 30.0)),
-        "pf_ac": float(ui_e.get("fp", 1.0)),
+
+        # Ambiente/material/arquitectura (defaults seguros)
+        "temp_amb_c": float(temp_amb_c),
+        "material": str(ui_e.get("material_conductor", "Cu")),
+        "has_combiner": bool(ui_e.get("has_combiner", False)),
+        "dc_arch": str(ui_e.get("dc_arch", "string_to_inverter")),
+
+        # Extras UI (por si tu NEC los usa o para trazabilidad)
         "otros_ccc": int(ui_e.get("otros_ccc", 0)),
         "incluye_neutro_ac": bool(ui_e.get("incluye_neutro_ac", False)),
     }
+
+
 def _armar_resultado(
     p, eq, panel, inv_id, dc_ac, hsp, pr,
     kwh_mes, kwp_req, n_pan, pdc,
@@ -317,5 +347,5 @@ def _armar_resultado(
         "inversor_recomendado_meta": sizing_inv.get("inversor_recomendado_meta", {}),
         "strings_auto": _resumen_strings(rec),
         "traza": _trazabilidad(eq, _panel_id(eq), inv_id, dc_ac, hsp, pr),
-        "electrico": electrico,
+        "electrico": electrico,  # <-- CLAVE: puente hacia adaptador_nec
     }
