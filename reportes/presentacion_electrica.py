@@ -138,90 +138,52 @@ CATALOGO: Dict[str, Dict[str, str]] = {
 # Normalización
 # ----------------------------
 
+
 def normalizar_electrico(pkg: Dict[str, Any]) -> Dict[str, Any]:
+    # Acepta wrapper {ok/errores/input/paq} o paq directo
+    base = pkg.get("paq") if isinstance(pkg, dict) and isinstance(pkg.get("paq"), dict) else (pkg or {})
 
     checks = {
-        "ok_vdc": bool(pkg.get("ok_vdc", _get(pkg, "checks.ok_vdc", False))),
-        "ok_mppt": bool(pkg.get("ok_mppt", _get(pkg, "checks.ok_mppt", False))),
-        "ok_corriente": bool(pkg.get("ok_corriente", _get(pkg, "checks.ok_corriente", False))),
-        "string_valido": bool(pkg.get("string_valido", _get(pkg, "checks.string_valido", False))),
+        "ok_vdc": bool(base.get("ok_vdc", _get(base, "checks.ok_vdc", False))),
+        "ok_mppt": bool(base.get("ok_mppt", _get(base, "checks.ok_mppt", False))),
+        "ok_corriente": bool(base.get("ok_corriente", _get(base, "checks.ok_corriente", False))),
+        "string_valido": bool(base.get("string_valido", _get(base, "checks.string_valido", False))),
     }
 
-    # -------------------------
-    # Corrientes
-    # -------------------------
-    dc = _first_dict(
-        _get(pkg, "nec.dc"),
-        _get(pkg, "corrientes_dc"),
-        _get(pkg, "dc"),
-        _get(pkg, "ingenieria.nec.dc"),
-    )
+    dc = _first_dict(_get(base, "nec.dc"), _get(base, "corrientes_dc"), _get(base, "dc"), _get(base, "ingenieria.nec.dc"))
+    ac = _first_dict(_get(base, "nec.ac"), _get(base, "corrientes_ac"), _get(base, "ac"), _get(base, "ingenieria.nec.ac"))
 
-    ac = _first_dict(
-        _get(pkg, "nec.ac"),
-        _get(pkg, "corrientes_ac"),
-        _get(pkg, "ac"),
-        _get(pkg, "ingenieria.nec.ac"),
-    )
+    protecciones = _first_dict(_get(base, "protecciones"), _get(base, "ocpd"), _get(base, "nec.protecciones"), _get(base, "proteccion"))
+    spd = _first_dict(_get(base, "spd"), _get(base, "nec.spd"))
+    seccionamiento = _first_dict(_get(base, "seccionamiento"), _get(base, "nec.seccionamiento"))
 
-    # -------------------------
-    # Protecciones (OCPD real NEC)
-    # -------------------------
-    protecciones = _first_dict(
-        _get(pkg, "protecciones"),   # legacy
-        _get(pkg, "ocpd"),           # ✅ contrato real motor NEC
-        _get(pkg, "nec.protecciones"),
-        _get(pkg, "proteccion"),
-    )
+    conductores = _first_dict(_get(base, "conductores"), _get(base, "nec.conductores"), _get(base, "cables"))
 
-    # -------------------------
-    # SPD y Seccionamiento (NUEVO)
-    # -------------------------
-    spd = _first_dict(
-        _get(pkg, "spd"),
-        _get(pkg, "nec.spd"),
-    )
-
-    seccionamiento = _first_dict(
-        _get(pkg, "seccionamiento"),
-        _get(pkg, "nec.seccionamiento"),
-    )
-
-    # -------------------------
-    # Conductores
-    # -------------------------
-    conductores = _first_dict(
-        _get(pkg, "conductores"),
-        _get(pkg, "nec.conductores"),
-        _get(pkg, "cables"),
-    )
-
-    # -------------------------
-    # Warnings
-    # -------------------------
     warnings: List[str] = []
-    warnings += list(_first_list(pkg.get("warnings"), _get(pkg, "texto_ui.checks")))
+    warnings += list(_first_list(base.get("warnings"), _get(base, "texto_ui.checks")))
     warnings += list(_first_list(_get(dc, "warnings"), _get(ac, "warnings")))
 
     fus = _get(protecciones, "fusible_string", {})
     if isinstance(fus, dict) and fus.get("nota"):
         warnings.append(str(fus.get("nota")))
-
     warnings = [str(w) for w in warnings if str(w).strip()]
 
-    # -------------------------
-    # CONTRATO NORMALIZADO
-    # -------------------------
     return {
         "checks": checks,
         "dc": dc or {},
         "ac": ac or {},
         "protecciones": protecciones or {},
-        "spd": spd or {},                 # ✅ ahora visible en UI/PDF
-        "seccionamiento": seccionamiento or {},  # ✅ nuevo
+        "spd": spd or {},
+        "seccionamiento": seccionamiento or {},
         "conductores": conductores or {},
         "warnings": warnings,
     }
+
+
+
+
+
+
 def resumen_semáforo(norm: Dict[str, Any]) -> Tuple[str, str]:
     c = norm.get("checks") or {}
     ok_all = all(bool(c.get(k)) for k in ["ok_vdc", "ok_mppt", "ok_corriente", "string_valido"])
