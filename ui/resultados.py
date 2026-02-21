@@ -332,10 +332,17 @@ def render(ctx) -> None:
 
     if not _validar_ctx(ctx):
         return
-    st.subheader("DEBUG — Panel sizing nuevo")
-    st.write(resultado.tecnico.get("panel_sizing"))
-    
+
+    # ✅ Traer resultados ANTES de usarlos
     resultado_proyecto = _get_resultado_proyecto(ctx)
+
+    st.subheader("DEBUG — Panel sizing nuevo")
+    tecnico = resultado_proyecto.get("tecnico") or {}
+    st.write(tecnico.get("panel_sizing"))   # si existe esa clave
+
+    # Si lo que realmente tienes es "sizing", usa esto en vez de la línea de arriba:
+    # st.write(tecnico.get("sizing"))
+
     res = _res_plano_para_ui_y_pdf(resultado_proyecto)
 
     _render_kpis(res)
@@ -345,7 +352,7 @@ def render(ctx) -> None:
     _render_ajustes_vista(vista)
     st.divider()
 
-    # ✅ Mostrar NEC (en vez de un pkg referencial inexistente)
+    # ✅ Mostrar NEC
     paq_nec = _get_nec_paq(resultado_proyecto)
     _render_nec_resumen(paq_nec)
     st.divider()
@@ -359,7 +366,6 @@ def render(ctx) -> None:
 
     res_pdf = copy.deepcopy(res)
     _ejecutar_pipeline_pdf(ctx, res_pdf, vista, resultado_proyecto)
-
 
 def validar(ctx) -> Tuple[bool, List[str]]:
     errores: List[str] = []
