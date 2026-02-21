@@ -16,7 +16,7 @@ from electrical.strings_auto import PanelSpec, InversorSpec, recomendar_string
 # Constantes / defaults
 # ==========================================================
 T_STC_C = 25.0
-DIAS_MES = 30.0
+DIAS_MES = 30.0  # (legacy) ya no se usa para sizing, se mantiene por compat si alguien lo usa
 
 
 # ==========================================================
@@ -85,20 +85,35 @@ def _inv_id(eq: Dict[str, Any]) -> Optional[str]:
 
 # ==========================================================
 # Sizing energético (kWp, n paneles)
+#   NOTA: Antes se dimensionaba por "mes promedio" con DIAS_MES=30.
+#         Ahora se dimensiona por ENERGÍA ANUAL para evitar sesgo de días/mes.
 # ==========================================================
 def _kwh_mes_prom(p: Datosproyecto) -> float:
     return float(consumo_promedio(p.consumo_12m))
 
 
 def _kwh_obj_mes(kwh_mes: float, cobertura_obj: float) -> float:
+    # (legacy) se deja por compat; ya no se usa para sizing principal
     return float(kwh_mes) * _clamp(float(cobertura_obj), 0.0, 1.0)
 
 
 def _kwp_req(kwh_obj_mes: float, hsp: float, pr: float, dias_mes: float = DIAS_MES) -> float:
+    # (legacy) se deja por compat; ya no se usa en el sizing principal
     denom = float(hsp) * float(pr) * float(dias_mes)
     if denom <= 0:
         raise ValueError("HSP/PR inválidos (denominador <= 0).")
     return float(kwh_obj_mes) / denom
+
+
+def _kwh_obj_anual(consumo_anual_kwh: float, cobertura_obj: float) -> float:
+    return float(consumo_anual_kwh) * _clamp(float(cobertura_obj), 0.0, 1.0)
+
+
+def _kwp_req_anual(kwh_obj_anual: float, hsp: float, pr: float) -> float:
+    denom = float(hsp) * float(pr) * 365.0
+    if denom <= 0:
+        raise ValueError("HSP/PR inválidos (denominador <= 0).")
+    return float(kwh_obj_anual) / denom
 
 
 def _n_paneles(kwp_req: float, panel_w: float) -> int:
@@ -239,10 +254,18 @@ def _base_inputs(p, eq):
 
 
 def _sizing_energetico(p, panel, hsp, pr):
-    kwh_mes = _kwh_mes_prom(p)
-    kwp_req = _kwp_req(_kwh_obj_mes(kwh_mes, p.cobertura_objetivo), hsp, pr)
+    """
+    Sizing principal por energía ANUAL (reduce sesgo de días/mes).
+    Se mantiene kwh_mes_prom solo para reporting/UI.
+    """
+    kwh_anual = float(consumo_anual(p.consumo_12m))
+    kwh_obj_anual = _kwh_obj_anual(kwh_anual, p.cobertura_objetivo)
+    kwp_req = _kwp_req_anual(kwh_obj_anual, hsp, pr)
+
     n_pan = _n_paneles(kwp_req, panel.w)
     pdc = _pdc_kw(n_pan, panel.w)
+
+    kwh_mes = _kwh_mes_prom(p)  # referencia
     return kwh_mes, kwp_req, n_pan, pdc
 
 
@@ -336,16 +359,36 @@ def _armar_resultado(
     kwh_mes, kwp_req, n_pan, pdc,
     sizing_inv, rec, electrico
 ):
+    # Extras útiles para UI/PDF (no rompen contrato: solo agregan campos)
+    prod_anual_kwp = _prod_anual_por_kwp(hsp, pr)          # kWh/kWp-año
+    prod_diaria_kwp = float(hsp) * float(pr)               # kWh/kWp-día (promedio)
+
     return {
         "kwh_mes_prom": float(kwh_mes),
         "consumo_anual_kwh": float(consumo_anual(p.consumo_12m)),
+
+        # sizing
         "kwp_req": round(float(kwp_req), 3),
         "n_paneles": int(n_pan),
         "pdc_kw": round(float(pdc), 3),
+
+        # trazabilidad energética (nuevo)
+        "prod_anual_por_kwp_kwh": round(float(prod_anual_kwp), 2),
+        "prod_diaria_por_kwp_kwh": round(float(prod_diaria_kwp), 3),
+
+        # costos
         "capex_L": capex_L(float(pdc), p.costo_usd_kwp, p.tcambio),
+
+        # inversor
         "inversor_recomendado": inv_id,
         "inversor_recomendado_meta": sizing_inv.get("inversor_recomendado_meta", {}),
+
+        # strings
         "strings_auto": _resumen_strings(rec),
+
+        # traza inputs clave
         "traza": _trazabilidad(eq, _panel_id(eq), inv_id, dc_ac, hsp, pr),
+
+        # puente hacia NEC
         "electrico": electrico,  # <-- CLAVE: puente hacia adaptador_nec
     }
