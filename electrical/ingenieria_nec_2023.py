@@ -51,12 +51,40 @@ def _ctx_nec(d: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _reparto_paneles(n_paneles: int, n_strings: int) -> List[int]:
+    if n_paneles <= 0 or n_strings <= 0:
+        return []
+    base = n_paneles // n_strings
+    resto = n_paneles % n_strings
+    return [base + (1 if i < resto else 0) for i in range(n_strings)]
+
+
 def _post_dc(d: Dict[str, Any], dc: Dict[str, Any]) -> None:
-    ns = int(dc.get("n_strings", 0))
+    """
+    Post-proceso DC: decide combiner y arma config_strings para UI/PDF.
+    IMPORTANTE: para que 'modulos_por_string' salga bien, ideal pasar:
+      - d["n_paneles"] (o d["n_paneles_total"])
+    Si no viene, cae a n_modulos_serie (legacy), pero puede ser 0.
+    """
+    ns = _as_int(dc.get("n_strings", 0))
     d["has_combiner"] = bool(d.get("has_combiner", ns >= 3))
+
+    # Fuente preferida: total de paneles del sistema
+    n_paneles = _as_int(d.get("n_paneles", 0))
+    if n_paneles <= 0:
+        n_paneles = _as_int(d.get("n_paneles_total", 0))
+
+    # Legacy/fallback: módulos en serie (no es lo mismo, pero evitamos 0 si es lo único que hay)
+    if n_paneles <= 0:
+        n_paneles = _as_int(d.get("n_modulos_serie", 0))
+
+    reparto = _reparto_paneles(n_paneles, ns)
+    modulos_por_string = " / ".join(str(x) for x in reparto) if reparto else "—"
+
     dc["config_strings"] = {
         "n_strings": ns,
-        "modulos_por_string": int(d.get("n_modulos_serie", 0)),
+        "n_paneles": n_paneles if n_paneles > 0 else None,
+        "modulos_por_string": modulos_por_string,
         "tipo": "string directo a inversor" if ns <= 2 else "con combiner box",
     }
 
@@ -82,8 +110,8 @@ def _compat_strings_en_sizing(d: Dict[str, Any], dc: Dict[str, Any]) -> None:
     d["sizing"].setdefault("cfg_strings", {})
     d["sizing"]["cfg_strings"]["strings"] = [{
         "mppt": 1,
-        "n_series": int(d.get("n_modulos_serie", 0)),
-        "n_paralelo": int(dc.get("n_strings", 0)),
+        "n_series": _as_int(d.get("n_modulos_serie", 0)),
+        "n_paralelo": _as_int(dc.get("n_strings", 0)),
         "vmp_string_v": dc.get("vmp_string_v", 0.0),
         "voc_string_frio_v": dc.get("voc_frio_string_v", 0.0),
         "imp_a": dc.get("i_string_oper_a", 0.0),
@@ -94,7 +122,7 @@ def _compat_strings_en_sizing(d: Dict[str, Any], dc: Dict[str, Any]) -> None:
 def _ensamblar_paq(d: Dict[str, Any], s: SistemaAC, dc: Dict[str, Any], ac: Dict[str, Any], warnings: List[str]):
     ocpd = armar_ocpd(
         iac_nom_a=float(ac.get("i_ac_nom_a", 0.0)),
-        n_strings=int(dc.get("n_strings", 0)),
+        n_strings=_as_int(dc.get("n_strings", 0)),
         isc_mod_a=float(d.get("isc_mod_a", 0.0)),
         has_combiner=bool(d.get("has_combiner", False)),
     )
@@ -479,7 +507,7 @@ def _as_float(x: Any) -> float:
 
 def _as_int(x: Any) -> int:
     try:
-        return int(x)
+        return int(float(x))
     except Exception:
         return 0
 
