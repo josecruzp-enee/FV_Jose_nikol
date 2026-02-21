@@ -138,7 +138,7 @@ CATALOGO: Dict[str, Dict[str, str]] = {
 # Normalización
 # ----------------------------
 
-ddef normalizar_electrico(pkg: Dict[str, Any]) -> Dict[str, Any]:
+def normalizar_electrico(pkg: Dict[str, Any]) -> Dict[str, Any]:
 
     checks = {
         "ok_vdc": bool(pkg.get("ok_vdc", _get(pkg, "checks.ok_vdc", False))),
