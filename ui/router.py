@@ -26,7 +26,6 @@ class PasoWizard:
 # ==========================================================
 # Defaults (evita KeyError en validaciones)
 # ==========================================================
-
 def _init_defaults() -> None:
     s = st.session_state
 
@@ -87,7 +86,6 @@ def _init_ctx_campos(ctx) -> None:
 # ==========================================================
 # Sidebar libre (NO bloquea)
 # ==========================================================
-
 def _sidebar_nav(pasos: List[PasoWizard], paso_actual: int, ctx) -> None:
     st.sidebar.title("FV Engine • Wizard")
 
@@ -104,7 +102,6 @@ def _sidebar_nav(pasos: List[PasoWizard], paso_actual: int, ctx) -> None:
 # ==========================================================
 # UI del paso: header + errores + botones
 # ==========================================================
-
 def _render_header(pasos: List[PasoWizard], paso_actual: int) -> None:
     total = len(pasos)
     st.progress((paso_actual - 1) / max(total - 1, 1))
@@ -144,12 +141,16 @@ def _render_botones(ctx, pasos: List[PasoWizard], paso_id: int, ok: bool, errore
 # ==========================================================
 # Render principal
 # ==========================================================
-
 def render_wizard(pasos: List[PasoWizard]) -> None:
     _init_defaults()
 
     ctx = ctx_get(st)
     _init_ctx_campos(ctx)
+
+    # ✅ Si paso_actual quedó fuera de rango (cambiaron pasos), lo normalizamos
+    ids = [p.id for p in pasos]
+    if int(getattr(ctx, "paso_actual", 1) or 1) not in ids:
+        ctx.paso_actual = ids[0] if ids else 1
 
     # ✅ sidebar libre
     _sidebar_nav(pasos, int(ctx.paso_actual), ctx)
@@ -157,12 +158,19 @@ def render_wizard(pasos: List[PasoWizard]) -> None:
     # header
     _render_header(pasos, int(ctx.paso_actual))
 
-    # paso actual
-    paso = next(p for p in pasos if p.id == int(ctx.paso_actual))
+    # paso actual (safe)
+    paso = next((p for p in pasos if p.id == int(ctx.paso_actual)), None)
+    if paso is None:
+        st.error("Paso inválido. Revise la configuración del wizard.")
+        return
 
     # validar SOLO para "Siguiente" y para mostrar errores
     ok, errores = paso.validar(ctx)
     ctx.errores = errores or []
+
+    # ✅ opcional: si valida ok, lo marcamos como completado (mejora UX)
+    if ok:
+        _marcar_completado(ctx, paso.id, True)
 
     # render UI
     paso.render(ctx)
