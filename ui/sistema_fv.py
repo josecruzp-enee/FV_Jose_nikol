@@ -366,7 +366,7 @@ def _render_grafica_teorica(ctx, sf: Dict[str, Any]) -> None:
 
     with c2:
         fig, ax = plt.subplots()
-        ax.plot(MESES, gen, marker="o")
+        ax.bar(MESES, gen)
         ax.set_xticks(MESES)
         ax.set_xlabel("Mes")
         ax.set_ylabel("Generación estimada (kWh/mes)")
