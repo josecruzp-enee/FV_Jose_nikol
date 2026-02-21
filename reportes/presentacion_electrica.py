@@ -140,7 +140,27 @@ CATALOGO: Dict[str, Dict[str, str]] = {
 
 
 def normalizar_electrico(pkg: Dict[str, Any]) -> Dict[str, Any]:
-    # Acepta wrapper {ok/errores/input/paq} o paq directo
+    """
+    Normaliza el paquete eléctrico NEC para consumo UI/PDF.
+
+    Acepta:
+      - paq directo (dict con dc/ac/ocpd/...)
+      - wrapper del adaptador (dict con ok/errores/input/paq)
+
+    Retorna contrato único:
+    {
+      "checks": {...},
+      "dc": {...},
+      "ac": {...},
+      "protecciones": {...},    # OCPD (breaker/fusible)
+      "spd": {...},             # SPD DC/AC
+      "seccionamiento": {...},  # seccionamiento DC/AC
+      "conductores": {...},
+      "warnings": [str, ...]
+    }
+    """
+
+    # ✅ Si viene wrapper {ok/errores/input/paq}, usa el paq interno.
     base = pkg.get("paq") if isinstance(pkg, dict) and isinstance(pkg.get("paq"), dict) else (pkg or {})
 
     checks = {
@@ -150,22 +170,57 @@ def normalizar_electrico(pkg: Dict[str, Any]) -> Dict[str, Any]:
         "string_valido": bool(base.get("string_valido", _get(base, "checks.string_valido", False))),
     }
 
-    dc = _first_dict(_get(base, "nec.dc"), _get(base, "corrientes_dc"), _get(base, "dc"), _get(base, "ingenieria.nec.dc"))
-    ac = _first_dict(_get(base, "nec.ac"), _get(base, "corrientes_ac"), _get(base, "ac"), _get(base, "ingenieria.nec.ac"))
+    # DC / AC
+    dc = _first_dict(
+        _get(base, "nec.dc"),
+        _get(base, "corrientes_dc"),
+        _get(base, "dc"),
+        _get(base, "ingenieria.nec.dc"),
+    )
 
-    protecciones = _first_dict(_get(base, "protecciones"), _get(base, "ocpd"), _get(base, "nec.protecciones"), _get(base, "proteccion"))
-    spd = _first_dict(_get(base, "spd"), _get(base, "nec.spd"))
-    seccionamiento = _first_dict(_get(base, "seccionamiento"), _get(base, "nec.seccionamiento"))
+    ac = _first_dict(
+        _get(base, "nec.ac"),
+        _get(base, "corrientes_ac"),
+        _get(base, "ac"),
+        _get(base, "ingenieria.nec.ac"),
+    )
 
-    conductores = _first_dict(_get(base, "conductores"), _get(base, "nec.conductores"), _get(base, "cables"))
+    # Protecciones (OCPD): en tu motor NEC real está en "ocpd"
+    protecciones = _first_dict(
+        _get(base, "protecciones"),   # legacy
+        _get(base, "ocpd"),           # ✅ contrato real motor NEC
+        _get(base, "nec.protecciones"),
+        _get(base, "proteccion"),
+    )
 
+    # SPD y Seccionamiento (motor NEC real)
+    spd = _first_dict(
+        _get(base, "spd"),
+        _get(base, "nec.spd"),
+    )
+
+    seccionamiento = _first_dict(
+        _get(base, "seccionamiento"),
+        _get(base, "nec.seccionamiento"),
+    )
+
+    # Conductores
+    conductores = _first_dict(
+        _get(base, "conductores"),
+        _get(base, "nec.conductores"),
+        _get(base, "cables"),
+    )
+
+    # Warnings (consolidado)
     warnings: List[str] = []
     warnings += list(_first_list(base.get("warnings"), _get(base, "texto_ui.checks")))
     warnings += list(_first_list(_get(dc, "warnings"), _get(ac, "warnings")))
 
+    # Nota del fusible (si existe)
     fus = _get(protecciones, "fusible_string", {})
     if isinstance(fus, dict) and fus.get("nota"):
         warnings.append(str(fus.get("nota")))
+
     warnings = [str(w) for w in warnings if str(w).strip()]
 
     return {
@@ -178,7 +233,6 @@ def normalizar_electrico(pkg: Dict[str, Any]) -> Dict[str, Any]:
         "conductores": conductores or {},
         "warnings": warnings,
     }
-
 
 
 
