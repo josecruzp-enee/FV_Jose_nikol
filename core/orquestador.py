@@ -1,4 +1,4 @@
-# nucleo/orquestador.py
+# core/orquestador.py
 from __future__ import annotations
 
 from typing import Any, Dict, Tuple
@@ -25,9 +25,11 @@ def _set_attr_safe(obj: Any, name: str, value: Any) -> None:
 
 
 def _consolidar_parametros_fv_en_datos(p: Datosproyecto, params_fv: Dict[str, Any]) -> None:
+    # contrato mínimo para el motor energético
     _set_attr_safe(p, "prod_base_kwh_kwp_mes", float(params_fv["prod_base_kwh_kwp_mes"]))
     _set_attr_safe(p, "factores_fv_12m", list(params_fv["factores_fv_12m"]))
 
+    # trazabilidad
     _set_attr_safe(p, "hsp", float(params_fv.get("hsp", 0.0)))
     _set_attr_safe(p, "perdidas_sistema_pct", float(params_fv.get("perdidas_sistema_pct", 0.0)))
     _set_attr_safe(p, "sombras_pct", float(params_fv.get("sombras_pct", 0.0)))
@@ -47,7 +49,6 @@ def _consolidar_parametros_fv_en_datos(p: Datosproyecto, params_fv: Dict[str, An
 # ENTRYPOINT LEGACY (se mantiene)
 # ==========================================================
 def ejecutar_evaluacion(p: Datosproyecto) -> Dict[str, Any]:
-
     validar_entradas(p)
 
     params_fv = _params_y_consolidacion(p)
@@ -55,28 +56,26 @@ def ejecutar_evaluacion(p: Datosproyecto) -> Dict[str, Any]:
 
     electrico_nec = _build_electrico_nec_safe(p, sizing)
 
-    kwp_dc, capex_L = _extraer_kwp_y_capex(sizing)
+    kwp_dc, capex_l = _extraer_kwp_y_capex(sizing)
 
-    cuota, tabla = _cuota_y_tabla_12m(p, kwp_dc, capex_L)
+    cuota, tabla = _cuota_y_tabla_12m(p, kwp_dc, capex_l)
 
-    eval_, decision, ahorro_anual, pb = _evaluacion_y_payback(
-        p, tabla, cuota, capex_L
-    )
+    eval_, decision, ahorro_anual, pb = _evaluacion_y_payback(p, tabla, cuota, capex_l)
 
-    electrico = _build_electrico_ref_para_pdf(p, sizing)
+    electrico_ref = _build_electrico_ref_para_pdf(p, sizing)
 
     return _armar_salida(
-        params_fv,
-        sizing,
-        cuota,
-        tabla,
-        eval_,
-        decision,
-        ahorro_anual,
-        pb,
-        electrico,
-        electrico_nec,
-        p,
+        params_fv=params_fv,
+        sizing=sizing,
+        cuota=cuota,
+        tabla=tabla,
+        eval_=eval_,
+        decision=decision,
+        ahorro_anual=ahorro_anual,
+        pb=pb,
+        electrico_ref=electrico_ref,
+        electrico_nec=electrico_nec,
+        p=p,
     )
 
 
@@ -86,10 +85,12 @@ def ejecutar_evaluacion(p: Datosproyecto) -> Dict[str, Any]:
 def ejecutar_estudio(p: Datosproyecto) -> Dict[str, Any]:
     """
     Punto único de ejecución del sistema.
-    UI y PDF deben consumir SOLO este objeto.
+    UI y PDF deben consumir SOLO este objeto (ResultadoProyecto dict).
     """
-
     raw = ejecutar_evaluacion(p)
+
+    # ⚠️ tabla_12m: se coloca también en tecnico para compat con accessors/PDF
+    tabla_12m = raw.get("tabla_12m")
 
     resultado_proyecto: Dict[str, Any] = {
         "tecnico": {
@@ -97,9 +98,7 @@ def ejecutar_estudio(p: Datosproyecto) -> Dict[str, Any]:
             "sizing": raw.get("sizing"),
             "electrico_ref": raw.get("electrico_ref"),
             "electrico_nec": raw.get("electrico_nec"),
-        },
-        "energetico": {
-            "tabla_12m": raw.get("tabla_12m"),
+            "tabla_12m": tabla_12m,  # <- compat fuerte
         },
         "financiero": {
             "cuota_mensual": raw.get("cuota_mensual"),
@@ -108,20 +107,21 @@ def ejecutar_estudio(p: Datosproyecto) -> Dict[str, Any]:
             "ahorro_anual_L": raw.get("ahorro_anual_L"),
             "payback_simple_anios": raw.get("payback_simple_anios"),
             "finanzas_lp": raw.get("finanzas_lp"),
+            "tabla_12m": tabla_12m,  # <- si alguien lo lee desde finanzas
         },
         "pdf": {
             "datos_pdf": {},
             "warnings": [],
             "errores": [],
         },
-        "_compat": raw,
+
+        # Debug/Transición: NO USAR en UI/PDF final
+        "_debug_legacy_raw": raw,
     }
 
     nec = raw.get("electrico_nec") or {}
     if nec.get("ok") is False:
-        resultado_proyecto["pdf"]["warnings"].append(
-            "NEC no pudo calcularse correctamente."
-        )
+        resultado_proyecto["pdf"]["warnings"].append("NEC no pudo calcularse correctamente.")
 
     return resultado_proyecto
 
@@ -135,38 +135,34 @@ def _params_y_consolidacion(p: Datosproyecto) -> Dict[str, Any]:
     return params_fv
 
 
-def _cuota_y_tabla_12m(
-    p: Datosproyecto, kwp_dc: float, capex_L: float
-) -> Tuple[float, Any]:
-    cuota = _calcular_cuota(p, capex_L)
-    tabla = simular_12_meses(p, kwp_dc, cuota, capex_L)
+def _cuota_y_tabla_12m(p: Datosproyecto, kwp_dc: float, capex_l: float) -> Tuple[float, Any]:
+    cuota = _calcular_cuota(p, capex_l)
+    tabla = simular_12_meses(p, kwp_dc, cuota, capex_l)
     return cuota, tabla
 
 
-def _evaluacion_y_payback(
-    p: Datosproyecto, tabla: Any, cuota: float, capex_L: float
-):
+def _evaluacion_y_payback(p: Datosproyecto, tabla: Any, cuota: float, capex_l: float):
     eval_ = evaluar_viabilidad(tabla, cuota)
     decision = resumen_decision_mensual(tabla, cuota, p)
-    ahorro_anual = sum(float(x.get("ahorro_L", 0.0)) for x in tabla)
-    pb = payback_simple(float(capex_L), float(ahorro_anual))
+    ahorro_anual = sum(float(x.get("ahorro_L", 0.0)) for x in (tabla or []))
+    pb = payback_simple(float(capex_l), float(ahorro_anual))
     return eval_, decision, ahorro_anual, pb
 
 
 def _armar_salida(
-    params_fv,
-    sizing,
-    cuota,
-    tabla,
-    eval_,
-    decision,
-    ahorro_anual,
-    pb,
-    electrico,
-    electrico_nec,
-    p,
-):
-
+    *,
+    params_fv: Dict[str, Any],
+    sizing: Dict[str, Any],
+    cuota: float,
+    tabla: Any,
+    eval_: Any,
+    decision: Any,
+    ahorro_anual: float,
+    pb: float,
+    electrico_ref: Any,
+    electrico_nec: Dict[str, Any],
+    p: Datosproyecto,
+) -> Dict[str, Any]:
     finanzas_lp = proyectar_flujos_anuales(
         datos=p,
         resultado={"sizing": sizing, "cuota_mensual": cuota, "tabla_12m": tabla},
@@ -187,8 +183,9 @@ def _armar_salida(
         "decision": decision,
         "ahorro_anual_L": ahorro_anual,
         "payback_simple_anios": pb,
-        "electrico": electrico,
-        "electrico_ref": electrico,
+        # Compat: electrico_ref y electrico (legacy)
+        "electrico_ref": electrico_ref,
+        "electrico": electrico_ref,
         "electrico_nec": electrico_nec,
         "finanzas_lp": finanzas_lp,
     }
@@ -201,11 +198,13 @@ def _build_params_fv(p: Datosproyecto) -> Dict[str, Any]:
     return construir_parametros_fv_desde_dict(sfv)
 
 
-def _build_electrico_nec_safe(p: Datosproyecto, sizing: Dict[str, Any]):
+def _build_electrico_nec_safe(p: Datosproyecto, sizing: Dict[str, Any]) -> Dict[str, Any]:
     try:
         from electrical.adaptador_nec import generar_electrico_nec
-
-        return generar_electrico_nec(p=p, sizing=sizing)
+        out = generar_electrico_nec(p=p, sizing=sizing)
+        if isinstance(out, dict):
+            out.setdefault("paq", {})
+        return out
     except Exception as e:
         return {
             "ok": False,
@@ -214,23 +213,22 @@ def _build_electrico_nec_safe(p: Datosproyecto, sizing: Dict[str, Any]):
                 "equipos": getattr(p, "equipos", None),
                 "electrico": getattr(p, "electrico", None),
             },
+            "paq": {},
         }
 
 
 def _extraer_kwp_y_capex(sizing: Dict[str, Any]) -> Tuple[float, float]:
     res_tmp = {"sizing": dict(sizing or {})}
     kwp_dc = float(get_kwp_dc(res_tmp))
-    capex_L = float(get_capex_L(res_tmp))
-
-    if kwp_dc <= 0 or capex_L <= 0:
+    capex_l = float(get_capex_L(res_tmp))
+    if kwp_dc <= 0 or capex_l <= 0:
         raise KeyError("Sizing incompleto.")
+    return kwp_dc, capex_l
 
-    return kwp_dc, capex_L
 
-
-def _calcular_cuota(p: Datosproyecto, capex_L: float) -> float:
+def _calcular_cuota(p: Datosproyecto, capex_l: float) -> float:
     return calcular_cuota_mensual(
-        capex_L_=float(capex_L),
+        capex_L_=float(capex_l),
         tasa_anual=float(p.tasa_anual),
         plazo_anios=int(p.plazo_anios),
         pct_fin=float(p.porcentaje_financiado),
@@ -238,7 +236,10 @@ def _calcular_cuota(p: Datosproyecto, capex_L: float) -> float:
 
 
 def _build_electrico_ref_para_pdf(p: Datosproyecto, sizing: Dict[str, Any]):
-
+    """
+    Ojo: depende de sizing['cfg_strings'].
+    Si aún no existe en sizing, esto devuelve None.
+    """
     cfg = sizing.get("cfg_strings") or {}
     strings = cfg.get("strings") or []
     iac = cfg.get("iac_estimada_a", None)
@@ -254,6 +255,8 @@ def _build_electrico_ref_para_pdf(p: Datosproyecto, sizing: Dict[str, Any]):
         return None
 
     e = getattr(p, "electrico", None) or {}
+    if not isinstance(e, dict):
+        e = {}
 
     return simular_electrico_fv_para_pdf(
         v_ac=float(e.get("vac", 240.0)),
