@@ -339,8 +339,13 @@ def _mostrar_nec(pkg: dict):
 
     with tabs[2]:
         st.markdown("### Protecciones")
+
         br = (ocpd.get("breaker_ac") or {})
         fs = (ocpd.get("fusible_string") or {})
+
+        # ✅ NUEVO: vienen en el PAQ (ya calculados por el motor NEC)
+        spd = (pkg.get("spd") or {})
+        sec = (pkg.get("seccionamiento") or {})
 
         col1, col2 = st.columns(2)
         with col1:
@@ -355,6 +360,27 @@ def _mostrar_nec(pkg: dict):
             nota = fs.get("nota")
             if nota:
                 st.info(nota)
+
+        st.divider()
+
+        # ✅ NUEVO: Protecciones DC / AC (SPD + Seccionamiento)
+        cdc, cac = st.columns(2)
+        with cdc:
+            st.markdown("#### Protecciones DC")
+            if spd.get("dc"):
+                st.write("**SPD DC:**", str(spd.get("dc")))
+            if sec.get("dc"):
+                st.write("**Seccionamiento DC:**", str(sec.get("dc")))
+
+        with cac:
+            st.markdown("#### Protecciones AC")
+            if spd.get("ac"):
+                st.write("**SPD AC:**", str(spd.get("ac")))
+            if sec.get("ac"):
+                st.write("**Seccionamiento AC:**", str(sec.get("ac")))
+
+        if spd.get("nota"):
+            st.caption(str(spd.get("nota")))
 
     with tabs[3]:
         st.markdown("### Conductores")
