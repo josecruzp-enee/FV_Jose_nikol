@@ -332,7 +332,9 @@ def render(ctx) -> None:
 
     if not _validar_ctx(ctx):
         return
-
+    st.subheader("DEBUG — Panel sizing nuevo")
+    st.write(resultado.tecnico.get("panel_sizing"))
+    
     resultado_proyecto = _get_resultado_proyecto(ctx)
     res = _res_plano_para_ui_y_pdf(resultado_proyecto)
 
