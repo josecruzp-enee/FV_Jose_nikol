@@ -1,3 +1,4 @@
+# ui/state_helpers.py
 from __future__ import annotations
 
 import hashlib
@@ -5,7 +6,23 @@ import json
 from typing import Any, Callable, Dict
 
 
+# Solo INPUTS. No metas resultados aquí.
 _FINGERPRINT_KEYS = ("datos_cliente", "consumo", "sistema_fv", "equipos", "electrico")
+
+# Subset estable de inputs eléctricos (evita “stale” por outputs guardados en ctx.electrico)
+_ELECTRICO_INPUT_KEYS = (
+    "vac",
+    "fases",
+    "fp",
+    "dist_dc_m",
+    "dist_ac_m",
+    "vdrop_obj_dc_pct",
+    "vdrop_obj_ac_pct",
+    "t_min_c",
+    "incluye_neutro_ac",
+    "otros_ccc",
+    "dos_aguas",
+)
 
 
 def ensure_dict(ctx: Any, key: str, default_factory: Callable[[], Dict[str, Any]] | None = None) -> Dict[str, Any]:
@@ -48,8 +65,27 @@ def _norm_value(x: Any) -> Any:
     return str(x)
 
 
+def _electrico_inputs_only(e: Any) -> Dict[str, Any]:
+    """
+    Evita que el fingerprint cambie si alguien guarda resultados o campos extra en ctx.electrico.
+    Solo tomamos las keys eléctricas de INPUT.
+    """
+    if not isinstance(e, dict):
+        return {}
+    return {k: _norm_value(e.get(k)) for k in _ELECTRICO_INPUT_KEYS if k in e}
+
+
 def build_inputs_fingerprint(ctx: Any) -> str:
-    payload = {k: _norm_value(getattr(ctx, k, None)) for k in _FINGERPRINT_KEYS}
+    payload: Dict[str, Any] = {}
+
+    for k in _FINGERPRINT_KEYS:
+        v = getattr(ctx, k, None)
+
+        if k == "electrico":
+            payload[k] = _electrico_inputs_only(v)
+        else:
+            payload[k] = _norm_value(v)
+
     raw = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
