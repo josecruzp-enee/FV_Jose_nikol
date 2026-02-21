@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from reportlab.lib.pagesizes import letter
 from reportlab.lib.units import inch
 from reportlab.platypus import Spacer, Paragraph, Image, Table, TableStyle, PageBreak
 
@@ -17,7 +16,7 @@ def _append_layout_paneles(story, paths, styles, content_w):
     Mantenerlo como helper evita ensuciar build_page_2.
     """
     layout = paths.get("layout_paneles")
-    if layout and Path(layout).exists():
+    if layout and Path(str(layout)).exists():
         story.append(Spacer(1, 10))
         img = Image(str(layout), width=content_w, height=content_w * 0.55)
         img.hAlign = "CENTER"
@@ -30,17 +29,13 @@ def _append_layout_paneles(story, paths, styles, content_w):
 
 
 def build_page_2(resultado, datos, paths, pal, styles, content_w):
-    # content width estándar carta con márgenes típicos
-    page_w, _ = letter
-    left_margin = 36
-    right_margin = 36
-    content_w = page_w - left_margin - right_margin
-
+    """
+    Página 2
+    ✅ Usa el content_w que viene del builder (doc.width) para consistencia.
+    """
     story = []
     story.append(Paragraph("Reporte de Demanda / Energía", styles["Title"]))
     story.append(Spacer(1, 8))
-
-    
 
     story.append(Paragraph("Energía mensual (Consumo vs FV útil vs ENEE)", styles["H2b"]))
     story.append(Spacer(1, 6))
@@ -78,11 +73,15 @@ def build_page_2(resultado, datos, paths, pal, styles, content_w):
     CH_W = (content_w - GAP) / 2.0
     CH_H = 2.15 * inch
 
-    # ✅ tolerante: solo si existen
     chart_energia = paths.get("chart_energia")
     chart_generacion = paths.get("chart_generacion")
 
-    if chart_energia and chart_generacion and Path(chart_energia).exists() and Path(chart_generacion).exists():
+    if (
+        chart_energia
+        and chart_generacion
+        and Path(str(chart_energia)).exists()
+        and Path(str(chart_generacion)).exists()
+    ):
         img1 = Image(str(chart_energia), width=CH_W, height=CH_H)
         img2 = Image(str(chart_generacion), width=CH_W, height=CH_H)
 
