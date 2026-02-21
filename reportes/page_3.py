@@ -1,19 +1,20 @@
 # reportes/page_3.py
 from __future__ import annotations
 
+from typing import Any, Dict, List
+
 from reportlab.platypus import Paragraph, Spacer, PageBreak, TableStyle
 
-# Ajusta este import a donde realmente estén tus helpers:
-from .utils import make_table, table_style_uniform, box_paragraph
+# ✅ Unifica helpers con el resto de páginas
+from .helpers_pdf import make_table, table_style_uniform, box_paragraph, get_field, money_L
 from core.result_accessors import get_capex_L
 
 
-
-def amortizacion_anual(principal: float, tasa_anual: float, cuota_mensual: float, plazo_anios: int):
+def amortizacion_anual(principal: float, tasa_anual: float, cuota_mensual: float, plazo_anios: int) -> List[Dict[str, float]]:
     tasa_m = float(tasa_anual) / 12.0
     saldo = float(principal)
 
-    out = []
+    out: List[Dict[str, float]] = []
     for anio in range(1, int(plazo_anios) + 1):
         interes_y = 0.0
         principal_y = 0.0
@@ -32,71 +33,86 @@ def amortizacion_anual(principal: float, tasa_anual: float, cuota_mensual: float
             principal_y += principal_m
             pago_y += (interes_m + principal_m)
 
-        out.append({
-            "anio": anio,
-            "pago_anual": pago_y,
-            "interes_anual": interes_y,
-            "principal_anual": principal_y,
-            "saldo_fin": max(0.0, saldo),
-        })
+        out.append(
+            {
+                "anio": float(anio),
+                "pago_anual": float(pago_y),
+                "interes_anual": float(interes_y),
+                "principal_anual": float(principal_y),
+                "saldo_fin": float(max(0.0, saldo)),
+            }
+        )
 
     return out
 
 
-def build_page_3(resultado, datos, paths, pal, styles, content_w):
-    story = []
+def build_page_3(resultado: Dict[str, Any], datos: Any, paths: Dict[str, Any], pal: dict, styles, content_w: float):
+    story: List[Any] = []
     story.append(Paragraph("Financiamiento — Evolución del Préstamo", styles["Title"]))
     story.append(Spacer(1, 10))
 
-    # ===== Entradas =====
-    capex = float(get_capex_L(resultado))
-    pct_fin = float(getattr(datos, "porcentaje_financiado", 1.0))
+    # ===== Entradas (tolerantes a dict/dataclass) =====
+    capex = float(get_capex_L(resultado) or 0.0)
+
+    pct_fin = float(get_field(datos, "porcentaje_financiado", 1.0) or 1.0)
+    pct_fin = max(0.0, min(1.0, pct_fin))
     principal = capex * pct_fin
 
-    tasa_anual = float(getattr(datos, "tasa_anual", 0.0))
-    plazo_anios = int(getattr(datos, "plazo_anios", 10))
-    cuota = float(resultado["cuota_mensual"])
+    tasa_anual = float(get_field(datos, "tasa_anual", 0.0) or 0.0)
+    plazo_anios = int(get_field(datos, "plazo_anios", 10) or 10)
+
+    cuota = float((resultado or {}).get("cuota_mensual", 0.0) or 0.0)
 
     anual = amortizacion_anual(principal, tasa_anual, cuota, plazo_anios)
 
     # ===== Tabla =====
     header = ["Año", "Cuota (L/mes)", "Pago anual (L)", "Interés (L)", "Principal (L)", "Saldo fin (L)"]
-    rows = []
+    rows: List[List[str]] = []
+
     for a in anual:
-        rows.append([
-            str(a["anio"]),
-            f"{cuota:,.0f}",
-            f"{a['pago_anual']:,.0f}",
-            f"{a['interes_anual']:,.0f}",
-            f"{a['principal_anual']:,.0f}",
-            f"{a['saldo_fin']:,.0f}",
-        ])
+        rows.append(
+            [
+                str(int(a["anio"])),
+                money_L(cuota).replace("L ", ""),  # deja solo número si money_L devuelve "L x"
+                f"{a['pago_anual']:,.0f}",
+                f"{a['interes_anual']:,.0f}",
+                f"{a['principal_anual']:,.0f}",
+                f"{a['saldo_fin']:,.0f}",
+            ]
+        )
+
+    if not rows:
+        rows = [["—", "—", "—", "—", "—", "—"]]
 
     t = make_table(
         [header] + rows,
         content_w,
         ratios=[0.8, 1.4, 1.5, 1.3, 1.3, 1.4],
-        repeatRows=1
+        repeatRows=1,
     )
     t.setStyle(table_style_uniform(pal, font_header=9, font_body=9))
-    t.setStyle(TableStyle([
-        ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
-        ("ALIGN", (0, 1), (0, -1), "CENTER"),
-        ("TOPPADDING", (0, 0), (-1, -1), 4),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-        ("LEFTPADDING", (0, 0), (-1, -1), 6),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
-    ]))
+    t.setStyle(
+        TableStyle(
+            [
+                ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
+                ("ALIGN", (0, 1), (0, -1), "CENTER"),
+                ("TOPPADDING", (0, 0), (-1, -1), 4),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                ("LEFTPADDING", (0, 0), (-1, -1), 6),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+            ]
+        )
+    )
     story.append(t)
     story.append(Spacer(1, 10))
 
     # ===== Lectura ejecutiva =====
-    saldo_ultimo = anual[-1]["saldo_fin"] if anual else principal
+    saldo_ultimo = float(anual[-1]["saldo_fin"]) if anual else float(principal)
     nota = (
         "<b>Lectura ejecutiva</b><br/>"
-        f"• Cuota fija estimada: <b>{cuota:,.0f} L/mes</b> por <b>{plazo_anios}</b> años.<br/>"
-        f"• Monto financiado: <b>{principal:,.0f} L</b> (sobre CAPEX).<br/>"
-        f"• Saldo al cierre del plazo: <b>{saldo_ultimo:,.0f} L</b> (≈ 0 por redondeos)."
+        f"• Cuota fija estimada: <b>{money_L(cuota)}/mes</b> por <b>{plazo_anios}</b> años.<br/>"
+        f"• Monto financiado: <b>{money_L(principal)}</b> (sobre CAPEX).<br/>"
+        f"• Saldo al cierre del plazo: <b>{money_L(saldo_ultimo)}</b> (≈ 0 por redondeos)."
     )
     story.append(box_paragraph(nota, pal, content_w, font_size=10))
 
