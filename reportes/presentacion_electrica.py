@@ -348,11 +348,78 @@ def filas_dc(norm: Dict[str, Any]) -> List[List[str]]:
 def filas_ac(norm: Dict[str, Any]) -> List[List[str]]:
     return [[it["label"] + (f" ({it['unit']})" if it.get("unit") else ""), it.get("value_fmt", "—")] for it in items_ac(norm)]
 
-def filas_protecciones(norm: Dict[str, Any]) -> List[List[str]]:
-    # protecciones ya vienen como texto
-    items = items_protecciones(norm)
-    return [[it["label"], str(it["value"])] for it in items]
+def items_protecciones(norm: Dict[str, Any]) -> List[Dict[str, Any]]:
 
+    p = norm.get("protecciones") or {}
+    spd = norm.get("spd") or {}
+    sec = norm.get("seccionamiento") or {}
+
+    br = p.get("breaker_ac") or {}
+    fs = p.get("fusible_string") or {}
+
+    items: List[Dict[str, Any]] = []
+
+    # =====================
+    # PROTECCIONES DC
+    # =====================
+    items.append({
+        "label": "— Protecciones DC —",
+        "value": ""
+    })
+
+    items.append({
+        "label": "Fusible por string",
+        "value": "Requerido" if bool(fs.get("requerido")) else "No requerido"
+    })
+
+    if fs.get("nota"):
+        items.append({
+            "label": "Nota fusible",
+            "value": fs.get("nota")
+        })
+
+    if spd.get("dc"):
+        items.append({
+            "label": "SPD DC",
+            "value": spd.get("dc")
+        })
+
+    if sec.get("dc"):
+        items.append({
+            "label": "Seccionamiento DC",
+            "value": sec.get("dc")
+        })
+
+    # =====================
+    # PROTECCIONES AC
+    # =====================
+    items.append({
+        "label": "— Protecciones AC —",
+        "value": ""
+    })
+
+    breaker_txt = "—"
+    if br:
+        breaker_txt = f"{br.get('tamano_a','—')} A (I diseño { _to_num(br.get('i_diseno_a')) } A)"
+
+    items.append({
+        "label": "Breaker AC",
+        "value": breaker_txt
+    })
+
+    if spd.get("ac"):
+        items.append({
+            "label": "SPD AC",
+            "value": spd.get("ac")
+        })
+
+    if sec.get("ac"):
+        items.append({
+            "label": "Seccionamiento AC",
+            "value": sec.get("ac")
+        })
+
+    return items
 def filas_conductores(norm: Dict[str, Any]) -> List[List[str]]:
     # mantiene tu tabla ancha
     rows: List[List[str]] = []
