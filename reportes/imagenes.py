@@ -110,16 +110,14 @@ def generar_artefactos(
 
     paths = construir_paths_salida(out_dir)
 
-    # --- charts
-    tabla_12m = (res or {}).get("tabla_12m")
-    if tabla_12m:
-        charts = generar_charts(
-            tabla_12m,
-            paths["charts_dir"],
-            vista_resultados=vista_resultados or {},
-        )
-        for k, v in (charts or {}).items():
-            paths[k] = str(v)
+    # --- charts (tabla_12m real si existe, o fallback HSP/pr/pdc si no)
+    charts = generar_charts(
+        res,  # 👈 IMPORTANTE: pasar TODO el resultado
+        paths["charts_dir"],
+        vista_resultados=vista_resultados or {},
+    )
+    for k, v in (charts or {}).items():
+        paths[k] = str(v)
 
     # --- layout paneles (tolerante)
     n_paneles = _inferir_n_paneles(res)
