@@ -1,238 +1,206 @@
-# electrical/sizing_panel.py
+# reportes/generar_charts.py
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
-import math
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Union
+
+import matplotlib.pyplot as plt
 
 
-# ==========================================================
-# Modelos de salida (estables y simples)
-# ==========================================================
-@dataclass(frozen=True)
-class PanelSizingResultado:
-    ok: bool
-    errores: List[str]
-
-    # energía/objetivo
-    consumo_anual_kwh: float
-    kwh_obj_anual: float
-    cobertura_obj: float
-
-    # recurso y pérdidas
-    hsp_12m: List[float]         # kWh/m²/día por mes (≈ HSP)
-    hsp_prom: float              # promedio anual (kWh/m²/día)
-    pr: float                    # performance ratio total (0..1)
-
-    # sizing
-    kwp_req: float
-    n_paneles: int
-    pdc_kw: float
-
-    # trazabilidad
-    meta: Dict[str, Any]
-
-
-# ==========================================================
-# Utilitarios
-# ==========================================================
-def _clamp(x: float, lo: float, hi: float) -> float:
-    return max(lo, min(hi, float(x)))
-
-
-def _safe_float(x: Any, default: float) -> float:
+# -------------------------
+# Helpers básicos
+# -------------------------
+def _as_float(x: Any, default: float = 0.0) -> float:
     try:
+        if x is None:
+            return float(default)
         return float(x)
     except Exception:
         return float(default)
 
 
-def _pct_factor(pct: float) -> float:
-    return 1.0 - float(pct) / 100.0
+def _dias_mes_default() -> List[int]:
+    # Aproximación estable (no bisiesto); suficiente para promedios.
+    return [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 
 
-_DIAS_MES = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+def _meses_default() -> List[str]:
+    return ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
 
 
-def _hsp_honduras_conservador_12m() -> List[float]:
-    # kWh/m²/día ≈ HSP diaria promedio por mes (conservador)
-    return [
-        5.1,  # Ene
-        5.4,  # Feb
-        5.8,  # Mar
-        5.6,  # Abr
-        5.0,  # May
-        4.5,  # Jun
-        4.3,  # Jul
-        4.4,  # Ago
-        4.1,  # Sep
-        4.0,  # Oct
-        4.4,  # Nov
-        4.7,  # Dic
-    ]
-
-
-def _leer_hsp_12m(
-    *,
-    hsp_12m: Optional[List[float]] = None,
-    hsp: Optional[float] = None,
-    usar_modelo_hn_conservador: bool = True,
-) -> List[float]:
-    # 1) si viene lista 12m válida
-    if isinstance(hsp_12m, (list, tuple)) and len(hsp_12m) == 12:
-        out: List[float] = []
-        for v in hsp_12m:
-            out.append(_clamp(_safe_float(v, 4.5), 0.5, 9.0))
-        return out
-
-    # 2) modelo offline Honduras conservador
-    if usar_modelo_hn_conservador:
-        return _hsp_honduras_conservador_12m()
-
-    # 3) fallback a hsp único
-    h = _clamp(_safe_float(hsp, 4.5), 0.5, 9.0)
-    return [h] * 12
-
-
-def _leer_pr(
-    *,
-    sombras_pct: float = 0.0,
-    perdidas_sistema_pct: Optional[float] = None,
-    perdidas_detalle: Optional[Dict[str, float]] = None,
-) -> float:
+def _resolver_tabla_12m(
+    tabla_12m: Union[List[Dict[str, Any]], Dict[str, Any], None]
+) -> List[Dict[str, Any]]:
     """
-    PR físico simplificado, conservador.
-    - pérdidas base constantes (editables vía perdidas_detalle)
-    - sombras siempre multiplican
-    - si perdidas_sistema_pct viene, se aplica suave (30%) para compat.
+    Normaliza entradas:
+    - Si viene lista: ok
+    - Si viene dict (resultado completo): intenta dict["tabla_12m"]
+    - Si viene None: []
     """
-    sombras_pct = _clamp(_safe_float(sombras_pct, 0.0), 0.0, 95.0)
-
-    base = {
-        "temperatura": 0.07,
-        "soiling": 0.03,
-        "mismatch": 0.015,
-        "dc": 0.02,
-        "inversor": 0.03,
-        "ac": 0.01,
-        "disponibilidad": 0.01,
-    }
-
-    if isinstance(perdidas_detalle, dict):
-        for k, v in perdidas_detalle.items():
-            if k in base:
-                base[k] = _clamp(_safe_float(v, base[k]), 0.0, 0.50)
-
-    pr = 1.0
-    for v in base.values():
-        pr *= (1.0 - float(v))
-
-    pr *= _pct_factor(sombras_pct)
-
-    if perdidas_sistema_pct is not None:
-        pr *= _pct_factor(_clamp(_safe_float(perdidas_sistema_pct, 0.0), 0.0, 95.0) * 0.3)
-
-    return _clamp(pr, 0.55, 0.95)
+    if tabla_12m is None:
+        return []
+    if isinstance(tabla_12m, list):
+        return [r for r in tabla_12m if isinstance(r, dict)]
+    if isinstance(tabla_12m, dict):
+        t = tabla_12m.get("tabla_12m")
+        if isinstance(t, list):
+            return [r for r in t if isinstance(r, dict)]
+    return []
 
 
-def _kwp_req_anual(kwh_obj_anual: float, hsp_12m: List[float], pr: float) -> float:
-    prod_anual_por_kwp = 0.0
-    for hsp_dia, dias in zip(hsp_12m, _DIAS_MES):
-        prod_anual_por_kwp += float(hsp_dia) * float(pr) * float(dias)
-
-    if prod_anual_por_kwp <= 0:
-        raise ValueError("Producción anual por kWp inválida (<=0).")
-
-    return float(kwh_obj_anual) / prod_anual_por_kwp
+def _mkdir_charts(out_dir: Optional[str]) -> Path:
+    # Default estable: salidas/charts
+    base = Path(out_dir) if out_dir else Path("salidas") / "charts"
+    base.mkdir(parents=True, exist_ok=True)
+    return base
 
 
-def _n_paneles(kwp_req: float, panel_w: float) -> int:
-    if panel_w <= 0:
-        raise ValueError("Panel inválido (W<=0).")
-    return max(1, int(math.ceil((float(kwp_req) * 1000.0) / float(panel_w))))
+def _plot_line(meses: List[str], ys: List[List[float]], labels: List[str], out_path: Path) -> None:
+    plt.figure()
+    for y, lab in zip(ys, labels):
+        plt.plot(meses, y, marker="o", label=lab)
+    plt.xticks(rotation=90)
+    if any(labels):
+        plt.legend()
+    plt.tight_layout()
+    plt.savefig(out_path, dpi=160)
+    plt.close()
 
 
-def _pdc_kw(n_paneles: int, panel_w: float) -> float:
-    return (int(n_paneles) * float(panel_w)) / 1000.0
+def _plot_bar(meses: List[str], y: List[float], out_path: Path) -> None:
+    plt.figure()
+    plt.bar(meses, y)
+    plt.xticks(rotation=90)
+    plt.tight_layout()
+    plt.savefig(out_path, dpi=160)
+    plt.close()
 
 
-# ==========================================================
-# API pública
-# ==========================================================
-def calcular_panel_sizing(
-    *,
-    consumo_12m_kwh: List[float],
-    cobertura_obj: float,
-    panel_w: float,
-    # recurso solar
-    hsp_12m: Optional[List[float]] = None,
-    hsp: Optional[float] = None,
-    usar_modelo_hn_conservador: bool = True,
-    # pérdidas/pr
-    sombras_pct: float = 0.0,
-    perdidas_sistema_pct: Optional[float] = None,
-    perdidas_detalle: Optional[Dict[str, float]] = None,
-) -> PanelSizingResultado:
-    errores: List[str] = []
+def _fv_aprox_desde_panel_sizing(res: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Construye generación FV aproximada usando:
+      res["sizing"]["pdc_kw"] (o kwp_dc)
+      res["sizing"]["panel_sizing"]["hsp_12m"]
+      res["sizing"]["panel_sizing"]["pr"]
+      res["sizing"]["panel_sizing"]["meta"]["dias_mes"] (opcional)
 
-    if not isinstance(consumo_12m_kwh, list) or len(consumo_12m_kwh) != 12:
-        errores.append("consumo_12m_kwh debe ser lista de 12 valores.")
-        consumo = [0.0] * 12
-    else:
-        consumo = [_safe_float(x, 0.0) for x in consumo_12m_kwh]
+    Devuelve:
+      {
+        "meses": [str]*12,
+        "fv_kwh": [float]*12,
+        "fv_kwh_dia": [float]*12,
+      }
+    """
+    sizing = (res or {}).get("sizing") or {}
+    if not isinstance(sizing, dict):
+        return {}
 
-    cov = _clamp(_safe_float(cobertura_obj, 1.0), 0.0, 1.0)
+    # Potencia DC (kW)
+    pdc_kw = _as_float(sizing.get("pdc_kw"), 0.0)
+    if pdc_kw <= 0:
+        pdc_kw = _as_float(sizing.get("kwp_dc"), 0.0)
+    if pdc_kw <= 0:
+        return {}
 
-    try:
-        panel_w_f = float(panel_w)
-        if panel_w_f <= 0:
-            errores.append("panel_w inválido (<=0).")
-    except Exception:
-        panel_w_f = 0.0
-        errores.append("panel_w inválido (no numérico).")
+    panel_sizing = sizing.get("panel_sizing") or {}
+    if not isinstance(panel_sizing, dict):
+        return {}
 
-    hsp12 = _leer_hsp_12m(hsp_12m=hsp_12m, hsp=hsp, usar_modelo_hn_conservador=usar_modelo_hn_conservador)
-    hsp_prom = sum(hsp12) / 12.0
+    hsp_12m = panel_sizing.get("hsp_12m")
+    if not (isinstance(hsp_12m, list) and len(hsp_12m) == 12):
+        return {}
 
-    pr = _leer_pr(
-        sombras_pct=sombras_pct,
-        perdidas_sistema_pct=perdidas_sistema_pct,
-        perdidas_detalle=perdidas_detalle,
-    )
+    pr = _as_float(panel_sizing.get("pr"), 0.0)
+    if pr <= 0:
+        return {}
 
-    consumo_anual = float(sum(consumo))
-    kwh_obj_anual = consumo_anual * cov
+    meta = panel_sizing.get("meta") or {}
+    dias = meta.get("dias_mes") if isinstance(meta, dict) else None
+    if not (isinstance(dias, list) and len(dias) == 12):
+        dias = _dias_mes_default()
 
-    kwp_req = 0.0
-    n_pan = 0
-    pdc = 0.0
+    meses = _meses_default()
 
-    if not errores:
-        try:
-            kwp_req = _kwp_req_anual(kwh_obj_anual, hsp12, pr)
-            n_pan = _n_paneles(kwp_req, panel_w_f)
-            pdc = _pdc_kw(n_pan, panel_w_f)
-        except Exception as e:
-            errores.append(str(e))
+    fv_kwh: List[float] = []
+    fv_kwh_dia: List[float] = []
+    for hsp, d in zip(hsp_12m, dias):
+        d_i = int(d) if int(d) > 0 else 30
+        e_mes = pdc_kw * _as_float(hsp, 0.0) * pr * float(d_i)
+        fv_kwh.append(float(e_mes))
+        fv_kwh_dia.append(float(e_mes / float(d_i)))
 
-    ok = len(errores) == 0
-    meta = {
-        "dias_mes": list(_DIAS_MES),
-        "hsp_fuente": "p.hsp_12m" if (isinstance(hsp_12m, (list, tuple)) and len(hsp_12m) == 12) else ("HN_CONSERVADOR" if usar_modelo_hn_conservador else "p.hsp"),
-        "perdidas_detalle_usadas": perdidas_detalle if isinstance(perdidas_detalle, dict) else {},
-    }
+    return {"meses": meses, "fv_kwh": fv_kwh, "fv_kwh_dia": fv_kwh_dia}
 
-    return PanelSizingResultado(
-        ok=ok,
-        errores=errores,
-        consumo_anual_kwh=consumo_anual,
-        kwh_obj_anual=kwh_obj_anual,
-        cobertura_obj=cov,
-        hsp_12m=hsp12,
-        hsp_prom=float(hsp_prom),
-        pr=float(pr),
-        kwp_req=float(kwp_req),
-        n_paneles=int(n_pan),
-        pdc_kw=float(pdc),
-        meta=meta,
-    )
+
+def generar_charts(
+    tabla_12m: Union[List[Dict[str, Any]], Dict[str, Any], None],
+    out_dir: Optional[str] = None,
+    vista_resultados: bool = False,
+    **kwargs: Any,
+) -> Dict[str, str]:
+    """
+    Genera PNGs:
+      - fv_chart_energia.png (factura_base vs pago_enee) (solo si hay tabla_12m real)
+      - fv_chart_neto.png (ahorro) (solo si hay tabla_12m real)
+      - fv_chart_generacion.png o fv_chart_generacion_aprox.png (fv_kwh mensual)
+      - fv_chart_generacion_diaria_aprox.png (kWh/día promedio por mes, solo en modo aprox)
+
+    Compatibilidad:
+    - Acepta vista_resultados (aunque no se use)
+    - Acepta **kwargs (tolerante a flags nuevos)
+    - Si por error le pasas el 'resultado' completo (dict), extrae dict["tabla_12m"]
+      y además puede usar dict["sizing"]["panel_sizing"] como fallback.
+    """
+    tabla = _resolver_tabla_12m(tabla_12m)
+    res_dict: Dict[str, Any] = tabla_12m if isinstance(tabla_12m, dict) else {}
+
+    base = _mkdir_charts(out_dir)
+    paths_out: Dict[str, str] = {}
+
+    # -------------------------
+    # Caso A: tenemos tabla_12m real
+    # -------------------------
+    if tabla:
+        meses = [str(r.get("mes", i + 1)) for i, r in enumerate(tabla)]
+        factura_base = [float(r.get("factura_base_L", 0.0)) for r in tabla]
+        pago_enee = [float(r.get("pago_enee_L", 0.0)) for r in tabla]
+        ahorro = [float(r.get("ahorro_L", 0.0)) for r in tabla]
+        fv_kwh = [float(r.get("fv_kwh", 0.0)) for r in tabla]
+
+        p1 = base / "fv_chart_energia.png"
+        _plot_line(meses, [factura_base, pago_enee], ["Factura base", "Pago ENEE"], p1)
+        paths_out["chart_energia"] = str(p1)
+
+        p2 = base / "fv_chart_neto.png"
+        _plot_bar(meses, ahorro, p2)
+        paths_out["chart_neto"] = str(p2)
+
+        p3 = base / "fv_chart_generacion.png"
+        _plot_line(meses, [fv_kwh], ["FV kWh"], p3)
+        paths_out["chart_generacion"] = str(p3)
+
+        return paths_out
+
+    # -------------------------
+    # Caso B: fallback aproximado (sin tabla_12m)
+    # -------------------------
+    if not res_dict:
+        return {}
+
+    aprox = _fv_aprox_desde_panel_sizing(res_dict)
+    if not aprox:
+        return {}
+
+    meses = aprox["meses"]
+    fv_kwh = aprox["fv_kwh"]
+    fv_kwh_dia = aprox["fv_kwh_dia"]
+
+    p3 = base / "fv_chart_generacion_aprox.png"
+    _plot_line(meses, [fv_kwh], ["FV kWh (aprox)"], p3)
+    paths_out["chart_generacion"] = str(p3)
+
+    p4 = base / "fv_chart_generacion_diaria_aprox.png"
+    _plot_bar(meses, fv_kwh_dia, p4)
+    paths_out["chart_generacion_diaria"] = str(p4)
+
+    return paths_out
