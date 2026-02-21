@@ -1,35 +1,20 @@
 # core/sizing.py
 from __future__ import annotations
 
-import math
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 from .modelo import Datosproyecto
 from .simular_12_meses import capex_L, consumo_anual, consumo_promedio
 
 from electrical.catalogos import get_panel, get_inversor, catalogo_inversores
 from electrical.sizing_electric import SizingInput, InversorCandidato, ejecutar_sizing
+from electrical.sizing_panel import calcular_panel_sizing
 from electrical.strings_auto import PanelSpec, InversorSpec, recomendar_string
-
-
-# ==========================================================
-# Constantes / defaults
-# ==========================================================
-T_STC_C = 25.0
-DIAS_MES = 30.0  # (legacy) ya no se usa para sizing, se mantiene por compat si alguien lo usa
 
 
 # ==========================================================
 # Utilitarios (cortos)
 # ==========================================================
-def _clamp(x: float, lo: float, hi: float) -> float:
-    return max(lo, min(hi, float(x)))
-
-
-def _pct_factor(pct: float) -> float:
-    return 1.0 - float(pct) / 100.0
-
-
 def _safe_float(x: Any, default: float) -> float:
     try:
         return float(x)
@@ -37,109 +22,8 @@ def _safe_float(x: Any, default: float) -> float:
         return float(default)
 
 
-def _safe_int(x: Any, default: int) -> int:
-    try:
-        return int(x)
-    except Exception:
-        return int(default)
-
-
-# ==========================================================
-# Lectura Paso 3: HSP + PR
-# ==========================================================
-def _leer_hsp(p: Datosproyecto) -> float:
-    """
-    Devuelve HSP promedio anual.
-
-    Prioridad:
-    1) Si el proyecto trae hsp_12m → usa su promedio
-    2) Si no, usa modelo conservador Honduras (12 meses)
-    3) Fallback final: p.hsp legacy
-    """
-
-    # --------------------------------------------------
-    # 1️⃣ Si ya existe HSP mensual en el proyecto
-    # --------------------------------------------------
-    hsp_12m = getattr(p, "hsp_12m", None)
-
-    if isinstance(hsp_12m, (list, tuple)) and len(hsp_12m) == 12:
-        try:
-            prom = sum(float(x) for x in hsp_12m) / 12.0
-            return _clamp(prom, 0.5, 9.0)
-        except Exception:
-            pass
-
-    # --------------------------------------------------
-    # 2️⃣ Modelo CONSERVADOR Honduras (offline seguro)
-    #    kWh/m²/día ≈ Horas Sol Pico
-    # --------------------------------------------------
-    HSP_HONDURAS_CONSERVADOR_12M = [
-        5.1,  # Ene
-        5.4,  # Feb
-        5.8,  # Mar
-        5.6,  # Abr
-        5.0,  # May
-        4.5,  # Jun
-        4.3,  # Jul
-        4.4,  # Ago
-        4.1,  # Sep
-        4.0,  # Oct
-        4.4,  # Nov
-        4.7,  # Dic
-    ]
-
-    prom = sum(HSP_HONDURAS_CONSERVADOR_12M) / 12.0
-    return _clamp(prom, 0.5, 9.0)
-
-
-def _leer_pr(p: Datosproyecto) -> float:
-    """
-    Performance Ratio físico simplificado.
-    Mantiene compatibilidad con 'perdidas_sistema_pct'
-    pero usa desglose realista FV.
-    """
-
-    # -----------------------------
-    # Sombras (input usuario)
-    # -----------------------------
-    sombras_pct = _safe_float(getattr(p, "sombras_pct", 0.0), 0.0)
-
-    # -----------------------------
-    # Pérdidas base FV (conservadoras)
-    # -----------------------------
-    perdidas = {
-        "temperatura": 0.07,   # 7%
-        "soiling": 0.03,       # polvo/suciedad
-        "mismatch": 0.015,
-        "dc": 0.02,
-        "inversor": 0.03,
-        "ac": 0.01,
-        "disponibilidad": 0.01,
-    }
-
-    pr = 1.0
-
-    for v in perdidas.values():
-        pr *= (1.0 - v)
-
-    # aplicar sombras del usuario
-    pr *= _pct_factor(sombras_pct)
-
-    # -----------------------------
-    # Compatibilidad legacy:
-    # si usuario define pérdidas globales,
-    # se aplica como factor adicional suave
-    # -----------------------------
-    perd_usuario = getattr(p, "perdidas_sistema_pct", None)
-    if perd_usuario is not None:
-        pr *= _pct_factor(_safe_float(perd_usuario, 0.0) * 0.3)
-        # solo 30% del peso para evitar doble castigo
-
-    return _clamp(pr, 0.55, 0.95)
-
-
-def _prod_anual_por_kwp(hsp: float, pr: float) -> float:
-    return float(hsp) * float(pr) * 365.0
+def _clamp(x: float, lo: float, hi: float) -> float:
+    return max(lo, min(hi, float(x)))
 
 
 # ==========================================================
@@ -164,83 +48,10 @@ def _inv_id(eq: Dict[str, Any]) -> Optional[str]:
 
 
 # ==========================================================
-# Sizing energético (kWp, n paneles)
-#   NOTA: Antes se dimensionaba por "mes promedio" con DIAS_MES=30.
-#         Ahora se dimensiona por ENERGÍA ANUAL para evitar sesgo de días/mes.
+# Sizing energético (kWp, n paneles) — EXTRAÍDO a electrical/sizing_panel.py
 # ==========================================================
 def _kwh_mes_prom(p: Datosproyecto) -> float:
     return float(consumo_promedio(p.consumo_12m))
-
-
-def _kwh_obj_mes(kwh_mes: float, cobertura_obj: float) -> float:
-    # (legacy) se deja por compat; ya no se usa para sizing principal
-    return float(kwh_mes) * _clamp(float(cobertura_obj), 0.0, 1.0)
-
-
-def _kwp_req_mejorado(
-    kwh_obj_anual: float,
-    hsp_12m: list[float],
-    pr: float,
-) -> float:
-    """
-    Calcula kWp requerido usando recurso solar mensual real.
-    Mucho más estable que usar mes promedio.
-    """
-
-    if not isinstance(hsp_12m, (list, tuple)) or len(hsp_12m) != 12:
-        raise ValueError("hsp_12m inválido")
-
-    dias_mes = [31,28,31,30,31,30,31,31,30,31,30,31]
-
-    produccion_anual_por_kwp = 0.0
-
-    for hsp, d in zip(hsp_12m, dias_mes):
-        produccion_anual_por_kwp += float(hsp) * float(pr) * d
-
-    if produccion_anual_por_kwp <= 0:
-        raise ValueError("Producción anual inválida")
-
-    return float(kwh_obj_anual) / produccion_anual_por_kwp
-
-
-def _kwh_obj_anual(consumo_anual_kwh: float, cobertura_obj: float) -> float:
-    return float(consumo_anual_kwh) * _clamp(float(cobertura_obj), 0.0, 1.0)
-
-
-def _kwp_req_anual(
-    kwh_obj_anual: float,
-    hsp_12m: list[float],
-    pr: float,
-) -> float:
-    """
-    kWp requerido usando recurso solar mensual real.
-    Sustituye aproximación HSP_prom * 365.
-    """
-
-    if not isinstance(hsp_12m, (list, tuple)) or len(hsp_12m) != 12:
-        raise ValueError("hsp_12m inválido")
-
-    dias_mes = [31,28,31,30,31,30,31,31,30,31,30,31]
-
-    produccion_anual_por_kwp = 0.0
-
-    for hsp, dias in zip(hsp_12m, dias_mes):
-        produccion_anual_por_kwp += float(hsp) * float(pr) * dias
-
-    if produccion_anual_por_kwp <= 0:
-        raise ValueError("Producción anual inválida")
-
-    return float(kwh_obj_anual) / produccion_anual_por_kwp
-
-
-def _n_paneles(kwp_req: float, panel_w: float) -> int:
-    if panel_w <= 0:
-        raise ValueError("Panel inválido (W<=0).")
-    return max(1, int(math.ceil((float(kwp_req) * 1000.0) / float(panel_w))))
-
-
-def _pdc_kw(n_paneles: int, panel_w: float) -> float:
-    return (int(n_paneles) * float(panel_w)) / 1000.0
 
 
 # ==========================================================
@@ -264,13 +75,22 @@ def _inv_dict_to_candidato(i: Dict[str, Any]) -> InversorCandidato:
     )
 
 
-def _recomendar_inversor(p: Datosproyecto, panel_w: float, dc_ac: float, prod_anual_kwp: float) -> Dict[str, Any]:
+def _recomendar_inversor(
+    *,
+    p: Datosproyecto,
+    panel_w: float,
+    dc_ac: float,
+    prod_anual_kwp: float,
+    pdc_obj_kw: Optional[float] = None,
+) -> Dict[str, Any]:
     inp = SizingInput(
         consumo_anual_kwh=float(sum(p.consumo_12m)),
         produccion_anual_por_kwp_kwh=float(prod_anual_kwp),
         cobertura_obj=float(p.cobertura_objetivo),
         dc_ac_obj=float(dc_ac),
         pmax_panel_w=float(panel_w),
+        # si tu sizing_electric ya fue actualizado, pasará; si no, ignora este argumento quitándolo
+        pdc_obj_kw=pdc_obj_kw,
     )
     return ejecutar_sizing(inp=inp, inversores_catalogo=_candidatos_inversores())
 
@@ -347,74 +167,100 @@ def _trazabilidad(eq: Dict[str, Any], panel_id: str, inv_id: str, dc_ac: float, 
 # ==========================================================
 def calcular_sizing_unificado(p: Datosproyecto) -> Dict[str, Any]:
     eq = _leer_equipos(p)
-    panel, hsp, pr, dc_ac = _base_inputs(p, eq)
-    kwh_mes, kwp_req, n_pan, pdc = _sizing_energetico(p, panel, hsp, pr)
-    inv, inv_id, pac_kw_fb, sizing_inv = _resolver_inversor(p, eq, panel, dc_ac, hsp, pr)
-    rec = _calcular_strings(p, panel, inv, inv_id, pac_kw_fb, dc_ac, pdc)
-    electrico = _build_electrico(p, panel, pac_kw_fb, rec)
-
-    return _armar_resultado(
-        p, eq, panel, inv_id, dc_ac, hsp, pr,
-        kwh_mes, kwp_req, n_pan, pdc,
-        sizing_inv, rec, electrico
-    )
-
-
-# ==========================================================
-# Helpers (≤10 líneas cada uno)
-# ==========================================================
-def _base_inputs(p, eq):
-    hsp, pr = _leer_hsp(p), _leer_pr(p)
     dc_ac = _dc_ac_obj(eq)
     panel = get_panel(_panel_id(eq))
-    return panel, hsp, pr, dc_ac
 
+    # 1) sizing paneles (nuevo módulo)
+    panel_sizing = calcular_panel_sizing(
+        consumo_12m_kwh=list(p.consumo_12m),
+        cobertura_obj=float(p.cobertura_objetivo),
+        panel_w=float(panel.w),
+        hsp_12m=getattr(p, "hsp_12m", None),
+        hsp=getattr(p, "hsp", None),
+        usar_modelo_hn_conservador=True,
+        sombras_pct=_safe_float(getattr(p, "sombras_pct", 0.0), 0.0),
+        perdidas_sistema_pct=getattr(p, "perdidas_sistema_pct", None),
+        perdidas_detalle=getattr(p, "perdidas_detalle", None),
+    )
 
-def _sizing_energetico(p, panel, hsp, pr):
-    """
-    Sizing principal por energía ANUAL (reduce sesgo de días/mes).
-    Se mantiene kwh_mes_prom solo para reporting/UI.
-    """
-    kwh_anual = float(consumo_anual(p.consumo_12m))
-    kwh_obj_anual = _kwh_obj_anual(kwh_anual, p.cobertura_objetivo)
-    kwp_req = _kwp_req_anual(kwh_obj_anual, hsp, pr)
+    # Si falla sizing paneles, devolvemos igual con lo que haya para no romper UI
+    kwp_req = float(panel_sizing.kwp_req) if panel_sizing.ok else 0.0
+    n_pan = int(panel_sizing.n_paneles) if panel_sizing.ok else 0
+    pdc = float(panel_sizing.pdc_kw) if panel_sizing.ok else 0.0
 
-    n_pan = _n_paneles(kwp_req, panel.w)
-    pdc = _pdc_kw(n_pan, panel.w)
+    # 2) recomendar inversor (usa producción anual por kWp según panel_sizing)
+    prod_anual_kwp = 0.0
+    # producción anual por kWp = sum(hsp_mes * pr * dias_mes)
+    for hsp_d, dias in zip(panel_sizing.hsp_12m, panel_sizing.meta.get("dias_mes", [])):
+        prod_anual_kwp += float(hsp_d) * float(panel_sizing.pr) * float(dias or 0)
 
-    kwh_mes = _kwh_mes_prom(p)  # referencia
-    return kwh_mes, kwp_req, n_pan, pdc
+    sizing_inv = _recomendar_inversor(
+        p=p,
+        panel_w=float(panel.w),
+        dc_ac=float(dc_ac),
+        prod_anual_kwp=float(prod_anual_kwp),
+        pdc_obj_kw=float(pdc) if pdc > 0 else None,
+    )
 
-
-def _resolver_inversor(p, eq, panel, dc_ac, hsp, pr):
-    prod = _prod_anual_por_kwp(hsp, pr)
-    sizing_inv = _recomendar_inversor(p, panel.w, dc_ac, prod)
     inv_id_rec = sizing_inv.get("inversor_recomendado")
     inv_id = _inv_final(eq, inv_id_rec)
     inv = get_inversor(inv_id)
+
     pac_kw_fb = _pac_kw_desde_reco(
         sizing_inv.get("inversor_recomendado_meta", {}), inv_id
     ) or float(getattr(inv, "kw_ac", 0.0) or 0.0)
-    return inv, inv_id, pac_kw_fb, sizing_inv
 
-
-def _calcular_strings(p, panel, inv, inv_id, pac_kw_fb, dc_ac, pdc):
-    return recomendar_string(
+    # 3) strings
+    rec = recomendar_string(
         panel=_panel_spec(panel),
         inversor=_inv_spec(inv, inv_id, pac_kw_fb),
         t_min_c=_safe_float(getattr(p, "t_min_c", 10.0), 10.0),
         objetivo_dc_ac=float(dc_ac),
-        pdc_kw_objetivo=float(pdc),
+        pdc_kw_objetivo=float(pdc) if pdc > 0 else float(pac_kw_fb) * float(dc_ac),
     )
+
+    # 4) puente NEC (igual que antes)
+    electrico = _build_electrico(p, panel, pac_kw_fb, rec)
+
+    # 5) armado resultado (manteniendo llaves)
+    kwh_mes = _kwh_mes_prom(p)
+    prod_diaria_kwp = float(panel_sizing.hsp_prom) * float(panel_sizing.pr)
+
+    return {
+        "kwh_mes_prom": float(kwh_mes),
+        "consumo_anual_kwh": float(consumo_anual(p.consumo_12m)),
+
+        "kwp_req": round(float(kwp_req), 3),
+        "n_paneles": int(n_pan),
+        "pdc_kw": round(float(pdc), 3),
+
+        "prod_anual_por_kwp_kwh": round(float(prod_anual_kwp), 2),
+        "prod_diaria_por_kwp_kwh": round(float(prod_diaria_kwp), 3),
+
+        "capex_L": capex_L(float(pdc), p.costo_usd_kwp, p.tcambio),
+
+        "inversor_recomendado": inv_id,
+        "inversor_recomendado_meta": sizing_inv.get("inversor_recomendado_meta", {}),
+
+        "strings_auto": _resumen_strings(rec),
+
+        "traza": _trazabilidad(eq, _panel_id(eq), inv_id, float(dc_ac), float(panel_sizing.hsp_prom), float(panel_sizing.pr)),
+
+        # extra opcional (no rompe): dejar detalle sizing paneles para depurar/mostrar
+        "panel_sizing": {
+            "ok": bool(panel_sizing.ok),
+            "errores": list(panel_sizing.errores),
+            "hsp_12m": list(panel_sizing.hsp_12m),
+            "hsp_prom": float(panel_sizing.hsp_prom),
+            "pr": float(panel_sizing.pr),
+            "meta": dict(panel_sizing.meta),
+        },
+
+        "electrico": electrico,
+    }
 
 
 def _build_electrico(p, panel, pac_kw, rec):
-    """
-    Este dict es el puente SIZING → NEC.
-    Debe contener:
-      - mínimos NEC: n_strings, isc_mod_a, imp_mod_a, vmp_string_v, voc_frio_string_v, p_ac_w
-      - y además parámetros AC/cableado targets (vd%, L, pf, sistema)
-    """
     r = (rec or {}).get("recomendacion") or {}
     ui_e = getattr(p, "electrico", {}) or {}
     if not isinstance(ui_e, dict):
@@ -428,13 +274,9 @@ def _build_electrico(p, panel, pac_kw, rec):
         eq = {}
     tension = str(eq.get("tension_sistema", "2F+N_120/240"))
 
-    # Importante: temp_amb_c NO es t_min_c (t_min es para Voc frío)
     temp_amb_c = float(ui_e.get("t_amb_c", 30.0)) if "t_amb_c" in ui_e else 30.0
 
     return {
-        # -------------------------
-        # Mínimos NEC (tu adapter los exige)
-        # -------------------------
         "n_strings": int(r.get("n_strings_total", 0) or 0),
         "isc_mod_a": float(getattr(panel, "isc", 0.0) or 0.0),
         "imp_mod_a": float(getattr(panel, "imp", 0.0) or 0.0),
@@ -442,70 +284,22 @@ def _build_electrico(p, panel, pac_kw, rec):
         "voc_frio_string_v": float(r.get("voc_frio_string_v", 0.0) or 0.0),
         "p_ac_w": float(pac_kw) * 1000.0,
 
-        # -------------------------
-        # AC / sistema
-        # -------------------------
         "v_ac": vac,
         "fases": fases,
         "tension_sistema": tension,
         "pf_ac": float(ui_e.get("fp", 1.0)),
 
-        # -------------------------
-        # Cableado / targets (para NEC)
-        # -------------------------
         "L_dc_string_m": float(ui_e.get("dist_dc_m", 10.0)),
-        "L_dc_trunk_m": float(ui_e.get("dist_dc_trunk_m", 0.0)),  # opcional
+        "L_dc_trunk_m": float(ui_e.get("dist_dc_trunk_m", 0.0)),
         "L_ac_m": float(ui_e.get("dist_ac_m", 15.0)),
         "vd_max_dc_pct": float(ui_e.get("vdrop_obj_dc_pct", 2.0)),
         "vd_max_ac_pct": float(ui_e.get("vdrop_obj_ac_pct", 2.0)),
 
-        # Ambiente/material/arquitectura (defaults seguros)
         "temp_amb_c": float(temp_amb_c),
         "material": str(ui_e.get("material_conductor", "Cu")),
         "has_combiner": bool(ui_e.get("has_combiner", False)),
         "dc_arch": str(ui_e.get("dc_arch", "string_to_inverter")),
 
-        # Extras UI (por si tu NEC los usa o para trazabilidad)
         "otros_ccc": int(ui_e.get("otros_ccc", 0)),
         "incluye_neutro_ac": bool(ui_e.get("incluye_neutro_ac", False)),
-    }
-
-
-def _armar_resultado(
-    p, eq, panel, inv_id, dc_ac, hsp, pr,
-    kwh_mes, kwp_req, n_pan, pdc,
-    sizing_inv, rec, electrico
-):
-    # Extras útiles para UI/PDF (no rompen contrato: solo agregan campos)
-    prod_anual_kwp = _prod_anual_por_kwp(hsp, pr)          # kWh/kWp-año
-    prod_diaria_kwp = float(hsp) * float(pr)               # kWh/kWp-día (promedio)
-
-    return {
-        "kwh_mes_prom": float(kwh_mes),
-        "consumo_anual_kwh": float(consumo_anual(p.consumo_12m)),
-
-        # sizing
-        "kwp_req": round(float(kwp_req), 3),
-        "n_paneles": int(n_pan),
-        "pdc_kw": round(float(pdc), 3),
-
-        # trazabilidad energética (nuevo)
-        "prod_anual_por_kwp_kwh": round(float(prod_anual_kwp), 2),
-        "prod_diaria_por_kwp_kwh": round(float(prod_diaria_kwp), 3),
-
-        # costos
-        "capex_L": capex_L(float(pdc), p.costo_usd_kwp, p.tcambio),
-
-        # inversor
-        "inversor_recomendado": inv_id,
-        "inversor_recomendado_meta": sizing_inv.get("inversor_recomendado_meta", {}),
-
-        # strings
-        "strings_auto": _resumen_strings(rec),
-
-        # traza inputs clave
-        "traza": _trazabilidad(eq, _panel_id(eq), inv_id, dc_ac, hsp, pr),
-
-        # puente hacia NEC
-        "electrico": electrico,  # <-- CLAVE: puente hacia adaptador_nec
     }
