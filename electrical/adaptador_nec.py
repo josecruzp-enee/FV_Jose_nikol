@@ -12,20 +12,36 @@ logger = logging.getLogger(__name__)
 # ==========================================================
 # Adapter core -> NEC
 # ==========================================================
-
 def generar_electrico_nec(*, p: Any, sizing: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Adaptador Core → NEC.
+
+    Contrato de salida:
+      { ok: bool, errores: [..], input: {...}, paq: {...} }
+
+    Nota: En esta versión inicial, el input NEC se extrae desde:
+      sizing["electrico"]
+    (p se conserva para futuras versiones donde se construya el input
+     desde el proyecto + sizing con un builder más completo.)
+    """
     datos, errores = _extraer_input_desde_sizing(sizing)
 
     if errores:
         return {"ok": False, "errores": errores, "input": datos, "paq": {}}
-    logger.debug("DEBUG ELECTRICO: %s", sizing.get("electrico"))
+
+    # log seguro (no imprime todo el dict)
+    try:
+        keys = list((sizing.get("electrico") or {}).keys())
+    except Exception:
+        keys = []
+    logger.debug("NEC input desde sizing.electrico keys=%s", keys)
+
     return _ejecutar_nec(datos)
 
 
 # ==========================================================
-# 1) Construcción input NEC (≤10 líneas)
+# 1) Construcción input NEC desde sizing["electrico"]
 # ==========================================================
-
 def _extraer_input_desde_sizing(sizing: Dict[str, Any]):
     electrico = sizing.get("electrico")
     if not electrico:
@@ -34,7 +50,8 @@ def _extraer_input_desde_sizing(sizing: Dict[str, Any]):
     datos = dict(electrico or {})
 
     faltantes = [
-        k for k in (
+        k
+        for k in (
             "n_strings",
             "isc_mod_a",
             "imp_mod_a",
@@ -52,9 +69,8 @@ def _extraer_input_desde_sizing(sizing: Dict[str, Any]):
 
 
 # ==========================================================
-# 2) Ejecución NEC segura (≤10 líneas)
+# 2) Ejecución NEC segura
 # ==========================================================
-
 def _ejecutar_nec(datos: Dict[str, Any]) -> Dict[str, Any]:
     try:
         paq = calcular_paquete_electrico_nec(datos)
@@ -67,10 +83,12 @@ def _ejecutar_nec(datos: Dict[str, Any]) -> Dict[str, Any]:
             "paq": {},
         }
 
-# ==========================================================
-# Builders (pequeños)
-# ==========================================================
 
+# ==========================================================
+# Builders alternos (no usados en esta versión)
+#   - Los dejo intactos para que luego migres a construir input NEC
+#     desde (p + sizing) sin depender de sizing["electrico"].
+# ==========================================================
 def _build_input_nec(p: Any, sizing: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str]]:
     d: Dict[str, Any] = {}
 
@@ -88,12 +106,10 @@ def _from_cfg_strings(sizing: Dict[str, Any]) -> Dict[str, Any]:
     if not strings:
         return {}
 
-    # tus strings suelen venir como dicts con estas keys:
     vmp = _max_num(strings, "vmp_string_v")
     imp = _max_num(strings, "imp_a")
     isc = _max_num(strings, "isc_a")
 
-    # voc frío: intenta varias keys por compat
     voc_frio = (
         _max_num(strings, "voc_frio_string_v")
         or _max_num(strings, "voc_frio_v")
@@ -102,7 +118,6 @@ def _from_cfg_strings(sizing: Dict[str, Any]) -> Dict[str, Any]:
     )
 
     out: Dict[str, Any] = {
-        # NEC espera esto:
         "n_strings": len(strings),
         "isc_mod_a": isc,
         "imp_mod_a": imp,
@@ -110,7 +125,6 @@ def _from_cfg_strings(sizing: Dict[str, Any]) -> Dict[str, Any]:
         "voc_frio_string_v": voc_frio,
     }
 
-    # opcional: tu core usa iac_estimada_a a veces
     iac = cfg.get("iac_estimada_a", None)
     if isinstance(iac, (int, float)) and float(iac) > 0:
         out["iac_estimada_a"] = float(iac)
@@ -119,10 +133,6 @@ def _from_cfg_strings(sizing: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _from_p_ac_w(sizing: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    NEC requiere p_ac_w para calcular Iac.
-    Lo buscamos en sizing con nombres típicos.
-    """
     s = sizing or {}
 
     p_ac_w = _first_num(s, ["p_ac_w", "pac_w"])
@@ -135,13 +145,8 @@ def _from_p_ac_w(sizing: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _defaults_desde_proyecto(p: Any, sizing: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Defaults seguros. Aquí es el ÚNICO lugar que luego conectás a config/UI.
-    Todo lo que no venga, se setea sin romper.
-    """
     eq = getattr(p, "equipos", None) or {}
 
-    # preferimos la tensión del eq UI si existe
     tension = (
         eq.get("tension_sistema")
         or getattr(p, "tension_sistema", None)
@@ -150,7 +155,6 @@ def _defaults_desde_proyecto(p: Any, sizing: Dict[str, Any]) -> Dict[str, Any]:
     )
 
     return {
-        # NEC parsea estas tags: 1F_240V, 2F+N_120/240, 3F+N_120/208, ...
         "tension_sistema": _normalizar_tag_sistema_ac(str(tension)),
 
         "pf_ac": float(getattr(p, "fp", 1.0) or 1.0),
@@ -173,7 +177,6 @@ def _defaults_desde_proyecto(p: Any, sizing: Dict[str, Any]) -> Dict[str, Any]:
 # ==========================================================
 # Validación mínima
 # ==========================================================
-
 def _validar_minimos_nec(d: Dict[str, Any]) -> List[str]:
     req = [
         "tension_sistema",
@@ -201,7 +204,6 @@ def _validar_minimos_nec(d: Dict[str, Any]) -> List[str]:
 # ==========================================================
 # Helpers pequeños
 # ==========================================================
-
 def _max_num(items: List[Dict[str, Any]], key: str) -> Optional[float]:
     vals: List[float] = []
     for it in items:
@@ -220,12 +222,8 @@ def _first_num(d: Dict[str, Any], keys: List[str]) -> Optional[float]:
 
 
 def _normalizar_tag_sistema_ac(tag: str) -> str:
-    """
-    Normaliza variaciones típicas para que coincidan con parse_sistema_ac().
-    """
     t = (tag or "").strip()
 
-    # Variantes comunes
     if t in ("1F-240V", "1F_240", "1F240", "240V_1F"):
         return "1F_240V"
     if t in ("2F+N-120/240", "2F+N_120/240", "120/240", "1F_120/240"):
@@ -235,5 +233,4 @@ def _normalizar_tag_sistema_ac(tag: str) -> str:
     if t in ("3F_480Y277", "3F+N_480Y277", "480Y/277"):
         return "3F_480Y277V"
 
-    # Si ya viene en formato esperado, lo devolvemos
     return t if t else "1F_240V"
