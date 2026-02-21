@@ -5,11 +5,8 @@ import math
 from datetime import datetime
 from typing import Any, Dict
 
-from reportlab.lib.pagesizes import letter
 from reportlab.platypus import Paragraph, Spacer, PageBreak
 
-# OJO: estos helpers deben existir en tu repo en reportes/helpers_pdf.py
-# Ajusta el import si tu archivo se llama distinto.
 from core.result_accessors import get_sizing, get_kwp_dc, get_capex_L
 from .helpers_pdf import (
     section_bar,
@@ -21,9 +18,7 @@ from .helpers_pdf import (
     get_field,
 )
 
-# Si money_L / num están en core/rutas.py (como tu app.py), importalos así:
 from core.rutas import money_L, num
-
 
 
 # ---------------------------
@@ -109,6 +104,7 @@ def p1_tabla_solucion_unica(datos, kwp, capex, ds, estado, pal, content_w):
 
     return [barra, Spacer(1, 6), t, Spacer(1, 12)]
 
+
 def p1_tabla_decision(decision, cuota_mensual, plazo_anios, pal, content_w):
     story = []
     story.append(section_bar("Decisión del cliente (mensual)", pal, content_w))
@@ -163,15 +159,9 @@ def p1_conclusion(impacto, ds, peor, kwp, cobertura_objetivo, estado, pal, conte
 
 def build_page_1(resultado: Dict[str, Any], datos, paths, pal, styles, content_w):
     """
-    Page 1 versión GitHub = tu Page 1 local.
-    No pedimos content_w desde builder; lo calculamos aquí.
+    Página 1.
+    ✅ Usa el content_w que viene del builder (doc.width) para consistencia.
     """
-    # content width estándar carta con márgenes típicos
-    page_w, _ = letter
-    left_margin = 36
-    right_margin = 36
-    content_w = page_w - left_margin - right_margin
-
     story = []
 
     sizing = get_sizing(resultado)
@@ -197,7 +187,11 @@ def build_page_1(resultado: Dict[str, Any], datos, paths, pal, styles, content_w
     story += p1_tabla_cliente(datos, sizing, fecha, pal, content_w)
     story += p1_tabla_solucion_unica(datos, kwp, capex, ds, estado, pal, content_w)
     story += p1_tabla_decision(decision, (resultado or {}).get("cuota_mensual", 0.0), plazo_anios, pal, content_w)
-    story += p1_conclusion(impacto, ds, peor, kwp, float(get_field(datos,"cobertura_objetivo",0.0)), estado, pal, content_w)
+    story += p1_conclusion(
+        impacto, ds, peor, kwp,
+        float(get_field(datos, "cobertura_objetivo", 0.0)),
+        estado, pal, content_w
+    )
 
     story.append(PageBreak())
     return story
