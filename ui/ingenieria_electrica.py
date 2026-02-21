@@ -302,6 +302,45 @@ def _mostrar_nec(pkg: dict):
         cfg = dc.get("config_strings", {}) or {}
         if cfg:
             st.markdown("#### Configuración de strings")
+
+            # ---------------------------------------------------------
+            # FIX UI: evitar "Módulos por string = 0"
+            # Si el motor NEC no llenó modulos_por_string, lo inferimos
+            # desde n_paneles y n_strings (y mostramos reparto real).
+            # ---------------------------------------------------------
+            def _to_int(x, default=0):
+                try:
+                    return int(float(x))
+                except Exception:
+                    return default
+
+            n_strings = _to_int(cfg.get("n_strings"), 0)
+
+            # Intentar resolver n_paneles desde varias rutas posibles
+            n_paneles = 0
+            # 1) si el motor NEC ya lo puso en dc
+            n_paneles = _to_int(dc.get("n_paneles"), 0)
+
+            # 2) si viene en config_strings
+            if n_paneles <= 0:
+                n_paneles = _to_int(cfg.get("n_paneles"), 0)
+
+            # 3) si viene en params (algunos motores lo guardan ahí)
+            if n_paneles <= 0:
+                params = dc.get("params", {}) or {}
+                n_paneles = _to_int(params.get("n_paneles"), 0)
+
+            # Si modulos_por_string viene 0 o no viene, lo rellenamos
+            mps_raw = _to_int(cfg.get("modulos_por_string"), 0)
+            if mps_raw <= 0:
+                if n_strings > 0 and n_paneles > 0:
+                    base = n_paneles // n_strings
+                    resto = n_paneles % n_strings
+                    reparto = [base + (1 if i < resto else 0) for i in range(n_strings)]
+                    cfg["modulos_por_string"] = " / ".join(str(x) for x in reparto)
+                else:
+                    cfg["modulos_por_string"] = "—"
+
             df_cfg = _kv_df(
                 cfg,
                 rename={"n_strings": "Número de strings", "modulos_por_string": "Módulos por string", "tipo": "Tipo"},
@@ -417,7 +456,6 @@ def _mostrar_nec(pkg: dict):
     with tabs[4]:
         st.markdown("### Datos crudos (para depurar)")
         st.json(pkg)
-
 
 def _mostrar_validacion_string(validacion: dict):
     v = validacion or {}
