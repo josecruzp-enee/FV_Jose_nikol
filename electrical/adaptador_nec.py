@@ -49,6 +49,27 @@ def _extraer_input_desde_sizing(sizing: Dict[str, Any]):
 
     datos = dict(electrico or {})
 
+    # ----------------------------------------------------------
+    # FIX: pasar n_paneles al motor NEC (para módulos por string)
+    # Preferencia:
+    #   1) sizing["n_paneles"]
+    #   2) sizing["panel_sizing"]["n_paneles"]
+    # ----------------------------------------------------------
+    def _to_int(x: Any, default: int = 0) -> int:
+        try:
+            return int(float(x))
+        except Exception:
+            return default
+
+    n_paneles = _to_int(sizing.get("n_paneles"), 0)
+    if n_paneles <= 0:
+        ps = (sizing.get("panel_sizing") or {})
+        if isinstance(ps, dict):
+            n_paneles = _to_int(ps.get("n_paneles"), 0)
+
+    if n_paneles > 0:
+        datos["n_paneles"] = n_paneles
+
     faltantes = [
         k
         for k in (
