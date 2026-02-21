@@ -148,7 +148,17 @@ def normalizar_electrico(pkg: Dict[str, Any]) -> Dict[str, Any]:
 
     dc = _first_dict(_get(pkg, "nec.dc"), _get(pkg, "corrientes_dc"), _get(pkg, "dc"), _get(pkg, "ingenieria.nec.dc"))
     ac = _first_dict(_get(pkg, "nec.ac"), _get(pkg, "corrientes_ac"), _get(pkg, "ac"), _get(pkg, "ingenieria.nec.ac"))
-    protecciones = _first_dict(_get(pkg, "protecciones"), _get(pkg, "nec.protecciones"), _get(pkg, "proteccion"))
+    protecciones = _first_dict(_get(pkg, "protecciones"), _get(pkg, "ocpd"), _get(pkg, "nec.protecciones"), _get(pkg, "proteccion"),)
+
+spd = _first_dict(
+    _get(pkg, "spd"),
+    _get(pkg, "nec.spd"),
+)
+
+seccionamiento = _first_dict(
+    _get(pkg, "seccionamiento"),
+    _get(pkg, "nec.seccionamiento"),
+)
     conductores = _first_dict(_get(pkg, "conductores"), _get(pkg, "nec.conductores"), _get(pkg, "cables"))
 
     warnings: List[str] = []
