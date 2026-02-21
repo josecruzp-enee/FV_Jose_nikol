@@ -48,14 +48,94 @@ def _safe_int(x: Any, default: int) -> int:
 # Lectura Paso 3: HSP + PR
 # ==========================================================
 def _leer_hsp(p: Datosproyecto) -> float:
-    return _clamp(_safe_float(getattr(p, "hsp", 4.5), 4.5), 0.5, 9.0)
+    """
+    Devuelve HSP promedio anual.
+
+    Prioridad:
+    1) Si el proyecto trae hsp_12m → usa su promedio
+    2) Si no, usa modelo conservador Honduras (12 meses)
+    3) Fallback final: p.hsp legacy
+    """
+
+    # --------------------------------------------------
+    # 1️⃣ Si ya existe HSP mensual en el proyecto
+    # --------------------------------------------------
+    hsp_12m = getattr(p, "hsp_12m", None)
+
+    if isinstance(hsp_12m, (list, tuple)) and len(hsp_12m) == 12:
+        try:
+            prom = sum(float(x) for x in hsp_12m) / 12.0
+            return _clamp(prom, 0.5, 9.0)
+        except Exception:
+            pass
+
+    # --------------------------------------------------
+    # 2️⃣ Modelo CONSERVADOR Honduras (offline seguro)
+    #    kWh/m²/día ≈ Horas Sol Pico
+    # --------------------------------------------------
+    HSP_HONDURAS_CONSERVADOR_12M = [
+        5.1,  # Ene
+        5.4,  # Feb
+        5.8,  # Mar
+        5.6,  # Abr
+        5.0,  # May
+        4.5,  # Jun
+        4.3,  # Jul
+        4.4,  # Ago
+        4.1,  # Sep
+        4.0,  # Oct
+        4.4,  # Nov
+        4.7,  # Dic
+    ]
+
+    prom = sum(HSP_HONDURAS_CONSERVADOR_12M) / 12.0
+    return _clamp(prom, 0.5, 9.0)
 
 
 def _leer_pr(p: Datosproyecto) -> float:
-    perd = _safe_float(getattr(p, "perdidas_sistema_pct", 15.0), 15.0)
-    sh = _safe_float(getattr(p, "sombras_pct", 0.0), 0.0)
-    pr = _pct_factor(perd) * _pct_factor(sh)
-    return _clamp(pr, 0.10, 1.00)
+    """
+    Performance Ratio físico simplificado.
+    Mantiene compatibilidad con 'perdidas_sistema_pct'
+    pero usa desglose realista FV.
+    """
+
+    # -----------------------------
+    # Sombras (input usuario)
+    # -----------------------------
+    sombras_pct = _safe_float(getattr(p, "sombras_pct", 0.0), 0.0)
+
+    # -----------------------------
+    # Pérdidas base FV (conservadoras)
+    # -----------------------------
+    perdidas = {
+        "temperatura": 0.07,   # 7%
+        "soiling": 0.03,       # polvo/suciedad
+        "mismatch": 0.015,
+        "dc": 0.02,
+        "inversor": 0.03,
+        "ac": 0.01,
+        "disponibilidad": 0.01,
+    }
+
+    pr = 1.0
+
+    for v in perdidas.values():
+        pr *= (1.0 - v)
+
+    # aplicar sombras del usuario
+    pr *= _pct_factor(sombras_pct)
+
+    # -----------------------------
+    # Compatibilidad legacy:
+    # si usuario define pérdidas globales,
+    # se aplica como factor adicional suave
+    # -----------------------------
+    perd_usuario = getattr(p, "perdidas_sistema_pct", None)
+    if perd_usuario is not None:
+        pr *= _pct_factor(_safe_float(perd_usuario, 0.0) * 0.3)
+        # solo 30% del peso para evitar doble castigo
+
+    return _clamp(pr, 0.55, 0.95)
 
 
 def _prod_anual_por_kwp(hsp: float, pr: float) -> float:
@@ -97,23 +177,60 @@ def _kwh_obj_mes(kwh_mes: float, cobertura_obj: float) -> float:
     return float(kwh_mes) * _clamp(float(cobertura_obj), 0.0, 1.0)
 
 
-def _kwp_req(kwh_obj_mes: float, hsp: float, pr: float, dias_mes: float = DIAS_MES) -> float:
-    # (legacy) se deja por compat; ya no se usa en el sizing principal
-    denom = float(hsp) * float(pr) * float(dias_mes)
-    if denom <= 0:
-        raise ValueError("HSP/PR inválidos (denominador <= 0).")
-    return float(kwh_obj_mes) / denom
+def _kwp_req_mejorado(
+    kwh_obj_anual: float,
+    hsp_12m: list[float],
+    pr: float,
+) -> float:
+    """
+    Calcula kWp requerido usando recurso solar mensual real.
+    Mucho más estable que usar mes promedio.
+    """
+
+    if not isinstance(hsp_12m, (list, tuple)) or len(hsp_12m) != 12:
+        raise ValueError("hsp_12m inválido")
+
+    dias_mes = [31,28,31,30,31,30,31,31,30,31,30,31]
+
+    produccion_anual_por_kwp = 0.0
+
+    for hsp, d in zip(hsp_12m, dias_mes):
+        produccion_anual_por_kwp += float(hsp) * float(pr) * d
+
+    if produccion_anual_por_kwp <= 0:
+        raise ValueError("Producción anual inválida")
+
+    return float(kwh_obj_anual) / produccion_anual_por_kwp
 
 
 def _kwh_obj_anual(consumo_anual_kwh: float, cobertura_obj: float) -> float:
     return float(consumo_anual_kwh) * _clamp(float(cobertura_obj), 0.0, 1.0)
 
 
-def _kwp_req_anual(kwh_obj_anual: float, hsp: float, pr: float) -> float:
-    denom = float(hsp) * float(pr) * 365.0
-    if denom <= 0:
-        raise ValueError("HSP/PR inválidos (denominador <= 0).")
-    return float(kwh_obj_anual) / denom
+def _kwp_req_anual(
+    kwh_obj_anual: float,
+    hsp_12m: list[float],
+    pr: float,
+) -> float:
+    """
+    kWp requerido usando recurso solar mensual real.
+    Sustituye aproximación HSP_prom * 365.
+    """
+
+    if not isinstance(hsp_12m, (list, tuple)) or len(hsp_12m) != 12:
+        raise ValueError("hsp_12m inválido")
+
+    dias_mes = [31,28,31,30,31,30,31,31,30,31,30,31]
+
+    produccion_anual_por_kwp = 0.0
+
+    for hsp, dias in zip(hsp_12m, dias_mes):
+        produccion_anual_por_kwp += float(hsp) * float(pr) * dias
+
+    if produccion_anual_por_kwp <= 0:
+        raise ValueError("Producción anual inválida")
+
+    return float(kwh_obj_anual) / produccion_anual_por_kwp
 
 
 def _n_paneles(kwp_req: float, panel_w: float) -> int:
