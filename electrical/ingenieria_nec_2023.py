@@ -40,9 +40,11 @@ def _map_sistemas_ac() -> Dict[str, SistemaAC]:
 # Contexto NEC + orquestación
 # ==========================================================
 def _ctx_nec(d: Dict[str, Any]) -> Dict[str, Any]:
+    # Nota: aceptamos t_amb_c o temp_amb_c; default 30C
+    t_amb = float(d.get("t_amb_c", d.get("temp_amb_c", 30.0)))
     return {
         "aplicar_derating": bool(d.get("aplicar_derating", True)),
-        "t_amb_c": float(d.get("t_amb_c", d.get("temp_amb_c", 30.0))),
+        "t_amb_c": t_amb,
         "columna": str(d.get("columna_temp_nec", "75C")),
         "ccc_ac": int(d.get("ccc_ac", 3)),
         "ccc_dc": int(d.get("ccc_dc", 2)),
@@ -73,6 +75,9 @@ def _calc_dc_ac(d: Dict[str, Any]):
 
 
 def _compat_strings_en_sizing(d: Dict[str, Any], dc: Dict[str, Any]) -> None:
+    """
+    Compat: si alguien quiere reutilizar output NEC como si fuera sizing.cfg_strings.
+    """
     d.setdefault("sizing", {})
     d["sizing"].setdefault("cfg_strings", {})
     d["sizing"]["cfg_strings"]["strings"] = [{
@@ -87,7 +92,6 @@ def _compat_strings_en_sizing(d: Dict[str, Any], dc: Dict[str, Any]) -> None:
 
 
 def _ensamblar_paq(d: Dict[str, Any], s: SistemaAC, dc: Dict[str, Any], ac: Dict[str, Any], warnings: List[str]):
-    # ✅ OCPD ahora viene del módulo electrical/protecciones.py (sin duplicar NEC aquí)
     ocpd = armar_ocpd(
         iac_nom_a=float(ac.get("i_ac_nom_a", 0.0)),
         n_strings=int(dc.get("n_strings", 0)),
@@ -104,7 +108,7 @@ def _ensamblar_paq(d: Dict[str, Any], s: SistemaAC, dc: Dict[str, Any], ac: Dict
         "spd": _recomendar_spd(d),
         "seccionamiento": _recomendar_seccionamiento(d),
         "canalizacion": _recomendar_canalizacion(cond),
-        "warnings": warnings + dc.get("warnings", []) + ac.get("warnings", []),
+        "warnings": warnings + (dc.get("warnings", []) or []) + (ac.get("warnings", []) or []),
     }
     paq["resumen_pdf"] = _armar_resumen_pdf(paq, s)
     return paq
@@ -142,10 +146,15 @@ def _defaults(d: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _validar_minimos(d: Dict[str, Any]) -> List[str]:
+    """
+    Warnings (no excepción): el motor intenta igual, pero avisa.
+    Antes solo marcaba si era None; ahora también si es 0/'' (inválido).
+    """
     w: List[str] = []
     for k in ["n_strings", "isc_mod_a", "imp_mod_a", "vmp_string_v", "voc_frio_string_v", "p_ac_w"]:
-        if d.get(k, None) is None:
-            w.append(f"Falta '{k}' para ingeniería NEC.")
+        v = d.get(k, None)
+        if v in (None, "", 0):
+            w.append(f"Falta/Inválido '{k}' para ingeniería NEC.")
     return w
 
 
@@ -219,7 +228,7 @@ def _iac(p_w: float, v_ll: float, pf: float, fases: int) -> float:
 # ==========================================================
 def _calc_conductores_y_vd(d: Dict[str, Any], s: SistemaAC, dc: Dict[str, Any], ac: Dict[str, Any]) -> Dict[str, Any]:
     tab = _tabla_conductores_base(d.get("material", "Cu"))
-    nec_base = d.get("nec", {})
+    nec_base = d.get("nec", {}) or {}
 
     dc_string = _tramo_conductor(
         nombre="DC string",
@@ -414,8 +423,9 @@ def _recomendar_canalizacion(conductores: Dict[str, Any]) -> Dict[str, Any]:
 # Resumen PDF
 # ==========================================================
 def _armar_resumen_pdf(paq: Dict[str, Any], s: SistemaAC) -> List[str]:
-    dc = paq["conductores"]["dc_string"]
-    ac = paq["conductores"]["ac_out"]
+    cond = (paq.get("conductores") or {})
+    dc = (cond.get("dc_string") or {})
+    ac = (cond.get("ac_out") or {})
     fuse = (paq.get("ocpd") or {}).get("fusible_string", {}) or {}
     brk = (paq.get("ocpd") or {}).get("breaker_ac", {}) or {}
 
@@ -423,17 +433,18 @@ def _armar_resumen_pdf(paq: Dict[str, Any], s: SistemaAC) -> List[str]:
     fuse_a = fuse.get("tamano_sugerido_a") or fuse.get("tamano_a") or 0
 
     out: List[str] = []
+
     if dc.get("ok"):
         out.append(
-            f"Conductores DC (string): {dc['awg']} {paq['conductores']['material']} | "
-            f"Dist {dc['l_m']} m | caída {dc['vd_pct']}% (obj {dc['vd_obj_pct']}%)."
+            f"Conductores DC (string): {dc.get('awg')} {cond.get('material')} | "
+            f"Dist {dc.get('l_m')} m | caída {dc.get('vd_pct')}% (obj {dc.get('vd_obj_pct')}%)."
         )
 
-    if paq["conductores"]["dc_trunk"] and paq["conductores"]["dc_trunk"].get("ok"):
-        t = paq["conductores"]["dc_trunk"]
+    if cond.get("dc_trunk") and (cond["dc_trunk"] or {}).get("ok"):
+        t = cond["dc_trunk"]
         out.append(
-            f"Conductores DC (trunk): {t['awg']} {paq['conductores']['material']} | "
-            f"Dist {t['l_m']} m | caída {t['vd_pct']}% (obj {t['vd_obj_pct']}%)."
+            f"Conductores DC (trunk): {t.get('awg')} {cond.get('material')} | "
+            f"Dist {t.get('l_m')} m | caída {t.get('vd_pct')}% (obj {t.get('vd_obj_pct')}%)."
         )
 
     if bool(fuse.get("requerido")):
@@ -447,8 +458,8 @@ def _armar_resumen_pdf(paq: Dict[str, Any], s: SistemaAC) -> List[str]:
 
     if ac.get("ok"):
         out.append(
-            f"Conductores AC: {ac['awg']} {paq['conductores']['material']} | "
-            f"Dist {ac['l_m']} m | caída {ac['vd_pct']}% (obj {ac['vd_obj_pct']}%)."
+            f"Conductores AC: {ac.get('awg')} {cond.get('material')} | "
+            f"Dist {ac.get('l_m')} m | caída {ac.get('vd_pct')}% (obj {ac.get('vd_obj_pct')}%)."
         )
 
     out.append("SPD: " + paq["spd"]["dc"] + " | " + paq["spd"]["ac"] + ".")
