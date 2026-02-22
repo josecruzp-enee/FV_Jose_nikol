@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, Dict, Optional
 
 from electrical.modelos import ParametrosCableado
-from electrical.paquete_electrico import calcular_paquete_electrico_ref
+from electrical.ref.paquete_ref import calcular_paquete_electrico_ref
 
 
 def simular_electrico_fv_para_pdf(
