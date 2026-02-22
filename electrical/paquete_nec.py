@@ -58,7 +58,49 @@ try:
     from electrical.canalizacion.conduit import canalizacion_fv  # type: ignore
 except Exception:  # pragma: no cover
     canalizacion_fv = None  # type: ignore
+# ==========================================================
+# API pública (compat): core -> NEC
+# ==========================================================
+from typing import Any, Dict
 
+def generar_electrico_nec(*, p: Any, sizing: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Wrapper compat. Mantiene el contrato:
+      { ok: bool, errores: [..], input: {...}, paq: {...} }
+
+    En v1 toma input NEC desde sizing["electrico"].
+    """
+    electrico = (sizing or {}).get("electrico") or {}
+    if not electrico:
+        return {"ok": False, "errores": ["NEC: sizing sin bloque 'electrico'"], "input": {}, "paq": {}}
+
+    datos = dict(electrico)
+
+    def _to_int(x, default=0):
+        try:
+            return int(float(x))
+        except Exception:
+            return default
+
+    # FIX n_paneles
+    n_paneles = _to_int((sizing or {}).get("n_paneles"), 0)
+    if n_paneles <= 0:
+        ps = (sizing or {}).get("panel_sizing") or {}
+        if isinstance(ps, dict):
+            n_paneles = _to_int(ps.get("n_paneles"), 0)
+    if n_paneles > 0:
+        datos["n_paneles"] = n_paneles
+
+    req = ("n_strings","isc_mod_a","imp_mod_a","vmp_string_v","voc_frio_string_v","p_ac_w")
+    falt = [k for k in req if k not in datos or datos[k] in (None, 0)]
+    if falt:
+        return {"ok": False, "errores": [f"NEC: falta '{k}'" for k in falt], "input": datos, "paq": {}}
+
+    try:
+        paq = armar_paquete_nec(datos)  # <- tu orquestador canónico
+        return {"ok": True, "errores": [], "input": datos, "paq": paq}
+    except Exception as e:
+        return {"ok": False, "errores": [f"NEC: {type(e).__name__}: {e}"], "input": datos, "paq": {}}
 
 # ---------------------------
 # Utilidades de orquestación
