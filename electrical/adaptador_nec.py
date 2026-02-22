@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional, Tuple
 import logging
 
-from electrical.ingenieria_nec_2023 import calcular_paquete_electrico_nec
+from electrical.paquete_nec import armar_paquete_nec
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +94,7 @@ def _extraer_input_desde_sizing(sizing: Dict[str, Any]):
 # ==========================================================
 def _ejecutar_nec(datos: Dict[str, Any]) -> Dict[str, Any]:
     try:
-        paq = calcular_paquete_electrico_nec(datos)
+        paq = armar_paquete_nec(datos)
         return {"ok": True, "errores": [], "input": datos, "paq": paq}
     except Exception as e:
         return {
