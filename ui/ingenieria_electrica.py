@@ -6,10 +6,10 @@ from typing import List, Tuple, Dict, Any
 import pandas as pd
 import streamlit as st
 
-from electrical.validador_strings import PanelFV, InversorFV, validar_string
+from electrical.paneles.validador_strings import PanelFV, InversorFV, validar_string
 from core.orquestador import ejecutar_estudio
 from core.modelo import Datosproyecto
-from electrical.catalogos import get_panel, get_inversor
+from electrical.catalogos.catalogos import get_panel, get_inversor
 from ui.validaciones_ui import campos_faltantes_para_paso5
 from ui.state_helpers import ensure_dict, merge_defaults, save_result_fingerprint
 
