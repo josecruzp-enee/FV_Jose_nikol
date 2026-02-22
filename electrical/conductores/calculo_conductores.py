@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from electrical.cables_conductores import tabla_base_conductores
+from electrical.conductores.cables_conductores import tabla_base_conductores
 from electrical.factores_nec import ampacidad_ajustada_nec
 from electrical.tramos_base import caida_tension_pct, mejorar_por_vd as _mejorar_por_vd_base
 
