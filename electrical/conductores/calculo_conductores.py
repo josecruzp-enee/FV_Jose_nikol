@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional
 
 from electrical.conductores.cables_conductores import tabla_base_conductores
 from electrical.conductores.factores_nec import ampacidad_ajustada_nec
-from electrical.tramos_base import caida_tension_pct, mejorar_por_vd as _mejorar_por_vd_base
+from electrical.conductores.tramos_base import caida_tension_pct, mejorar_por_vd as _mejorar_por_vd_base
 
 
 def tabla_conductores(material: str = "Cu") -> List[Dict[str, Any]]:
