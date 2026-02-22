@@ -4,10 +4,9 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
-
-from electrical.factores_nec import ampacidad_ajustada_nec
+from electrical.calculo_conductores import tramo_conductor
 from electrical.protecciones import armar_ocpd
-from electrical.tramos_base import caida_tension_pct, mejorar_por_vd as _mejorar_por_vd_base
+
 
 
 # ==========================================================
