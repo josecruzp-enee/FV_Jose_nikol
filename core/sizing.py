@@ -11,7 +11,7 @@ from electrical.inversor.sizing_inversor import SizingInput, InversorCandidato, 
 from electrical.paneles.sizing_panel import calcular_panel_sizing
 from electrical.inversor.sizing_inversor import SizingInput, InversorCandidato, ejecutar_sizing
 from electrical.paneles.strings_auto import recomendar_string
-
+from electrical.paneles.strings_auto import PanelSpec
 # ==========================================================
 # Utilitarios (cortos)
 # ==========================================================
