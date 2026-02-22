@@ -200,7 +200,7 @@ def _build_params_fv(p: Datosproyecto) -> Dict[str, Any]:
 
 def _build_electrico_nec_safe(p: Datosproyecto, sizing: Dict[str, Any]) -> Dict[str, Any]:
     try:
-        from electrical.adaptador_nec import generar_electrico_nec
+        from electrical.paquete_nec import generar_electrico_nec
         out = generar_electrico_nec(p=p, sizing=sizing)
         if isinstance(out, dict):
             out.setdefault("paq", {})
