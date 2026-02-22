@@ -4,9 +4,9 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
+
 from electrical.calculo_conductores import tramo_conductor
 from electrical.protecciones import armar_ocpd
-
 
 
 # ==========================================================
@@ -44,7 +44,7 @@ def _ctx_nec(d: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "aplicar_derating": bool(d.get("aplicar_derating", True)),
         "t_amb_c": t_amb,
-        "columna": str(d.get("columna_temp_nec", "75C")),
+        "columna": str(d.get("columna_temp_nec", "75C")),  # reservado (futuro)
         "ccc_ac": int(d.get("ccc_ac", 3)),
         "ccc_dc": int(d.get("ccc_dc", 2)),
     }
@@ -73,7 +73,7 @@ def _post_dc(d: Dict[str, Any], dc: Dict[str, Any]) -> None:
     if n_paneles <= 0:
         n_paneles = _as_int(d.get("n_paneles_total", 0))
 
-    # Legacy/fallback: módulos en serie (no es lo mismo, pero evitamos 0 si es lo único que hay)
+    # Legacy/fallback: módulos en serie
     if n_paneles <= 0:
         n_paneles = _as_int(d.get("n_modulos_serie", 0))
 
@@ -118,7 +118,13 @@ def _compat_strings_en_sizing(d: Dict[str, Any], dc: Dict[str, Any]) -> None:
     }]
 
 
-def _ensamblar_paq(d: Dict[str, Any], s: SistemaAC, dc: Dict[str, Any], ac: Dict[str, Any], warnings: List[str]):
+def _ensamblar_paq(
+    d: Dict[str, Any],
+    s: SistemaAC,
+    dc: Dict[str, Any],
+    ac: Dict[str, Any],
+    warnings: List[str],
+) -> Dict[str, Any]:
     ocpd = armar_ocpd(
         iac_nom_a=float(ac.get("i_ac_nom_a", 0.0)),
         n_strings=_as_int(dc.get("n_strings", 0)),
@@ -127,7 +133,8 @@ def _ensamblar_paq(d: Dict[str, Any], s: SistemaAC, dc: Dict[str, Any], ac: Dict
     )
 
     cond = _calc_conductores_y_vd(d, s, dc, ac)
-    paq = {
+
+    paq: Dict[str, Any] = {
         "dc": dc,
         "ac": ac,
         "ocpd": ocpd,
@@ -175,7 +182,6 @@ def _defaults(d: Dict[str, Any]) -> Dict[str, Any]:
 def _validar_minimos(d: Dict[str, Any]) -> List[str]:
     """
     Warnings (no excepción): el motor intenta igual, pero avisa.
-    Antes solo marcaba si era None; ahora también si es 0/'' (inválido).
     """
     w: List[str] = []
     for k in ["n_strings", "isc_mod_a", "imp_mod_a", "vmp_string_v", "voc_frio_string_v", "p_ac_w"]:
@@ -251,136 +257,53 @@ def _iac(p_w: float, v_ll: float, pf: float, fases: int) -> float:
 
 
 # ==========================================================
-# Conductores + caída de voltaje
+# Conductores + caída de voltaje (delegado a calculo_conductores)
 # ==========================================================
 def _calc_conductores_y_vd(d: Dict[str, Any], s: SistemaAC, dc: Dict[str, Any], ac: Dict[str, Any]) -> Dict[str, Any]:
-    tab = _tabla_conductores_base(d.get("material", "Cu"))
     nec_base = d.get("nec", {}) or {}
+    material = str(d.get("material", "Cu"))
 
-    dc_string = _tramo_conductor(
+    dc_string = tramo_conductor(
         nombre="DC string",
         i_a=_as_float(dc.get("i_string_max_a", 0.0)),
         v_base=_as_float(dc.get("vmp_string_v", 0.0)) or 600.0,
         l_m=_as_float(d.get("L_dc_string_m", 0.0)),
         vd_obj_pct=_as_float(d.get("vd_max_dc_pct", 2.0)),
-        tabla=tab,
+        material=material,
         n_hilos=2,
         nec={**nec_base, "ccc": int(nec_base.get("ccc_dc", 2))},
     )
 
-def _tramo_conductor(
-    *,
-    nombre: str,
-    i_a: float,
-    v_base: float,
-    l_m: float,
-    vd_obj_pct: float,
-    tabla: List[Dict[str, Any]],
-    n_hilos: int,
-    nec: Dict[str, Any] | None = None,
-) -> Dict[str, Any]:
-    if i_a <= 0 or l_m <= 0 or v_base <= 0:
-        return {"nombre": nombre, "ok": False, "nota": "Datos insuficientes para conductor/VD."}
+    dc_trunk = None
+    if bool(d.get("has_combiner", False)) and _as_float(d.get("L_dc_trunk_m", 0.0)) > 0:
+        dc_trunk = tramo_conductor(
+            nombre="DC trunk",
+            i_a=_as_float(dc.get("i_array_design_a", 0.0)),
+            v_base=_as_float(dc.get("vmp_string_v", 0.0)) or 600.0,
+            l_m=_as_float(d.get("L_dc_trunk_m", 0.0)),
+            vd_obj_pct=_as_float(d.get("vd_max_dc_pct", 2.0)),
+            material=material,
+            n_hilos=2,
+            nec={**nec_base, "ccc": int(nec_base.get("ccc_dc", 2))},
+        )
 
-    t_amb_c = float((nec or {}).get("t_amb_c", 30.0))
-    aplicar = bool((nec or {}).get("aplicar_derating", True))
-    ccc = int((nec or {}).get("ccc", n_hilos))
-
-    cand = _seleccionar_por_ampacidad_nec(i_a, tabla, t_amb_c=t_amb_c, ccc=ccc, aplicar=aplicar)
-    best = _mejorar_por_vd(cand, i_a, v_base, l_m, vd_obj_pct, tabla, n_hilos=n_hilos)
-
-    amp_adj, f_t, f_c = ampacidad_ajustada_nec(float(best["amp_a"]), t_amb_c, ccc, aplicar=aplicar)
-    vd = _vdrop_pct(i_a, best["r_ohm_km"], l_m, v_base, n_hilos=n_hilos)
+    ac_out = tramo_conductor(
+        nombre="AC salida inversor",
+        i_a=_as_float(ac.get("i_ac_design_a", 0.0)),
+        v_base=float(s.v_ll),
+        l_m=_as_float(d.get("L_ac_m", 0.0)),
+        vd_obj_pct=_as_float(d.get("vd_max_ac_pct", 2.0)),
+        material=material,
+        n_hilos=2 if s.fases == 1 else 3,
+        nec={**nec_base, "ccc": int(nec_base.get("ccc_ac", 3))},
+    )
 
     return {
-        "nombre": nombre,
-        "ok": True,
-        "i_a": round(float(i_a), 2),
-        "l_m": round(float(l_m), 2),
-        "v_base_v": round(float(v_base), 2),
-        "awg": best["awg"],
-        "amp_base_a": best["amp_a"],
-        "amp_ajustada_a": round(float(amp_adj), 2),
-        "fac_temp": round(float(f_t), 3),
-        "fac_ccc": round(float(f_c), 3),
-        "vd_pct": round(float(vd), 3),
-        "vd_obj_pct": float(vd_obj_pct),
-        "n_hilos": int(n_hilos),
+        "dc_string": dc_string,
+        "dc_trunk": dc_trunk,
+        "ac_out": ac_out,
+        "material": material,
     }
-
-
-def _seleccionar_por_ampacidad_nec(
-    i_a: float,
-    tabla: List[Dict[str, Any]],
-    *,
-    t_amb_c: float,
-    ccc: int,
-    aplicar: bool,
-) -> Dict[str, Any]:
-    x = float(i_a)
-    ccc = max(1, int(ccc))
-    for t in tabla:
-        amp_adj, _, _ = ampacidad_ajustada_nec(float(t["amp_a"]), float(t_amb_c), ccc, aplicar=aplicar)
-        if x <= amp_adj:
-            return dict(t)
-    return dict(tabla[-1])
-
-
-def _mejorar_por_vd(
-    cand: Dict[str, Any],
-    i_a: float,
-    v_base: float,
-    l_m: float,
-    vd_obj_pct: float,
-    tabla: List[Dict[str, Any]],
-    *,
-    n_hilos: int,
-) -> Dict[str, Any]:
-    awg = _mejorar_por_vd_base(
-        tabla,
-        awg=str(cand["awg"]),
-        i_a=float(i_a),
-        v_v=float(v_base),
-        l_m=float(l_m),
-        vd_obj_pct=float(vd_obj_pct),
-        n_hilos=int(n_hilos),
-    )
-    return next((dict(t) for t in tabla if str(t.get("awg")) == str(awg)), dict(tabla[-1]))
-
-
-def _vdrop_pct(i_a: float, r_ohm_km: float, l_m: float, v_base: float, *, n_hilos: int = 2) -> float:
-    return caida_tension_pct(v=float(v_base), i=float(i_a), l_m=float(l_m), r_ohm_km=float(r_ohm_km), n_hilos=int(n_hilos))
-
-
-def _tabla_conductores_base(material: str) -> List[Dict[str, Any]]:
-    cu = [
-        {"awg": "14",  "amp_a": 20,  "r_ohm_km": 8.286},
-        {"awg": "12",  "amp_a": 25,  "r_ohm_km": 5.211},
-        {"awg": "10",  "amp_a": 35,  "r_ohm_km": 3.277},
-        {"awg": "8",   "amp_a": 50,  "r_ohm_km": 2.061},
-        {"awg": "6",   "amp_a": 65,  "r_ohm_km": 1.296},
-        {"awg": "4",   "amp_a": 85,  "r_ohm_km": 0.815},
-        {"awg": "3",   "amp_a": 100, "r_ohm_km": 0.646},
-        {"awg": "2",   "amp_a": 115, "r_ohm_km": 0.513},
-        {"awg": "1",   "amp_a": 130, "r_ohm_km": 0.407},
-        {"awg": "1/0", "amp_a": 150, "r_ohm_km": 0.323},
-        {"awg": "2/0", "amp_a": 175, "r_ohm_km": 0.256},
-        {"awg": "3/0", "amp_a": 200, "r_ohm_km": 0.203},
-        {"awg": "4/0", "amp_a": 230, "r_ohm_km": 0.161},
-    ]
-    al = [
-        {"awg": "12",  "amp_a": 20,  "r_ohm_km": 8.487},
-        {"awg": "10",  "amp_a": 30,  "r_ohm_km": 5.350},
-        {"awg": "8",   "amp_a": 40,  "r_ohm_km": 3.367},
-        {"awg": "6",   "amp_a": 50,  "r_ohm_km": 2.118},
-        {"awg": "4",   "amp_a": 65,  "r_ohm_km": 1.335},
-        {"awg": "2",   "amp_a": 90,  "r_ohm_km": 0.840},
-        {"awg": "1/0", "amp_a": 120, "r_ohm_km": 0.528},
-        {"awg": "2/0", "amp_a": 135, "r_ohm_km": 0.418},
-        {"awg": "3/0", "amp_a": 155, "r_ohm_km": 0.331},
-        {"awg": "4/0", "amp_a": 180, "r_ohm_km": 0.263},
-    ]
-    return al if str(material).strip().upper() == "AL" else cu
 
 
 # ==========================================================
