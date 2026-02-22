@@ -2,9 +2,10 @@ import math
 import unittest
 
 from electrical.calculos_regulacion import tramo_ac_1f_ref, tramo_dc_ref
-from electrical.ingenieria_nec_2023 import calcular_paquete_electrico_nec
+
 from electrical.modelos import ParametrosCableado
-from electrical.paquete_electrico import calcular_paquete_electrico_ref
+from electrical.paquete_nec import armar_paquete_nec as calcular_paquete_electrico_nec
+from electrical.ref.paquete_ref import calcular_paquete_electrico_ref
 from electrical.tramos_base import caida_tension_pct, elegir_calibre
 
 
