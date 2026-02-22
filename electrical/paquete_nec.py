@@ -1,45 +1,14 @@
 # electrical/paquete_nec.py
-"""
-Paquete NEC (orquestador) — FV Engine
-
-Reglas duras (cumplimiento):
-- Este módulo NO calcula ampacidad/VD/calibre: delega a electrical/conductores/.
-- Este módulo NO dimensiona OCPD: delega a electrical/protecciones/.
-- Este módulo solo orquesta: corrientes DC/AC base, armado del paquete, warnings y resumen.
-
-Compatibilidad:
-- Mantiene salida tipo dict con llaves principales:
-  dc, ac, ocpd, conductores, canalizacion, warnings, resumen_pdf
-- Integra spd y seccionamiento si están disponibles, sin romper consumidores legacy.
-
-Tolerancia a refactor:
-- Llamadas defensivas: filtra kwargs a la firma real del destino.
-- Imports tolerantes para módulos opcionales (SPD/Seccionamiento/Canalización).
-
-Entradas esperadas (flexibles):
-- `entrada` puede ser dict-like (Mapping). Se toleran claves faltantes.
-- Claves recomendadas:
-    * potencia_dc_w / potencia_dc_kw
-    * potencia_ac_w / potencia_ac_kw
-    * vdc_nom (V)
-    * vac_ll (V) o vac_ln (V)
-    * fases (1 o 3)
-    * fp (factor de potencia)
-    * eficiencia_inversor (0..1)
-    * circuitos: lista de tramos/circuitos a calcular (DC/AC), opcional
-"""
-
 from __future__ import annotations
 
 from typing import Any, Callable, Dict, Iterable, Mapping, Optional, Tuple
 import inspect
 
-
 # ============================
 # Imports de dominio (duros)
 # ============================
 from electrical.conductores.calculo_conductores import tramo_conductor
-from electrical.protecciones.ocpd import armar_ocpd
+from electrical.protecciones.protecciones import armar_ocpd
 
 # ============================
 # Imports opcionales (tolerantes)
@@ -55,15 +24,10 @@ except Exception:  # pragma: no cover
     recomendar_seccionamiento = None  # type: ignore
 
 try:
-    from electrical.canalizacion.conduit import canalizacion_fv  # type: ignore
+    # Opción B (si NO existe electrical/canalizacion/conduit.py)
+    from electrical.canalizacion.canalizacion import canalizacion_fv  # type: ignore
 except Exception:  # pragma: no cover
     canalizacion_fv = None  # type: ignore
-# ==========================================================
-# API pública (compat): core -> NEC
-# ==========================================================
-from typing import Any, Dict
-
-
 # ---------------------------
 # Utilidades de orquestación
 # ---------------------------
