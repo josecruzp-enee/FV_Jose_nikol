@@ -268,33 +268,6 @@ def _calc_conductores_y_vd(d: Dict[str, Any], s: SistemaAC, dc: Dict[str, Any], 
         nec={**nec_base, "ccc": int(nec_base.get("ccc_dc", 2))},
     )
 
-    dc_trunk = None
-    if bool(d.get("has_combiner", False)) and _as_float(d.get("L_dc_trunk_m", 0.0)) > 0:
-        dc_trunk = _tramo_conductor(
-            nombre="DC trunk",
-            i_a=_as_float(dc.get("i_array_design_a", 0.0)),
-            v_base=_as_float(dc.get("vmp_string_v", 0.0)) or 600.0,
-            l_m=_as_float(d.get("L_dc_trunk_m", 0.0)),
-            vd_obj_pct=_as_float(d.get("vd_max_dc_pct", 2.0)),
-            tabla=tab,
-            n_hilos=2,
-            nec={**nec_base, "ccc": int(nec_base.get("ccc_dc", 2))},
-        )
-
-    ac_out = _tramo_conductor(
-        nombre="AC salida inversor",
-        i_a=_as_float(ac.get("i_ac_design_a", 0.0)),
-        v_base=float(s.v_ll),
-        l_m=_as_float(d.get("L_ac_m", 0.0)),
-        vd_obj_pct=_as_float(d.get("vd_max_ac_pct", 2.0)),
-        tabla=tab,
-        n_hilos=2 if s.fases == 1 else 3,
-        nec={**nec_base, "ccc": int(nec_base.get("ccc_ac", 3))},
-    )
-
-    return {"dc_string": dc_string, "dc_trunk": dc_trunk, "ac_out": ac_out, "material": str(d.get("material", "Cu"))}
-
-
 def _tramo_conductor(
     *,
     nombre: str,
