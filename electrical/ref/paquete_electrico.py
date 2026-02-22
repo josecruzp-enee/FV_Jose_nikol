@@ -2,7 +2,7 @@
 from __future__ import annotations
 from typing import Any, Dict, List, Optional
 
-from electrical.modelos import ParametrosCableado
+from electrical.catalogos.modelos import ParametrosCableado
 from electrical.calculos_regulacion import tramo_dc_ref, tramo_ac_1f_ref, tramo_ac_3f_ref
 from electrical.protecciones import armar_ocpd
 from electrical.canalizacion import conduit_ac_heuristico, canalizacion_fv
