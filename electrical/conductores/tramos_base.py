@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Dict, List
 
-from electrical.cables_conductores import ampacidad, calibres, idx_calibre, resistencia_cu_ohm_km, tabla_base
+from electrical.conductores.cables_conductores import ampacidad, calibres, idx_calibre, resistencia_cu_ohm_km, tabla_base
 
 
 def caida_tension_pct(*, v: float, i: float, l_m: float, r_ohm_km: float, n_hilos: int) -> float:
