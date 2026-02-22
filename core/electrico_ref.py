@@ -2,7 +2,7 @@
 from __future__ import annotations
 from typing import Any, Dict, Optional
 
-from electrical.modelos import ParametrosCableado
+from electrical.catalogos.modelos import ParametrosCableado
 from electrical.ref.paquete_electrico import calcular_paquete_electrico_ref
 
 
