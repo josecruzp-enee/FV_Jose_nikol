@@ -2,14 +2,12 @@
 from __future__ import annotations
 from typing import Dict, Optional
 
-from electrical.tramos_base import (
+from electrical.conductores.tramos_base import (
     caida_tension_pct,
     elegir_calibre,
     tramo_tabla_base,
     r_cu_ohm_km,
 )
-
-
 def tramo_dc_ref(
     *, vmp_v: float, imp_a: float, isc_a: Optional[float], dist_m: float,
     factor_seguridad: float = 1.25, vd_obj_pct: float = 2.0
