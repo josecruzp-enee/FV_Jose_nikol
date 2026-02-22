@@ -199,23 +199,33 @@ def _build_params_fv(p: Datosproyecto) -> Dict[str, Any]:
 
 
 def _build_electrico_nec_safe(p: Datosproyecto, sizing: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Wrapper seguro para construir el paquete NEC sin depender de adaptador_nec.
+    Contrato de salida:
+      { ok: bool, errores: [..], input: {...}, paq: {...} }
+    """
     try:
         from electrical.paquete_nec import armar_paquete_nec
-        out = generar_electrico_nec(p=p, sizing=sizing)
-        if isinstance(out, dict):
-            out.setdefault("paq", {})
-        return out
+
+        # Fuente canónica actual: sizing["electrico"]
+        entrada_electrica = (sizing or {}).get("electrico") or {}
+        if not isinstance(entrada_electrica, dict) or not entrada_electrica:
+            return {"ok": False, "errores": ["NEC: sizing sin bloque 'electrico'"], "input": {}, "paq": {}}
+
+        paq = armar_paquete_nec(entrada_electrica)
+
+        return {"ok": True, "errores": [], "input": entrada_electrica, "paq": paq}
+
     except Exception as e:
         return {
             "ok": False,
             "errores": [f"NEC: {type(e).__name__}: {e}"],
             "input": {
                 "equipos": getattr(p, "equipos", None),
-                "electrico": getattr(p, "electrico", None),
+                "electrico": (sizing or {}).get("electrico") or getattr(p, "electrico", None),
             },
             "paq": {},
         }
-
 
 def _extraer_kwp_y_capex(sizing: Dict[str, Any]) -> Tuple[float, float]:
     res_tmp = {"sizing": dict(sizing or {})}
