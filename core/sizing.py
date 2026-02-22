@@ -136,8 +136,10 @@ def _pac_kw_desde_reco(meta: Dict[str, Any], inv_id: str) -> float:
 # ==========================================================
 # Resúmenes (UI/PDF)
 # ==========================================================
-def _resumen_strings(rec: Dict[str, Any]) -> Dict[str, Any]:
-    r = (rec or {}).get("recomendacion") or {}
+def _resumen_strings(rec: Dict[str, Any] | None) -> Dict[str, Any]:
+    rec = rec or {}
+    r = rec.get("recomendacion") or {}
+
     return {
         "n_paneles_string": int(r.get("n_paneles_string", 0) or 0),
         "n_strings_total": int(r.get("n_strings_total", 0) or 0),
@@ -149,7 +151,6 @@ def _resumen_strings(rec: Dict[str, Any]) -> Dict[str, Any]:
         "errores": list(rec.get("errores") or []),
         "ok": bool(rec.get("ok", False)),
     }
-
 
 def _trazabilidad(eq: Dict[str, Any], panel_id: str, inv_id: str, dc_ac: float, hsp: float, pr: float) -> Dict[str, Any]:
     return {
@@ -210,13 +211,8 @@ def calcular_sizing_unificado(p: Datosproyecto) -> Dict[str, Any]:
     ) or float(getattr(inv, "kw_ac", 0.0) or 0.0)
 
     # 3) strings
+    # 3) strings
     rec = None  # strings se calculan en ingeniería eléctrica (Paso 5 / paquete_nec)
-        panel=_panel_spec(panel),
-        inversor=_inv_spec(inv, inv_id, pac_kw_fb),
-        t_min_c=_safe_float(getattr(p, "t_min_c", 10.0), 10.0),
-        objetivo_dc_ac=float(dc_ac),
-        pdc_kw_objetivo=float(pdc) if pdc > 0 else float(pac_kw_fb) * float(dc_ac),
-    )
 
     # 4) puente NEC (igual que antes)
     electrico = _build_electrico(p, panel, pac_kw_fb, rec)
