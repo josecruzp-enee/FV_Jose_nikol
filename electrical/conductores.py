@@ -1,125 +1,116 @@
-# electrical/conductores.py
+# electrical/calculo_conductores.py
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Dict, Tuple, List
+from typing import Any, Dict, List, Optional
 
-from electrical.modelos import SeleccionConductor
-
-
-# Tabla mínima (referencial) Cu THHN/THWN-2 a 75°C (NEC 310.16 aprox; ajustar luego)
-# OJO: para comercial real: esto debe venir de catálogo + correcciones.
-AMPACIDAD_CU_75C: Dict[str, float] = {
-    "14 AWG": 20,
-    "12 AWG": 25,
-    "10 AWG": 35,
-    "8 AWG": 50,
-    "6 AWG": 65,
-    "4 AWG": 85,
-    "3 AWG": 100,
-    "2 AWG": 115,
-    "1 AWG": 130,
-    "1/0 AWG": 150,
-    "2/0 AWG": 175,
-    "3/0 AWG": 200,
-    "4/0 AWG": 230,
-}
-
-# Resistencias aproximadas Cu a 20°C en ohm/km (para caída simple). Ajustar con temp luego.
-R_OHM_KM_CU: Dict[str, float] = {
-    "14 AWG": 8.286,
-    "12 AWG": 5.211,
-    "10 AWG": 3.277,
-    "8 AWG": 2.061,
-    "6 AWG": 1.296,
-    "4 AWG": 0.815,
-    "3 AWG": 0.646,
-    "2 AWG": 0.513,
-    "1 AWG": 0.407,
-    "1/0 AWG": 0.323,
-    "2/0 AWG": 0.256,
-    "3/0 AWG": 0.203,
-    "4/0 AWG": 0.161,
-}
+from electrical.cables_conductores import tabla_base_conductores
+from electrical.factores_nec import ampacidad_ajustada_nec
+from electrical.tramos_base import caida_tension_pct, mejorar_por_vd as _mejorar_por_vd_base
 
 
-def _seleccionar_por_ampacidad(i_diseno: float, tabla_amp: Dict[str, float]) -> str:
-    for calibre, amp in tabla_amp.items():
-        if amp >= i_diseno:
-            return calibre
-    # si no alcanza, devuelve el mayor
-    return list(tabla_amp.keys())[-1]
-
-
-def _caida_tension_dc_pct(i_a: float, v_v: float, dist_m: float, calibre: str) -> float:
+def tabla_conductores(material: str = "Cu") -> List[Dict[str, Any]]:
     """
-    Caída DC simple: Vdrop = I * R_total
-    R_total = 2 * R(ohm/m) * L
+    Fuente única de tabla base (ampacidad + resistencia) Cu/Al.
+    Formato estándar: {"awg": "10", "amp_a": 35, "r_ohm_km": 3.277}
     """
-    if v_v <= 0:
-        return 0.0
-    r_ohm_km = R_OHM_KM_CU.get(calibre)
-    if r_ohm_km is None:
-        return 0.0
-    r_ohm_m = r_ohm_km / 1000.0
-    r_total = 2.0 * r_ohm_m * dist_m
-    vdrop = i_a * r_total
-    return (vdrop / v_v) * 100.0
+    return tabla_base_conductores(material)
 
 
-def _caida_tension_ac_pct(i_a: float, v_v: float, dist_m: float, calibre: str, fases: int) -> float:
+def vdrop_pct(i_a: float, r_ohm_km: float, l_m: float, v_base: float, *, n_hilos: int = 2) -> float:
+    return caida_tension_pct(v=float(v_base), i=float(i_a), l_m=float(l_m), r_ohm_km=float(r_ohm_km), n_hilos=int(n_hilos))
+
+
+def seleccionar_por_ampacidad_nec(
+    i_a: float,
+    tabla: List[Dict[str, Any]],
+    *,
+    t_amb_c: float,
+    ccc: int,
+    aplicar_derating: bool,
+) -> Dict[str, Any]:
     """
-    Caída AC simplificada (solo R): monofásico ≈ 2*L, trifásico ≈ sqrt(3)*L.
+    Selecciona el primer conductor cuya ampacidad ajustada NEC >= i_a.
     """
-    if v_v <= 0:
-        return 0.0
-    r_ohm_km = R_OHM_KM_CU.get(calibre)
-    if r_ohm_km is None:
-        return 0.0
-    r_ohm_m = r_ohm_km / 1000.0
+    x = float(i_a)
+    ccc = max(1, int(ccc))
 
-    if fases == 3:
-        import math
-        vdrop = math.sqrt(3) * i_a * r_ohm_m * dist_m
-    else:
-        vdrop = 2.0 * i_a * r_ohm_m * dist_m
+    for t in tabla:
+        amp_adj, _, _ = ampacidad_ajustada_nec(float(t["amp_a"]), float(t_amb_c), ccc, aplicar=bool(aplicar_derating))
+        if x <= amp_adj:
+            return dict(t)
 
-    return (vdrop / v_v) * 100.0
+    return dict(tabla[-1])
 
 
-def seleccionar_conductor_dc(i_dc_diseno_a: float, v_dc_v: float, dist_m: float, cfg: dict) -> SeleccionConductor:
-    objetivo = float(cfg.get("caida_tension_objetivo_pct", 2.0))
-
-    calibre = _seleccionar_por_ampacidad(i_dc_diseno_a, AMPACIDAD_CU_75C)
-    caida = _caida_tension_dc_pct(i_dc_diseno_a, v_dc_v, dist_m, calibre)
-
-    obs: List[str] = []
-    if caida > objetivo:
-        obs.append(f"Caída DC {caida:.2f}% > objetivo {objetivo:.2f}% (subir calibre o reducir distancia).")
-
-    return SeleccionConductor(
-        calibre=calibre,
-        material="Cu",
-        ampacidad_a=float(AMPACIDAD_CU_75C[calibre]),
-        caida_tension_pct=float(caida),
-        observaciones=obs,
+def mejorar_por_vd(
+    cand: Dict[str, Any],
+    *,
+    i_a: float,
+    v_base: float,
+    l_m: float,
+    vd_obj_pct: float,
+    tabla: List[Dict[str, Any]],
+    n_hilos: int,
+) -> Dict[str, Any]:
+    """
+    Si la caída de tensión excede el objetivo, sube calibre usando mejorar_por_vd_base.
+    """
+    awg = _mejorar_por_vd_base(
+        tabla,
+        awg=str(cand["awg"]),
+        i_a=float(i_a),
+        v_v=float(v_base),
+        l_m=float(l_m),
+        vd_obj_pct=float(vd_obj_pct),
+        n_hilos=int(n_hilos),
     )
+    return next((dict(t) for t in tabla if str(t.get("awg")) == str(awg)), dict(tabla[-1]))
 
 
-def seleccionar_conductor_ac(i_ac_diseno_a: float, v_ac_v: float, dist_m: float, fases: int, cfg: dict) -> SeleccionConductor:
-    objetivo = float(cfg.get("caida_tension_objetivo_pct", 2.0))
+def tramo_conductor(
+    *,
+    nombre: str,
+    i_a: float,
+    v_base: float,
+    l_m: float,
+    vd_obj_pct: float,
+    material: str = "Cu",
+    n_hilos: int = 2,
+    nec: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """
+    Motor único: selecciona calibre por ampacidad ajustada NEC + mejora por VD.
+    """
+    if i_a <= 0 or l_m <= 0 or v_base <= 0:
+        return {"nombre": nombre, "ok": False, "nota": "Datos insuficientes para conductor/VD."}
 
-    calibre = _seleccionar_por_ampacidad(i_ac_diseno_a, AMPACIDAD_CU_75C)
-    caida = _caida_tension_ac_pct(i_ac_diseno_a, v_ac_v, dist_m, calibre, fases=fases)
+    nec = nec or {}
+    t_amb_c = float(nec.get("t_amb_c", 30.0))
+    aplicar = bool(nec.get("aplicar_derating", True))
+    ccc = int(nec.get("ccc", n_hilos))
 
-    obs: List[str] = []
-    if caida > objetivo:
-        obs.append(f"Caída AC {caida:.2f}% > objetivo {objetivo:.2f}% (subir calibre o reducir distancia).")
+    tab = tabla_conductores(material)
+    cand = seleccionar_por_ampacidad_nec(i_a, tab, t_amb_c=t_amb_c, ccc=ccc, aplicar_derating=aplicar)
+    best = mejorar_por_vd(cand, i_a=float(i_a), v_base=float(v_base), l_m=float(l_m),
+                          vd_obj_pct=float(vd_obj_pct), tabla=tab, n_hilos=int(n_hilos))
 
-    return SeleccionConductor(
-        calibre=calibre,
-        material="Cu",
-        ampacidad_a=float(AMPACIDAD_CU_75C[calibre]),
-        caida_tension_pct=float(caida),
-        observaciones=obs,
-    )
+    amp_adj, f_t, f_c = ampacidad_ajustada_nec(float(best["amp_a"]), t_amb_c, ccc, aplicar=aplicar)
+    vd = vdrop_pct(float(i_a), float(best["r_ohm_km"]), float(l_m), float(v_base), n_hilos=int(n_hilos))
+
+    return {
+        "nombre": nombre,
+        "ok": True,
+        "i_a": round(float(i_a), 2),
+        "l_m": round(float(l_m), 2),
+        "v_base_v": round(float(v_base), 2),
+        "awg": str(best["awg"]),
+        "amp_base_a": float(best["amp_a"]),
+        "amp_ajustada_a": round(float(amp_adj), 2),
+        "fac_temp": round(float(f_t), 3),
+        "fac_ccc": round(float(f_c), 3),
+        "vd_pct": round(float(vd), 3),
+        "vd_obj_pct": float(vd_obj_pct),
+        "n_hilos": int(n_hilos),
+        "material": str(material),
+        "nec": {"t_amb_c": t_amb_c, "ccc": ccc, "aplicar_derating": aplicar},
+    }
