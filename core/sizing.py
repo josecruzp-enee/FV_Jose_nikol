@@ -210,7 +210,7 @@ def calcular_sizing_unificado(p: Datosproyecto) -> Dict[str, Any]:
     ) or float(getattr(inv, "kw_ac", 0.0) or 0.0)
 
     # 3) strings
-    rec = recomendar_string(
+    rec = None  # strings se calculan en ingeniería eléctrica (Paso 5 / paquete_nec)
         panel=_panel_spec(panel),
         inversor=_inv_spec(inv, inv_id, pac_kw_fb),
         t_min_c=_safe_float(getattr(p, "t_min_c", 10.0), 10.0),
