@@ -355,3 +355,6 @@ def calcular_strings_fv(
         "strings": strings,
         "meta": meta,
     }
+
+# Compatibilidad con nombre anterior (si UI u otros módulos aún lo usan)
+calcular_strings_auto = calcular_strings_fv
