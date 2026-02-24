@@ -210,6 +210,10 @@ def calcular_strings_fv(
     Motor único para strings (UI/NEC/PDF).
     Retorna dict estable:
       ok, errores, warnings, topologia, bounds, recomendacion, strings, meta
+
+    Nota de semántica:
+      - n_paneles_total aquí es trazabilidad / referencia.
+      - El dimensionamiento de strings se basa en objetivo_dc_ac o pdc_kw_objetivo.
     """
     errores: List[str] = []
     warnings: List[str] = []
@@ -241,11 +245,11 @@ def calcular_strings_fv(
             "meta": {"n_paneles_total": int(n_total), "dos_aguas": bool(dos_aguas)},
         }
 
-    # Acepta PanelSpec / InversorSpec directamente (motor puro)
+    # Motor puro: exige PanelSpec / InversorSpec
     if not isinstance(panel, PanelSpec) or not isinstance(inversor, InversorSpec):
         return {
             "ok": False,
-            "errores": ["calcular_strings_fv requiere PanelSpec e InversorSpec (normaliza en orquestador/entradas)."],
+            "errores": ["calcular_strings_fv requiere PanelSpec e InversorSpec (normaliza en orquestador)."],
             "warnings": [],
             "topologia": "N/A",
             "bounds": {},
@@ -319,7 +323,7 @@ def calcular_strings_fv(
     # Strings totales: por objetivo (ya viene)
     n_strings_total = _i(r.get("n_strings_total"), 0)
     if n_strings_total <= 0:
-        # fallback por total paneles
+        # fallback por total paneles (referencial)
         n_strings_total = max(1, int(ceil(n_total / max(n_series, 1))))
 
     # Topología
@@ -333,11 +337,8 @@ def calcular_strings_fv(
         etiqueta = str(rama.get("etiqueta") or "Arreglo FV")
 
         i_mppt_a = float(p.imp_a) * float(n_paralelo)
-        ok_corr = i_mppt_a <= inv.imppt_max_a + 1e-9
-        if not ok_corr:
-            warnings.append(
-                f"Corriente MPPT alta en MPPT {mppt}: {i_mppt_a:.2f} A > {inv.imppt_max_a:.2f} A."
-            )
+        if i_mppt_a > inv.imppt_max_a + 1e-9:
+            warnings.append(f"Corriente MPPT alta en MPPT {mppt}: {i_mppt_a:.2f} A > {inv.imppt_max_a:.2f} A.")
 
         strings.append(
             {
@@ -353,7 +354,6 @@ def calcular_strings_fv(
             }
         )
 
-    # Recomendación unificada
     recomendacion = {
         "n_series": int(n_series),
         "n_paneles_string": int(n_series),  # alias estable
