@@ -165,12 +165,13 @@ def _trazabilidad(eq: Dict[str, Any], panel_id: str, inv_id: str, dc_ac: float, 
 # ==========================================================
 # API pública: ORQUESTA sizing unificado
 # ==========================================================
+from core.inputs_electricos import build_inputs_electricos_ui  # <-- agregar
+
 def calcular_sizing_unificado(p: Datosproyecto) -> Dict[str, Any]:
     eq = _leer_equipos(p)
     dc_ac = _dc_ac_obj(eq)
     panel = get_panel(_panel_id(eq))
 
-    # 1) sizing paneles (nuevo módulo)
     panel_sizing = calcular_panel_sizing(
         consumo_12m_kwh=list(p.consumo_12m),
         cobertura_obj=float(p.cobertura_objetivo),
@@ -183,14 +184,11 @@ def calcular_sizing_unificado(p: Datosproyecto) -> Dict[str, Any]:
         perdidas_detalle=getattr(p, "perdidas_detalle", None),
     )
 
-    # Si falla sizing paneles, devolvemos igual con lo que haya para no romper UI
     kwp_req = float(panel_sizing.kwp_req) if panel_sizing.ok else 0.0
     n_pan = int(panel_sizing.n_paneles) if panel_sizing.ok else 0
     pdc = float(panel_sizing.pdc_kw) if panel_sizing.ok else 0.0
 
-    # 2) recomendar inversor (usa producción anual por kWp según panel_sizing)
     prod_anual_kwp = 0.0
-    # producción anual por kWp = sum(hsp_mes * pr * dias_mes)
     for hsp_d, dias in zip(panel_sizing.hsp_12m, panel_sizing.meta.get("dias_mes", [])):
         prod_anual_kwp += float(hsp_d) * float(panel_sizing.pr) * float(dias or 0)
 
@@ -210,14 +208,9 @@ def calcular_sizing_unificado(p: Datosproyecto) -> Dict[str, Any]:
         sizing_inv.get("inversor_recomendado_meta", {}), inv_id
     ) or float(getattr(inv, "kw_ac", 0.0) or 0.0)
 
-    # 3) strings
-    # 3) strings
-    rec = None  # strings se calculan en ingeniería eléctrica (Paso 5 / paquete_nec)
+    # ✅ SOLO inputs eléctricos para Paso 5 (NO NEC aquí)
+    electrico_inputs = build_inputs_electricos_ui(p)
 
-    # 4) puente NEC (igual que antes)
-    electrico = _build_electrico(p, panel, pac_kw_fb, rec)
-
-    # 5) armado resultado (manteniendo llaves)
     kwh_mes = _kwh_mes_prom(p)
     prod_diaria_kwp = float(panel_sizing.hsp_prom) * float(panel_sizing.pr)
 
@@ -234,14 +227,18 @@ def calcular_sizing_unificado(p: Datosproyecto) -> Dict[str, Any]:
 
         "capex_L": capex_L(float(pdc), p.costo_usd_kwp, p.tcambio),
 
+        "panel_id": _panel_id(eq),
         "inversor_recomendado": inv_id,
         "inversor_recomendado_meta": sizing_inv.get("inversor_recomendado_meta", {}),
 
-        "strings_auto": _resumen_strings(rec),
+        # strings NO aquí
+        "strings_auto": {"ok": False, "warnings": ["Strings se calculan en Paso 5 (Ingeniería eléctrica)."]},
 
-        "traza": _trazabilidad(eq, _panel_id(eq), inv_id, float(dc_ac), float(panel_sizing.hsp_prom), float(panel_sizing.pr)),
+        "traza": _trazabilidad(
+            eq, _panel_id(eq), inv_id, float(dc_ac),
+            float(panel_sizing.hsp_prom), float(panel_sizing.pr)
+        ),
 
-        # extra opcional (no rompe): dejar detalle sizing paneles para depurar/mostrar
         "panel_sizing": {
             "ok": bool(panel_sizing.ok),
             "errores": list(panel_sizing.errores),
@@ -251,9 +248,12 @@ def calcular_sizing_unificado(p: Datosproyecto) -> Dict[str, Any]:
             "meta": dict(panel_sizing.meta),
         },
 
-        "electrico": electrico,
-    }
+        # ✅ inputs eléctricos para Paso 5
+        "electrico_inputs": electrico_inputs,
 
+        # útil para Paso 5 / NEC
+        "pac_kw": float(pac_kw_fb),
+    }
 
 def build_inputs_electricos_ui(p: Datosproyecto) -> Dict[str, Any]:
     ui_e = getattr(p, "electrico", {}) or {}
