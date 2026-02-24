@@ -275,4 +275,3 @@ def calcular_strings_dc(
 
 def a_lineas(cfg: Dict[str, Any]) -> List[str]:
     return a_lineas_strings(cfg)
->>>>>>> a61303a (refactor(paneles): nuevo orquestador y compat strings)
