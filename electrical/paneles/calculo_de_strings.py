@@ -1,4 +1,3 @@
-# electrical/calculo_de_strings.py
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -16,7 +15,7 @@ class PanelSpec:
     voc_v: float
     imp_a: float
     isc_a: float
-    coef_voc_pct_c: float  # ej -0.25 (%/°C)
+    coef_voc_pct_c: float  # ej -0.28 (%/°C)
 
 
 @dataclass(frozen=True)
@@ -30,16 +29,16 @@ class InversorSpec:
 
 
 # ==========================================================
-# Utilitarios numéricos
+# Utilitarios numéricos (internos)
 # ==========================================================
-def _a_float(x: Any, default: float = 0.0) -> float:
+def _f(x: Any, default: float = 0.0) -> float:
     try:
         return float(x)
     except Exception:
         return float(default)
 
 
-def _a_int(x: Any, default: int = 0) -> int:
+def _i(x: Any, default: int = 0) -> int:
     try:
         return int(x)
     except Exception:
@@ -49,28 +48,35 @@ def _a_int(x: Any, default: int = 0) -> int:
 # ==========================================================
 # Cálculos base
 # ==========================================================
-def _voc_frio(*, voc_stc: float, coef_voc_pct_c: float, t_min_c: float, t_stc_c: float = 25.0) -> float:
+def _voc_frio(
+    *,
+    voc_stc: float,
+    coef_voc_pct_c: float,
+    t_min_c: float,
+    t_stc_c: float = 25.0,
+) -> float:
     """
     Voc(T) = Voc_STC * (1 + coef%/°C/100 * (T - 25))
+    coef_voc_pct_c es %/°C (normalmente negativo).
     """
     return float(voc_stc) * (1.0 + (float(coef_voc_pct_c) / 100.0) * (float(t_min_c) - float(t_stc_c)))
 
 
-def _limites_por_voltaje(*, panel: PanelSpec, inv: InversorSpec, t_min_c: float) -> Dict[str, Any]:
-    voc_frio_v = _voc_frio(voc_stc=panel.voc_v, coef_voc_pct_c=panel.coef_voc_pct_c, t_min_c=t_min_c)
+def _bounds_por_voltaje(*, panel: PanelSpec, inv: InversorSpec, t_min_c: float) -> Dict[str, Any]:
+    voc_frio_panel_v = _voc_frio(voc_stc=panel.voc_v, coef_voc_pct_c=panel.coef_voc_pct_c, t_min_c=t_min_c)
 
-    # Límite por Vdc max (con Voc frío)
-    max_por_vdc = floor(inv.vdc_max_v / max(voc_frio_v, 1e-9))
+    # Límite por Vdc max usando Voc frío por panel
+    max_por_vdc = floor(inv.vdc_max_v / max(voc_frio_panel_v, 1e-9))
 
-    # Límite por MPPT (Vmp STC como aproximación)
+    # Límite por MPPT usando Vmp STC por panel como aproximación
     min_por_mppt = ceil(inv.mppt_min_v / max(panel.vmp_v, 1e-9))
     max_por_mppt = floor(inv.mppt_max_v / max(panel.vmp_v, 1e-9))
 
-    n_max = max(0, min(max_por_vdc, max_por_mppt))
-    n_min = max(1, min_por_mppt)
+    n_min = max(1, int(min_por_mppt))
+    n_max = max(0, int(min(max_por_vdc, max_por_mppt)))
 
     return {
-        "voc_frio_v": float(voc_frio_v),
+        "voc_frio_panel_v": float(voc_frio_panel_v),
         "n_min": int(n_min),
         "n_max": int(n_max),
         "max_por_vdc": int(max_por_vdc),
@@ -79,20 +85,32 @@ def _limites_por_voltaje(*, panel: PanelSpec, inv: InversorSpec, t_min_c: float)
     }
 
 
-def _limite_corriente_mppt(*, panel: PanelSpec, inv: InversorSpec, strings_por_mppt: int) -> Dict[str, Any]:
-    i_mppt_a = panel.imp_a * int(strings_por_mppt)
-    ok = i_mppt_a <= inv.imppt_max_a + 1e-9
-    return {"i_mppt_a": float(i_mppt_a), "ok": bool(ok)}
-
-
 def _score_n(*, n_series: int, panel: PanelSpec, inv: InversorSpec) -> float:
-    """
-    Score simple: acercar Vmp_string al centro de la ventana MPPT.
-    Menor es mejor.
-    """
+    """Menor es mejor: Vmp_string cerca del centro de MPPT."""
     vmp_string = int(n_series) * panel.vmp_v
     mid = (inv.mppt_min_v + inv.mppt_max_v) / 2.0
     return abs(vmp_string - mid)
+
+
+def _split_por_mppt(*, n_strings_total: int, n_mppt: int, dos_aguas: bool) -> List[Dict[str, Any]]:
+    """
+    Retorna lista de "ramas" por MPPT: [{mppt, n_strings}]
+    Si dos_aguas True y hay >=2 MPPT, reparte en dos ramas (mppt 1 y 2).
+    Si no, todo a mppt 1.
+    """
+    if n_strings_total <= 0:
+        return []
+
+    if bool(dos_aguas) and n_mppt >= 2:
+        s1 = n_strings_total // 2
+        s2 = n_strings_total - s1
+        ramas = [
+            {"mppt": 1, "n_strings": s1, "etiqueta": "Techo izquierdo"},
+            {"mppt": 2, "n_strings": s2, "etiqueta": "Techo derecho"},
+        ]
+        return [r for r in ramas if r["n_strings"] > 0]
+
+    return [{"mppt": 1, "n_strings": int(n_strings_total), "etiqueta": "Arreglo FV"}]
 
 
 # ==========================================================
@@ -107,12 +125,11 @@ def recomendar_string(
     pdc_kw_objetivo: Optional[float] = None,
 ) -> Dict[str, Any]:
     """
-    Recomienda:
-    - N paneles en serie por string (n_paneles_string)
-    - strings totales (n_strings_total)
-    - strings por MPPT (strings_por_mppt)
-
-    Si pdc_kw_objetivo no se pasa, se usa: objetivo_dc_ac * pac_kw.
+    Recomienda (en base a límites eléctricos y objetivo DC):
+      - n_series (paneles en serie)
+      - n_strings_total
+      - pdc_obj_kw, p_string_kw_stc
+      - vmp_string_v, voc_frio_string_v (por string)
     """
     errores: List[str] = []
     warnings: List[str] = []
@@ -123,9 +140,9 @@ def recomendar_string(
         errores.append("Panel inválido: revisar STC (pmax/vmp/voc).")
 
     if errores:
-        return {"ok": False, "errores": errores, "warnings": warnings}
+        return {"ok": False, "errores": errores, "warnings": warnings, "bounds": {}, "recomendacion": {}}
 
-    bounds = _limites_por_voltaje(panel=panel, inv=inversor, t_min_c=float(t_min_c))
+    bounds = _bounds_por_voltaje(panel=panel, inv=inversor, t_min_c=float(t_min_c))
     n_min, n_max = int(bounds["n_min"]), int(bounds["n_max"])
 
     if n_max < n_min:
@@ -133,42 +150,30 @@ def recomendar_string(
             f"No existe N válido: n_min={n_min}, n_max={n_max}. "
             f"Revisa MPPT o Vdc_max vs Voc frío."
         )
-        return {"ok": False, "errores": errores, "warnings": warnings, "bounds": bounds}
+        return {"ok": False, "errores": errores, "warnings": warnings, "bounds": bounds, "recomendacion": {}}
 
-    # Elegir N recomendado por score
     candidatos = list(range(n_min, n_max + 1))
-    n_rec = min(candidatos, key=lambda n: _score_n(n_series=n, panel=panel, inv=inversor))
+    n_series = min(candidatos, key=lambda n: _score_n(n_series=n, panel=panel, inv=inversor))
 
     # Potencia DC objetivo
-    pdc_obj_kw = float(pdc_kw_objetivo) if pdc_kw_objetivo is not None else (float(objetivo_dc_ac) * inversor.pac_kw)
+    pdc_obj_kw = float(pdc_kw_objetivo) if pdc_kw_objetivo is not None else (float(objetivo_dc_ac) * float(inversor.pac_kw))
     pdc_obj_w = pdc_obj_kw * 1000.0
 
-    # Potencia de un string (STC)
-    p_string_w = n_rec * panel.pmax_w
-
-    # Strings totales requeridos
+    p_string_w = float(n_series) * float(panel.pmax_w)
     n_strings_total = max(1, int(ceil(pdc_obj_w / max(p_string_w, 1e-9))))
 
-    # Reparto por MPPT
-    strings_por_mppt = max(1, int(ceil(n_strings_total / max(inversor.n_mppt, 1))))
+    # Voltajes del string
+    vmp_string_v = float(panel.vmp_v) * float(n_series)
+    voc_frio_panel_v = float(bounds["voc_frio_panel_v"])
+    voc_frio_string_v = voc_frio_panel_v * float(n_series)
 
-    # Corriente MPPT (referencial)
-    corr = _limite_corriente_mppt(panel=panel, inv=inversor, strings_por_mppt=strings_por_mppt)
-    if not corr["ok"]:
+    # Checks (informativos)
+    if voc_frio_string_v > inversor.vdc_max_v + 1e-9:
+        errores.append(f"Voc frío string excede Vdc_max: {voc_frio_string_v:.1f} V > {inversor.vdc_max_v:.1f} V")
+
+    if vmp_string_v < inversor.mppt_min_v - 1e-9 or vmp_string_v > inversor.mppt_max_v + 1e-9:
         warnings.append(
-            f"Corriente MPPT alta: {corr['i_mppt_a']:.2f} A > {inversor.imppt_max_a:.2f} A. "
-            f"Reduce strings por MPPT o cambia inversor."
-        )
-
-    # Checks voltaje finales
-    voc_frio_total = float(bounds["voc_frio_v"]) * n_rec
-    if voc_frio_total > inversor.vdc_max_v + 1e-9:
-        errores.append(f"Voc frío total excede Vdc_max: {voc_frio_total:.1f} V > {inversor.vdc_max_v:.1f} V")
-
-    vmp_total = panel.vmp_v * n_rec
-    if vmp_total < inversor.mppt_min_v - 1e-9 or vmp_total > inversor.mppt_max_v + 1e-9:
-        warnings.append(
-            f"Vmp string fuera de MPPT (referencial): {vmp_total:.1f} V vs "
+            f"Vmp string fuera de MPPT (referencial): {vmp_string_v:.1f} V vs "
             f"{inversor.mppt_min_v:.1f}-{inversor.mppt_max_v:.1f} V."
         )
 
@@ -178,53 +183,14 @@ def recomendar_string(
         "warnings": warnings,
         "bounds": bounds,
         "recomendacion": {
-            "n_paneles_string": int(n_rec),
+            "n_series": int(n_series),
             "n_strings_total": int(n_strings_total),
-            "strings_por_mppt": int(strings_por_mppt),
             "pdc_obj_kw": float(pdc_obj_kw),
             "p_string_kw_stc": float(p_string_w / 1000.0),
-            "vmp_string_v": float(vmp_total),
-            "voc_frio_string_v": float(voc_frio_total),
-            "i_mppt_a": float(corr["i_mppt_a"]),
+            "vmp_string_v": float(vmp_string_v),
+            "voc_frio_string_v": float(voc_frio_string_v),
         },
     }
-
-
-# ==========================================================
-# Normalización de entradas (catálogo → Spec)
-# ==========================================================
-def _panel_a_spec(panel: Any) -> PanelSpec:
-    if isinstance(panel, PanelSpec):
-        return panel
-
-    coef = _a_float(getattr(panel, "coef_voc_pct_c", getattr(panel, "coef_voc", -0.28)), -0.28)
-    return PanelSpec(
-        pmax_w=_a_float(getattr(panel, "w", getattr(panel, "pmax_w", 0.0))),
-        vmp_v=_a_float(getattr(panel, "vmp", getattr(panel, "vmp_v", 0.0))),
-        voc_v=_a_float(getattr(panel, "voc", getattr(panel, "voc_v", 0.0))),
-        imp_a=_a_float(getattr(panel, "imp", getattr(panel, "imp_a", 0.0))),
-        isc_a=_a_float(getattr(panel, "isc", getattr(panel, "isc_a", 0.0))),
-        coef_voc_pct_c=_a_float(coef),
-    )
-
-
-def _inversor_a_spec(inversor: Any) -> InversorSpec:
-    if isinstance(inversor, InversorSpec):
-        return inversor
-
-    pac_kw = _a_float(getattr(inversor, "kw_ac", getattr(inversor, "pac_kw", 0.0)))
-    imppt = getattr(inversor, "imppt_max_a", None)
-    if imppt is None:
-        imppt = getattr(inversor, "imppt_max", 25.0)
-
-    return InversorSpec(
-        pac_kw=_a_float(pac_kw),
-        vdc_max_v=_a_float(getattr(inversor, "vdc_max", getattr(inversor, "vdc_max_v", 0.0))),
-        mppt_min_v=_a_float(getattr(inversor, "vmppt_min", getattr(inversor, "mppt_min_v", 0.0))),
-        mppt_max_v=_a_float(getattr(inversor, "vmppt_max", getattr(inversor, "mppt_max_v", 0.0))),
-        n_mppt=_a_int(getattr(inversor, "n_mppt", 1), 1) or 1,
-        imppt_max_a=_a_float(imppt, 25.0),
-    )
 
 
 # ==========================================================
@@ -242,119 +208,174 @@ def calcular_strings_fv(
 ) -> Dict[str, Any]:
     """
     Motor único para strings (UI/NEC/PDF).
-    Retorna dict estable: ok/errores/warnings/recomendacion/strings/bounds/meta
+    Retorna dict estable:
+      ok, errores, warnings, topologia, bounds, recomendacion, strings, meta
     """
-    n_total = _a_int(n_paneles_total, 0)
+    errores: List[str] = []
+    warnings: List[str] = []
+
+    n_total = _i(n_paneles_total, 0)
     if n_total <= 0:
         return {
             "ok": False,
             "errores": ["n_paneles_total inválido (<=0)."],
             "warnings": [],
+            "topologia": "N/A",
+            "bounds": {},
             "recomendacion": {},
             "strings": [],
-            "bounds": {},
             "meta": {},
         }
 
-    p = _panel_a_spec(panel)
-    inv = _inversor_a_spec(inversor)
+    try:
+        tmin = float(t_min_c)
+    except Exception:
+        return {
+            "ok": False,
+            "errores": ["t_min_c inválido (no convertible a número)."],
+            "warnings": [],
+            "topologia": "N/A",
+            "bounds": {},
+            "recomendacion": {},
+            "strings": [],
+            "meta": {"n_paneles_total": int(n_total), "dos_aguas": bool(dos_aguas)},
+        }
+
+    # Acepta PanelSpec / InversorSpec directamente (motor puro)
+    if not isinstance(panel, PanelSpec) or not isinstance(inversor, InversorSpec):
+        return {
+            "ok": False,
+            "errores": ["calcular_strings_fv requiere PanelSpec e InversorSpec (normaliza en orquestador/entradas)."],
+            "warnings": [],
+            "topologia": "N/A",
+            "bounds": {},
+            "recomendacion": {},
+            "strings": [],
+            "meta": {"n_paneles_total": int(n_total), "dos_aguas": bool(dos_aguas), "t_min_c": tmin},
+        }
+
+    p: PanelSpec = panel
+    inv: InversorSpec = inversor
+
+    # Coherencia mínima
+    if inv.n_mppt <= 0:
+        errores.append("Inversor inválido: n_mppt <= 0.")
+    if p.pmax_w <= 0 or p.vmp_v <= 0 or p.voc_v <= 0:
+        errores.append("Panel inválido: pmax/vmp/voc deben ser > 0.")
+    if inv.vdc_max_v <= 0 or inv.mppt_min_v <= 0 or inv.mppt_max_v <= 0:
+        errores.append("Inversor inválido: vdc_max/mppt_min/mppt_max deben ser > 0.")
+    if inv.mppt_min_v >= inv.mppt_max_v:
+        errores.append("Inversor inválido: mppt_min_v debe ser < mppt_max_v.")
+    if inv.imppt_max_a <= 0:
+        errores.append("Inversor inválido: imppt_max_a debe ser > 0.")
+
+    if errores:
+        return {
+            "ok": False,
+            "errores": errores,
+            "warnings": warnings,
+            "topologia": "N/A",
+            "bounds": {},
+            "recomendacion": {},
+            "strings": [],
+            "meta": {"n_paneles_total": int(n_total), "dos_aguas": bool(dos_aguas), "t_min_c": tmin},
+        }
 
     rec = recomendar_string(
         panel=p,
         inversor=inv,
-        t_min_c=float(t_min_c),
+        t_min_c=tmin,
         objetivo_dc_ac=float(objetivo_dc_ac) if objetivo_dc_ac is not None else 1.2,
         pdc_kw_objetivo=float(pdc_kw_objetivo) if pdc_kw_objetivo is not None else None,
-    ) or {}
+    )
 
     if not rec.get("ok", False):
         return {
             "ok": False,
             "errores": list(rec.get("errores") or ["No se pudo recomendar string."]),
             "warnings": list(rec.get("warnings") or []),
+            "topologia": "N/A",
+            "bounds": rec.get("bounds") or {},
             "recomendacion": rec.get("recomendacion") or {},
             "strings": [],
-            "bounds": rec.get("bounds") or {},
-            "meta": {},
+            "meta": {"n_paneles_total": int(n_total), "dos_aguas": bool(dos_aguas), "t_min_c": tmin},
         }
 
     r = rec.get("recomendacion") or {}
-    n_series = _a_int(r.get("n_paneles_string"), 0)
+
+    n_series = _i(r.get("n_series"), 0)
     if n_series <= 0:
         return {
             "ok": False,
-            "errores": ["recomendar_string no retornó n_paneles_string válido."],
+            "errores": ["recomendar_string no retornó n_series válido."],
             "warnings": list(rec.get("warnings") or []),
+            "topologia": "N/A",
+            "bounds": rec.get("bounds") or {},
             "recomendacion": r,
             "strings": [],
-            "bounds": rec.get("bounds") or {},
-            "meta": {},
+            "meta": {"n_paneles_total": int(n_total), "dos_aguas": bool(dos_aguas), "t_min_c": tmin},
         }
 
-    # Derivar strings por total paneles (si aplica)
-    n_strings_total = _a_int(r.get("n_strings_total"), 0)
+    # Strings totales: por objetivo (ya viene)
+    n_strings_total = _i(r.get("n_strings_total"), 0)
     if n_strings_total <= 0:
-        n_strings_total = max(1, int((n_total + n_series - 1) // n_series))
+        # fallback por total paneles
+        n_strings_total = max(1, int(ceil(n_total / max(n_series, 1))))
 
-    strings_por_mppt = _a_int(r.get("strings_por_mppt"), 0)
-    if strings_por_mppt <= 0:
-        strings_por_mppt = max(1, int(ceil(n_strings_total / max(inv.n_mppt, 1))))
-
-    # Topología por MPPT
+    # Topología
     topologia = "2-aguas" if (bool(dos_aguas) and inv.n_mppt >= 2) else "1-agua"
+    ramas = _split_por_mppt(n_strings_total=n_strings_total, n_mppt=inv.n_mppt, dos_aguas=bool(dos_aguas))
 
-    strings: list[dict] = []
-    if topologia == "2-aguas":
-        s1 = n_strings_total // 2
-        s2 = n_strings_total - s1
-        partes = [(1, s1, "Techo izquierdo"), (2, s2, "Techo derecho")]
-    else:
-        partes = [(1, n_strings_total, "Arreglo FV")]
+    strings: List[Dict[str, Any]] = []
+    for rama in ramas:
+        mppt = int(rama["mppt"])
+        n_paralelo = int(rama["n_strings"])
+        etiqueta = str(rama.get("etiqueta") or "Arreglo FV")
 
-    for mppt, n_paralelo, etiqueta in partes:
-        if n_paralelo <= 0:
-            continue
+        i_mppt_a = float(p.imp_a) * float(n_paralelo)
+        ok_corr = i_mppt_a <= inv.imppt_max_a + 1e-9
+        if not ok_corr:
+            warnings.append(
+                f"Corriente MPPT alta en MPPT {mppt}: {i_mppt_a:.2f} A > {inv.imppt_max_a:.2f} A."
+            )
+
         strings.append(
             {
-                "mppt": int(mppt),
-                "etiqueta": str(etiqueta),
+                "mppt": mppt,
+                "etiqueta": etiqueta,
                 "n_series": int(n_series),
                 "n_paralelo": int(n_paralelo),
-                "vmp_string_v": _a_float(r.get("vmp_string_v"), 0.0),
-                "voc_frio_string_v": _a_float(r.get("voc_frio_string_v"), 0.0),
+                "vmp_string_v": float(r.get("vmp_string_v") or 0.0),
+                "voc_frio_string_v": float(r.get("voc_frio_string_v") or 0.0),
                 "imp_a": float(p.imp_a),
                 "isc_a": float(p.isc_a),
+                "i_mppt_a": float(i_mppt_a),
             }
         )
 
+    # Recomendación unificada
     recomendacion = {
-        "n_paneles_string": int(n_series),
+        "n_series": int(n_series),
+        "n_paneles_string": int(n_series),  # alias estable
         "n_strings_total": int(n_strings_total),
-        "strings_por_mppt": int(strings_por_mppt),
-        "vmp_string_v": _a_float(r.get("vmp_string_v"), 0.0),
-        "voc_frio_string_v": _a_float(r.get("voc_frio_string_v"), 0.0),
-        "i_mppt_a": _a_float(r.get("i_mppt_a"), 0.0),
-        "pdc_obj_kw": _a_float(r.get("pdc_obj_kw"), 0.0),
-        "p_string_kw_stc": _a_float(r.get("p_string_kw_stc"), 0.0),
+        "strings_por_mppt": int(ceil(n_strings_total / max(inv.n_mppt, 1))),
+        "vmp_string_v": float(r.get("vmp_string_v") or 0.0),
+        "voc_frio_string_v": float(r.get("voc_frio_string_v") or 0.0),
+        "pdc_obj_kw": float(r.get("pdc_obj_kw") or 0.0),
+        "p_string_kw_stc": float(r.get("p_string_kw_stc") or 0.0),
     }
 
     meta = {
         "n_paneles_total": int(n_total),
         "dos_aguas": bool(dos_aguas),
         "n_mppt": int(inv.n_mppt),
-        "t_min_c": float(t_min_c),
+        "t_min_c": float(tmin),
     }
-    pid = getattr(panel, "id", None)
-    iid = getattr(inversor, "id", None)
-    if pid is not None:
-        meta["panel_id"] = str(pid)
-    if iid is not None:
-        meta["inversor_id"] = str(iid)
 
     return {
         "ok": True,
-        "warnings": list(rec.get("warnings") or []),
         "errores": [],
+        "warnings": list(rec.get("warnings") or []) + warnings,
         "topologia": topologia,
         "bounds": rec.get("bounds") or {},
         "recomendacion": recomendacion,
@@ -363,5 +384,5 @@ def calcular_strings_fv(
     }
 
 
-# Compatibilidad con nombre anterior (si UI u otros módulos aún lo usan)
+# Compatibilidad con nombre anterior
 calcular_strings_auto = calcular_strings_fv
