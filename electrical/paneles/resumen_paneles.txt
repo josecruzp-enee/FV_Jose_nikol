@@ -1,0 +1,132 @@
+========================================================
+PANELES FV — OVERVIEW DEL MÓDULO
+Ubicación: electrical/paneles/
+========================================================
+
+PROPÓSITO
+--------------------------------------------------------
+Este módulo implementa el motor de configuración eléctrica
+del generador fotovoltaico (lado DC).
+
+Convierte datos de panel e inversor en una configuración
+válida de strings FV.
+
+
+QUÉ RESUELVE
+--------------------------------------------------------
+Panel + restricciones eléctricas + condiciones ambientales
+                          ↓
+Configuración eléctrica del arreglo FV:
+- Paneles en serie (Ns)
+- Strings en paralelo (Np)
+- Voltajes del string
+- Corrientes del arreglo
+- Distribución por MPPT
+
+
+FLUJO INTERNO
+--------------------------------------------------------
+UI / Excel / API
+        ↓
+entradas_strings
+(normaliza datos)
+        ↓
+orquestador_paneles
+(coordina proceso)
+        ↓
+calculo_de_strings
+(MOTOR ELÉCTRICO)
+        ↓
+resumen_strings / a_lineas_strings
+(salida para UI y PDF)
+
+
+QUÉ CALCULA EL MOTOR
+--------------------------------------------------------
+- Voc frío del string
+- Límites eléctricos por MPPT y Vdc_max
+- Selección óptima de paneles en serie
+- Número total de strings
+- Corriente por MPPT
+- Topología (1 agua / 2 aguas)
+
+
+QUÉ NO HACE (FUERA DE ALCANCE)
+--------------------------------------------------------
+Este módulo NO:
+- selecciona inversores
+- dimensiona protecciones
+- calcula conductores
+- aplica NEC completo
+- dimensiona canalización
+- calcula producción energética anual final
+
+Solo configura el generador FV DC.
+
+
+ARCHIVOS PRINCIPALES
+--------------------------------------------------------
+calculo_de_strings.py
+    Motor eléctrico principal.
+
+orquestador_paneles.py
+    Punto de entrada del dominio.
+    Normaliza datos y ejecuta el motor.
+
+validacion_strings.py
+    Compatibilidad con UI legacy.
+
+resumen_strings.py
+    Genera resumen estable para UI/PDF.
+
+entradas_strings.py
+    Normaliza entradas externas.
+
+dimensionado_paneles.py
+    Sizing energético preliminar.
+
+__init__.py
+    API pública y compatibilidad de imports.
+
+
+ENTRYPOINT OFICIAL
+--------------------------------------------------------
+Usar siempre:
+
+    ejecutar_calculo_strings()
+
+Evitar llamar directamente al motor desde la UI.
+
+
+SALIDA ESTÁNDAR
+--------------------------------------------------------
+Todos los cálculos retornan:
+
+    ok
+    errores[]
+    warnings[]
+    topologia
+    recomendacion{}
+    strings[]
+    meta{}
+
+
+IDEA CLAVE DEL DISEÑO
+--------------------------------------------------------
+Paneles = cerebro eléctrico DC.
+Los demás módulos consumen su resultado.
+
+
+ESTADO DEL MÓDULO
+--------------------------------------------------------
+ESTABLE (ARCHITECTURE FREEZE)
+
+Permitido:
+- corrección de bugs
+- mejoras internas
+
+No permitido:
+- refactor estructural
+- cambio de interfaces públicas
+
+========================================================
