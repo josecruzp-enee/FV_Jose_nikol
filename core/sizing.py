@@ -255,47 +255,59 @@ def calcular_sizing_unificado(p: Datosproyecto) -> Dict[str, Any]:
         "pac_kw": float(pac_kw_fb),
     }
 
-def build_inputs_electricos_ui(p: Datosproyecto) -> Dict[str, Any]:
-    ui_e = getattr(p, "electrico", {}) or {}
-    if not isinstance(ui_e, dict):
-        ui_e = {}
+# core/inputs_electricos.py
+from __future__ import annotations
 
-    eq = getattr(p, "equipos", {}) or {}
-    if not isinstance(eq, dict):
-        eq = {}
+from dataclasses import dataclass
+from typing import Any, Dict
 
-    # AC input
-    vac = float(ui_e.get("vac", 240.0))
-    fases = int(ui_e.get("fases", 1))
-    fp = float(ui_e.get("fp", 1.0))
+import streamlit as st
 
-    tension_sistema = str(eq.get("tension_sistema", "2F+N_120/240"))
 
-    # Mapear voltajes al contrato que paquete_nec entiende
-    # Regla simple: 1φ => vac_ln ; 3φ => vac_ll (si tu UI usa un solo campo)
-    vac_ln = vac if fases == 1 else None
-    vac_ll = vac if fases == 3 else None
+def build_inputs_electricos_ui(*, defaults: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    """
+    UI mínima para inputs eléctricos.
+    Retorna un dict estable para que el orquestador/sizing no rompa.
 
-    t_amb_c = float(ui_e.get("t_amb_c", 30.0)) if "t_amb_c" in ui_e else 30.0
+    Ajusta campos según tu modelo real.
+    """
+    defaults = defaults or {}
+
+    st.subheader("Inputs eléctricos (NEC / Ingeniería)")
+
+    v_ll = st.number_input(
+        "Voltaje AC (V)",
+        min_value=100.0,
+        max_value=1000.0,
+        value=float(defaults.get("v_ac_v", 240.0)),
+        step=10.0,
+    )
+
+    fases = st.selectbox(
+        "Sistema",
+        options=["1Φ", "3Φ"],
+        index=0 if str(defaults.get("fases", "1Φ")) == "1Φ" else 1,
+    )
+
+    frec = st.number_input(
+        "Frecuencia (Hz)",
+        min_value=50.0,
+        max_value=60.0,
+        value=float(defaults.get("f_hz", 60.0)),
+        step=1.0,
+    )
+
+    temp_amb = st.number_input(
+        "Temperatura ambiente (°C)",
+        min_value=-10.0,
+        max_value=70.0,
+        value=float(defaults.get("t_amb_c", 30.0)),
+        step=1.0,
+    )
 
     return {
-        # --- AC base (paquete_nec._corrientes_dc_ac) ---
-        "fases": fases,
-        "fp": fp,
-        "vac_ln": vac_ln,
-        "vac_ll": vac_ll,
-
-        # --- UI/instalación (consume conductores/canalización) ---
-        "tension_sistema": tension_sistema,
-        "dist_dc_m": float(ui_e.get("dist_dc_m", 10.0)),
-        "dist_dc_trunk_m": float(ui_e.get("dist_dc_trunk_m", 0.0)),
-        "dist_ac_m": float(ui_e.get("dist_ac_m", 15.0)),
-        "vdrop_obj_dc_pct": float(ui_e.get("vdrop_obj_dc_pct", 2.0)),
-        "vdrop_obj_ac_pct": float(ui_e.get("vdrop_obj_ac_pct", 2.0)),
-        "t_amb_c": float(t_amb_c),
-        "material_conductor": str(ui_e.get("material_conductor", "Cu")),
-        "has_combiner": bool(ui_e.get("has_combiner", False)),
-        "dc_arch": str(ui_e.get("dc_arch", "string_to_inverter")),
-        "otros_ccc": int(ui_e.get("otros_ccc", 0)),
-        "incluye_neutro_ac": bool(ui_e.get("incluye_neutro_ac", False)),
+        "v_ac_v": float(v_ll),
+        "fases": str(fases),
+        "f_hz": float(frec),
+        "t_amb_c": float(temp_amb),
     }
