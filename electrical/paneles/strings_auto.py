@@ -155,3 +155,109 @@ def recomendar_string(
             "i_mppt_a": float(corr["i_mppt_a"]),
         },
     }
+
+# ==========================================================
+# API pública unificada (motor único)
+# ==========================================================
+def calcular_strings_fv(
+    *,
+    n_paneles_total: int,
+    panel: Any,
+    inversor: Any,
+    t_min_c: float,
+    dos_aguas: bool = False,
+    objetivo_dc_ac: float | None = None,
+    pdc_kw_objetivo: float | None = None,
+) -> Dict[str, Any]:
+    """
+    Motor único para strings (para UI/NEC/PDF).
+    Retorna un dict estable.
+    """
+    warnings: list[str] = []
+    errores: list[str] = []
+
+    try:
+        n_total = int(n_paneles_total)
+    except Exception:
+        n_total = 0
+    if n_total <= 0:
+        return {
+            "ok": False,
+            "errores": ["n_paneles_total inválido (<=0)."],
+            "warnings": [],
+            "recomendacion": {},
+            "strings": [],
+        }
+
+    # Reusar lógica existente: recomendar_string() ya calcula bounds por voltaje/corriente
+    rec = recomendar_string(
+        panel=panel,
+        inversor=inversor,
+        t_min_c=float(t_min_c),
+        objetivo_dc_ac=float(objetivo_dc_ac) if objetivo_dc_ac is not None else 1.2,
+        pdc_kw_objetivo=float(pdc_kw_objetivo) if pdc_kw_objetivo is not None else None,
+    ) or {}
+
+    if not rec.get("ok", False):
+        return {
+            "ok": False,
+            "errores": list(rec.get("errores") or ["No se pudo recomendar string."]),
+            "warnings": list(rec.get("warnings") or []),
+            "recomendacion": rec.get("recomendacion") or {},
+            "strings": [],
+        }
+
+    r = rec.get("recomendacion") or {}
+    ns = int(r.get("n_paneles_string") or 0)
+    if ns <= 0:
+        errores.append("recomendar_string no retornó n_paneles_string válido.")
+        return {"ok": False, "errores": errores, "warnings": list(rec.get("warnings") or []), "recomendacion": r, "strings": []}
+
+    n_strings_total = int(r.get("n_strings_total") or 0) or max(1, int((n_total + ns - 1) // ns))
+    strings_por_mppt = int(r.get("strings_por_mppt") or 0) or n_strings_total
+
+    # Armar lista strings por MPPT (mínimo)
+    n_mppt = int(getattr(inversor, "n_mppt", 1) or 1)
+    topologia = "2-aguas" if (dos_aguas and n_mppt >= 2) else "1-agua"
+
+    strings: list[dict] = []
+    if topologia == "2-aguas":
+        # reparto simple mitad/mitad
+        s1 = n_strings_total // 2
+        s2 = n_strings_total - s1
+        parts = [(1, s1, "Techo izquierdo"), (2, s2, "Techo derecho")]
+    else:
+        parts = [(1, n_strings_total, "Arreglo FV")]
+
+    for mppt, n_s, etiqueta in parts:
+        if n_s <= 0:
+            continue
+        strings.append(
+            {
+                "mppt": mppt,
+                "etiqueta": etiqueta,
+                "n_series": ns,
+                "n_paralelo": n_s,  # aquí es cantidad de strings (paralelo a nivel MPPT)
+                "vmp_string_v": float(r.get("vmp_string_v") or 0.0),
+                "voc_frio_string_v": float(r.get("voc_frio_string_v") or 0.0),
+                "imp_a": float(getattr(panel, "imp", 0.0) or 0.0),
+                "isc_a": float(getattr(panel, "isc", 0.0) or 0.0),
+            }
+        )
+
+    out = {
+        "ok": True,
+        "warnings": list(rec.get("warnings") or []),
+        "errores": [],
+        "topologia": topologia,
+        "recomendacion": {
+            "n_paneles_string": ns,
+            "n_strings_total": n_strings_total,
+            "strings_por_mppt": strings_por_mppt,
+            "vmp_string_v": float(r.get("vmp_string_v") or 0.0),
+            "voc_frio_string_v": float(r.get("voc_frio_string_v") or 0.0),
+            "i_mppt_a": float(r.get("i_mppt_a") or 0.0),
+        },
+        "strings": strings,
+    }
+    return out
