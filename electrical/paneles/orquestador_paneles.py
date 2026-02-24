@@ -1,8 +1,5 @@
-<<<<<<< HEAD
 # electrical/paneles/orquestador_paneles.py
-=======
-# electrical/strings.py  (legacy)
->>>>>>> a61303a (refactor(paneles): nuevo orquestador y compat strings)
+
 from __future__ import annotations
 
 from typing import Any, Dict, List
