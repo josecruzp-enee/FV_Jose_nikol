@@ -1,9 +1,8 @@
-# electrical/sizing_panel.py
 from __future__ import annotations
 
 from dataclasses import dataclass
+from math import ceil
 from typing import Any, Dict, List, Optional
-import math
 
 
 # ==========================================================
@@ -17,12 +16,12 @@ class PanelSizingResultado:
     # energía/objetivo
     consumo_anual_kwh: float
     kwh_obj_anual: float
-    cobertura_obj: float
+    cobertura_obj: float  # 0..1
 
     # recurso y pérdidas
-    hsp_12m: List[float]         # kWh/m²/día por mes (≈ HSP)
-    hsp_prom: float              # promedio anual (kWh/m²/día)
-    pr: float                    # performance ratio total (0..1)
+    hsp_12m: List[float]  # kWh/m²/día por mes (≈ HSP)
+    hsp_prom: float       # promedio anual (kWh/m²/día)
+    pr: float             # performance ratio total (0..1)
 
     # sizing
     kwp_req: float
@@ -54,8 +53,11 @@ def _pct_factor(pct: float) -> float:
 _DIAS_MES = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 
 
-def _hsp_honduras_conservador_12m() -> List[float]:
-    # kWh/m²/día ≈ HSP diaria promedio por mes (conservador)
+def _hsp_modelo_conservador_12m() -> List[float]:
+    """
+    Modelo offline conservador (Centroamérica/latitudes tropicales).
+    Ajustable luego por ubicación, pero estable como fallback.
+    """
     return [
         5.1,  # Ene
         5.4,  # Feb
@@ -76,7 +78,7 @@ def _leer_hsp_12m(
     *,
     hsp_12m: Optional[List[float]] = None,
     hsp: Optional[float] = None,
-    usar_modelo_hn_conservador: bool = True,
+    usar_modelo_conservador: bool = True,
 ) -> List[float]:
     # 1) si viene lista 12m válida
     if isinstance(hsp_12m, (list, tuple)) and len(hsp_12m) == 12:
@@ -85,9 +87,9 @@ def _leer_hsp_12m(
             out.append(_clamp(_safe_float(v, 4.5), 0.5, 9.0))
         return out
 
-    # 2) modelo offline Honduras conservador
-    if usar_modelo_hn_conservador:
-        return _hsp_honduras_conservador_12m()
+    # 2) modelo offline conservador
+    if usar_modelo_conservador:
+        return _hsp_modelo_conservador_12m()
 
     # 3) fallback a hsp único
     h = _clamp(_safe_float(hsp, 4.5), 0.5, 9.0)
@@ -104,7 +106,7 @@ def _leer_pr(
     PR físico simplificado, conservador.
     - pérdidas base constantes (editables vía perdidas_detalle)
     - sombras siempre multiplican
-    - si perdidas_sistema_pct viene, se aplica suave (30%) para compat.
+    - si perdidas_sistema_pct viene, se aplica suave (30%) para compat
     """
     sombras_pct = _clamp(_safe_float(sombras_pct, 0.0), 0.0, 95.0)
 
@@ -149,11 +151,23 @@ def _kwp_req_anual(kwh_obj_anual: float, hsp_12m: List[float], pr: float) -> flo
 def _n_paneles(kwp_req: float, panel_w: float) -> int:
     if panel_w <= 0:
         raise ValueError("Panel inválido (W<=0).")
-    return max(1, int(math.ceil((float(kwp_req) * 1000.0) / float(panel_w))))
+    return max(1, int(ceil((float(kwp_req) * 1000.0) / float(panel_w))))
 
 
 def _pdc_kw(n_paneles: int, panel_w: float) -> float:
     return (int(n_paneles) * float(panel_w)) / 1000.0
+
+
+def _normalizar_cobertura(cobertura_obj: Any) -> float:
+    """
+    Acepta:
+      - 0..1 (fracción)
+      - 0..100 (porcentaje)
+    """
+    cov = _safe_float(cobertura_obj, 1.0)
+    if cov > 1.0 and cov <= 100.0:
+        cov = cov / 100.0
+    return _clamp(cov, 0.0, 1.0)
 
 
 # ==========================================================
@@ -167,7 +181,7 @@ def calcular_panel_sizing(
     # recurso solar
     hsp_12m: Optional[List[float]] = None,
     hsp: Optional[float] = None,
-    usar_modelo_hn_conservador: bool = True,
+    usar_modelo_conservador: bool = True,
     # pérdidas/pr
     sombras_pct: float = 0.0,
     perdidas_sistema_pct: Optional[float] = None,
@@ -181,7 +195,7 @@ def calcular_panel_sizing(
     else:
         consumo = [_safe_float(x, 0.0) for x in consumo_12m_kwh]
 
-    cov = _clamp(_safe_float(cobertura_obj, 1.0), 0.0, 1.0)
+    cov = _normalizar_cobertura(cobertura_obj)
 
     try:
         panel_w_f = float(panel_w)
@@ -191,7 +205,7 @@ def calcular_panel_sizing(
         panel_w_f = 0.0
         errores.append("panel_w inválido (no numérico).")
 
-    hsp12 = _leer_hsp_12m(hsp_12m=hsp_12m, hsp=hsp, usar_modelo_hn_conservador=usar_modelo_hn_conservador)
+    hsp12 = _leer_hsp_12m(hsp_12m=hsp_12m, hsp=hsp, usar_modelo_conservador=usar_modelo_conservador)
     hsp_prom = sum(hsp12) / 12.0
 
     pr = _leer_pr(
@@ -218,9 +232,7 @@ def calcular_panel_sizing(
     ok = len(errores) == 0
     meta = {
         "dias_mes": list(_DIAS_MES),
-        "hsp_fuente": "p.hsp_12m"
-        if (isinstance(hsp_12m, (list, tuple)) and len(hsp_12m) == 12)
-        else ("HN_CONSERVADOR" if usar_modelo_hn_conservador else "p.hsp"),
+        "hsp_fuente": "hsp_12m" if (isinstance(hsp_12m, (list, tuple)) and len(hsp_12m) == 12) else ("CONSERVADOR_12M" if usar_modelo_conservador else "hsp"),
         "perdidas_detalle_usadas": perdidas_detalle if isinstance(perdidas_detalle, dict) else {},
     }
 
