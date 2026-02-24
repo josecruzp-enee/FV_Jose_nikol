@@ -320,7 +320,7 @@ def _render_grafica_teorica(ctx, sf: Dict[str, Any]) -> None:
     st.markdown("#### Gráfica teórica de generación FV (preview)")
 
     import matplotlib.pyplot as plt
-    from electrical.paneles.sizing_panel import _hsp_honduras_conservador_12m
+    from electrical.paneles.dimensionado_paneles import _hsp_honduras_conservador_12m
 
     DIAS_MES = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
     MESES = list(range(1, 13))
