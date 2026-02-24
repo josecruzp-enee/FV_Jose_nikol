@@ -22,53 +22,43 @@ def _i(x: Any, default: int = 0) -> int:
 def _as_panel_spec(panel: Any) -> PanelSpec:
     """
     Normaliza panel -> PanelSpec.
-
     Soporta:
       - PanelSpec directo
-      - legacy con atributos: w/vmp/voc/imp/isc
-      - UI legacy: voc_stc/vmp_stc/isc/imp/pmax_w
-      - nuevo: pmax_w/vmp_v/voc_v/imp_a/isc_a
-      - coef: coef_voc_pct_c | coef_voc | tc_voc_pct_c (default -0.28 %/°C)
+      - modelos legacy con atributos: w/vmp/voc/imp/isc
+      - modelos nuevos con: pmax_w/vmp_v/voc_v/imp_a/isc_a
+      - coef voc: coef_voc_pct_c | coef_voc | tc_voc_pct_c
+      - coef vmp: coef_vmp_pct_c | coef_vmp | tc_vmp_pct_c | (fallback: coef_pmax_pct_c)
     """
     if isinstance(panel, PanelSpec):
         return panel
 
-    coef = _f(
-        getattr(
-            panel,
-            "coef_voc_pct_c",
-            getattr(panel, "coef_voc", getattr(panel, "tc_voc_pct_c", -0.28)),
-        ),
+    coef_voc = _f(
+        getattr(panel, "coef_voc_pct_c", getattr(panel, "coef_voc", getattr(panel, "tc_voc_pct_c", -0.28))),
         -0.28,
     )
 
-    # Voc/Vmp soporta variantes
-    voc = getattr(panel, "voc", getattr(panel, "voc_v", getattr(panel, "voc_stc", 0.0)))
-    vmp = getattr(panel, "vmp", getattr(panel, "vmp_v", getattr(panel, "vmp_stc", 0.0)))
-    isc = getattr(panel, "isc", getattr(panel, "isc_a", 0.0))
-    imp = getattr(panel, "imp", getattr(panel, "imp_a", 0.0))
-    pmax = getattr(panel, "w", getattr(panel, "pmax_w", getattr(panel, "pmax", 0.0)))
+    # NUEVO: coef Vmp (si no existe, usar coef_pmax_pct_c si lo tienes; si no, default -0.34)
+    coef_vmp = getattr(panel, "coef_vmp_pct_c", None)
+    if coef_vmp is None:
+        coef_vmp = getattr(panel, "coef_vmp", None)
+    if coef_vmp is None:
+        coef_vmp = getattr(panel, "tc_vmp_pct_c", None)
+    if coef_vmp is None:
+        # aproximación típica cuando el datasheet no trae coef Vmp:
+        coef_vmp = getattr(panel, "coef_pmax_pct_c", -0.34)
 
     return PanelSpec(
-        pmax_w=_f(pmax, 0.0),
-        vmp_v=_f(vmp, 0.0),
-        voc_v=_f(voc, 0.0),
-        imp_a=_f(imp, 0.0),
-        isc_a=_f(isc, 0.0),
-        coef_voc_pct_c=_f(coef, -0.28),
+        pmax_w=_f(getattr(panel, "w", getattr(panel, "pmax_w", 0.0))),
+        vmp_v=_f(getattr(panel, "vmp", getattr(panel, "vmp_v", 0.0))),
+        voc_v=_f(getattr(panel, "voc", getattr(panel, "voc_v", 0.0))),
+        imp_a=_f(getattr(panel, "imp", getattr(panel, "imp_a", 0.0))),
+        isc_a=_f(getattr(panel, "isc", getattr(panel, "isc_a", 0.0))),
+        coef_voc_pct_c=_f(coef_voc, -0.28),
+        coef_vmp_pct_c=_f(coef_vmp, -0.34),
     )
 
 
 def _as_inversor_spec(inversor: Any) -> InversorSpec:
-    """
-    Normaliza inversor -> InversorSpec.
-
-    Soporta:
-      - InversorSpec directo
-      - legacy: kw_ac, vdc_max, vmppt_min, vmppt_max, n_mppt, imppt_max|imppt_max_a
-      - UI legacy: vdc_max, mppt_min, mppt_max, imppt_max, n_mppt, pac_kw
-      - nuevo: pac_kw, vdc_max_v, mppt_min_v, mppt_max_v, n_mppt, imppt_max_a
-    """
     if isinstance(inversor, InversorSpec):
         return inversor
 
@@ -81,8 +71,8 @@ def _as_inversor_spec(inversor: Any) -> InversorSpec:
     return InversorSpec(
         pac_kw=_f(getattr(inversor, "kw_ac", getattr(inversor, "pac_kw", 0.0))),
         vdc_max_v=_f(getattr(inversor, "vdc_max", getattr(inversor, "vdc_max_v", 0.0))),
-        mppt_min_v=_f(getattr(inversor, "vmppt_min", getattr(inversor, "mppt_min_v", getattr(inversor, "mppt_min", 0.0)))),
-        mppt_max_v=_f(getattr(inversor, "vmppt_max", getattr(inversor, "mppt_max_v", getattr(inversor, "mppt_max", 0.0)))),
+        mppt_min_v=_f(getattr(inversor, "vmppt_min", getattr(inversor, "mppt_min_v", 0.0))),
+        mppt_max_v=_f(getattr(inversor, "vmppt_max", getattr(inversor, "mppt_max_v", 0.0))),
         n_mppt=n_mppt,
         imppt_max_a=_f(imppt, 25.0),
     )
@@ -98,13 +88,6 @@ def ejecutar_calculo_strings(
     objetivo_dc_ac: float | None = None,
     pdc_kw_objetivo: float | None = None,
 ) -> Dict[str, Any]:
-    """
-    Orquesta el cálculo de strings (UI/NEC/PDF).
-    Entrada → Validación básica → Cálculo (motor) → Salida estable.
-
-    Retorna dict estable:
-      ok, errores, warnings, topologia, strings, recomendacion, bounds, meta
-    """
     errores: List[str] = []
     warnings: List[str] = []
 
@@ -135,11 +118,9 @@ def ejecutar_calculo_strings(
             "meta": {"n_paneles_total": n_total, "dos_aguas": bool(dos_aguas)},
         }
 
-    # Normalización
     p = _as_panel_spec(panel)
     inv = _as_inversor_spec(inversor)
 
-    # Validación mínima
     if p.pmax_w <= 0 or p.vmp_v <= 0 or p.voc_v <= 0:
         errores.append("Panel inválido: revisar pmax/vmp/voc (>0).")
 
@@ -158,6 +139,9 @@ def ejecutar_calculo_strings(
     if p.coef_voc_pct_c >= 0:
         warnings.append("Aviso: coef_voc_pct_c >= 0 (típicamente es negativo).")
 
+    if p.coef_vmp_pct_c >= 0:
+        warnings.append("Aviso: coef_vmp_pct_c >= 0 (típicamente es negativo).")
+
     if errores:
         return {
             "ok": False,
@@ -171,8 +155,8 @@ def ejecutar_calculo_strings(
                 "n_paneles_total": n_total,
                 "dos_aguas": bool(dos_aguas),
                 "t_min_c": tmin,
-                "panel_spec": p.__dict__,
-                "inversor_spec": inv.__dict__,
+                "panel_spec": p.__dict__ if hasattr(p, "__dict__") else {},
+                "inversor_spec": inv.__dict__ if hasattr(inv, "__dict__") else {},
             },
         }
 
@@ -199,30 +183,28 @@ def ejecutar_calculo_strings(
     meta.setdefault("n_paneles_total", n_total)
     meta.setdefault("dos_aguas", bool(dos_aguas))
     meta.setdefault("t_min_c", tmin)
-    meta.setdefault("panel_spec", p.__dict__)
-    meta.setdefault("inversor_spec", inv.__dict__)
+    meta.setdefault("panel_spec", p.__dict__ if hasattr(p, "__dict__") else {})
+    meta.setdefault("inversor_spec", inv.__dict__ if hasattr(inv, "__dict__") else {})
     out["meta"] = meta
+
+    # agrega warnings locales del orquestador
+    out["warnings"] = list(out.get("warnings") or []) + warnings
 
     return out
 
 
 def a_lineas_strings(cfg: Dict[str, Any]) -> List[str]:
-    """
-    Líneas listas para UI/PDF.
-    """
     lines: List[str] = []
     rec = (cfg.get("recomendacion") or {}) if isinstance(cfg, dict) else {}
-
     p_string_kw = _f(rec.get("p_string_kw_stc", 0.0), 0.0)
 
     for s in (cfg.get("strings") or []):
         etiqueta = s.get("etiqueta", "Arreglo FV")
-
         ns = int(s.get("n_series", s.get("ns", 0)) or 0)
         np_ = int(s.get("n_paralelo", s.get("np", 1)) or 1)
         nstr = np_
 
-        vmp = _f(s.get("vmp_string_v", s.get("vmp_V", 0.0)), 0.0)
+        vmp = _f(s.get("vmp_string_v", s.get("vmp_V", 0.0)), 0.0)  # ahora Vmp caliente
         voc_frio = _f(s.get("voc_frio_string_v", s.get("voc_frio_V", 0.0)), 0.0)
         imp = _f(s.get("imp_a", s.get("imp_A", 0.0)), 0.0)
 
@@ -231,13 +213,13 @@ def a_lineas_strings(cfg: Dict[str, Any]) -> List[str]:
         if pdc_kw > 0:
             lines.append(
                 f"{etiqueta} — {ns}S×{np_}P ({nstr} string): "
-                f"Vmp≈{vmp:.0f} V | Voc frío≈{voc_frio:.0f} V | Imp≈{imp:.1f} A | "
+                f"Vmp_hot≈{vmp:.0f} V | Voc_frío≈{voc_frio:.0f} V | Imp≈{imp:.1f} A | "
                 f"Pdc≈{pdc_kw:.2f} kW."
             )
         else:
             lines.append(
                 f"{etiqueta} — {ns}S×{np_}P ({nstr} string): "
-                f"Vmp≈{vmp:.0f} V | Voc frío≈{voc_frio:.0f} V | Imp≈{imp:.1f} A."
+                f"Vmp_hot≈{vmp:.0f} V | Voc_frío≈{voc_frio:.0f} V | Imp≈{imp:.1f} A."
             )
 
     return lines
@@ -250,8 +232,8 @@ def calcular_strings_dc(
     inversor: Any,
     dos_aguas: bool,
     t_min_c: float = 10.0,
-    t_ref_c: float = 25.0,  # compat (no usado)
-    min_modulos_serie: int = 6,  # compat (no usado)
+    t_ref_c: float = 25.0,
+    min_modulos_serie: int = 6,
 ) -> Dict[str, Any]:
     return ejecutar_calculo_strings(
         n_paneles_total=int(n_paneles),
