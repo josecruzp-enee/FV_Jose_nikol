@@ -255,46 +255,47 @@ def calcular_sizing_unificado(p: Datosproyecto) -> Dict[str, Any]:
     }
 
 
-def _build_electrico(p, panel, pac_kw, rec):
-    r = (rec or {}).get("recomendacion") or {}
+def build_inputs_electricos_ui(p: Datosproyecto) -> Dict[str, Any]:
     ui_e = getattr(p, "electrico", {}) or {}
     if not isinstance(ui_e, dict):
         ui_e = {}
 
-    vac = float(ui_e.get("vac", 240.0))
-    fases = int(ui_e.get("fases", 1))
-
     eq = getattr(p, "equipos", {}) or {}
     if not isinstance(eq, dict):
         eq = {}
-    tension = str(eq.get("tension_sistema", "2F+N_120/240"))
 
-    temp_amb_c = float(ui_e.get("t_amb_c", 30.0)) if "t_amb_c" in ui_e else 30.0
+    # AC input
+    vac = float(ui_e.get("vac", 240.0))
+    fases = int(ui_e.get("fases", 1))
+    fp = float(ui_e.get("fp", 1.0))
+
+    tension_sistema = str(eq.get("tension_sistema", "2F+N_120/240"))
+
+    # Mapear voltajes al contrato que paquete_nec entiende
+    # Regla simple: 1φ => vac_ln ; 3φ => vac_ll (si tu UI usa un solo campo)
+    vac_ln = vac if fases == 1 else None
+    vac_ll = vac if fases == 3 else None
+
+    t_amb_c = float(ui_e.get("t_amb_c", 30.0)) if "t_amb_c" in ui_e else 30.0
 
     return {
-        "n_strings": int(r.get("n_strings_total", 0) or 0),
-        "isc_mod_a": float(getattr(panel, "isc", 0.0) or 0.0),
-        "imp_mod_a": float(getattr(panel, "imp", 0.0) or 0.0),
-        "vmp_string_v": float(r.get("vmp_string_v", 0.0) or 0.0),
-        "voc_frio_string_v": float(r.get("voc_frio_string_v", 0.0) or 0.0),
-        "p_ac_w": float(pac_kw) * 1000.0,
-
-        "v_ac": vac,
+        # --- AC base (paquete_nec._corrientes_dc_ac) ---
         "fases": fases,
-        "tension_sistema": tension,
-        "pf_ac": float(ui_e.get("fp", 1.0)),
+        "fp": fp,
+        "vac_ln": vac_ln,
+        "vac_ll": vac_ll,
 
-        "L_dc_string_m": float(ui_e.get("dist_dc_m", 10.0)),
-        "L_dc_trunk_m": float(ui_e.get("dist_dc_trunk_m", 0.0)),
-        "L_ac_m": float(ui_e.get("dist_ac_m", 15.0)),
-        "vd_max_dc_pct": float(ui_e.get("vdrop_obj_dc_pct", 2.0)),
-        "vd_max_ac_pct": float(ui_e.get("vdrop_obj_ac_pct", 2.0)),
-
-        "temp_amb_c": float(temp_amb_c),
-        "material": str(ui_e.get("material_conductor", "Cu")),
+        # --- UI/instalación (consume conductores/canalización) ---
+        "tension_sistema": tension_sistema,
+        "dist_dc_m": float(ui_e.get("dist_dc_m", 10.0)),
+        "dist_dc_trunk_m": float(ui_e.get("dist_dc_trunk_m", 0.0)),
+        "dist_ac_m": float(ui_e.get("dist_ac_m", 15.0)),
+        "vdrop_obj_dc_pct": float(ui_e.get("vdrop_obj_dc_pct", 2.0)),
+        "vdrop_obj_ac_pct": float(ui_e.get("vdrop_obj_ac_pct", 2.0)),
+        "t_amb_c": float(t_amb_c),
+        "material_conductor": str(ui_e.get("material_conductor", "Cu")),
         "has_combiner": bool(ui_e.get("has_combiner", False)),
         "dc_arch": str(ui_e.get("dc_arch", "string_to_inverter")),
-
         "otros_ccc": int(ui_e.get("otros_ccc", 0)),
         "incluye_neutro_ac": bool(ui_e.get("incluye_neutro_ac", False)),
     }
