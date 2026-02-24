@@ -37,14 +37,12 @@ def _as_panel_spec(panel: Any) -> PanelSpec:
         -0.28,
     )
 
-    # NUEVO: coef Vmp (si no existe, usar coef_pmax_pct_c si lo tienes; si no, default -0.34)
     coef_vmp = getattr(panel, "coef_vmp_pct_c", None)
     if coef_vmp is None:
         coef_vmp = getattr(panel, "coef_vmp", None)
     if coef_vmp is None:
         coef_vmp = getattr(panel, "tc_vmp_pct_c", None)
     if coef_vmp is None:
-        # aproximación típica cuando el datasheet no trae coef Vmp:
         coef_vmp = getattr(panel, "coef_pmax_pct_c", -0.34)
 
     return PanelSpec(
@@ -59,12 +57,19 @@ def _as_panel_spec(panel: Any) -> PanelSpec:
 
 
 def _as_inversor_spec(inversor: Any) -> InversorSpec:
+    """
+    Normaliza inversor -> InversorSpec.
+    Norma/QA: NO inventa imppt_max_a. Debe venir del datasheet/catálogo.
+    """
     if isinstance(inversor, InversorSpec):
         return inversor
 
+    # --- imppt_max_a: OBLIGATORIO para cálculo "a norma" ---
     imppt = getattr(inversor, "imppt_max_a", None)
     if imppt is None:
-        imppt = getattr(inversor, "imppt_max", 25.0)
+        imppt = getattr(inversor, "imppt_max", None)
+
+    imppt_f = _f(imppt, 0.0) if imppt is not None else 0.0
 
     n_mppt = _i(getattr(inversor, "n_mppt", 1), 1) or 1
 
@@ -74,7 +79,7 @@ def _as_inversor_spec(inversor: Any) -> InversorSpec:
         mppt_min_v=_f(getattr(inversor, "vmppt_min", getattr(inversor, "mppt_min_v", 0.0))),
         mppt_max_v=_f(getattr(inversor, "vmppt_max", getattr(inversor, "mppt_max_v", 0.0))),
         n_mppt=n_mppt,
-        imppt_max_a=_f(imppt, 25.0),
+        imppt_max_a=imppt_f,
     )
 
 
@@ -127,8 +132,9 @@ def ejecutar_calculo_strings(
     if inv.vdc_max_v <= 0 or inv.mppt_min_v <= 0 or inv.mppt_max_v <= 0 or inv.n_mppt <= 0:
         errores.append("Inversor inválido: revisar vdc_max/mppt/n_mppt (>0).")
 
+    # A norma: debe venir del datasheet/catálogo (si no, se considera inválido)
     if inv.imppt_max_a <= 0:
-        errores.append("Inversor inválido: imppt_max_a debe ser > 0.")
+        errores.append("Inversor inválido: imppt_max_a debe ser > 0 (dato obligatorio del datasheet).")
 
     if inv.mppt_min_v >= inv.mppt_max_v:
         errores.append("Inversor inválido: mppt_min_v debe ser < mppt_max_v.")
