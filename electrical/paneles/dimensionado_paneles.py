@@ -5,36 +5,26 @@ from math import ceil
 from typing import Any, Dict, List, Optional
 
 
-# ==========================================================
-# Modelos de salida (estables y simples)
-# ==========================================================
 @dataclass(frozen=True)
 class PanelSizingResultado:
     ok: bool
     errores: List[str]
 
-    # energía/objetivo
     consumo_anual_kwh: float
     kwh_obj_anual: float
     cobertura_obj: float  # 0..1
 
-    # recurso y pérdidas
     hsp_12m: List[float]  # kWh/m²/día por mes (≈ HSP)
     hsp_prom: float       # promedio anual (kWh/m²/día)
     pr: float             # performance ratio total (0..1)
 
-    # sizing
     kwp_req: float
     n_paneles: int
     pdc_kw: float
 
-    # trazabilidad
     meta: Dict[str, Any]
 
 
-# ==========================================================
-# Utilitarios
-# ==========================================================
 def _clamp(x: float, lo: float, hi: float) -> float:
     return max(lo, min(hi, float(x)))
 
@@ -54,24 +44,7 @@ _DIAS_MES = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 
 
 def _hsp_modelo_conservador_12m() -> List[float]:
-    """
-    Modelo offline conservador (Centroamérica/latitudes tropicales).
-    Ajustable luego por ubicación, pero estable como fallback.
-    """
-    return [
-        5.1,  # Ene
-        5.4,  # Feb
-        5.8,  # Mar
-        5.6,  # Abr
-        5.0,  # May
-        4.5,  # Jun
-        4.3,  # Jul
-        4.4,  # Ago
-        4.1,  # Sep
-        4.0,  # Oct
-        4.4,  # Nov
-        4.7,  # Dic
-    ]
+    return [5.1, 5.4, 5.8, 5.6, 5.0, 4.5, 4.3, 4.4, 4.1, 4.0, 4.4, 4.7]
 
 
 def _leer_hsp_12m(
@@ -80,18 +53,15 @@ def _leer_hsp_12m(
     hsp: Optional[float] = None,
     usar_modelo_conservador: bool = True,
 ) -> List[float]:
-    # 1) si viene lista 12m válida
     if isinstance(hsp_12m, (list, tuple)) and len(hsp_12m) == 12:
         out: List[float] = []
         for v in hsp_12m:
             out.append(_clamp(_safe_float(v, 4.5), 0.5, 9.0))
         return out
 
-    # 2) modelo offline conservador
     if usar_modelo_conservador:
         return _hsp_modelo_conservador_12m()
 
-    # 3) fallback a hsp único
     h = _clamp(_safe_float(hsp, 4.5), 0.5, 9.0)
     return [h] * 12
 
@@ -102,12 +72,6 @@ def _leer_pr(
     perdidas_sistema_pct: Optional[float] = None,
     perdidas_detalle: Optional[Dict[str, float]] = None,
 ) -> float:
-    """
-    PR físico simplificado, conservador.
-    - pérdidas base constantes (editables vía perdidas_detalle)
-    - sombras siempre multiplican
-    - si perdidas_sistema_pct viene, se aplica suave (30%) para compat
-    """
     sombras_pct = _clamp(_safe_float(sombras_pct, 0.0), 0.0, 95.0)
 
     base = {
@@ -159,30 +123,20 @@ def _pdc_kw(n_paneles: int, panel_w: float) -> float:
 
 
 def _normalizar_cobertura(cobertura_obj: Any) -> float:
-    """
-    Acepta:
-      - 0..1 (fracción)
-      - 0..100 (porcentaje)
-    """
     cov = _safe_float(cobertura_obj, 1.0)
     if cov > 1.0 and cov <= 100.0:
         cov = cov / 100.0
     return _clamp(cov, 0.0, 1.0)
 
 
-# ==========================================================
-# API pública
-# ==========================================================
 def calcular_panel_sizing(
     *,
     consumo_12m_kwh: List[float],
     cobertura_obj: float,
     panel_w: float,
-    # recurso solar
     hsp_12m: Optional[List[float]] = None,
     hsp: Optional[float] = None,
     usar_modelo_conservador: bool = True,
-    # pérdidas/pr
     sombras_pct: float = 0.0,
     perdidas_sistema_pct: Optional[float] = None,
     perdidas_detalle: Optional[Dict[str, float]] = None,
@@ -232,7 +186,9 @@ def calcular_panel_sizing(
     ok = len(errores) == 0
     meta = {
         "dias_mes": list(_DIAS_MES),
-        "hsp_fuente": "hsp_12m" if (isinstance(hsp_12m, (list, tuple)) and len(hsp_12m) == 12) else ("CONSERVADOR_12M" if usar_modelo_conservador else "hsp"),
+        "hsp_fuente": "hsp_12m"
+        if (isinstance(hsp_12m, (list, tuple)) and len(hsp_12m) == 12)
+        else ("CONSERVADOR_12M" if usar_modelo_conservador else "hsp"),
         "perdidas_detalle_usadas": perdidas_detalle if isinstance(perdidas_detalle, dict) else {},
     }
 
