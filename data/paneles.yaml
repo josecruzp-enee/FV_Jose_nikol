@@ -1,50 +1,35 @@
-schema: 1
 paneles:
 
-  # ===== EJEMPLO (rellena con tus datos reales) =====
-  trina_tsm-deg19c20_550w:
-    marca: "Trina Solar"
-    nombre: "Vertex 550W"
-    codigo: "TSM-DEG19C.20"
-    tecnologia: ["mono", "bifacial", "doble_vidrio"]   # opcional
+  ja_550:
+    marca: JA Solar
+    nombre: JAM72S30-550
+    codigo: JAM72S30
 
-    stc:  # OBLIGATORIO (para strings DC)
-      pmax_w: 550.0
-      vmp_v: 31.8
-      imp_a: 17.29
-      voc_v: 38.1
-      isc_a: 18.39
-      eficiencia_pct: 21.0              # opcional
-      tolerancia_w: [0, 5]              # opcional (min,max)
+    stc:
+      pmax_w: 550
+      vmp_v: 41.5
+      voc_v: 49.5
+      imp_a: 13.25
+      isc_a: 14.10
 
-    nmot: # opcional (pero útil)
-      nmot_c: 43.0
-      pmax_w: 416.0
-      vmp_v: 29.5
-      imp_a: 14.10
-      voc_v: 35.9
-      isc_a: 14.82
+    coeficientes_pct_c:
+      voc: -0.28
+      vmp: -0.35
+      pmax: -0.34
 
-    coeficientes_pct_c:  # OBLIGATORIO para Voc frío
-      voc: -0.25
-      pmax: -0.34          # opcional (pero útil)
-      isc: 0.04            # opcional
 
-    limites:  # recomendado
-      v_sistema_max_v: 1500
-      fusible_max_a: 35
-      temp_oper_min_c: -40
-      temp_oper_max_c: 85
+  canadian_450:
+    marca: Canadian Solar
+    nombre: HiKu CS3W-450
+    codigo: CS3W450
 
-    mecanicos:  # opcional (layout/estructura)
-      largo_mm: 2384
-      ancho_mm: 1096
-      espesor_mm: 35
-      peso_kg: 32.6
+    stc:
+      pmax_w: 450
+      vmp_v: 41.0
+      voc_v: 49.0
+      imp_a: 10.98
+      isc_a: 11.60
 
-    fuente:  # recomendado (trazabilidad)
-      archivo: "LAC_Datasheet_Vertex550W_DEG19C.20_2020A.pdf"
-      version: "2020A"
-      notas: ""
-
-    extras: {}  # TODO lo demás que no uses aún (certs, IP, conectores, etc.)
+    coeficientes_pct_c:
+      voc: -0.29
+      pmax: -0.37   # tu loader usará esto como fallback para Vmp
