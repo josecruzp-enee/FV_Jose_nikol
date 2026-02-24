@@ -3,8 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Dict, Any
 
-from electrical.strings_auto import PanelSpec, InversorSpec, calcular_strings_fv
-
+from electrical.paneles.strings_auto import PanelSpec, InversorSpec, calcular_strings_auto
 
 @dataclass(frozen=True)
 class PanelFV:
