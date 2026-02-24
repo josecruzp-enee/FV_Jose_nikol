@@ -1,39 +1,48 @@
-schema: 1
 inversores:
 
-  inv_generico_5kw_2mppt:
-    marca: "Genérico"
-    nombre: "Inversor 5kW 2MPPT"
-    codigo: "GEN-5KW-2MPPT"   # si no hay, inventas uno consistente
+  growatt_min_5000tlx:
+    marca: Growatt
+    nombre: MIN 5000TL-X
+    codigo: MIN5000TLX
 
-    entrada_dc:  # OBLIGATORIO para validación
+    entrada_dc:
       vdc_max_v: 550
-      vdc_min_v: 120               # opcional si tienes
-      mppt_min_v: 120
-      mppt_max_v: 480
+      mppt_min_v: 100
+      mppt_max_v: 500
       n_mppt: 2
-      imppt_max_a: 13.0            # OBLIGATORIO (para no “adivinar”)
+      imppt_max_a: 13.5
 
-    salida_ac:  # recomendado para protecciones
+    salida_ac:
       pac_kw: 5.0
-      vac_nominal_v: 240
-      fases: 1
-      iac_max_a: 25.0              # opcional si tienes
 
-    eficiencia:  # opcional
-      max_pct: null
 
-    protecciones:  # opcional
-      ip: "IP65"
-      seccionador_dc: true
-      afci: null
+  sungrow_sg8rt:
+    marca: Sungrow
+    nombre: SG8RT
+    codigo: SG8RT
 
-    limites:  # opcional
-      temp_oper_min_c: null
-      temp_oper_max_c: null
+    entrada_dc:
+      vdc_max_v: 1100
+      mppt_min_v: 200
+      mppt_max_v: 1000
+      n_mppt: 2
+      imppt_max_a: 30
 
-    fuente:
-      archivo: ""
-      pagina: null
+    salida_ac:
+      pac_kw: 8.0
 
-    extras: {}
+
+  solis_10k_4g:
+    marca: Solis
+    nombre: Solis-10K-4G
+    codigo: SOLIS10K4G
+
+    entrada_dc:
+      vdc_max_v: 1000
+      mppt_min_v: 160
+      mppt_max_v: 850
+      n_mppt: 2
+      imppt_max_a: 26
+
+    salida_ac:
+      pac_kw: 10.0
