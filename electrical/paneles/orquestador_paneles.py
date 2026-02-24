@@ -250,8 +250,6 @@ def a_lineas_strings(cfg: Dict[str, Any]) -> List[str]:
 
     return lines
 
-from electrical.paneles.orquestador_paneles import ejecutar_calculo_strings, a_lineas_strings
-
 
 def calcular_strings_dc(
     *,
