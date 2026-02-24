@@ -255,7 +255,6 @@ def calcular_sizing_unificado(p: Datosproyecto) -> Dict[str, Any]:
     }
 
 # core/inputs_electricos.py
-from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, Dict
