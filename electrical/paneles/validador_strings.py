@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict
+from typing import Dict, Any
 
-from electrical.strings_auto import calcular_strings_fv
+from electrical.strings_auto import PanelSpec, InversorSpec, calcular_strings_fv
 
 
 @dataclass(frozen=True)
@@ -13,6 +13,7 @@ class PanelFV:
     isc: float
     imp: float
     coef_voc_pct_c: float  # ej -0.28 (%/°C)
+    pmax_w: float = 0.0    # opcional, por si quieres mostrarlo luego
 
 
 @dataclass(frozen=True)
@@ -22,13 +23,14 @@ class InversorFV:
     mppt_max: float
     imppt_max: float
     n_mppt: int
+    pac_kw: float = 0.0    # opcional, por si quieres el sizing por DC/AC
 
 
 def validar_string(panel: PanelFV, inversor: InversorFV, n_paneles_total: int, temp_min: float) -> Dict[str, Any]:
     """
     Compat UI:
-    - UI pasa n_paneles_total (no n_paneles_string).
-    - Usamos calcular_strings_fv() (motor único) para recomendar ns y validar.
+    - UI pasa n_paneles_total
+    - Motor recomienda ns y valida límites (Voc frío, MPPT, corriente).
     """
     try:
         n_total = int(n_paneles_total)
@@ -44,30 +46,32 @@ def validar_string(panel: PanelFV, inversor: InversorFV, n_paneles_total: int, t
             "warnings": ["n_paneles_total inválido (<=0)."],
         }
 
-    # Objeto mínimo con atributos esperados (sin depender de catálogos)
-    class _P: ...
-    class _I: ...
+    # Convertir explícitamente a specs del motor (cero ambigüedad)
+    p = PanelSpec(
+        pmax_w=float(panel.pmax_w or 0.0),
+        vmp_v=float(panel.vmp_stc),
+        voc_v=float(panel.voc_stc),
+        imp_a=float(panel.imp),
+        isc_a=float(panel.isc),
+        coef_voc_pct_c=float(panel.coef_voc_pct_c),
+    )
 
-    p = _P()
-    p.voc = float(panel.voc_stc)
-    p.vmp = float(panel.vmp_stc)
-    p.isc = float(panel.isc)
-    p.imp = float(panel.imp)
-    p.coef_voc_pct_c = float(panel.coef_voc_pct_c)
-
-    inv = _I()
-    inv.vdc_max = float(inversor.vdc_max)
-    inv.vmppt_min = float(inversor.mppt_min)
-    inv.vmppt_max = float(inversor.mppt_max)
-    inv.imppt_max_a = float(inversor.imppt_max)
-    inv.n_mppt = int(inversor.n_mppt)
+    inv = InversorSpec(
+        pac_kw=float(inversor.pac_kw or 0.0),
+        vdc_max_v=float(inversor.vdc_max),
+        mppt_min_v=float(inversor.mppt_min),
+        mppt_max_v=float(inversor.mppt_max),
+        n_mppt=int(inversor.n_mppt) if int(inversor.n_mppt) > 0 else 1,
+        imppt_max_a=float(inversor.imppt_max),
+    )
 
     res = calcular_strings_fv(
         n_paneles_total=n_total,
         panel=p,
         inversor=inv,
         t_min_c=float(temp_min),
-        dos_aguas=False,  # UI controla esto aparte si lo quieres luego
+        dos_aguas=False,
+        # objetivo_dc_ac / pdc_kw_objetivo: UI no lo usa aquí (solo validación)
     ) or {}
 
     if not res.get("ok", False):
@@ -99,10 +103,8 @@ def validar_string(panel: PanelFV, inversor: InversorFV, n_paneles_total: int, t
         "string_valido": bool(ok_vdc and ok_mppt and ok_corr),
         "warnings": list(res.get("warnings") or []),
         "meta": {
-            "n_paneles_total": int(n_total),
             "ns_recomendado": int(r.get("n_paneles_string") or 0),
             "n_strings_total": int(r.get("n_strings_total") or 0),
-            "strings_por_mppt": int(r.get("strings_por_mppt") or 0),
             **(res.get("meta") or {}),
         },
     }
