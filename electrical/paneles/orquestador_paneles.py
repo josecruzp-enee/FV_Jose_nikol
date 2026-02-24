@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
-<<<<<<< HEAD
+
 from .calculo_de_strings import PanelSpec, InversorSpec, calcular_strings_fv
 
 
