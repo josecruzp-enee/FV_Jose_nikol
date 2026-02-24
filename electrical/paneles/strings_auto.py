@@ -171,15 +171,29 @@ def calcular_strings_fv(
 ) -> Dict[str, Any]:
     """
     Motor único para strings (para UI/NEC/PDF).
-    Retorna un dict estable.
+    - Acepta objetos de catálogo (panel/inversor) o PanelSpec/InversorSpec.
+    - Retorna un dict estable: ok/errores/warnings/recomendacion/strings/bounds/meta
     """
-    warnings: list[str] = []
-    errores: list[str] = []
+    def _f(x: Any, default: float = 0.0) -> float:
+        try:
+            return float(x)
+        except Exception:
+            return float(default)
 
+    def _i(x: Any, default: int = 0) -> int:
+        try:
+            return int(x)
+        except Exception:
+            return int(default)
+
+    # -----------------------
+    # Normalizar entradas
+    # -----------------------
     try:
         n_total = int(n_paneles_total)
     except Exception:
         n_total = 0
+
     if n_total <= 0:
         return {
             "ok": False,
@@ -187,12 +201,51 @@ def calcular_strings_fv(
             "warnings": [],
             "recomendacion": {},
             "strings": [],
+            "bounds": {},
+            "meta": {},
         }
 
-    # Reusar lógica existente: recomendar_string() ya calcula bounds por voltaje/corriente
+    # -----------------------
+    # Convertir a PanelSpec/InversorSpec
+    # -----------------------
+    # Permitir que el caller ya pase PanelSpec/InversorSpec
+    if isinstance(panel, PanelSpec):
+        p = panel
+    else:
+        # compat catálogos: panel.w, panel.vmp, panel.voc, panel.imp, panel.isc
+        coef = _f(getattr(panel, "coef_voc_pct_c", getattr(panel, "coef_voc", -0.28)), -0.28)
+        p = PanelSpec(
+            pmax_w=_f(getattr(panel, "w", getattr(panel, "pmax_w", 0.0))),
+            vmp_v=_f(getattr(panel, "vmp", getattr(panel, "vmp_v", 0.0))),
+            voc_v=_f(getattr(panel, "voc", getattr(panel, "voc_v", 0.0))),
+            imp_a=_f(getattr(panel, "imp", getattr(panel, "imp_a", 0.0))),
+            isc_a=_f(getattr(panel, "isc", getattr(panel, "isc_a", 0.0))),
+            coef_voc_pct_c=_f(coef),
+        )
+
+    if isinstance(inversor, InversorSpec):
+        inv = inversor
+    else:
+        # compat catálogos: inv.kw_ac, inv.vdc_max, inv.vmppt_min, inv.vmppt_max, inv.n_mppt, inv.imppt_max_a/imppt_max
+        pac_kw = _f(getattr(inversor, "kw_ac", getattr(inversor, "pac_kw", 0.0)))
+        imppt = getattr(inversor, "imppt_max_a", None)
+        if imppt is None:
+            imppt = getattr(inversor, "imppt_max", 25.0)
+        inv = InversorSpec(
+            pac_kw=_f(pac_kw),
+            vdc_max_v=_f(getattr(inversor, "vdc_max", getattr(inversor, "vdc_max_v", 0.0))),
+            mppt_min_v=_f(getattr(inversor, "vmppt_min", getattr(inversor, "mppt_min_v", 0.0))),
+            mppt_max_v=_f(getattr(inversor, "vmppt_max", getattr(inversor, "mppt_max_v", 0.0))),
+            n_mppt=_i(getattr(inversor, "n_mppt", 1), 1) or 1,
+            imppt_max_a=_f(imppt, 25.0),
+        )
+
+    # -----------------------
+    # Ejecutar recomendador base
+    # -----------------------
     rec = recomendar_string(
-        panel=panel,
-        inversor=inversor,
+        panel=p,
+        inversor=inv,
         t_min_c=float(t_min_c),
         objetivo_dc_ac=float(objetivo_dc_ac) if objetivo_dc_ac is not None else 1.2,
         pdc_kw_objetivo=float(pdc_kw_objetivo) if pdc_kw_objetivo is not None else None,
@@ -205,24 +258,41 @@ def calcular_strings_fv(
             "warnings": list(rec.get("warnings") or []),
             "recomendacion": rec.get("recomendacion") or {},
             "strings": [],
+            "bounds": rec.get("bounds") or {},
+            "meta": {},
         }
 
     r = rec.get("recomendacion") or {}
-    ns = int(r.get("n_paneles_string") or 0)
+    ns = _i(r.get("n_paneles_string"), 0)
     if ns <= 0:
-        errores.append("recomendar_string no retornó n_paneles_string válido.")
-        return {"ok": False, "errores": errores, "warnings": list(rec.get("warnings") or []), "recomendacion": r, "strings": []}
+        return {
+            "ok": False,
+            "errores": ["recomendar_string no retornó n_paneles_string válido."],
+            "warnings": list(rec.get("warnings") or []),
+            "recomendacion": r,
+            "strings": [],
+            "bounds": rec.get("bounds") or {},
+            "meta": {},
+        }
 
-    n_strings_total = int(r.get("n_strings_total") or 0) or max(1, int((n_total + ns - 1) // ns))
-    strings_por_mppt = int(r.get("strings_por_mppt") or 0) or n_strings_total
+    # -----------------------
+    # Derivar strings por total paneles (si aplica)
+    # -----------------------
+    n_strings_total = _i(r.get("n_strings_total"), 0)
+    if n_strings_total <= 0:
+        n_strings_total = max(1, int((n_total + ns - 1) // ns))
 
-    # Armar lista strings por MPPT (mínimo)
-    n_mppt = int(getattr(inversor, "n_mppt", 1) or 1)
-    topologia = "2-aguas" if (dos_aguas and n_mppt >= 2) else "1-agua"
+    strings_por_mppt = _i(r.get("strings_por_mppt"), 0)
+    if strings_por_mppt <= 0:
+        strings_por_mppt = max(1, int(ceil(n_strings_total / max(inv.n_mppt, 1))))
+
+    # -----------------------
+    # Topología por MPPT
+    # -----------------------
+    topologia = "2-aguas" if (bool(dos_aguas) and inv.n_mppt >= 2) else "1-agua"
 
     strings: list[dict] = []
     if topologia == "2-aguas":
-        # reparto simple mitad/mitad
         s1 = n_strings_total // 2
         s2 = n_strings_total - s1
         parts = [(1, s1, "Techo izquierdo"), (2, s2, "Techo derecho")]
@@ -234,30 +304,54 @@ def calcular_strings_fv(
             continue
         strings.append(
             {
-                "mppt": mppt,
-                "etiqueta": etiqueta,
-                "n_series": ns,
-                "n_paralelo": n_s,  # aquí es cantidad de strings (paralelo a nivel MPPT)
-                "vmp_string_v": float(r.get("vmp_string_v") or 0.0),
-                "voc_frio_string_v": float(r.get("voc_frio_string_v") or 0.0),
-                "imp_a": float(getattr(panel, "imp", 0.0) or 0.0),
-                "isc_a": float(getattr(panel, "isc", 0.0) or 0.0),
+                "mppt": int(mppt),
+                "etiqueta": str(etiqueta),
+                "n_series": int(ns),
+                "n_paralelo": int(n_s),
+                "vmp_string_v": _f(r.get("vmp_string_v"), 0.0),
+                "voc_frio_string_v": _f(r.get("voc_frio_string_v"), 0.0),
+                "imp_a": float(p.imp_a),
+                "isc_a": float(p.isc_a),
             }
         )
 
-    out = {
+    # -----------------------
+    # Salida estable
+    # -----------------------
+    recomendacion = {
+        # core
+        "n_paneles_string": int(ns),
+        "n_strings_total": int(n_strings_total),
+        "strings_por_mppt": int(strings_por_mppt),
+        "vmp_string_v": _f(r.get("vmp_string_v"), 0.0),
+        "voc_frio_string_v": _f(r.get("voc_frio_string_v"), 0.0),
+        "i_mppt_a": _f(r.get("i_mppt_a"), 0.0),
+        # extras útiles para trazabilidad
+        "pdc_obj_kw": _f(r.get("pdc_obj_kw"), 0.0),
+        "p_string_kw_stc": _f(r.get("p_string_kw_stc"), 0.0),
+    }
+
+    meta = {
+        "n_paneles_total": int(n_total),
+        "dos_aguas": bool(dos_aguas),
+        "n_mppt": int(inv.n_mppt),
+        "t_min_c": float(t_min_c),
+    }
+    # si el catálogo trae id, lo guardamos
+    pid = getattr(panel, "id", None)
+    iid = getattr(inversor, "id", None)
+    if pid is not None:
+        meta["panel_id"] = str(pid)
+    if iid is not None:
+        meta["inversor_id"] = str(iid)
+
+    return {
         "ok": True,
         "warnings": list(rec.get("warnings") or []),
         "errores": [],
         "topologia": topologia,
-        "recomendacion": {
-            "n_paneles_string": ns,
-            "n_strings_total": n_strings_total,
-            "strings_por_mppt": strings_por_mppt,
-            "vmp_string_v": float(r.get("vmp_string_v") or 0.0),
-            "voc_frio_string_v": float(r.get("voc_frio_string_v") or 0.0),
-            "i_mppt_a": float(r.get("i_mppt_a") or 0.0),
-        },
+        "bounds": rec.get("bounds") or {},
+        "recomendacion": recomendacion,
         "strings": strings,
+        "meta": meta,
     }
-    return out
