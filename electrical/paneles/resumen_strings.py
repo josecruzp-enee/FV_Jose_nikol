@@ -32,15 +32,20 @@ def resumen_strings(res: Mapping[str, Any]) -> Dict[str, Any]:
     n_strings_total = _i(r.get("n_strings_total", r.get("n_strings", 0)), 0)
     strings_por_mppt = _i(r.get("strings_por_mppt", 0), 0)
 
+    # FIX: i_mppt_a no vive en recomendacion; viene por string.
+    i_mppt_max = 0.0
+    for s in (res.get("strings") or []):
+        i_mppt_max = max(i_mppt_max, _f(s.get("i_mppt_a", 0.0), 0.0))
+
     out = {
         "ok": bool(res.get("ok", False)),
-        "n_paneles_string": int(n_series),          # nombre legacy estable
-        "n_series": int(n_series),                  # nombre nuevo estable
+        "n_paneles_string": int(n_series),
+        "n_series": int(n_series),
         "n_strings_total": int(n_strings_total),
         "strings_por_mppt": int(strings_por_mppt),
         "vmp_string_v": _f(r.get("vmp_string_v", 0.0), 0.0),
         "voc_frio_string_v": _f(r.get("voc_frio_string_v", 0.0), 0.0),
-        "i_mppt_a": _f(r.get("i_mppt_a", 0.0), 0.0),
+        "i_mppt_a": float(i_mppt_max),
         "warnings": list(res.get("warnings") or []),
         "errores": list(res.get("errores") or []),
         "topologia": str(res.get("topologia") or ""),
