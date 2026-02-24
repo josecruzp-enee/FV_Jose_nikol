@@ -209,24 +209,41 @@ def ejecutar_calculo_strings(
 
 def a_lineas_strings(cfg: Dict[str, Any]) -> List[str]:
     """
-    Líneas listas para UI/PDF (compat con tu función anterior a_lineas).
+    Líneas listas para UI/PDF.
     Tolera claves legacy y nuevas del motor.
     """
     lines: List[str] = []
+    rec = (cfg.get("recomendacion") or {}) if isinstance(cfg, dict) else {}
+
+    # Potencia por string (kW) si viene del motor
+    p_string_kw = _f(rec.get("p_string_kw_stc", 0.0), 0.0)
+
     for s in (cfg.get("strings") or []):
         etiqueta = s.get("etiqueta", "Arreglo FV")
 
         ns = int(s.get("n_series", s.get("ns", 0)) or 0)
         np_ = int(s.get("n_paralelo", s.get("np", 1)) or 1)
-        nstr = int(s.get("n_strings", s.get("strings", 1)) or 1)
+
+        # cada paralelo representa un string
+        nstr = np_
 
         vmp = _f(s.get("vmp_string_v", s.get("vmp_V", 0.0)), 0.0)
         voc_frio = _f(s.get("voc_frio_string_v", s.get("voc_frio_V", 0.0)), 0.0)
         imp = _f(s.get("imp_a", s.get("imp_A", 0.0)), 0.0)
-        pdc = _f(s.get("pdc_kw", s.get("pdc_kW", 0.0)), 0.0)
 
-        lines.append(
-            f"{etiqueta} — {ns}S×{np_}P ({nstr} string): "
-            f"Vmp≈{vmp:.0f} V | Voc frío≈{voc_frio:.0f} V | Imp≈{imp:.1f} A | Pdc≈{pdc:.2f} kW."
-        )
+        # Pdc aproximada (STC) usando lo que sí existe en el motor
+        pdc_kw = p_string_kw * nstr if p_string_kw > 0 else 0.0
+
+        if pdc_kw > 0:
+            lines.append(
+                f"{etiqueta} — {ns}S×{np_}P ({nstr} string): "
+                f"Vmp≈{vmp:.0f} V | Voc frío≈{voc_frio:.0f} V | Imp≈{imp:.1f} A | "
+                f"Pdc≈{pdc_kw:.2f} kW."
+            )
+        else:
+            lines.append(
+                f"{etiqueta} — {ns}S×{np_}P ({nstr} string): "
+                f"Vmp≈{vmp:.0f} V | Voc frío≈{voc_frio:.0f} V | Imp≈{imp:.1f} A."
+            )
+
     return lines
