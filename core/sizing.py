@@ -165,7 +165,6 @@ def _trazabilidad(eq: Dict[str, Any], panel_id: str, inv_id: str, dc_ac: float, 
 # ==========================================================
 # API pública: ORQUESTA sizing unificado
 # ==========================================================
-from core.inputs_electricos import build_inputs_electricos_ui  # <-- agregar
 
 def calcular_sizing_unificado(p: Datosproyecto) -> Dict[str, Any]:
     eq = _leer_equipos(p)
