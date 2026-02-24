@@ -4,7 +4,7 @@ from .calculo_de_strings import (
     PanelSpec,
     InversorSpec,
 )
-
+from .orquestador_paneles import ejecutar_calculo_strings, a_lineas_strings
 __all__ = ["calcular_strings_fv"]
 
 """
