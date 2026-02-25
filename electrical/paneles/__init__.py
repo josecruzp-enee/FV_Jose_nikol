@@ -1,56 +1,47 @@
-"""
-Paneles FV — API pública del dominio paneles.
-
-Mantiene compatibilidad con imports antiguos mientras se completa el refactor.
-"""
-
+# Paneles FV — API pública del dominio paneles: exports oficiales + compatibilidad temporal de imports legacy.
 from __future__ import annotations
 
 # ===============================
-# NUEVOS NOMBRES (OFICIALES)
+# EXPORTS OFICIALES (API PÚBLICA)
 # ===============================
 from .dimensionado_paneles import calcular_panel_sizing
-from .calculo_de_strings import (
-    calcular_strings_fv,
-    calcular_strings_auto,
-    PanelSpec,
-    InversorSpec,
-)
+from .calculo_de_strings import calcular_strings_fv, InversorSpec, PanelSpec
+from .orquestador_paneles import a_lineas_strings, ejecutar_calculo_strings
+from .resumen_strings import resumen_strings
 from .validacion_strings import (
-    PanelFV,
     InversorFV,
-    validar_string,
-)
-from .orquestador_paneles import (
-    ejecutar_calculo_strings,
-    a_lineas_strings,
+    PanelFV,
+    validar_inversor,
+    validar_panel,
+    validar_parametros_generales,
 )
 
 __all__ = [
+    # Dimensionado energético
     "calcular_panel_sizing",
+    # Motor/orquestación de strings
     "calcular_strings_fv",
-    "calcular_strings_auto",
-    "PanelSpec",
-    "InversorSpec",
-    "PanelFV",
-    "InversorFV",
-    "validar_string",
     "ejecutar_calculo_strings",
     "a_lineas_strings",
+    "resumen_strings",
+    # Contratos internos
+    "PanelSpec",
+    "InversorSpec",
+    # Validación pura (sin motor)
+    "PanelFV",
+    "InversorFV",
+    "validar_panel",
+    "validar_inversor",
+    "validar_parametros_generales",
 ]
 
 # ===============================
-# PARCHE COMPATIBILIDAD (IMPORTS VIEJOS)
+# COMPATIBILIDAD LEGACY (TEMPORAL)
 # ===============================
 import importlib
 import sys
 
-# Asegurar módulos cargados
-_mod_dimensionado = importlib.import_module(__name__ + ".dimensionado_paneles")
-_mod_validacion = importlib.import_module(__name__ + ".validacion_strings")
-_mod_calculo = importlib.import_module(__name__ + ".calculo_de_strings")
-
-# Aliases para imports viejos (mantener mientras migra el código legacy)
-sys.modules[__name__ + ".sizing_panel"] = _mod_dimensionado
-sys.modules[__name__ + ".validador_strings"] = _mod_validacion
-sys.modules[__name__ + ".strings_auto"] = _mod_calculo
+# Alias de módulos antiguos (mantener mientras migras imports en el repo).
+sys.modules.setdefault(__name__ + ".sizing_panel", importlib.import_module(__name__ + ".dimensionado_paneles"))
+sys.modules.setdefault(__name__ + ".validador_strings", importlib.import_module(__name__ + ".validacion_strings"))
+sys.modules.setdefault(__name__ + ".strings_auto", importlib.import_module(__name__ + ".calculo_de_strings"))
