@@ -1,9 +1,12 @@
+# electrical/paneles/orquestador_paneles.py
 # Orquestador del dominio paneles: normaliza entradas, valida coherencia mínima y ejecuta el motor único de strings FV.
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
 from .calculo_de_strings import InversorSpec, PanelSpec, calcular_strings_fv
+from .dimensionado_paneles import calcular_panel_sizing
+from .resumen_strings import resumen_strings
 from .validacion_strings import (
     validar_inversor,
     validar_panel,
@@ -194,6 +197,83 @@ def ejecutar_calculo_strings(
     out["warnings"] = list(out.get("warnings") or []) + warnings
 
     return out
+
+
+# Orquestador único del dominio (modo demanda): consumo + cobertura => sizing => strings => resumen.
+def ejecutar_paneles_por_demanda(
+    *,
+    consumo_12m_kwh: float,
+    cobertura_pct: float,
+    panel: Any,
+    inversor: Any,
+    t_min_c: float,
+    dos_aguas: bool = False,
+    objetivo_dc_ac: float | None = None,
+    t_oper_c: float | None = None,
+) -> Dict[str, Any]:
+    """
+    Entrada mínima UI:
+      - consumo_12m_kwh, cobertura_pct, panel(catálogo), inversor(catálogo), t_min_c, dos_aguas (opcional)
+
+    Devuelve paquete unificado:
+      - sizing (n_paneles, pdc_kw, etc)
+      - strings (raw)
+      - resumen (shape estable UI/PDF)
+    """
+    # 1) Dimensionado por energía
+    sizing = calcular_panel_sizing(
+        consumo_12m_kwh=float(consumo_12m_kwh),
+        cobertura_pct=float(cobertura_pct),
+        panel=panel,
+    )
+
+    # Soporta dataclass o dict (sin adivinar demasiado)
+    if isinstance(sizing, dict):
+        ok_sizing = bool(sizing.get("ok", True))
+        n_paneles = _i(sizing.get("n_paneles", 0), 0)
+        pdc_kw = _f(sizing.get("pdc_kw", 0.0), 0.0)
+        err_sizing = list(sizing.get("errores") or [])
+        warn_sizing = list(sizing.get("warnings") or [])
+    else:
+        ok_sizing = bool(getattr(sizing, "ok", True))
+        n_paneles = _i(getattr(sizing, "n_paneles", 0), 0)
+        pdc_kw = _f(getattr(sizing, "pdc_kw", 0.0), 0.0)
+        err_sizing = list(getattr(sizing, "errores", []) or [])
+        warn_sizing = list(getattr(sizing, "warnings", []) or [])
+
+    if (not ok_sizing) or n_paneles <= 0 or pdc_kw <= 0:
+        return {
+            "ok": False,
+            "errores": err_sizing or ["Dimensionado inválido (n_paneles/pdc_kw)."],
+            "warnings": warn_sizing,
+            "sizing": sizing,
+            "strings": {},
+            "resumen": {},
+        }
+
+    # 2) Strings (ingeniería DC) usando el motor único
+    strings_out = ejecutar_calculo_strings(
+        n_paneles_total=int(n_paneles),
+        panel=panel,
+        inversor=inversor,
+        t_min_c=float(t_min_c),
+        dos_aguas=bool(dos_aguas),
+        objetivo_dc_ac=float(objetivo_dc_ac) if objetivo_dc_ac is not None else None,
+        pdc_kw_objetivo=float(pdc_kw),
+        t_oper_c=float(t_oper_c) if t_oper_c is not None else None,
+    )
+
+    # 3) Resumen estable (UI/PDF)
+    resumen = resumen_strings(strings_out)
+
+    return {
+        "ok": bool(strings_out.get("ok")),
+        "errores": err_sizing + list(strings_out.get("errores") or []),
+        "warnings": warn_sizing + list(strings_out.get("warnings") or []),
+        "sizing": sizing,
+        "strings": strings_out,
+        "resumen": resumen,
+    }
 
 
 # Convierte resultado a líneas legibles (UI/PDF).
