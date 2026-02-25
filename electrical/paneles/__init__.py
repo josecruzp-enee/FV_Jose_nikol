@@ -35,13 +35,3 @@ __all__ = [
     "validar_parametros_generales",
 ]
 
-# ===============================
-# COMPATIBILIDAD LEGACY (TEMPORAL)
-# ===============================
-import importlib
-import sys
-
-# Alias de módulos antiguos (mantener mientras migras imports en el repo).
-sys.modules.setdefault(__name__ + ".sizing_panel", importlib.import_module(__name__ + ".dimensionado_paneles"))
-sys.modules.setdefault(__name__ + ".validador_strings", importlib.import_module(__name__ + ".validacion_strings"))
-sys.modules.setdefault(__name__ + ".strings_auto", importlib.import_module(__name__ + ".calculo_de_strings"))
