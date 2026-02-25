@@ -1,89 +1,61 @@
-# Validación del dominio paneles: verifica coherencia de datos de entrada sin ejecutar cálculos FV.
+# Validación del dominio paneles: verifica coherencia de datos eléctricos antes de ejecutar el motor FV.
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any, List, Tuple
+from typing import List, Tuple
+
+from .calculo_de_strings import PanelSpec, InversorSpec
 
 
-# Modelo simple de panel usado solo para validar datos provenientes de UI/API.
-@dataclass(frozen=True)
-class PanelFV:
-    voc_stc: float
-    vmp_stc: float
-    isc: float
-    imp: float
-    coef_voc_pct_c: float
-    pmax_w: float = 0.0
-
-
-# Modelo simple de inversor usado solo para validar datos provenientes de UI/API.
-@dataclass(frozen=True)
-class InversorFV:
-    vdc_max: float
-    mppt_min: float
-    mppt_max: float
-    imppt_max: float
-    n_mppt: int
-    pac_kw: float = 0.0
-
-
-# Convierte cualquier valor a float seguro.
-def _f(x: Any, default: float = 0.0) -> float:
-    try:
-        return float(x)
-    except Exception:
-        return float(default)
-
-
-# Convierte cualquier valor a entero seguro.
-def _i(x: Any, default: int = 0) -> int:
-    try:
-        return int(x)
-    except Exception:
-        return int(default)
-
-
-# Valida coherencia básica de parámetros del panel FV.
-def validar_panel(panel: PanelFV) -> Tuple[List[str], List[str]]:
+# Valida coherencia básica de parámetros del panel FV usando el contrato interno PanelSpec.
+def validar_panel(panel: PanelSpec) -> Tuple[List[str], List[str]]:
     errores: List[str] = []
     warnings: List[str] = []
 
-    if panel.voc_stc <= 0 or panel.vmp_stc <= 0:
+    if panel.voc_v <= 0 or panel.vmp_v <= 0:
         errores.append("Panel inválido: Voc/Vmp deben ser > 0.")
 
-    if panel.isc <= 0 or panel.imp <= 0:
+    if panel.isc_a <= 0 or panel.imp_a <= 0:
         errores.append("Panel inválido: Isc/Imp deben ser > 0.")
+
+    if panel.pmax_w <= 0:
+        warnings.append("pmax_w <= 0 (revisar catálogo del panel).")
 
     if panel.coef_voc_pct_c >= 0:
         warnings.append("coef_voc_pct_c normalmente es negativo.")
 
+    if panel.coef_vmp_pct_c >= 0:
+        warnings.append("coef_vmp_pct_c normalmente es negativo.")
+
     return errores, warnings
 
 
-# Valida coherencia básica de parámetros del inversor.
-def validar_inversor(inversor: InversorFV) -> Tuple[List[str], List[str]]:
+# Valida coherencia básica de parámetros del inversor usando el contrato interno InversorSpec.
+def validar_inversor(inversor: InversorSpec) -> Tuple[List[str], List[str]]:
     errores: List[str] = []
     warnings: List[str] = []
 
-    if inversor.vdc_max <= 0:
-        errores.append("Inversor inválido: vdc_max <= 0.")
+    if inversor.vdc_max_v <= 0:
+        errores.append("Inversor inválido: vdc_max_v <= 0.")
 
-    if inversor.mppt_min <= 0 or inversor.mppt_max <= 0:
+    if inversor.mppt_min_v <= 0 or inversor.mppt_max_v <= 0:
         errores.append("Inversor inválido: ventana MPPT inválida.")
 
-    if inversor.mppt_min >= inversor.mppt_max:
-        errores.append("mppt_min debe ser menor que mppt_max.")
+    if inversor.mppt_min_v >= inversor.mppt_max_v:
+        errores.append("mppt_min_v debe ser menor que mppt_max_v.")
 
-    if inversor.imppt_max <= 0:
-        errores.append("imppt_max debe ser > 0 (dato obligatorio datasheet).")
+    if inversor.imppt_max_a <= 0:
+        errores.append("imppt_max_a debe ser > 0 (dato obligatorio datasheet).")
 
     if inversor.n_mppt <= 0:
         errores.append("n_mppt inválido.")
 
+    if inversor.vdc_max_v < inversor.mppt_max_v:
+        warnings.append("vdc_max_v < mppt_max_v (revisar datasheet).")
+
     return errores, warnings
 
 
-# Valida parámetros generales del cálculo de strings.
+# Valida parámetros generales previos al cálculo de strings.
 def validar_parametros_generales(
     n_paneles_total: int,
     temp_min: float,
@@ -91,7 +63,7 @@ def validar_parametros_generales(
     errores: List[str] = []
     warnings: List[str] = []
 
-    if _i(n_paneles_total, 0) <= 0:
+    if int(n_paneles_total) <= 0:
         errores.append("n_paneles_total inválido (<=0).")
 
     try:
