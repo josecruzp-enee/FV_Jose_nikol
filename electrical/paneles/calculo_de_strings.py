@@ -91,6 +91,7 @@ def _score_n(*, n_series: int, panel: PanelSpec, inv: InversorSpec, t_oper_c: fl
 def _split_por_mppt(*, n_strings_total: int, n_mppt: int, dos_aguas: bool) -> List[Dict[str, Any]]:
     if n_strings_total <= 0:
         return []
+
     if bool(dos_aguas) and n_mppt >= 2:
         s1 = n_strings_total // 2
         s2 = n_strings_total - s1
@@ -99,6 +100,7 @@ def _split_por_mppt(*, n_strings_total: int, n_mppt: int, dos_aguas: bool) -> Li
             {"mppt": 2, "n_strings": s2, "etiqueta": "Techo derecho"},
         ]
         return [r for r in ramas if r["n_strings"] > 0]
+
     return [{"mppt": 1, "n_strings": int(n_strings_total), "etiqueta": "Arreglo FV"}]
 
 
@@ -159,7 +161,9 @@ def recomendar_string(
         )
 
     if vmp_stc_string_v > inversor.mppt_max_v + 1e-9:
-        warnings.append(f"Vmp STC por encima de MPPT_max (referencial): {vmp_stc_string_v:.1f} V > {inversor.mppt_max_v:.1f} V.")
+        warnings.append(
+            f"Vmp STC por encima de MPPT_max (referencial): {vmp_stc_string_v:.1f} V > {inversor.mppt_max_v:.1f} V."
+        )
 
     return {
         "ok": len(errores) == 0,
@@ -196,15 +200,42 @@ def calcular_strings_fv(
 
     n_total = _i(n_paneles_total, 0)
     if n_total <= 0:
-        return {"ok": False, "errores": ["n_paneles_total inválido (<=0)."], "warnings": [], "topologia": "N/A", "bounds": {}, "recomendacion": {}, "strings": [], "meta": {}}
+        return {
+            "ok": False,
+            "errores": ["n_paneles_total inválido (<=0)."],
+            "warnings": [],
+            "topologia": "N/A",
+            "bounds": {},
+            "recomendacion": {},
+            "strings": [],
+            "meta": {},
+        }
 
     try:
         tmin = float(t_min_c)
     except Exception:
-        return {"ok": False, "errores": ["t_min_c inválido (no convertible a número)."], "warnings": [], "topologia": "N/A", "bounds": {}, "recomendacion": {}, "strings": [], "meta": {"n_paneles_total": int(n_total), "dos_aguas": bool(dos_aguas)}}
+        return {
+            "ok": False,
+            "errores": ["t_min_c inválido (no convertible a número)."],
+            "warnings": [],
+            "topologia": "N/A",
+            "bounds": {},
+            "recomendacion": {},
+            "strings": [],
+            "meta": {"n_paneles_total": int(n_total), "dos_aguas": bool(dos_aguas)},
+        }
 
     if not isinstance(panel, PanelSpec) or not isinstance(inversor, InversorSpec):
-        return {"ok": False, "errores": ["calcular_strings_fv requiere PanelSpec e InversorSpec (normaliza en orquestador)."], "warnings": [], "topologia": "N/A", "bounds": {}, "recomendacion": {}, "strings": [], "meta": {"n_paneles_total": int(n_total), "dos_aguas": bool(dos_aguas), "t_min_c": tmin}}
+        return {
+            "ok": False,
+            "errores": ["calcular_strings_fv requiere PanelSpec e InversorSpec (normaliza en orquestador)."],
+            "warnings": [],
+            "topologia": "N/A",
+            "bounds": {},
+            "recomendacion": {},
+            "strings": [],
+            "meta": {"n_paneles_total": int(n_total), "dos_aguas": bool(dos_aguas), "t_min_c": tmin},
+        }
 
     p: PanelSpec = panel
     inv: InversorSpec = inversor
@@ -221,7 +252,16 @@ def calcular_strings_fv(
         errores.append("Inversor inválido: imppt_max_a debe ser > 0.")
 
     if errores:
-        return {"ok": False, "errores": errores, "warnings": warnings, "topologia": "N/A", "bounds": {}, "recomendacion": {}, "strings": [], "meta": {"n_paneles_total": int(n_total), "dos_aguas": bool(dos_aguas), "t_min_c": tmin}}
+        return {
+            "ok": False,
+            "errores": errores,
+            "warnings": warnings,
+            "topologia": "N/A",
+            "bounds": {},
+            "recomendacion": {},
+            "strings": [],
+            "meta": {"n_paneles_total": int(n_total), "dos_aguas": bool(dos_aguas), "t_min_c": tmin},
+        }
 
     t_oper = float(t_oper_c) if t_oper_c is not None else 55.0
 
@@ -345,8 +385,13 @@ def calcular_strings_fv(
         "t_oper_c": float(t_oper),
     }
 
-    return {"ok": True, "errores": [], "warnings": list(rec.get("warnings") or []), "topologia": topologia, "bounds": rec.get("bounds") or {}, "recomendacion": recomendacion, "strings": strings, "meta": meta}
-
-
-# Alias legado: mantener temporalmente hasta eliminar referencias en el repo.
-calcular_strings_auto = calcular_strings_fv
+    return {
+        "ok": True,
+        "errores": [],
+        "warnings": list(rec.get("warnings") or []),
+        "topologia": topologia,
+        "bounds": rec.get("bounds") or {},
+        "recomendacion": recomendacion,
+        "strings": strings,
+        "meta": meta,
+    }
