@@ -1,4 +1,4 @@
-# Orquestador del dominio paneles: normaliza entradas, valida coherencia mínima y ejecuta el motor de strings FV.
+# Orquestador del dominio paneles: normaliza entradas, valida coherencia mínima y ejecuta el motor único de strings FV.
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
@@ -27,15 +27,13 @@ def _i(x: Any, default: int = 0) -> int:
         return int(default)
 
 
-# Normaliza objetos de panel (legacy/nuevo/UI) al contrato interno PanelSpec.
+# Normaliza panel (legacy/nuevo/UI) al contrato interno PanelSpec.
 def _as_panel_spec(panel: Any) -> PanelSpec:
     if isinstance(panel, PanelSpec):
         return panel
 
     coef_voc = _f(
-        getattr(panel, "coef_voc_pct_c",
-                getattr(panel, "coef_voc",
-                        getattr(panel, "tc_voc_pct_c", -0.28))),
+        getattr(panel, "coef_voc_pct_c", getattr(panel, "coef_voc", getattr(panel, "tc_voc_pct_c", -0.28))),
         -0.28,
     )
 
@@ -58,7 +56,7 @@ def _as_panel_spec(panel: Any) -> PanelSpec:
     )
 
 
-# Normaliza objetos de inversor (legacy/nuevo/UI) al contrato interno InversorSpec.
+# Normaliza inversor (legacy/nuevo/UI) al contrato interno InversorSpec.
 def _as_inversor_spec(inversor: Any) -> InversorSpec:
     if isinstance(inversor, InversorSpec):
         return inversor
@@ -80,7 +78,7 @@ def _as_inversor_spec(inversor: Any) -> InversorSpec:
     )
 
 
-# Ejecuta el cálculo completo de strings FV.
+# Ejecuta el cálculo completo de strings: normaliza, valida, llama al motor y unifica salida.
 def ejecutar_calculo_strings(
     *,
     n_paneles_total: Optional[int],
@@ -92,7 +90,6 @@ def ejecutar_calculo_strings(
     pdc_kw_objetivo: float | None = None,
     t_oper_c: float | None = None,
 ) -> Dict[str, Any]:
-
     errores: List[str] = []
     warnings: List[str] = []
 
@@ -114,7 +111,7 @@ def ejecutar_calculo_strings(
     except Exception:
         return {
             "ok": False,
-            "errores": ["t_min_c inválido."],
+            "errores": ["t_min_c inválido (no convertible a número)."],
             "warnings": [],
             "topologia": "N/A",
             "strings": [],
@@ -123,14 +120,14 @@ def ejecutar_calculo_strings(
             "meta": {"n_paneles_total": n_total, "dos_aguas": bool(dos_aguas)},
         }
 
-    # temperatura operativa
+    # Temperatura operativa (conservador por defecto).
     t_oper = float(t_oper_c) if t_oper_c is not None else 55.0
 
-    # --- normalización ---
+    # Normalización a contrato interno estable.
     p = _as_panel_spec(panel)
     inv = _as_inversor_spec(inversor)
 
-    # --- validación dominio ---
+    # Validación dominio (pura, sin cálculos de strings).
     e, w = validar_panel(p)
     errores += e
     warnings += w
@@ -157,10 +154,12 @@ def ejecutar_calculo_strings(
                 "dos_aguas": bool(dos_aguas),
                 "t_min_c": tmin,
                 "t_oper_c": t_oper,
+                "panel_spec": p.__dict__ if hasattr(p, "__dict__") else {},
+                "inversor_spec": inv.__dict__ if hasattr(inv, "__dict__") else {},
             },
         }
 
-    # --- motor FV ---
+    # Motor FV (único).
     out = calcular_strings_fv(
         n_paneles_total=n_total,
         panel=p,
@@ -170,16 +169,28 @@ def ejecutar_calculo_strings(
         objetivo_dc_ac=float(objetivo_dc_ac) if objetivo_dc_ac is not None else None,
         pdc_kw_objetivo=float(pdc_kw_objetivo) if pdc_kw_objetivo is not None else None,
         t_oper_c=t_oper,
-    )
+    ) or {}
 
+    # Normaliza contrato de salida.
+    out.setdefault("ok", False)
+    out.setdefault("errores", [])
+    out.setdefault("warnings", [])
+    out.setdefault("topologia", "N/A")
+    out.setdefault("strings", [])
+    out.setdefault("recomendacion", {})
+    out.setdefault("bounds", {})
     out.setdefault("meta", {})
-    out["meta"].update({
-        "n_paneles_total": n_total,
-        "dos_aguas": bool(dos_aguas),
-        "t_min_c": tmin,
-        "t_oper_c": t_oper,
-    })
 
+    meta = out["meta"] if isinstance(out.get("meta"), dict) else {}
+    meta.setdefault("n_paneles_total", n_total)
+    meta.setdefault("dos_aguas", bool(dos_aguas))
+    meta.setdefault("t_min_c", tmin)
+    meta.setdefault("t_oper_c", t_oper)
+    meta.setdefault("panel_spec", p.__dict__ if hasattr(p, "__dict__") else {})
+    meta.setdefault("inversor_spec", inv.__dict__ if hasattr(inv, "__dict__") else {})
+    out["meta"] = meta
+
+    # Agrega warnings locales del orquestador.
     out["warnings"] = list(out.get("warnings") or []) + warnings
 
     return out
@@ -188,30 +199,37 @@ def ejecutar_calculo_strings(
 # Convierte resultado a líneas legibles (UI/PDF).
 def a_lineas_strings(cfg: Dict[str, Any]) -> List[str]:
     lines: List[str] = []
-    rec = cfg.get("recomendacion") or {}
-    p_string_kw = _f(rec.get("p_string_kw_stc", 0.0))
+    cfg = dict(cfg or {})
+    rec = (cfg.get("recomendacion") or {}) if isinstance(cfg.get("recomendacion"), dict) else {}
+    p_string_kw = _f(rec.get("p_string_kw_stc", 0.0), 0.0)
 
-    for s in cfg.get("strings") or []:
-        etiqueta = s.get("etiqueta", "Arreglo FV")
-        ns = int(s.get("n_series", 0))
-        np_ = int(s.get("n_paralelo", 1))
+    for s in (cfg.get("strings") or []):
+        etiqueta = str(s.get("etiqueta") or "Arreglo FV")
+        ns = _i(s.get("n_series", s.get("ns", 0)), 0)
+        np_ = _i(s.get("n_paralelo", s.get("np", 1)), 1) or 1
 
-        vmp = _f(s.get("vmp_string_v", 0.0))
-        voc_frio = _f(s.get("voc_frio_string_v", 0.0))
-        imp = _f(s.get("imp_a", 0.0))
+        vmp = _f(s.get("vmp_string_v", s.get("vmp_V", 0.0)), 0.0)  # Vmp caliente
+        voc_frio = _f(s.get("voc_frio_string_v", s.get("voc_frio_V", 0.0)), 0.0)
+        imp = _f(s.get("imp_a", s.get("imp_A", 0.0)), 0.0)
 
-        pdc_kw = p_string_kw * np_
+        pdc_kw = p_string_kw * float(np_) if p_string_kw > 0 else 0.0
 
-        lines.append(
-            f"{etiqueta} — {ns}S×{np_}P: "
-            f"Vmp_hot≈{vmp:.0f} V | Voc_frío≈{voc_frio:.0f} V | "
-            f"Imp≈{imp:.1f} A | Pdc≈{pdc_kw:.2f} kW."
-        )
+        if pdc_kw > 0:
+            lines.append(
+                f"{etiqueta} — {ns}S×{np_}P ({np_} string): "
+                f"Vmp_hot≈{vmp:.0f} V | Voc_frío≈{voc_frio:.0f} V | Imp≈{imp:.1f} A | "
+                f"Pdc≈{pdc_kw:.2f} kW."
+            )
+        else:
+            lines.append(
+                f"{etiqueta} — {ns}S×{np_}P ({np_} string): "
+                f"Vmp_hot≈{vmp:.0f} V | Voc_frío≈{voc_frio:.0f} V | Imp≈{imp:.1f} A."
+            )
 
     return lines
 
 
-# Alias simple
+# Alias simple: ejecuta strings DC desde inputs simples (compatibilidad).
 def calcular_strings_dc(
     *,
     n_paneles: int,
@@ -221,13 +239,14 @@ def calcular_strings_dc(
     t_min_c: float = 10.0,
 ) -> Dict[str, Any]:
     return ejecutar_calculo_strings(
-        n_paneles_total=n_paneles,
+        n_paneles_total=int(n_paneles),
         panel=panel,
         inversor=inversor,
-        dos_aguas=dos_aguas,
-        t_min_c=t_min_c,
+        dos_aguas=bool(dos_aguas),
+        t_min_c=float(t_min_c),
     )
 
 
+# Alias de compatibilidad para líneas de salida.
 def a_lineas(cfg: Dict[str, Any]) -> List[str]:
     return a_lineas_strings(cfg)
