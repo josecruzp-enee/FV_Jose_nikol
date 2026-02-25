@@ -226,7 +226,7 @@ def calcular_sizing_unificado(p: Datosproyecto) -> Dict[str, Any]:
         "inversor_recomendado_meta": sizing_inv.get("inversor_recomendado_meta", {}),
 
         # Strings NO aquí
-        "strings_auto": {"ok": False, "warnings": ["Strings se calculan en Paso 5 (Ingeniería eléctrica)."]},
+        "strings": {"ok": False, "warnings": ["Strings se calculan en Paso 5 (Ingeniería eléctrica)."]},
 
         "traza": {
             "panel_id": _panel_id(eq),
