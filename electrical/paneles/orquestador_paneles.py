@@ -80,7 +80,7 @@ def _as_inversor_spec(inversor: Any) -> InversorSpec:
             imppt_max_a=_f(getattr(inversor, "imppt_max", 0.0), 0.0),
         )
 
-    # --- imppt_max_a: OBLIGATORIO para cálculo "a norma" ---
+    # imppt_max_a es obligatorio a norma (si falta, el motor lo marcará inválido).
     imppt = getattr(inversor, "imppt_max_a", None)
     if imppt is None:
         imppt = getattr(inversor, "imppt_max", None)
@@ -113,7 +113,7 @@ def ejecutar_calculo_strings(
     errores: List[str] = []
     warnings: List[str] = []
 
-    # Nota: para strings "a norma" mantenemos n_paneles_total requerido (derivado del sizing).
+    # Para strings a norma, n_paneles_total debe venir derivado del dimensionado energético.
     n_total = _i(n_paneles_total, 0) if n_paneles_total is not None else 0
     if n_total <= 0:
         return {
@@ -141,14 +141,19 @@ def ejecutar_calculo_strings(
             "meta": {"n_paneles_total": n_total, "dos_aguas": bool(dos_aguas)},
         }
 
-    # Validación básica (sin cálculos) a través de los validadores puros.
-    # Si panel/inversor no son PanelFV/InversorFV, creamos “vista” mínima para validar.
+    # Temperatura operativa: default conservador si no viene del payload.
+    t_oper = float(t_oper_c) if t_oper_c is not None else 55.0
+
+    # Validación básica (sin cálculos) a través de validadores puros.
     panel_v = panel if isinstance(panel, PanelFV) else PanelFV(
         voc_stc=_f(getattr(panel, "voc_stc", getattr(panel, "voc", getattr(panel, "voc_v", 0.0))), 0.0),
         vmp_stc=_f(getattr(panel, "vmp_stc", getattr(panel, "vmp", getattr(panel, "vmp_v", 0.0))), 0.0),
         isc=_f(getattr(panel, "isc", getattr(panel, "isc_a", 0.0)), 0.0),
         imp=_f(getattr(panel, "imp", getattr(panel, "imp_a", 0.0)), 0.0),
-        coef_voc_pct_c=_f(getattr(panel, "coef_voc_pct_c", getattr(panel, "coef_voc", getattr(panel, "tc_voc_pct_c", -0.28))), -0.28),
+        coef_voc_pct_c=_f(
+            getattr(panel, "coef_voc_pct_c", getattr(panel, "coef_voc", getattr(panel, "tc_voc_pct_c", -0.28))),
+            -0.28,
+        ),
         pmax_w=_f(getattr(panel, "pmax_w", getattr(panel, "w", 0.0)), 0.0),
     )
 
@@ -196,6 +201,7 @@ def ejecutar_calculo_strings(
                 "n_paneles_total": n_total,
                 "dos_aguas": bool(dos_aguas),
                 "t_min_c": tmin,
+                "t_oper_c": float(t_oper),
                 "panel_spec": p.__dict__ if hasattr(p, "__dict__") else {},
                 "inversor_spec": inv.__dict__ if hasattr(inv, "__dict__") else {},
             },
@@ -209,7 +215,7 @@ def ejecutar_calculo_strings(
         dos_aguas=bool(dos_aguas),
         objetivo_dc_ac=float(objetivo_dc_ac) if objetivo_dc_ac is not None else None,
         pdc_kw_objetivo=float(pdc_kw_objetivo) if pdc_kw_objetivo is not None else None,
-        # Nota: t_oper_c aún no está plumbed al motor en tu firma; queda guardado en meta para el siguiente paso.
+        t_oper_c=float(t_oper),  # ✅ ya viaja al motor
     )
 
     out.setdefault("ok", False)
@@ -225,8 +231,7 @@ def ejecutar_calculo_strings(
     meta.setdefault("n_paneles_total", n_total)
     meta.setdefault("dos_aguas", bool(dos_aguas))
     meta.setdefault("t_min_c", tmin)
-    if t_oper_c is not None:
-        meta.setdefault("t_oper_c", float(t_oper_c))
+    meta.setdefault("t_oper_c", float(t_oper))
     meta.setdefault("panel_spec", p.__dict__ if hasattr(p, "__dict__") else {})
     meta.setdefault("inversor_spec", inv.__dict__ if hasattr(inv, "__dict__") else {})
     out["meta"] = meta
