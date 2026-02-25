@@ -1,4 +1,5 @@
-# Paneles FV — API pública del dominio paneles: exports oficiales + compatibilidad temporal de imports legacy.
+# electrical/paneles/__init__.py
+# Paneles FV — API pública del dominio paneles: exports oficiales.
 from __future__ import annotations
 
 # ===============================
@@ -6,7 +7,11 @@ from __future__ import annotations
 # ===============================
 from .dimensionado_paneles import calcular_panel_sizing
 from .calculo_de_strings import calcular_strings_fv, InversorSpec, PanelSpec
-from .orquestador_paneles import a_lineas_strings, ejecutar_calculo_strings
+from .orquestador_paneles import (
+    a_lineas_strings,
+    ejecutar_calculo_strings,
+    ejecutar_paneles_por_demanda,
+)
 from .resumen_strings import resumen_strings
 from .validacion_strings import (
     InversorFV,
@@ -17,6 +22,8 @@ from .validacion_strings import (
 )
 
 __all__ = [
+    # Orquestación (entrada UI)
+    "ejecutar_paneles_por_demanda",
     # Dimensionado energético
     "calcular_panel_sizing",
     # Motor/orquestación de strings
@@ -34,4 +41,3 @@ __all__ = [
     "validar_inversor",
     "validar_parametros_generales",
 ]
-
