@@ -1,11 +1,17 @@
-# electrical/conductores/calculo_conductores.py
 """
-Motor de dimensionamiento de conductores FV Engine.
+calculo_conductores.py — FV Engine
+
+Motor de dimensionamiento de conductores.
 
 Responsabilidad:
-- Selección de calibre por ampacidad NEC ajustada.
+- Selección de calibre por ampacidad ajustada (derating).
 - Verificación y mejora por caída de tensión.
 - Entrega de resultado estable para UI/PDF/orquestador.
+
+Notas normativas:
+- Ampacidad base proviene de tablas (referencial; luego migrar a NEC 310.16 completo).
+- Correcciones por temperatura y CCC: NEC 310.15(B)(1) y 310.15(C)(1).
+- Caída de tensión: guía práctica basada en NEC 215.2 y 210.19 (Informational Notes).
 """
 
 from __future__ import annotations
@@ -19,13 +25,22 @@ from electrical.conductores.modelo_tramo import (
     mejorar_por_vd as _mejorar_por_vd_base,
 )
 
+# Referencias normativas utilizadas en este módulo
+NEC_REFERENCIAS = [
+    "NEC 310.15(B)(1) - Ambient Temperature Correction",
+    "NEC 310.15(C)(1) - Adjustment Factors for CCC",
+    "NEC 215.2(A)(1) Informational Note - Voltage Drop Guidance",
+    "NEC 210.19(A)(1) Informational Note - Voltage Drop Guidance",
+    # "NEC 310.16 - Ampacity Tables (pendiente: migrar tablas completas)",
+]
 
-# Retorna la tabla base de conductores según material (Cu/Al).
+
+# Retorna la tabla base de conductores según material (Cu/Al) como insumo de selección.
 def tabla_conductores(material: str = "Cu") -> List[Dict[str, Any]]:
     return list(tabla_base_conductores(material))
 
 
-# Calcula caída de tensión porcentual para un tramo.
+# Calcula caída de tensión porcentual de un tramo usando el modelo físico (VD%).
 def vdrop_pct(
     i_a: float,
     r_ohm_km: float,
@@ -43,7 +58,7 @@ def vdrop_pct(
     )
 
 
-# Selecciona el primer conductor cuya ampacidad NEC ajustada soporta la corriente.
+# Selecciona el primer conductor que soporta corriente por ampacidad ajustada NEC 310.15 (temp y CCC).
 def seleccionar_por_ampacidad_nec(
     i_a: float,
     tabla: List[Dict[str, Any]],
@@ -60,6 +75,7 @@ def seleccionar_por_ampacidad_nec(
     ccc = max(1, int(ccc))
 
     for t in tabla:
+        # NEC 310.15(B)(1) + 310.15(C)(1): derating por temperatura y CCC
         amp_adj, _, _ = ampacidad_ajustada_nec(
             float(t["amp_a"]),
             float(t_amb_c),
@@ -72,7 +88,7 @@ def seleccionar_por_ampacidad_nec(
     return dict(tabla[-1])
 
 
-# Incrementa calibre hasta cumplir el objetivo de caída de tensión.
+# Incrementa calibre hasta cumplir VD objetivo siguiendo guía de caída de tensión NEC (informational notes).
 def mejorar_por_vd(
     cand: Dict[str, Any],
     *,
@@ -90,6 +106,7 @@ def mejorar_por_vd(
     if not cand or "awg" not in cand:
         cand = dict(tabla[0])
 
+    # NEC 215.2 / 210.19 Informational Notes: se recomienda limitar VD (no es mandato estricto).
     awg = _mejorar_por_vd_base(
         tabla,
         awg=str(cand["awg"]),
@@ -103,7 +120,7 @@ def mejorar_por_vd(
     return next((dict(t) for t in tabla if str(t.get("awg")) == str(awg)), dict(tabla[-1]))
 
 
-# Motor principal: dimensiona conductor por ampacidad NEC y caída de tensión.
+# Dimensiona un tramo: selecciona calibre por ampacidad (NEC 310.15) y mejora por VD (NEC informational notes).
 def tramo_conductor(
     *,
     nombre: str,
@@ -138,7 +155,7 @@ def tramo_conductor(
             "nota": f"Tabla de conductores vacía para material={material!r}.",
         }
 
-    # Selección por ampacidad
+    # Selección por ampacidad ajustada (NEC 310.15)
     cand = seleccionar_por_ampacidad_nec(
         float(i_diseno_a),
         tab,
@@ -147,7 +164,7 @@ def tramo_conductor(
         aplicar_derating=aplicar,
     )
 
-    # Mejora por caída de tensión
+    # Mejora por caída de tensión (NEC 215.2 / 210.19 Informational Notes)
     best = mejorar_por_vd(
         cand,
         i_a=float(i_diseno_a),
@@ -158,7 +175,7 @@ def tramo_conductor(
         n_hilos=int(n_hilos),
     )
 
-    # Cálculos finales
+    # Cálculos finales de verificación
     amp_adj, f_t, f_c = ampacidad_ajustada_nec(float(best["amp_a"]), t_amb_c, ccc, aplicar=aplicar)
     r_ohm_km = float(best["r_ohm_km"])
     vd_pct = vdrop_pct(float(i_diseno_a), r_ohm_km, float(l_m), float(v_base_v), n_hilos=int(n_hilos))
