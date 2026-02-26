@@ -67,7 +67,6 @@ def seleccionar_por_ampacidad_nec(
     ccc: int,
     aplicar_derating: bool,
 ) -> Dict[str, Any]:
-
     if not tabla:
         return {}
 
@@ -75,7 +74,6 @@ def seleccionar_por_ampacidad_nec(
     ccc = max(1, int(ccc))
 
     for t in tabla:
-        # NEC 310.15(B)(1) + 310.15(C)(1): derating por temperatura y CCC
         amp_adj, _, _ = ampacidad_ajustada_nec(
             float(t["amp_a"]),
             float(t_amb_c),
@@ -99,14 +97,12 @@ def mejorar_por_vd(
     tabla: List[Dict[str, Any]],
     n_hilos: int,
 ) -> Dict[str, Any]:
-
     if not tabla:
         return {}
 
     if not cand or "awg" not in cand:
         cand = dict(tabla[0])
 
-    # NEC 215.2 / 210.19 Informational Notes: se recomienda limitar VD (no es mandato estricto).
     awg = _mejorar_por_vd_base(
         tabla,
         awg=str(cand["awg"]),
@@ -132,7 +128,6 @@ def tramo_conductor(
     n_hilos: int = 2,
     nec: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-
     if i_diseno_a <= 0 or l_m <= 0 or v_base_v <= 0:
         return {
             "nombre": nombre,
@@ -155,7 +150,6 @@ def tramo_conductor(
             "nota": f"Tabla de conductores vacía para material={material!r}.",
         }
 
-    # Selección por ampacidad ajustada (NEC 310.15)
     cand = seleccionar_por_ampacidad_nec(
         float(i_diseno_a),
         tab,
@@ -164,7 +158,6 @@ def tramo_conductor(
         aplicar_derating=aplicar,
     )
 
-    # Mejora por caída de tensión (NEC 215.2 / 210.19 Informational Notes)
     best = mejorar_por_vd(
         cand,
         i_a=float(i_diseno_a),
@@ -175,7 +168,6 @@ def tramo_conductor(
         n_hilos=int(n_hilos),
     )
 
-    # Cálculos finales de verificación
     amp_adj, f_t, f_c = ampacidad_ajustada_nec(float(best["amp_a"]), t_amb_c, ccc, aplicar=aplicar)
     r_ohm_km = float(best["r_ohm_km"])
     vd_pct = vdrop_pct(float(i_diseno_a), r_ohm_km, float(l_m), float(v_base_v), n_hilos=int(n_hilos))
@@ -223,3 +215,103 @@ def tramo_conductor(
         out["nota"] = " ".join(notas)
 
     return out
+
+
+# Wrapper DC legacy: calcula i_diseno y delega a tramo_conductor() (motor único).
+def tramo_dc_ref(
+    *,
+    vmp_v: float,
+    imp_a: float,
+    isc_a: Optional[float],
+    dist_m: float,
+    factor_seguridad: float = 1.25,
+    vd_obj_pct: float = 2.0,
+    material: str = "Cu",
+    nec: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    base_i = float(isc_a) if isc_a is not None else float(imp_a)
+    i_diseno = float(base_i) * float(factor_seguridad)
+
+    res = tramo_conductor(
+        nombre="TRAMO_DC",
+        i_diseno_a=float(i_diseno),
+        v_base_v=float(vmp_v),
+        l_m=float(dist_m),
+        vd_obj_pct=float(vd_obj_pct),
+        material=str(material),
+        n_hilos=2,
+        nec=nec,
+    )
+
+    # Compat: conserva campos mínimos históricos
+    res.setdefault("i_diseno_a", round(float(i_diseno), 3))
+    return res
+
+
+# Wrapper AC 1F legacy: calcula i_diseno y delega a tramo_conductor() (motor único).
+def tramo_ac_1f_ref(
+    *,
+    vac_v: float,
+    iac_a: float,
+    dist_m: float,
+    factor_seguridad: float = 1.25,
+    vd_obj_pct: float = 2.0,
+    material: str = "Cu",
+    nec: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    i_diseno = float(iac_a) * float(factor_seguridad)
+
+    res = tramo_conductor(
+        nombre="TRAMO_AC_1F",
+        i_diseno_a=float(i_diseno),
+        v_base_v=float(vac_v),
+        l_m=float(dist_m),
+        vd_obj_pct=float(vd_obj_pct),
+        material=str(material),
+        n_hilos=2,
+        nec=nec,
+    )
+
+    res.setdefault("i_diseno_a", round(float(i_diseno), 3))
+    return res
+
+
+# Wrapper AC 3F legacy: calcula i_diseno y delega a tramo_conductor() (motor único).
+def tramo_ac_3f_ref(
+    *,
+    vll_v: float,
+    iac_a: float,
+    dist_m: float,
+    factor_seguridad: float = 1.25,
+    vd_obj_pct: float = 2.0,
+    material: str = "Cu",
+    nec: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    i_diseno = float(iac_a) * float(factor_seguridad)
+
+    res = tramo_conductor(
+        nombre="TRAMO_AC_3F",
+        i_diseno_a=float(i_diseno),
+        v_base_v=float(vll_v),
+        l_m=float(dist_m),
+        vd_obj_pct=float(vd_obj_pct),
+        material=str(material),
+        n_hilos=3,
+        nec=nec,
+    )
+
+    res.setdefault("i_diseno_a", round(float(i_diseno), 3))
+    return res
+
+
+__all__ = [
+    "NEC_REFERENCIAS",
+    "tabla_conductores",
+    "vdrop_pct",
+    "seleccionar_por_ampacidad_nec",
+    "mejorar_por_vd",
+    "tramo_conductor",
+    "tramo_dc_ref",
+    "tramo_ac_1f_ref",
+    "tramo_ac_3f_ref",
+]
