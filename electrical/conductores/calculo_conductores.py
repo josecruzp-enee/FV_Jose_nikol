@@ -1,4 +1,13 @@
 # electrical/conductores/calculo_conductores.py
+"""
+Motor de dimensionamiento de conductores FV Engine.
+
+Responsabilidad:
+- Selección de calibre por ampacidad NEC ajustada.
+- Verificación y mejora por caída de tensión.
+- Entrega de resultado estable para UI/PDF/orquestador.
+"""
+
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
@@ -11,16 +20,12 @@ from electrical.conductores.modelo_tramo import (
 )
 
 
+# Retorna la tabla base de conductores según material (Cu/Al).
 def tabla_conductores(material: str = "Cu") -> List[Dict[str, Any]]:
-    """
-    Fuente única de tabla base (ampacidad + resistencia) Cu/Al.
-
-    Formato estándar por fila:
-      {"awg": "10", "amp_a": 35, "r_ohm_km": 3.277}
-    """
     return list(tabla_base_conductores(material))
 
 
+# Calcula caída de tensión porcentual para un tramo.
 def vdrop_pct(
     i_a: float,
     r_ohm_km: float,
@@ -38,6 +43,7 @@ def vdrop_pct(
     )
 
 
+# Selecciona el primer conductor cuya ampacidad NEC ajustada soporta la corriente.
 def seleccionar_por_ampacidad_nec(
     i_a: float,
     tabla: List[Dict[str, Any]],
@@ -46,9 +52,7 @@ def seleccionar_por_ampacidad_nec(
     ccc: int,
     aplicar_derating: bool,
 ) -> Dict[str, Any]:
-    """
-    Selecciona el primer conductor cuya ampacidad ajustada NEC >= i_a.
-    """
+
     if not tabla:
         return {}
 
@@ -68,6 +72,7 @@ def seleccionar_por_ampacidad_nec(
     return dict(tabla[-1])
 
 
+# Incrementa calibre hasta cumplir el objetivo de caída de tensión.
 def mejorar_por_vd(
     cand: Dict[str, Any],
     *,
@@ -78,9 +83,7 @@ def mejorar_por_vd(
     tabla: List[Dict[str, Any]],
     n_hilos: int,
 ) -> Dict[str, Any]:
-    """
-    Si la caída de tensión excede el objetivo, sube calibre usando _mejorar_por_vd_base.
-    """
+
     if not tabla:
         return {}
 
@@ -88,7 +91,7 @@ def mejorar_por_vd(
         cand = dict(tabla[0])
 
     awg = _mejorar_por_vd_base(
-        tabla,  # tabla base con r_ohm_km
+        tabla,
         awg=str(cand["awg"]),
         i_a=float(i_a),
         v_v=float(v_base),
@@ -100,6 +103,7 @@ def mejorar_por_vd(
     return next((dict(t) for t in tabla if str(t.get("awg")) == str(awg)), dict(tabla[-1]))
 
 
+# Motor principal: dimensiona conductor por ampacidad NEC y caída de tensión.
 def tramo_conductor(
     *,
     nombre: str,
@@ -111,13 +115,7 @@ def tramo_conductor(
     n_hilos: int = 2,
     nec: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """
-    Motor único: selecciona calibre por:
-      1) ampacidad ajustada NEC (derating por temp y CCC)
-      2) mejora por caída de tensión (VD)
 
-    Salida normalizada para UI/PDF + trazabilidad.
-    """
     if i_diseno_a <= 0 or l_m <= 0 or v_base_v <= 0:
         return {
             "nombre": nombre,
@@ -140,7 +138,7 @@ def tramo_conductor(
             "nota": f"Tabla de conductores vacía para material={material!r}.",
         }
 
-    # 1) por ampacidad NEC
+    # Selección por ampacidad
     cand = seleccionar_por_ampacidad_nec(
         float(i_diseno_a),
         tab,
@@ -149,7 +147,7 @@ def tramo_conductor(
         aplicar_derating=aplicar,
     )
 
-    # 2) mejora por VD
+    # Mejora por caída de tensión
     best = mejorar_por_vd(
         cand,
         i_a=float(i_diseno_a),
@@ -160,7 +158,7 @@ def tramo_conductor(
         n_hilos=int(n_hilos),
     )
 
-    # cálculos finales del candidato seleccionado
+    # Cálculos finales
     amp_adj, f_t, f_c = ampacidad_ajustada_nec(float(best["amp_a"]), t_amb_c, ccc, aplicar=aplicar)
     r_ohm_km = float(best["r_ohm_km"])
     vd_pct = vdrop_pct(float(i_diseno_a), r_ohm_km, float(l_m), float(v_base_v), n_hilos=int(n_hilos))
@@ -169,20 +167,18 @@ def tramo_conductor(
     cumple_vd = float(vd_pct) <= float(vd_obj_pct)
     cumple = bool(cumple_amp and cumple_vd)
 
-    # salida estable (y compatible con legacy)
     out = {
         "nombre": str(nombre),
         "ok": True,
 
-        # contrato estable
         "i_diseno_a": round(float(i_diseno_a), 3),
         "l_m": round(float(l_m), 3),
         "v_base_v": round(float(v_base_v), 3),
         "material": str(material),
         "n_hilos": int(n_hilos),
 
-        "calibre": str(best["awg"]),   # preferido
-        "awg": str(best["awg"]),       # compat legacy
+        "calibre": str(best["awg"]),
+        "awg": str(best["awg"]),  # compatibilidad legacy
 
         "ampacidad_base_a": float(best["amp_a"]),
         "ampacidad_ajustada_a": round(float(amp_adj), 3),
@@ -194,16 +190,13 @@ def tramo_conductor(
         "vd_pct": round(float(vd_pct), 4),
         "vd_obj_pct": float(vd_obj_pct),
 
-        # checks
         "cumple_ampacidad": bool(cumple_amp),
         "cumple_vd": bool(cumple_vd),
         "cumple": bool(cumple),
 
-        # trazabilidad NEC
         "nec": {"t_amb_c": t_amb_c, "ccc": int(ccc), "aplicar_derating": bool(aplicar)},
     }
 
-    # si no cumple, no lo escondas: deja nota útil
     if not cumple:
         notas = []
         if not cumple_amp:
