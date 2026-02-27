@@ -6,7 +6,7 @@ from typing import List, Tuple, Dict, Any
 import pandas as pd
 import streamlit as st
 
-from electrical.paneles.validacion_strings import PanelFV, InversorFV, validar_string
+from electrical.modelos import Panel as PanelFV, Inversor as InversorFV
 from core.orquestador import ejecutar_estudio
 from core.modelo import Datosproyecto
 from electrical.catalogos.catalogos import get_panel, get_inversor
