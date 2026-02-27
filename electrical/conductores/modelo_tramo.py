@@ -8,10 +8,9 @@ Responsabilidad:
 
 from __future__ import annotations
 
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 
-# Calcula la caída de tensión porcentual en un tramo para una corriente dada.
 def caida_tension_pct(
     *,
     v: float,
@@ -20,22 +19,48 @@ def caida_tension_pct(
     r_ohm_km: float,
     n_hilos: int = 2,
 ) -> float:
-    if v <= 0 or i <= 0 or l_m <= 0 or r_ohm_km <= 0:
+    """
+    Caída de tensión porcentual usando modelo resistivo DC simplificado:
+
+        VD% = 100 * (I * R_total) / V
+        R_total = r_ohm_km * (L_km) * n_hilos
+
+    Donde n_hilos representa el número de conductores en el camino de corriente
+    (por ejemplo, 2 para ida-vuelta en DC o 1Φ con retorno).
+    """
+    try:
+        v = float(v)
+        i = float(i)
+        l_m = float(l_m)
+        r_ohm_km = float(r_ohm_km)
+        n_hilos = int(n_hilos)
+    except Exception:
         return 0.0
 
-    r_total = float(r_ohm_km) * (float(l_m) / 1000.0) * float(n_hilos)
-    return 100.0 * (float(i) * r_total) / float(v)
+    if n_hilos < 1:
+        n_hilos = 1
+
+    if v <= 0.0 or i <= 0.0 or l_m <= 0.0 or r_ohm_km <= 0.0:
+        return 0.0
+
+    r_total = r_ohm_km * (l_m / 1000.0) * float(n_hilos)
+    return 100.0 * (i * r_total) / v
 
 
-# Obtiene la resistencia (ohm/km) del calibre desde una tabla base.
 def r_de_tabla(tab: List[Dict[str, float]], awg: str) -> float:
+    """
+    Obtiene la resistencia (ohm/km) del calibre desde una tabla base.
+
+    Si no encuentra el calibre:
+      - retorna 0.0 (para que el motor detecte inconsistencia / no se "auto-corrija").
+    """
+    a = str(awg)
     for t in tab:
-        if str(t["awg"]) == str(awg):
-            return float(t["r_ohm_km"])
-    return float(tab[-1]["r_ohm_km"])
+        if str(t.get("awg")) == a:
+            return float(t.get("r_ohm_km", 0.0))
+    return 0.0
 
 
-# Incrementa calibre dentro de la tabla hasta cumplir la VD objetivo.
 def mejorar_por_vd(
     tab: List[Dict[str, float]],
     *,
@@ -46,18 +71,35 @@ def mejorar_por_vd(
     vd_obj_pct: float,
     n_hilos: int = 2,
 ) -> str:
-    idx = next((i for i, t in enumerate(tab) if str(t["awg"]) == str(awg)), 0)
+    """
+    Incrementa calibre dentro de la tabla hasta cumplir la VD objetivo.
+    Devuelve el AWG final (puede terminar en el máximo si no logra cumplir).
+    """
+    a0 = str(awg)
+    try:
+        i_a = float(i_a)
+        v_v = float(v_v)
+        l_m = float(l_m)
+        vd_obj_pct = float(vd_obj_pct)
+        n_hilos = int(n_hilos)
+    except Exception:
+        return a0
 
-    while idx < len(tab) - 1:
+    # Localiza índice inicial; si no existe, arranca en el primer calibre.
+    idx0 = next((k for k, t in enumerate(tab) if str(t.get("awg")) == a0), 0)
+
+    idx = idx0
+    while idx < len(tab):
         vd = caida_tension_pct(
             v=v_v,
             i=i_a,
             l_m=l_m,
-            r_ohm_km=float(tab[idx]["r_ohm_km"]),
+            r_ohm_km=float(tab[idx].get("r_ohm_km", 0.0)),
             n_hilos=n_hilos,
         )
-        if vd <= float(vd_obj_pct):
-            break
+        if vd <= vd_obj_pct:
+            return str(tab[idx].get("awg"))
         idx += 1
 
-    return str(tab[idx]["awg"])
+    # No cumplió ni con el máximo; devuelve el último calibre disponible.
+    return str(tab[-1].get("awg"))
