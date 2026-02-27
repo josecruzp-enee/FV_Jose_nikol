@@ -1,3 +1,7 @@
+# API pública del dominio catalogos
+
+from .modelos import Panel, Inversor
+
 from .catalogos import (
     get_panel,
     get_inversor,
@@ -8,6 +12,11 @@ from .catalogos import (
 )
 
 __all__ = [
+    # modelos
+    "Panel",
+    "Inversor",
+
+    # funciones catálogo
     "get_panel",
     "get_inversor",
     "ids_paneles",
