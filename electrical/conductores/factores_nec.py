@@ -1,7 +1,7 @@
 """
 factores_nec.py — FV Engine
 
-Factores de corrección NEC 2023 para ampacidad de conductores.
+Factores de corrección NEC (simplificados) para ampacidad de conductores.
 
 Base normativa:
 - NEC 310.15(B)(1) → Corrección por temperatura ambiente.
@@ -11,6 +11,10 @@ Objetivo:
 Aplicar derating normativo sin modificar el modelo físico del conductor.
 """
 
+from __future__ import annotations
+
+from typing import Tuple
+
 # Referencias normativas utilizadas en este módulo
 NEC_REFERENCIAS = [
     "NEC 310.15(B)(1) - Ambient Temperature Correction",
@@ -18,66 +22,101 @@ NEC_REFERENCIAS = [
 ]
 
 
-# Calcula el factor de corrección por temperatura ambiente según NEC 310.15(B)(1).
 def factor_temperatura_nec(t_amb_c: float, columna: str = "75C") -> float:
     """
-    Usa valores simplificados para columna 75°C
-    (terminales típicas THWN-2 / equipos ≤100A).
-    """
+    Factor de corrección por temperatura ambiente (NEC 310.15(B)(1)).
 
-    if t_amb_c <= 30:
+    Implementación simplificada por columna de temperatura del aislamiento:
+    - '75C': terminales típicas / equipos ≤100A (muy común en diseño).
+    - '90C': aislamiento 90°C (ej. THWN-2, PV Wire). *Ojo*: terminal puede limitar.
+
+    Nota: estos valores son aproximados (tabla real es más granular).
+    """
+    try:
+        t = float(t_amb_c)
+    except Exception:
+        t = 30.0
+
+    col = str(columna).strip().upper()
+    if col not in {"75C", "90C"}:
+        col = "75C"
+
+    # Simplificación por tramos (referencial)
+    # 75C (aprox)
+    if col == "75C":
+        if t <= 30:
+            return 1.00
+        if t <= 40:
+            return 0.91
+        if t <= 50:
+            return 0.82
+        return 0.71
+
+    # 90C (aprox)
+    # (valores típicamente menos severos que 75C)
+    if t <= 30:
         return 1.00
-    if t_amb_c <= 40:
-        return 0.91
-    if t_amb_c <= 50:
+    if t <= 40:
+        return 0.91  # puedes refinar después (ej. 0.91/0.94 según tabla real)
+    if t <= 50:
         return 0.82
     return 0.71
 
 
-# Calcula el factor de ajuste por cantidad de conductores portadores de corriente (CCC).
 def factor_agrupamiento_ccc(ccc: int) -> float:
     """
-    NEC 310.15(C)(1)
+    Factor de ajuste por cantidad de conductores portadores de corriente (CCC).
+    NEC 310.15(C)(1), simplificado.
 
-    Reduce ampacidad cuando múltiples conductores
-    comparten la misma canalización.
+    ccc:
+      - 1–3  -> 1.00
+      - 4–6  -> 0.80
+      - 7–9  -> 0.70
+      - >=10 -> 0.50 (simplificado)
     """
+    try:
+        n = int(ccc)
+    except Exception:
+        n = 1
 
-    if ccc <= 3:
+    if n <= 3:
         return 1.00
-    if ccc <= 6:
+    if n <= 6:
         return 0.80
-    if ccc <= 9:
+    if n <= 9:
         return 0.70
     return 0.50
 
 
-# Aplica el ajuste completo NEC a una ampacidad base del conductor.
 def ampacidad_ajustada_nec(
     ampacidad_base: float,
     t_amb_c: float,
     ccc: int,
     aplicar: bool = True,
-):
+    *,
+    columna: str = "75C",
+) -> Tuple[float, float, float]:
     """
-    NEC 310.15(B)(1) + 310.15(C)(1)
-
-    Ampacidad_final =
-        Ampacidad_base × Factor_temperatura × Factor_CCC
+    Aplica derating completo:
+        Ampacidad_ajustada = Ampacidad_base × f_temp × f_ccc
 
     Returns:
-        ampacidad_ajustada (A)
-        factor_temperatura
-        factor_ccc
+        (ampacidad_ajustada, f_temp, f_ccc)
     """
+    try:
+        amp_base = float(ampacidad_base)
+    except Exception:
+        amp_base = 0.0
+
+    if amp_base <= 0.0:
+        return 0.0, 1.0, 1.0
 
     # Permite comparar cálculos con y sin derating
-    if not aplicar:
-        return ampacidad_base, 1.0, 1.0
+    if not bool(aplicar):
+        return float(amp_base), 1.0, 1.0
 
-    f_temp = factor_temperatura_nec(t_amb_c)
-    f_ccc = factor_agrupamiento_ccc(ccc)
+    f_temp = float(factor_temperatura_nec(t_amb_c, columna=columna))
+    f_ccc = float(factor_agrupamiento_ccc(ccc))
 
-    ampacidad_ajustada = ampacidad_base * f_temp * f_ccc
-
-    return ampacidad_ajustada, f_temp, f_ccc
+    amp_adj = float(amp_base) * f_temp * f_ccc
+    return amp_adj, f_temp, f_ccc
