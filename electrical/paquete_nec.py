@@ -8,7 +8,7 @@ import inspect
 # Imports de dominio (duros)
 # ============================
 from electrical.conductores.calculo_conductores import tramo_conductor
-from electrical.protecciones.protecciones import armar_ocpd
+from electrical.protecciones import armar_ocpd
 
 # ============================
 # Imports opcionales (tolerantes)
