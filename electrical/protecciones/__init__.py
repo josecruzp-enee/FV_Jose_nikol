@@ -1,14 +1,12 @@
-"""
-Paquete protecciones — FV Engine.
-
-API pública estable del subdominio protecciones.
-
-Expone únicamente:
-- dimensionar_protecciones_fv → dimensionamiento OCPD FV (AC/DC)
-"""
-
 from __future__ import annotations
 
-from electrical.protecciones import armar_ocpd
+from typing import Any, Dict, Optional
 
-__all__ = ["dimensionar_protecciones_fv"]
+
+def armar_ocpd(*, iac_nom_a: float, n_strings: int, isc_mod_a: float, has_combiner: Optional[bool] = None) -> Dict[str, object]:
+    # Import diferido para evitar circular imports
+    from .protecciones import armar_ocpd as _armar_ocpd
+    return _armar_ocpd(iac_nom_a=float(iac_nom_a), n_strings=int(n_strings), isc_mod_a=float(isc_mod_a), has_combiner=has_combiner)
+
+
+__all__ = ["armar_ocpd"]
