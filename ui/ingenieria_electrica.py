@@ -7,7 +7,6 @@ import pandas as pd
 import streamlit as st
 
 from electrical.catalogos.modelos import Panel as PanelFV, Inversor as InversorFV
-from core.orquestador import ejecutar_estudio
 from core.modelo import Datosproyecto
 from electrical.catalogos.catalogos import get_panel, get_inversor
 from ui.validaciones_ui import campos_faltantes_para_paso5
@@ -218,6 +217,8 @@ def _ui_inputs_electricos(e: dict):
 # CORE — EJECUCIÓN CENTRAL
 # ==========================================================
 def _ejecutar_core(ctx) -> Dict[str, Any]:
+    from core.orquestador import ejecutar_estudio  # lazy import
+
     datos = _datosproyecto_desde_ctx(ctx)
     ctx.datos_proyecto = datos
 
