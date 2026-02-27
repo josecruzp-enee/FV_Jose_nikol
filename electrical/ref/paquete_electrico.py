@@ -6,7 +6,7 @@ from electrical.catalogos.modelos import ParametrosCableado
 from electrical.conductores.calculo_conductores import (
     tramo_dc_ref, tramo_ac_1f_ref, tramo_ac_3f_ref
 )
-from electrical.protecciones import armar_ocpd
+from electrical.protecciones import dimensionar_protecciones_fv
 from electrical.canalizacion import conduit_ac_heuristico, canalizacion_fv
 
 
@@ -35,7 +35,7 @@ def _calc_tramos(*, p: ParametrosCableado, vmp: float, imp: float, isc: Optional
 
 def _calc_protecciones(*, ac: Dict[str, Any], n_strings: int = 0, isc_mod_a: float = 0.0,
                        has_combiner: bool = False) -> Dict[str, Any]:
-    return armar_ocpd(iac_nom_a=float(ac.get("i_nom_a", 0.0)), n_strings=int(n_strings),
+    return dimensionar_protecciones_fv(iac_nom_a=float(ac.get("i_nom_a", 0.0)), n_strings=int(n_strings),
                       isc_mod_a=float(isc_mod_a), has_combiner=bool(has_combiner))
 
 

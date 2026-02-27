@@ -8,7 +8,7 @@ import inspect
 # Imports de dominio (duros)
 # ============================
 from electrical.conductores.calculo_conductores import tramo_conductor
-from electrical.protecciones import armar_ocpd
+from electrical.protecciones.protecciones import dimensionar_protecciones_fv
 
 # ============================
 # Imports opcionales (tolerantes)
@@ -258,7 +258,7 @@ def armar_paquete_nec(entrada: Mapping[str, Any]) -> Dict[str, Any]:
     # OCPD (duro)
     try:
         ocpd = _call_with_supported_kwargs(
-            armar_ocpd,
+            dimensionar_protecciones_fv,
             entrada=entrada,
             dc=dc,
             ac=ac,
@@ -268,7 +268,7 @@ def armar_paquete_nec(entrada: Mapping[str, Any]) -> Dict[str, Any]:
         if isinstance(ocpd, Mapping):
             warnings_out = _merge_warnings(warnings_out, _ensure_list(ocpd.get("warnings")))
     except Exception as e:
-        warnings_out.append(f"OCPD no disponible o falló armar_ocpd(): {e}")
+        warnings_out.append(f"OCPD no disponible o falló dimensionar_protecciones_fv(): {e}")
 
     # SPD (opcional)
     if callable(recomendar_spd):
