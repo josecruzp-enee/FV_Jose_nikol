@@ -20,10 +20,7 @@ from typing import Any, Dict, List, Optional
 
 from electrical.conductores.cables_conductores import tabla_base_conductores
 from electrical.conductores.factores_nec import ampacidad_ajustada_nec
-from electrical.conductores.modelo_tramo import (
-    caida_tension_pct,
-    mejorar_por_vd as _mejorar_por_vd_base,
-)
+from .modelo_tramo import caida_tension_pct, mejorar_por_vd
 
 # Referencias normativas utilizadas en este módulo
 NEC_REFERENCIAS = [
@@ -87,33 +84,6 @@ def seleccionar_por_ampacidad_nec(
 
 
 # Incrementa calibre hasta cumplir VD objetivo siguiendo guía de caída de tensión NEC (informational notes).
-def mejorar_por_vd(
-    cand: Dict[str, Any],
-    *,
-    i_a: float,
-    v_base: float,
-    l_m: float,
-    vd_obj_pct: float,
-    tabla: List[Dict[str, Any]],
-    n_hilos: int,
-) -> Dict[str, Any]:
-    if not tabla:
-        return {}
-
-    if not cand or "awg" not in cand:
-        cand = dict(tabla[0])
-
-    awg = _mejorar_por_vd_base(
-        tabla,
-        awg=str(cand["awg"]),
-        i_a=float(i_a),
-        v_v=float(v_base),
-        l_m=float(l_m),
-        vd_obj_pct=float(vd_obj_pct),
-        n_hilos=int(n_hilos),
-    )
-
-    return next((dict(t) for t in tabla if str(t.get("awg")) == str(awg)), dict(tabla[-1]))
 
 
 # Dimensiona un tramo: selecciona calibre por ampacidad (NEC 310.15) y mejora por VD (NEC informational notes).
