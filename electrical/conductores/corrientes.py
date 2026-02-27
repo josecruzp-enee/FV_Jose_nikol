@@ -8,7 +8,9 @@ Responsabilidad:
 
 from __future__ import annotations
 
-from electrical.modelos import ResultadoStrings, EntradaInversor, ResultadoCorrientes
+from electrical.paneles.modelos_strings import ResultadoStrings
+from electrical.inversor.modelos_operacion import EntradaInversor
+from .modelos_corrientes import ResultadoCorrientes
 
 
 # Calcula corrientes de diseño DC/AC usando el mejor dato disponible del motor de strings e inversor.
