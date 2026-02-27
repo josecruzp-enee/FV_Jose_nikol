@@ -171,7 +171,7 @@ def calcular_sizing_unificado(p: Datosproyecto) -> Dict[str, Any]:
         panel_w=float(panel.w),
         hsp_12m=getattr(p, "hsp_12m", None),
         hsp=getattr(p, "hsp", None),
-        usar_modelo_hn_conservador=True,
+        usar_modelo_conservador=True,
         sombras_pct=_safe_float(getattr(p, "sombras_pct", 0.0), 0.0),
         perdidas_sistema_pct=getattr(p, "perdidas_sistema_pct", None),
         perdidas_detalle=getattr(p, "perdidas_detalle", None),
