@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Tuple
 
 import streamlit as st
 from ui.state_helpers import ensure_dict, merge_defaults, sync_fields
-
+from electrical.paneles.dimensionado_paneles import _hsp_modelo_conservador_12m
 
 # ==========================================================
 # Defaults / Modelo UI
@@ -320,7 +320,10 @@ def _render_grafica_teorica(ctx, sf: Dict[str, Any]) -> None:
     st.markdown("#### Gráfica teórica de generación FV (preview)")
 
     import matplotlib.pyplot as plt
-    from electrical.paneles.dimensionado_paneles import _hsp_honduras_conservador_12m
+
+    # ✅ Fuente local (UI) para no depender de funciones privadas de paneles
+    def _hsp_honduras_conservador_12m() -> List[float]:
+        return [5.1, 5.4, 5.8, 5.6, 5.0, 4.5, 4.3, 4.4, 4.1, 4.0, 4.4, 4.7]
 
     DIAS_MES = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
     MESES = list(range(1, 13))
@@ -342,6 +345,8 @@ def _render_grafica_teorica(ctx, sf: Dict[str, Any]) -> None:
 
         perd = float(sf.get("perdidas_sistema_pct", 15.0))
         sh = float(sf.get("sombras_pct", 0.0))
+
+        # PR simple de preview (UI). El PR “real” lo debe calcular el motor energético.
         pr = (1.0 - perd / 100.0) * (1.0 - sh / 100.0)
         pr = max(0.10, min(1.00, pr))
 
@@ -377,7 +382,6 @@ def _render_grafica_teorica(ctx, sf: Dict[str, Any]) -> None:
     with st.expander("Ver HSP y promedio diario (preview)", expanded=False):
         st.write({"hsp_12m": hsp_12m})
         st.write({"kwh_dia_prom_12m": [round(x, 2) for x in gen_dia]})
-
 
 # ==========================================================
 # API del paso
