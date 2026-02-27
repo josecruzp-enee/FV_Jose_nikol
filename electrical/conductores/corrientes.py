@@ -8,9 +8,11 @@ Responsabilidad:
 
 from __future__ import annotations
 
-from typing import Mapping, Any 
+from typing import Mapping, Any
+
 ResultadoStrings = Mapping[str, Any]
-from electrical.inversor.modelos_operacion import EntradaInversor
+EntradaInversor = Mapping[str, Any]   # <- alias neutral, sin import cruzado
+
 from .modelos_corrientes import ResultadoCorrientes
 
 
