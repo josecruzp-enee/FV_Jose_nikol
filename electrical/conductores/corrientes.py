@@ -8,7 +8,8 @@ Responsabilidad:
 
 from __future__ import annotations
 
-from electrical.paneles.modelos_strings import ResultadoStrings
+from typing import Mapping, Any 
+ResultadoStrings = Mapping[str, Any]
 from electrical.inversor.modelos_operacion import EntradaInversor
 from .modelos_corrientes import ResultadoCorrientes
 
