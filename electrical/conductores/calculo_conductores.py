@@ -8,19 +8,18 @@ Responsabilidad:
 - Verificación y mejora por caída de tensión.
 - Entrega de resultado estable para UI/PDF/orquestador.
 
-Notas normativas:
-- Ampacidad base proviene de tablas (referencial; luego migrar a NEC 310.16 completo).
-- Correcciones por temperatura y CCC: NEC 310.15(B)(1) y 310.15(C)(1).
-- Caída de tensión: guía práctica basada en NEC 215.2 y 210.19 (Informational Notes).
+Extras (FV):
+- Orquestador de tramos FV típicos (DC/AC) a partir de strings + inversor.
 """
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Mapping, Optional
 
 from .cables_conductores import tabla_base_conductores
 from .factores_nec import ampacidad_ajustada_nec
-from .modelo_tramo import caida_tension_pct, mejorar_por_vd, r_de_tabla
+from .modelo_tramo import caida_tension_pct, mejorar_por_vd
+from .corrientes import calcular_corrientes
 
 # Referencias normativas utilizadas en este módulo
 NEC_REFERENCIAS = [
@@ -28,7 +27,6 @@ NEC_REFERENCIAS = [
     "NEC 310.15(C)(1) - Adjustment Factors for CCC",
     "NEC 215.2(A)(1) Informational Note - Voltage Drop Guidance",
     "NEC 210.19(A)(1) Informational Note - Voltage Drop Guidance",
-    # "NEC 310.16 - Ampacity Tables (pendiente: migrar tablas completas)",
 ]
 
 
@@ -101,7 +99,7 @@ def seleccionar_por_ampacidad_nec(
 
 
 # ==========================================================
-# Motor principal
+# Motor principal (genérico)
 # ==========================================================
 
 def tramo_conductor(
@@ -121,14 +119,11 @@ def tramo_conductor(
       2) Mejora por caída de tensión (informational notes) subiendo calibre.
       3) Entrega resultado estable para UI/PDF.
 
-    Entradas:
-      - i_diseno_a: corriente de diseño (ya incluye 125% u otro criterio).
-      - v_base_v: tensión base del tramo (Vmp para DC, Vac/Vll para AC).
-      - n_hilos: número de conductores en el camino de corriente del modelo VD
-                 (DC: 2, AC 1Φ: 2, AC 3Φ (modelo simple): 3 si así lo manejas).
-      - nec: {"t_amb_c": 30, "ccc": ..., "aplicar_derating": True}
+    Convención VD:
+      - Modelo resistivo simplificado (DC) del tramo.
+      - n_hilos representa la cantidad de conductores en el camino resistivo.
+      - Si luego implementas VD 3Φ con √3, hacerlo en modelo_tramo (fuente única).
     """
-    # Validación mínima
     if float(i_diseno_a) <= 0 or float(l_m) <= 0 or float(v_base_v) <= 0:
         return {
             "nombre": str(nombre),
@@ -141,7 +136,7 @@ def tramo_conductor(
     t_amb_c = float(nec.get("t_amb_c", 30.0))
     aplicar = bool(nec.get("aplicar_derating", True))
 
-    # CCC: por defecto usa n_hilos, pero NEC CCC real puede ser distinto
+    ccc_provisto = "ccc" in nec
     ccc = int(nec.get("ccc", n_hilos))
     ccc = max(1, ccc)
 
@@ -164,7 +159,7 @@ def tramo_conductor(
     )
     awg_cand = str(cand.get("awg", tab[0].get("awg")))
 
-    # 2) Mejora por VD (devuelve AWG final)
+    # 2) Mejora por VD
     awg_final = mejorar_por_vd(
         tab,
         awg=awg_cand,
@@ -178,7 +173,7 @@ def tramo_conductor(
     fila_final = _fila_por_awg(tab, awg_final) or dict(tab[-1])
     awg_final = str(fila_final.get("awg"))
 
-    # 3) Cálculos finales (ampacidad ajustada y VD)
+    # 3) Cálculos finales
     amp_base = float(fila_final.get("amp_a", 0.0))
     r_ohm_km = float(fila_final.get("r_ohm_km", 0.0))
 
@@ -201,7 +196,6 @@ def tramo_conductor(
     cumple_vd = float(vd_pct) <= float(vd_obj_pct)
     cumple = bool(cumple_amp and cumple_vd)
 
-    # Detectar si se agotó tabla por VD (útil para notas)
     agotado_vd = (awg_final == str(tab[-1].get("awg"))) and (float(vd_pct) > float(vd_obj_pct))
 
     out: Dict[str, Any] = {
@@ -215,7 +209,7 @@ def tramo_conductor(
         "n_hilos": int(n_hilos),
 
         "calibre": awg_final,
-        "awg": awg_final,  # compat legacy
+        "awg": awg_final,
 
         "ampacidad_base_a": round(float(amp_base), 3),
         "ampacidad_ajustada_a": round(float(amp_adj), 3),
@@ -236,6 +230,9 @@ def tramo_conductor(
         "referencias": list(NEC_REFERENCIAS),
     }
 
+    if not ccc_provisto:
+        out["nota_ccc"] = "CCC no provisto; se usó n_hilos como aproximación."
+
     if not cumple:
         notas: List[str] = []
         if not cumple_amp:
@@ -248,6 +245,139 @@ def tramo_conductor(
         out["nota"] = " ".join(notas)
 
     return out
+
+
+# ==========================================================
+# Orquestador FV: panel/string → inversor → tablero principal
+# ==========================================================
+
+def _f(m: Mapping[str, Any], k: str, default: float = 0.0) -> float:
+    try:
+        v = m.get(k, default)
+        return float(v) if v is not None else float(default)
+    except Exception:
+        return float(default)
+
+
+def dimensionar_tramos_fv(
+    *,
+    strings: Mapping[str, Any],
+    inversor: Mapping[str, Any],
+    params_cableado: Mapping[str, Any],
+    cfg_tecnicos: Mapping[str, Any],
+    material_dc: str = "Cu",
+    material_ac: str = "Cu",
+    nec_dc: Optional[Dict[str, Any]] = None,
+    nec_ac: Optional[Dict[str, Any]] = None,
+    distancias_m: Optional[Dict[str, float]] = None,
+) -> Dict[str, Any]:
+    """
+    Construye tramos FV típicos y los dimensiona con el motor.
+
+    Tramos que modela (por defecto):
+      - DC_STRING_A_INV: string/array DC → inversor (usa dist_dc_m)
+      - AC_INV_A_TABLERO: inversor → tablero principal (usa dist_ac_m)
+
+    Si quieres separar "panel→string" y "string→inversor", pasa distancias_m:
+      distancias_m = {
+        "dc_panel_a_string": 5.0,
+        "dc_string_a_inversor": 18.0,
+        "ac_inversor_a_tabl_principal": 25.0,
+      }
+
+    params_cableado esperado (keys típicas):
+      - dist_dc_m, dist_ac_m
+      - vdrop_obj_dc_pct, vdrop_obj_ac_pct
+      - vac (opcional)
+
+    strings esperado (keys típicas):
+      - vmp_string_v (o vmp_array_v / vmp_string_v)
+      - (corrientes salen de calcular_corrientes)
+
+    inversor esperado (keys típicas):
+      - v_ac_nom_v / vac, fases
+      - i_ac_max_a (opcional) o kw_ac/potencia_ac_kw
+    """
+    distancias_m = distancias_m or {}
+
+    # 1) Corrientes de diseño (DC/AC)
+    corr = calcular_corrientes(strings, inversor, cfg_tecnicos)
+
+    # 2) Voltajes base
+    vmp_dc = _f(strings, "vmp_string_v", 0.0)
+    if vmp_dc <= 0.0:
+        vmp_dc = _f(strings, "vmp_array_v", 0.0)
+
+    vac = _f(params_cableado, "vac", 0.0)
+    if vac <= 0.0:
+        vac = _f(inversor, "v_ac_nom_v", 0.0)
+    if vac <= 0.0:
+        vac = _f(inversor, "vac", 0.0)
+
+    # 3) Distancias / objetivos VD
+    dist_dc = float(distancias_m.get("dc_string_a_inversor", _f(params_cableado, "dist_dc_m", 0.0)))
+    dist_ac = float(distancias_m.get("ac_inversor_a_tabl_principal", _f(params_cableado, "dist_ac_m", 0.0)))
+
+    vd_obj_dc = _f(params_cableado, "vdrop_obj_dc_pct", 2.0)
+    vd_obj_ac = _f(params_cableado, "vdrop_obj_ac_pct", 2.0)
+
+    # 4) Dimensionamiento tramos
+    out_tramos: Dict[str, Any] = {}
+
+    # (Opcional) panel → string (si te pasan distancia)
+    dist_panel_string = distancias_m.get("dc_panel_a_string", 0.0)
+    if dist_panel_string and dist_panel_string > 0.0 and vmp_dc > 0.0:
+        out_tramos["DC_PANEL_A_STRING"] = tramo_conductor(
+            nombre="DC_PANEL_A_STRING",
+            i_diseno_a=float(corr.get("i_dc_diseno_a", 0.0)),
+            v_base_v=float(vmp_dc),
+            l_m=float(dist_panel_string),
+            vd_obj_pct=float(vd_obj_dc),
+            material=str(material_dc),
+            n_hilos=2,
+            nec=nec_dc,
+        )
+
+    # string/array → inversor (principal DC)
+    out_tramos["DC_STRING_A_INV"] = tramo_conductor(
+        nombre="DC_STRING_A_INV",
+        i_diseno_a=float(corr.get("i_dc_diseno_a", 0.0)),
+        v_base_v=float(vmp_dc) if vmp_dc > 0.0 else 1.0,
+        l_m=float(dist_dc),
+        vd_obj_pct=float(vd_obj_dc),
+        material=str(material_dc),
+        n_hilos=2,
+        nec=nec_dc,
+    )
+
+    # inversor → tablero principal (AC principal)
+    # Nota: el VD aquí sigue el modelo resistivo simplificado del dominio.
+    fases = int(inversor.get("fases", 1) or 1)
+    n_hilos_ac = 3 if fases == 3 else 2
+
+    out_tramos["AC_INV_A_TABLERO"] = tramo_conductor(
+        nombre="AC_INV_A_TABLERO",
+        i_diseno_a=float(corr.get("i_ac_diseno_a", 0.0)),
+        v_base_v=float(vac) if vac > 0.0 else 1.0,
+        l_m=float(dist_ac),
+        vd_obj_pct=float(vd_obj_ac),
+        material=str(material_ac),
+        n_hilos=int(n_hilos_ac),
+        nec=nec_ac,
+    )
+
+    return {
+        "corrientes": dict(corr),
+        "tramos": out_tramos,
+        "meta": {
+            "material_dc": str(material_dc),
+            "material_ac": str(material_ac),
+            "vd_obj_dc_pct": float(vd_obj_dc),
+            "vd_obj_ac_pct": float(vd_obj_ac),
+            "dist_dc_m": float(dist_dc),
+            "dist_ac_m": float(dist_ac),
+        },
+    }
 
 
 # ==========================================================
@@ -320,8 +450,6 @@ def tramo_ac_3f_ref(
 ) -> Dict[str, Any]:
     i_diseno = float(iac_a) * float(factor_seguridad)
 
-    # Ojo: este modelo VD es resistivo “lineal” (no usa √3).
-    # Si luego implementas VD 3Φ con √3, hazlo en modelo_tramo (fuente única).
     res = tramo_conductor(
         nombre="TRAMO_AC_3F",
         i_diseno_a=float(i_diseno),
@@ -342,6 +470,7 @@ __all__ = [
     "vdrop_pct",
     "seleccionar_por_ampacidad_nec",
     "tramo_conductor",
+    "dimensionar_tramos_fv",
     "tramo_dc_ref",
     "tramo_ac_1f_ref",
     "tramo_ac_3f_ref",
