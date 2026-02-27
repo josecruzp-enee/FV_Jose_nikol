@@ -1,14 +1,23 @@
 """
 Paquete conductores — FV Engine.
 
-API pública:
-- calcular_corrientes
-- tramo_conductor
-- caida_tension_pct
+Subdominio de dimensionamiento eléctrico.
+
+API pública estable:
+- calcular_corrientes → obtiene corrientes de diseño DC/AC
+- tramo_conductor     → dimensiona conductor (NEC + VD)
+
+Nota:
+Las funciones físicas internas (modelo_tramo, tablas, NEC)
+NO forman parte de la API pública.
 """
 
-from .calculo_conductores import tramo_conductor
-from .corrientes import calcular_corrientes
-from .modelo_tramo import caida_tension_pct
+from __future__ import annotations
 
-__all__ = ["calcular_corrientes", "tramo_conductor", "caida_tension_pct"]
+from .corrientes import calcular_corrientes
+from .calculo_conductores import tramo_conductor
+
+__all__ = [
+    "calcular_corrientes",
+    "tramo_conductor",
+]
