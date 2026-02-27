@@ -6,7 +6,14 @@ from typing import Any, Dict
 import yaml
 
 from .modelos import Panel, Inversor
+from functools import lru_cache
 
+@lru_cache(maxsize=32)
+def _read_yaml_cached(path_str: str) -> Dict[str, Any]:
+    path = Path(path_str)
+    if not path.exists():
+        return {}
+    return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
 DATA_DIR = Path("data")
 
 
@@ -87,7 +94,7 @@ def _validate_inversor(iid: str, inv: Dict[str, Any]) -> None:
 
 
 def cargar_paneles_yaml(path: str = "paneles.yaml") -> Dict[str, Panel]:
-    doc = _read_yaml(DATA_DIR / path)
+    doc = _read_yaml_cached(str(DATA_DIR / path))
     paneles = (doc.get("paneles") or {}) if isinstance(doc, dict) else {}
 
     out: Dict[str, Panel] = {}
@@ -128,7 +135,7 @@ def cargar_paneles_yaml(path: str = "paneles.yaml") -> Dict[str, Panel]:
 
 
 def cargar_inversores_yaml(path: str = "inversores.yaml") -> Dict[str, Inversor]:
-    doc = _read_yaml(DATA_DIR / path)
+    doc = _read_yaml_cached(str(DATA_DIR / path))
     inversores = (doc.get("inversores") or {}) if isinstance(doc, dict) else {}
 
     out: Dict[str, Inversor] = {}
