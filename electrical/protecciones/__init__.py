@@ -9,6 +9,6 @@ Expone únicamente:
 
 from __future__ import annotations
 
-from .protecciones import dimensionar_protecciones_fv
+from electrical.protecciones import armar_ocpd
 
 __all__ = ["dimensionar_protecciones_fv"]
