@@ -29,7 +29,7 @@ _INVERSORES: Dict[str, Inversor] = {
         n_mppt=2,
         vmppt_min=120.0,
         vmppt_max=480.0,
-        vdc_max=550.0,
+        vdc_max_v=550.0,
     ),
 }
 
@@ -113,6 +113,6 @@ def catalogo_inversores() -> list[dict]:
             "n_mppt": int(inv.n_mppt),
             "mppt_min_v": float(inv.vmppt_min),
             "mppt_max_v": float(inv.vmppt_max),
-            "vmax_dc_v": float(inv.vdc_max),
+            "vmax_dc_v": float(inv.vdc_max_v),
         })
     return out
