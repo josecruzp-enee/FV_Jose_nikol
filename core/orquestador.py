@@ -147,7 +147,7 @@ def ejecutar_estudio(p: Datosproyecto) -> Dict[str, Any]:
     nec_input = {
         "potencia_dc_kw": pdc_kw,
         "potencia_ac_kw": pac_kw,
-        "vdc_nom": res_strings.get("vdc_nom"),
+        "vdc_nom": (res_strings.get("recomendacion") or {}).get("vmp_string_v"),
         "n_strings": res_strings.get("n_strings"),
         "isc_mod_a": res_strings.get("isc_mod_a"),
         "vac_ll": getattr(p, "vac", 240.0),
