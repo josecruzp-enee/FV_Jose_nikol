@@ -173,23 +173,20 @@ def calcular_sizing_unificado(p: Datosproyecto) -> Dict[str, Any]:
     if not isinstance(sfv, dict):
         sfv = {}
 
-    # consumo_12m_kwh (lista 12) desde p.consumo_12m (canónico)
     consumo_12m_kwh = list(getattr(p, "consumo_12m", None) or [])
     if len(consumo_12m_kwh) != 12:
         consumo_12m_kwh = (consumo_12m_kwh + [0.0] * 12)[:12]
     consumo_12m_kwh = [float(x or 0.0) for x in consumo_12m_kwh]
 
-    # cobertura objetivo (0..1). Si viene en %, normalizamos.
     cobertura_obj = sfv.get("cobertura_obj", sfv.get("cobertura", 1.0))
     try:
         cobertura_obj = float(cobertura_obj)
     except Exception:
         cobertura_obj = 1.0
     if cobertura_obj > 1.0:
-        cobertura_obj = cobertura_obj / 100.0
+        cobertura_obj /= 100.0
     cobertura_obj = max(0.0, min(1.0, cobertura_obj))
 
-    # hsp_12m: preferir lo que venga de sistema_fv; si no, None (dimensionado_paneles decide)
     hsp_12m = sfv.get("hsp_12m", None)
     if isinstance(hsp_12m, (list, tuple)) and len(hsp_12m) == 12:
         try:
@@ -199,26 +196,19 @@ def calcular_sizing_unificado(p: Datosproyecto) -> Dict[str, Any]:
     else:
         hsp_12m = None
 
-    # panel_w: primero desde el panel seleccionado en catálogo; si no, fallback en sistema_fv
-    panel_w = None
+    # potencia panel
     try:
         panel_w = float(getattr(panel, "w"))
     except Exception:
-        panel_w = None
-
-    if panel_w is None:
-        try:
-            panel_w = float(sfv.get("panel_w", sfv.get("potencia_panel_w", 550.0)))
-        except Exception:
-            panel_w = 550.0
+        panel_w = float(sfv.get("panel_w", 550.0))
 
     # =========================
-    # Panel sizing (OBLIGATORIOS: cobertura_obj, panel_w)
+    # PANEL SIZING
     # =========================
     panel_sizing = calcular_panel_sizing(
         consumo_12m_kwh=consumo_12m_kwh,
-        cobertura_obj=cobertura_obj,   # ✅ obligatorio
-        panel_w=panel_w,               # ✅ obligatorio
+        cobertura_obj=cobertura_obj,
+        panel_w=panel_w,
         hsp_12m=hsp_12m,
         hsp=sfv.get("hsp"),
         usar_modelo_conservador=bool(sfv.get("usar_modelo_conservador", False)),
@@ -232,17 +222,17 @@ def calcular_sizing_unificado(p: Datosproyecto) -> Dict[str, Any]:
     n_pan = int(getattr(panel_sizing, "n_paneles", 0)) if panel_sizing.ok else 0
     pdc = float(getattr(panel_sizing, "pdc_kw", 0.0)) if panel_sizing.ok else 0.0
 
-    # Producción anual por kWp (kWh/kWp-año)
+    # producción anual
     prod_anual_kwp = 0.0
     try:
         dias_mes = list((panel_sizing.meta or {}).get("dias_mes", []))
         for hsp_d, dias in zip(panel_sizing.hsp_12m, dias_mes):
             prod_anual_kwp += float(hsp_d or 0.0) * float(panel_sizing.pr or 0.0) * float(dias or 0.0)
     except Exception:
-        prod_anual_kwp = 0.0
+        pass
 
     # =========================
-    # Recomendación inversor
+    # INVERSOR
     # =========================
     sizing_inv = _recomendar_inversor(
         p=p,
@@ -256,15 +246,35 @@ def calcular_sizing_unificado(p: Datosproyecto) -> Dict[str, Any]:
     inv_id = _inv_final(eq, inv_id_rec)
     inv = get_inversor(inv_id)
 
-    pac_kw_fb = _pac_kw_desde_reco(
-        sizing_inv.get("inversor_recomendado_meta", {}), inv_id
-    ) or float(getattr(inv, "kw_ac", 0.0) or 0.0)
+    pac_kw_fb = (
+        _pac_kw_desde_reco(
+            sizing_inv.get("inversor_recomendado_meta", {}), inv_id
+        )
+        or float(getattr(inv, "kw_ac", 0.0) or 0.0)
+    )
 
-    # Inputs eléctricos para Paso 5
+    # Inputs eléctricos UI
     electrico_inputs = build_inputs_electricos_ui(p)
 
+    # ======================================================
+    # ✅ BLOQUE CANÓNICO PARA MOTOR NEC (LA CLAVE DEL FIX)
+    # ======================================================
+    try:
+        electrico_nec = {
+            "potencia_dc_kw": float(pdc),
+            "potencia_ac_kw": float(pac_kw_fb),
+            "vdc_nom": float(getattr(panel_sizing, "vmp_string_v", 0.0) or 0.0),
+            "vac_ll": float(electrico_inputs.get("vac", 240.0)),
+            "fases": int(electrico_inputs.get("fases", 1)),
+            "fp": float(electrico_inputs.get("fp", 1.0)),
+        }
+    except Exception:
+        electrico_nec = {}
+
     kwh_mes = _kwh_mes_prom(p)
-    prod_diaria_kwp = float(getattr(panel_sizing, "hsp_prom", 0.0) or 0.0) * float(getattr(panel_sizing, "pr", 0.0) or 0.0)
+    prod_diaria_kwp = float(getattr(panel_sizing, "hsp_prom", 0.0) or 0.0) * float(
+        getattr(panel_sizing, "pr", 0.0) or 0.0
+    )
 
     return {
         "kwh_mes_prom": float(kwh_mes),
@@ -283,28 +293,9 @@ def calcular_sizing_unificado(p: Datosproyecto) -> Dict[str, Any]:
         "inversor_recomendado": inv_id,
         "inversor_recomendado_meta": sizing_inv.get("inversor_recomendado_meta", {}),
 
-        # Strings NO aquí
-        "strings": {"ok": False, "warnings": ["Strings se calculan en Paso 5 (Ingeniería eléctrica)."]},
-
-        "traza": {
-            "panel_id": _panel_id(eq),
-            "inversor_id": inv_id,
-            "dc_ac_objetivo": float(dc_ac),
-            "hsp_usada": float(getattr(panel_sizing, "hsp_prom", 0.0) or 0.0),
-            "pr_usado": float(getattr(panel_sizing, "pr", 0.0) or 0.0),
-        },
-
-        "panel_sizing": {
-            "ok": bool(getattr(panel_sizing, "ok", False)),
-            "errores": list(getattr(panel_sizing, "errores", []) or []),
-            "hsp_12m": list(getattr(panel_sizing, "hsp_12m", []) or []),
-            "hsp_prom": float(getattr(panel_sizing, "hsp_prom", 0.0) or 0.0),
-            "pr": float(getattr(panel_sizing, "pr", 0.0) or 0.0),
-            "meta": dict(getattr(panel_sizing, "meta", {}) or {}),
-        },
+        "strings": {"ok": False, "warnings": ["Strings se calculan en Paso 5."]},
 
         "electrico_inputs": electrico_inputs,
-
-        # útil para Paso 5 / NEC
+        "electrico": electrico_nec,   # ⭐⭐⭐ ESTE ERA EL PROBLEMA
         "pac_kw": float(pac_kw_fb),
     }
