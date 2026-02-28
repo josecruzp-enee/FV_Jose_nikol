@@ -268,7 +268,11 @@ def _validar_string_catalogo(eq, e, n_paneles):
 def _mostrar_nec(pkg: dict):
     st.divider()
     st.subheader("Ingeniería NEC 2023")
+
+    st.markdown("### DEBUG")
     st.json(pkg)
+
+    
     if not pkg:
         st.info("Sin resultados NEC.")
         return
