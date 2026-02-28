@@ -150,7 +150,6 @@ def _normalizar_cobertura(cobertura_obj: Any) -> float:
 
 
 # API pública: dimensiona sistema FV por energía (kWh) y cobertura deseada.
-# API pública: dimensiona sistema FV por energía (kWh) y cobertura deseada.
 def calcular_panel_sizing(
     *,
     consumo_12m_kwh: List[float],
@@ -159,22 +158,19 @@ def calcular_panel_sizing(
     hsp_12m: Optional[List[float]] = None,
     hsp: Optional[float] = None,
     usar_modelo_conservador: bool = True,
-    usar_modelo_hn_conservador: Optional[bool] = None,  # ✅ alias legacy
+    usar_modelo_hn_conservador: Optional[bool] = None,  # alias legacy
     sombras_pct: float = 0.0,
     perdidas_sistema_pct: Optional[float] = None,
     perdidas_detalle: Optional[Dict[str, float]] = None,
-    **_extra,  # ✅ ignora kwargs basura que puedan venir de UI vieja
+    **_extra,  # ignora kwargs desconocidos de UI/config vieja
 ) -> PanelSizingResultado:
-
     errores: List[str] = []
 
     # --- compatibilidad legacy ---
     if usar_modelo_hn_conservador is not None:
         usar_modelo_conservador = bool(usar_modelo_hn_conservador)
 
-    # ==============================
     # Validación consumo 12m
-    # ==============================
     if not isinstance(consumo_12m_kwh, list) or len(consumo_12m_kwh) != 12:
         errores.append("consumo_12m_kwh debe ser lista de 12 valores.")
         consumo = [0.0] * 12
@@ -195,15 +191,12 @@ def calcular_panel_sizing(
         panel_w_f = 0.0
         errores.append("panel_w inválido (no numérico).")
 
-    # ==============================
     # HSP y PR
-    # ==============================
     hsp12 = _leer_hsp_12m(
         hsp_12m=hsp_12m,
         hsp=hsp,
         usar_modelo_conservador=usar_modelo_conservador,
     )
-
     hsp_prom = sum(hsp12) / 12.0
 
     pr = _leer_pr(
@@ -258,7 +251,5 @@ def calcular_panel_sizing(
         kwp_req=float(kwp_req),
         n_paneles=int(n_pan),
         pdc_kw=float(pdc),
-        meta=meta,
-    )
         meta=meta,
     )
