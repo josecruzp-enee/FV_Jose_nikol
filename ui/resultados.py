@@ -99,15 +99,13 @@ def _res_plano_para_ui_y_pdf(resultado_proyecto: dict) -> dict:
         return compat
 
     tecnico = (resultado_proyecto.get("tecnico") or {})
-    energetico = (resultado_proyecto.get("energetico") or {})
     financiero = (resultado_proyecto.get("financiero") or {})
 
     out: dict = {}
     out["params_fv"] = tecnico.get("params_fv")
     out["sizing"] = tecnico.get("sizing")
-    out["electrico_ref"] = tecnico.get("electrico_ref")
     out["electrico_nec"] = tecnico.get("electrico_nec")
-    out["tabla_12m"] = energetico.get("tabla_12m")
+    out["tabla_12m"] = tecnico.get("tabla_12m") or financiero.get("tabla_12m")
 
     out["cuota_mensual"] = financiero.get("cuota_mensual")
     out["evaluacion"] = financiero.get("evaluacion")
@@ -119,10 +117,24 @@ def _res_plano_para_ui_y_pdf(resultado_proyecto: dict) -> dict:
 
 
 def _get_nec_paq(resultado_proyecto: dict) -> dict:
-    tecnico = (resultado_proyecto.get("tecnico") or {})
-    electrico_nec = (tecnico.get("electrico_nec") or {})
-    paq = electrico_nec.get("paq")
-    return paq if isinstance(paq, dict) else {}
+    """
+    Devuelve el paquete NEC real (dict) para UI/PDF.
+    Acepta:
+      - forma nueva: tecnico.electrico_nec = {ok, errores, input, paq}
+      - forma vieja: tecnico.electrico_nec = {dc, ac, ...} (paq directo)
+    """
+    tec = (resultado_proyecto or {}).get("tecnico") or {}
+    nec = tec.get("electrico_nec") or {}
+
+    # forma nueva (wrapper)
+    if isinstance(nec, dict) and "paq" in nec and isinstance(nec.get("paq"), dict):
+        return nec.get("paq") or {}
+
+    # forma vieja (paq directo)
+    if isinstance(nec, dict):
+        return nec
+
+    return {}
 
 
 def _validar_datos_para_pdf(ctx) -> bool:
@@ -223,7 +235,6 @@ def _render_nec_resumen(paq: dict) -> None:
 
     dc = paq.get("dc") or {}
     ac = paq.get("ac") or {}
-    cond = paq.get("conductores") or {}
     ocpd = paq.get("ocpd") or {}
 
     c1, c2, c3, c4 = st.columns(4)
@@ -366,6 +377,7 @@ def render(ctx) -> None:
 
     res_pdf = copy.deepcopy(res)
     _ejecutar_pipeline_pdf(ctx, res_pdf, vista, resultado_proyecto)
+
 
 def validar(ctx) -> Tuple[bool, List[str]]:
     errores: List[str] = []
