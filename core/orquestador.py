@@ -8,7 +8,6 @@ from .sizing import calcular_sizing_unificado
 from .simular_12_meses import simular_12_meses, calcular_cuota_mensual
 from .evaluacion import evaluar_viabilidad, resumen_decision_mensual, payback_simple
 from .finanzas_lp import proyectar_flujos_anuales
-from .electrico_ref import simular_electrico_fv_para_pdf
 from .modelo import Datosproyecto
 from .result_accessors import get_capex_L, get_kwp_dc
 from core.sistema_fv_mapper import construir_parametros_fv_desde_dict
@@ -57,12 +56,9 @@ def ejecutar_evaluacion(p: Datosproyecto) -> Dict[str, Any]:
     electrico_nec = _build_electrico_nec_safe(p, sizing)
 
     kwp_dc, capex_l = _extraer_kwp_y_capex(sizing)
-
     cuota, tabla = _cuota_y_tabla_12m(p, kwp_dc, capex_l)
 
     eval_, decision, ahorro_anual, pb = _evaluacion_y_payback(p, tabla, cuota, capex_l)
-
-    electrico_ref = _build_electrico_ref_para_pdf(p, sizing)
 
     return _armar_salida(
         params_fv=params_fv,
@@ -73,7 +69,6 @@ def ejecutar_evaluacion(p: Datosproyecto) -> Dict[str, Any]:
         decision=decision,
         ahorro_anual=ahorro_anual,
         pb=pb,
-        electrico_ref=electrico_ref,
         electrico_nec=electrico_nec,
         p=p,
     )
@@ -96,7 +91,6 @@ def ejecutar_estudio(p: Datosproyecto) -> Dict[str, Any]:
         "tecnico": {
             "params_fv": raw.get("params_fv"),
             "sizing": raw.get("sizing"),
-            "electrico_ref": raw.get("electrico_ref"),
             "electrico_nec": raw.get("electrico_nec"),
             "tabla_12m": tabla_12m,  # <- compat fuerte
         },
@@ -114,7 +108,6 @@ def ejecutar_estudio(p: Datosproyecto) -> Dict[str, Any]:
             "warnings": [],
             "errores": [],
         },
-
         # Debug/Transición: NO USAR en UI/PDF final
         "_debug_legacy_raw": raw,
     }
@@ -159,7 +152,6 @@ def _armar_salida(
     decision: Any,
     ahorro_anual: float,
     pb: float,
-    electrico_ref: Any,
     electrico_nec: Dict[str, Any],
     p: Datosproyecto,
 ) -> Dict[str, Any]:
@@ -183,9 +175,7 @@ def _armar_salida(
         "decision": decision,
         "ahorro_anual_L": ahorro_anual,
         "payback_simple_anios": pb,
-        # Compat: electrico_ref y electrico (legacy)
-        "electrico_ref": electrico_ref,
-        "electrico": electrico_ref,
+        # Unificado: un solo paquete eléctrico para UI/PDF
         "electrico_nec": electrico_nec,
         "finanzas_lp": finanzas_lp,
     }
@@ -227,6 +217,7 @@ def _build_electrico_nec_safe(p: Datosproyecto, sizing: Dict[str, Any]) -> Dict[
             "paq": {},
         }
 
+
 def _extraer_kwp_y_capex(sizing: Dict[str, Any]) -> Tuple[float, float]:
     res_tmp = {"sizing": dict(sizing or {})}
     kwp_dc = float(get_kwp_dc(res_tmp))
@@ -242,42 +233,4 @@ def _calcular_cuota(p: Datosproyecto, capex_l: float) -> float:
         tasa_anual=float(p.tasa_anual),
         plazo_anios=int(p.plazo_anios),
         pct_fin=float(p.porcentaje_financiado),
-    )
-
-
-def _build_electrico_ref_para_pdf(p: Datosproyecto, sizing: Dict[str, Any]):
-    """
-    Ojo: depende de sizing['cfg_strings'].
-    Si aún no existe en sizing, esto devuelve None.
-    """
-    cfg = sizing.get("cfg_strings") or {}
-    strings = cfg.get("strings") or []
-    iac = cfg.get("iac_estimada_a", None)
-
-    if not strings or iac is None:
-        return None
-
-    vmp_string = max(float(s.get("vmp_string_v", 0.0)) for s in strings)
-    imp = max(float(s.get("imp_a", 0.0)) for s in strings)
-    isc = max(float(s.get("isc_a", 0.0)) for s in strings)
-
-    if vmp_string <= 0 or imp <= 0 or isc <= 0:
-        return None
-
-    e = getattr(p, "electrico", None) or {}
-    if not isinstance(e, dict):
-        e = {}
-
-    return simular_electrico_fv_para_pdf(
-        v_ac=float(e.get("vac", 240.0)),
-        i_ac_estimado=float(iac),
-        dist_ac_m=float(e.get("dist_ac_m", 15.0)),
-        objetivo_vdrop_ac_pct=float(e.get("vdrop_obj_ac_pct", 2.0)),
-        vmp_string_v=vmp_string,
-        imp_a=imp,
-        isc_a=isc,
-        dist_dc_m=float(e.get("dist_dc_m", 10.0)),
-        objetivo_vdrop_dc_pct=float(e.get("vdrop_obj_dc_pct", 2.0)),
-        incluye_neutro_ac=bool(e.get("incluye_neutro_ac", False)),
-        otros_ccc_en_misma_tuberia=int(e.get("otros_ccc", 0)),
     )
