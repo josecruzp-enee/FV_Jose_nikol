@@ -19,7 +19,7 @@ class Inversor:
     n_mppt: int
     vmppt_min: float
     vmppt_max: float
-    vdc_max: float
+    vdc_max_v: float
     imppt_max: float = 25.0  # A por MPPT (referencial)
 
 @dataclass(frozen=True)
