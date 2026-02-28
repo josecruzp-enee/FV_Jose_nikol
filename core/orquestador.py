@@ -77,46 +77,158 @@ def ejecutar_evaluacion(p: Datosproyecto) -> Dict[str, Any]:
 # ==========================================================
 # ENTRYPOINT OFICIAL (ARQUITECTURA)
 # ==========================================================
-def ejecutar_estudio(p: Datosproyecto) -> Dict[str, Any]:
+def ejecutar_evaluacion(p: Datosproyecto) -> Dict[str, Any]:
     """
-    Punto único de ejecución del sistema.
-    UI y PDF deben consumir SOLO este objeto (ResultadoProyecto dict).
+    Flujo lineal estricto:
+    Entradas → Sizing → Strings → NEC → Financiero
     """
-    raw = ejecutar_evaluacion(p)
 
-    # ⚠️ tabla_12m: se coloca también en tecnico para compat con accessors/PDF
-    tabla_12m = raw.get("tabla_12m")
+    # -------------------------------------------------
+    # 1️⃣ Validaciones base
+    # -------------------------------------------------
+    validar_entradas(p)
 
-    resultado_proyecto: Dict[str, Any] = {
-        "tecnico": {
-            "params_fv": raw.get("params_fv"),
-            "sizing": raw.get("sizing"),
-            "electrico_nec": raw.get("electrico_nec"),
-            "tabla_12m": tabla_12m,  # <- compat fuerte
-        },
-        "financiero": {
-            "cuota_mensual": raw.get("cuota_mensual"),
-            "evaluacion": raw.get("evaluacion"),
-            "decision": raw.get("decision"),
-            "ahorro_anual_L": raw.get("ahorro_anual_L"),
-            "payback_simple_anios": raw.get("payback_simple_anios"),
-            "finanzas_lp": raw.get("finanzas_lp"),
-            "tabla_12m": tabla_12m,  # <- si alguien lo lee desde finanzas
-        },
-        "pdf": {
-            "datos_pdf": {},
-            "warnings": [],
-            "errores": [],
-        },
-        # Debug/Transición: NO USAR en UI/PDF final
-        "_debug_legacy_raw": raw,
+    params_fv = _params_y_consolidacion(p)
+
+    # -------------------------------------------------
+    # 2️⃣ SIZING
+    # -------------------------------------------------
+    sizing = calcular_sizing_unificado(p)
+
+    if not sizing or sizing.get("n_paneles", 0) <= 0:
+        raise ValueError("Sizing inválido.")
+
+    # -------------------------------------------------
+    # 3️⃣ Selección de equipos desde sizing
+    # -------------------------------------------------
+    from electrical.catalogos.catalogos import get_panel, get_inversor
+    from electrical.paneles.strings_auto import calcular_strings_auto
+
+    panel_id = sizing.get("panel_id")
+    inversor_id = sizing.get("inversor_recomendado")
+
+    panel = get_panel(panel_id)
+    inversor = get_inversor(inversor_id)
+
+    pdc_kw = float(sizing.get("pdc_kw", 0.0))
+    pac_kw = float(getattr(inversor, "kw_ac", 0.0))
+
+    # -------------------------------------------------
+    # 4️⃣ Guard DC/AC ratio (evita sabotaje técnico)
+    # -------------------------------------------------
+    if pac_kw <= 0:
+        raise ValueError("Inversor inválido.")
+
+    dc_ac_ratio = pdc_kw / pac_kw
+
+    if dc_ac_ratio < 0.8 or dc_ac_ratio > 1.35:
+        return {
+            "params_fv": params_fv,
+            "sizing": sizing,
+            "cuota_mensual": 0,
+            "tabla_12m": [],
+            "evaluacion": None,
+            "decision": None,
+            "ahorro_anual_L": 0,
+            "payback_simple_anios": None,
+            "electrico_nec": {
+                "ok": False,
+                "errores": [f"DC/AC ratio inválido ({dc_ac_ratio:.2f})."],
+                "paq": None,
+            },
+            "finanzas_lp": None,
+        }
+
+    # -------------------------------------------------
+    # 5️⃣ STRINGS (OBLIGATORIO)
+    # -------------------------------------------------
+    res_strings = calcular_strings_auto(
+        panel=panel,
+        inversor=inversor,
+        n_paneles=int(sizing["n_paneles"]),
+        t_min_c=float(getattr(p, "t_min_c", 10.0)),
+    )
+
+    if not res_strings.get("ok"):
+        return {
+            "params_fv": params_fv,
+            "sizing": sizing,
+            "cuota_mensual": 0,
+            "tabla_12m": [],
+            "evaluacion": None,
+            "decision": None,
+            "ahorro_anual_L": 0,
+            "payback_simple_anios": None,
+            "electrico_nec": {
+                "ok": False,
+                "errores": ["Strings inválido."],
+                "paq": None,
+            },
+            "finanzas_lp": None,
+        }
+
+    # -------------------------------------------------
+    # 6️⃣ NEC (YA CON STRINGS VÁLIDO)
+    # -------------------------------------------------
+    from electrical.paquete_nec import armar_paquete_nec
+
+    nec_input = {
+        "potencia_dc_kw": pdc_kw,
+        "potencia_ac_kw": pac_kw,
+        "vdc_nom": res_strings.get("vdc_nom"),
+        "n_strings": res_strings.get("n_strings"),
+        "isc_mod_a": res_strings.get("isc_mod_a"),
+        "vac_ll": getattr(p, "vac", 240.0),
+        "fases": getattr(p, "fases", 1),
+        "fp": getattr(p, "fp", 1.0),
+        "dist_dc_m": getattr(p, "dist_dc_m", 15.0),
+        "dist_ac_m": getattr(p, "dist_ac_m", 25.0),
+        "vdrop_obj_dc_pct": getattr(p, "vdrop_obj_dc_pct", 2.0),
+        "vdrop_obj_ac_pct": getattr(p, "vdrop_obj_ac_pct", 2.0),
     }
 
-    nec = raw.get("electrico_nec") or {}
-    if nec.get("ok") is False:
-        resultado_proyecto["pdf"]["warnings"].append("NEC no pudo calcularse correctamente.")
+    electrico_nec = {
+        "ok": True,
+        "errores": [],
+        "paq": armar_paquete_nec(nec_input),
+    }
 
-    return resultado_proyecto
+    # -------------------------------------------------
+    # 7️⃣ FINANCIERO
+    # -------------------------------------------------
+    kwp_dc, capex_l = _extraer_kwp_y_capex(sizing)
+    cuota, tabla = _cuota_y_tabla_12m(p, kwp_dc, capex_l)
+
+    eval_, decision, ahorro_anual, pb = _evaluacion_y_payback(
+        p, tabla, cuota, capex_l
+    )
+
+    finanzas_lp = proyectar_flujos_anuales(
+        datos=p,
+        resultado={"sizing": sizing, "cuota_mensual": cuota, "tabla_12m": tabla},
+        horizonte_anios=15,
+        crecimiento_tarifa_anual=0.06,
+        degradacion_fv_anual=0.006,
+        tasa_descuento=0.14,
+        reemplazo_inversor_anio=12,
+        reemplazo_inversor_pct_capex=0.15,
+    )
+
+    # -------------------------------------------------
+    # 8️⃣ SALIDA FINAL
+    # -------------------------------------------------
+    return {
+        "params_fv": params_fv,
+        "sizing": sizing,
+        "cuota_mensual": cuota,
+        "tabla_12m": tabla,
+        "evaluacion": eval_,
+        "decision": decision,
+        "ahorro_anual_L": ahorro_anual,
+        "payback_simple_anios": pb,
+        "electrico_nec": electrico_nec,
+        "finanzas_lp": finanzas_lp,
+    }
 
 
 # ==========================================================
