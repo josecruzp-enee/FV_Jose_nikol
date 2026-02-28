@@ -140,33 +140,37 @@ def ejecutar_estudio(p: Datosproyecto) -> Dict[str, Any]:
         }
 
     # -------------------------------------------------
-    # 5️⃣ STRINGS (OBLIGATORIO)
-    # -------------------------------------------------
-    res_strings = calcular_strings_auto(
-        panel=panel,
-        inversor=inversor,
-        n_paneles=int(sizing["n_paneles"]),
-        t_min_c=float(getattr(p, "t_min_c", 10.0)),
-    )
+# 5️⃣ STRINGS (OBLIGATORIO)
+# -------------------------------------------------
+from electrical.paneles.orquestador_paneles import ejecutar_calculo_strings
 
-    if not res_strings.get("ok"):
-        return {
-            "params_fv": params_fv,
-            "sizing": sizing,
-            "cuota_mensual": 0,
-            "tabla_12m": [],
-            "evaluacion": None,
-            "decision": None,
-            "ahorro_anual_L": 0,
-            "payback_simple_anios": None,
-            "electrico_nec": {
-                "ok": False,
-                "errores": ["Strings inválido."],
-                "paq": None,
-            },
-            "finanzas_lp": None,
-        }
+res_strings = ejecutar_calculo_strings(
+    n_paneles_total=int(sizing["n_paneles"]),
+    panel=panel,
+    inversor=inversor,
+    t_min_c=float(getattr(p, "t_min_c", 10.0)),
+    dos_aguas=bool(getattr(p, "dos_aguas", False)),
+    objetivo_dc_ac=(pdc_kw / pac_kw) if pac_kw > 0 else None,
+    pdc_kw_objetivo=float(pdc_kw),
+)
 
+if not res_strings.get("ok"):
+    return {
+        "params_fv": params_fv,
+        "sizing": sizing,
+        "cuota_mensual": 0,
+        "tabla_12m": [],
+        "evaluacion": None,
+        "decision": None,
+        "ahorro_anual_L": 0,
+        "payback_simple_anios": None,
+        "electrico_nec": {
+            "ok": False,
+            "errores": list(res_strings.get("errores") or []),
+            "paq": None,
+        },
+        "finanzas_lp": None,
+    }
     # -------------------------------------------------
     # 6️⃣ NEC (YA CON STRINGS VÁLIDO)
     # -------------------------------------------------
