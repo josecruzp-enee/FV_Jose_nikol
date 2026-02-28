@@ -235,59 +235,36 @@ def _ejecutar_core(ctx) -> Dict[str, Any]:
 # ==========================================================
 # Validación string catálogo
 # ==========================================================
-def _validar_string_catalogo(eq, e, n_paneles):
+def _validar_string_catalogo(eq, e, n_paneles, resultado_proyecto):
 
-    try:
-        # 🔹 Tomar resultado real del motor
-        res = st.session_state.get("resultado_proyecto") or {}
-        strings_res = res.get("strings") or {}
-        lista = strings_res.get("strings") or []
+    res = resultado_proyecto or {}
+    strings_res = res.get("strings") or {}
+    lista = strings_res.get("strings") or []
 
-        if not lista:
-            return {
-                "voc_frio_total": None,
-                "vmp_operativo": None,
-                "corriente_mppt": None,
-                "ok_vdc": False,
-                "ok_mppt": False,
-                "ok_corriente": False,
-                "string_valido": False,
-            }
+    if not lista:
+        return {}
 
-        inv = get_inversor(eq["inversor_id"])
+    inv = get_inversor(eq["inversor_id"])
 
-        # 🔹 Consolidar valores reales por MPPT
-        voc_frio_total = max(s.get("voc_frio_string_v", 0) for s in lista)
-        vmp_operativo = lista[0].get("vmp_string_v")
-        corriente_mppt = max(s.get("imax_pv_a", 0) for s in lista)
+    voc_frio_total = max(s.get("voc_frio_string_v", 0) for s in lista)
+    vmp_operativo = lista[0].get("vmp_string_v")
+    corriente_mppt = max(s.get("imax_pv_a", 0) for s in lista)
 
-        imppt_max = getattr(inv, "imppt_max", None) or getattr(inv, "imppt_max_a", None)
+    imppt_max = getattr(inv, "imppt_max", None) or getattr(inv, "imppt_max_a", None)
 
-        ok_vdc = voc_frio_total <= inv.vdc_max_v
-        ok_mppt = inv.mppt_min_v <= vmp_operativo <= inv.mppt_max_v
-        ok_corriente = corriente_mppt <= imppt_max
+    ok_vdc = voc_frio_total <= inv.vdc_max_v
+    ok_mppt = inv.mppt_min_v <= vmp_operativo <= inv.mppt_max_v
+    ok_corriente = corriente_mppt <= imppt_max
 
-        return {
-            "voc_frio_total": voc_frio_total,
-            "vmp_operativo": vmp_operativo,
-            "corriente_mppt": corriente_mppt,
-            "ok_vdc": ok_vdc,
-            "ok_mppt": ok_mppt,
-            "ok_corriente": ok_corriente,
-            "string_valido": ok_vdc and ok_mppt and ok_corriente,
-        }
-
-    except Exception as exc:
-        return {
-            "voc_frio_total": None,
-            "vmp_operativo": None,
-            "corriente_mppt": None,
-            "ok_vdc": False,
-            "ok_mppt": False,
-            "ok_corriente": False,
-            "string_valido": False,
-            "error": str(exc),
-        }
+    return {
+        "voc_frio_total": voc_frio_total,
+        "vmp_operativo": vmp_operativo,
+        "corriente_mppt": corriente_mppt,
+        "ok_vdc": ok_vdc,
+        "ok_mppt": ok_mppt,
+        "ok_corriente": ok_corriente,
+        "string_valido": ok_vdc and ok_mppt and ok_corriente,
+    }
 
 # ==========================================================
 # UI NEC display (cuadros bonitos)
