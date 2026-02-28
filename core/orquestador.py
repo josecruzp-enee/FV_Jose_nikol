@@ -190,21 +190,178 @@ def _build_params_fv(p: Datosproyecto) -> Dict[str, Any]:
 
 def _build_electrico_nec_safe(p: Datosproyecto, sizing: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Wrapper seguro para construir el paquete NEC sin depender de adaptador_nec.
+    Wrapper seguro para construir el paquete NEC.
     Contrato de salida:
       { ok: bool, errores: [..], input: {...}, paq: {...} }
     """
     try:
         from electrical.paquete_nec import armar_paquete_nec
 
-        # Fuente canónica actual: sizing["electrico"]
-        entrada_electrica = (sizing or {}).get("electrico") or {}
+        # -----------------------------
+        # 1) Fuente canónica de inputs
+        # -----------------------------
+        s = dict(sizing or {})
+        entrada_electrica = (s.get("electrico") or s.get("electrico_inputs") or {})  # ✅ FIX
         if not isinstance(entrada_electrica, dict) or not entrada_electrica:
-            return {"ok": False, "errores": ["NEC: sizing sin bloque 'electrico'"], "input": {}, "paq": {}}
+            return {"ok": False, "errores": ["NEC: sizing sin 'electrico_inputs' (ni 'electrico')"], "input": {}, "paq": {}}
 
-        paq = armar_paquete_nec(entrada_electrica)
+        # Copia defensiva (evita mutar el dict original)
+        ee = dict(entrada_electrica)
 
-        return {"ok": True, "errores": [], "input": entrada_electrica, "paq": paq}
+        # -----------------------------
+        # 2) Enriquecer potencias base
+        # -----------------------------
+        # sizing trae pdc_kw y pac_kw (según tu calcular_sizing_unificado)
+        try:
+            pdc_kw = float(s.get("pdc_kw", 0.0) or 0.0)
+        except Exception:
+            pdc_kw = 0.0
+
+        try:
+            pac_kw = float(s.get("pac_kw", 0.0) or 0.0)
+        except Exception:
+            pac_kw = 0.0
+
+        if pdc_kw > 0 and "potencia_dc_kw" not in ee and "potencia_dc_w" not in ee:
+            ee["potencia_dc_kw"] = pdc_kw
+
+        if pac_kw > 0 and "potencia_ac_kw" not in ee and "potencia_ac_w" not in ee:
+            ee["potencia_ac_kw"] = pac_kw
+
+        # Voltaje AC: si es 1φ, usa vac_ln; si es 3φ, usa vac_ll.
+        # (paquete_nec ya intenta inferir, pero lo dejamos claro)
+        vac = ee.get("vac", None)
+        fases = ee.get("fases", None)
+        try:
+            vac_f = float(vac) if vac is not None else None
+        except Exception:
+            vac_f = None
+
+        try:
+            fases_i = int(fases) if fases is not None else None
+        except Exception:
+            fases_i = None
+
+        if vac_f is not None:
+            if fases_i == 3:
+                ee.setdefault("vac_ll", vac_f)
+            else:
+                ee.setdefault("vac_ln", vac_f)
+
+        # --------------------------------------
+        # 3) Calcular STRINGS (para DC “real”)
+        # --------------------------------------
+        # Esto NO dimensiona NEC; solo produce:
+        # - n_strings_total, voc_frio_string_v, vmp_string_v, etc.
+        try:
+            from electrical.catalogos.catalogos import get_panel, get_inversor
+            from electrical.paneles.calculo_de_strings import (
+                PanelSpec,
+                InversorSpec,
+                calcular_strings_fv,
+            )
+
+            eq = getattr(p, "equipos", {}) or {}
+            panel_id = (eq or {}).get("panel_id")
+            inversor_id = (eq or {}).get("inversor_id")
+
+            if panel_id and inversor_id:
+                pan = get_panel(panel_id)
+                inv = get_inversor(inversor_id)
+
+                # Normalización a contrato interno estable (PanelSpec/InversorSpec)
+                # Panel catálogo: w,vmp,voc,imp,isc,tc_voc_frac_c
+                coef_voc_pct_c = float(getattr(pan, "tc_voc_frac_c", -0.0029) or -0.0029) * 100.0  # frac/°C → %/°C
+
+                panel_spec = PanelSpec(
+                    pmax_w=float(getattr(pan, "w")),
+                    vmp_v=float(getattr(pan, "vmp")),
+                    voc_v=float(getattr(pan, "voc")),
+                    imp_a=float(getattr(pan, "imp")),
+                    isc_a=float(getattr(pan, "isc")),
+                    coef_voc_pct_c=float(coef_voc_pct_c),
+                    # coef_vmp_pct_c queda default (-0.34) en tu dataclass
+                )
+
+                imppt = getattr(inv, "imppt_max", None)
+                if imppt is None:
+                    # fallback ultra alto para no falsear corriente (como tú ya haces)
+                    imppt = 1e9
+
+                inversor_spec = InversorSpec(
+                    pac_kw=float(getattr(inv, "kw_ac")),
+                    vdc_max_v=float(getattr(inv, "vdc_max_v", getattr(inv, "vdc_max"))),  # tolera legacy
+                    mppt_min_v=float(getattr(inv, "vmppt_min")),
+                    mppt_max_v=float(getattr(inv, "vmppt_max")),
+                    n_mppt=int(getattr(inv, "n_mppt", 1) or 1),
+                    imppt_max_a=float(imppt),
+                )
+
+                # n_paneles_total: sizing["n_paneles"]
+                n_paneles_total = int(s.get("n_paneles") or 0)
+                t_min_c = float(ee.get("t_min_c", 10.0) or 10.0)
+                dos_aguas = bool(ee.get("dos_aguas", True))
+
+                strings = calcular_strings_fv(
+                    n_paneles_total=n_paneles_total,
+                    panel=panel_spec,
+                    inversor=inversor_spec,
+                    t_min_c=t_min_c,
+                    dos_aguas=dos_aguas,
+                    objetivo_dc_ac=float((s.get("traza") or {}).get("dc_ac_objetivo", 1.2) or 1.2),
+                    pdc_kw_objetivo=float(pdc_kw) if pdc_kw > 0 else None,
+                    t_oper_c=55.0,
+                )
+
+                ee["strings"] = strings
+
+                # Usar Vmp string como Vdc nominal para conductores (si no venía)
+                try:
+                    vdc_nom = (strings.get("recomendacion") or {}).get("vmp_string_v")
+                    if vdc_nom and "vdc_nom" not in ee and "vdc" not in ee:
+                        ee["vdc_nom"] = float(vdc_nom)
+                except Exception:
+                    pass
+
+        except Exception:
+            # Si strings falla, NEC igual corre con lo base
+            pass
+
+        # ------------------------------------------------
+        # 4) Circuitos mínimos (DC y AC) para conductores
+        # ------------------------------------------------
+        # paquete_nec soporta modo mínimo, pero esto ayuda a tramo_conductor.
+        circuitos = ee.get("circuitos")
+        if not isinstance(circuitos, list) or not circuitos:
+            c_list = []
+
+            # DC
+            c_list.append(
+                {
+                    "tipo": "DC",
+                    "l_m": float(ee.get("dist_dc_m", 15.0) or 15.0),
+                    "v_base_v": float(ee.get("vdc_nom", ee.get("vdc", 0.0)) or 0.0),
+                }
+            )
+
+            # AC
+            c_list.append(
+                {
+                    "tipo": "AC",
+                    "l_m": float(ee.get("dist_ac_m", 25.0) or 25.0),
+                    "v_base_v": float(ee.get("vac", 240.0) or 240.0),
+                    "fases": int(ee.get("fases", 1) or 1),
+                }
+            )
+
+            ee["circuitos"] = c_list
+
+        # -----------------------------
+        # 5) Ejecutar paquete NEC
+        # -----------------------------
+        paq = armar_paquete_nec(ee)
+
+        return {"ok": True, "errores": [], "input": ee, "paq": paq}
 
     except Exception as e:
         return {
@@ -212,7 +369,7 @@ def _build_electrico_nec_safe(p: Datosproyecto, sizing: Dict[str, Any]) -> Dict[
             "errores": [f"NEC: {type(e).__name__}: {e}"],
             "input": {
                 "equipos": getattr(p, "equipos", None),
-                "electrico": (sizing or {}).get("electrico") or getattr(p, "electrico", None),
+                "electrico": (sizing or {}).get("electrico_inputs") or (sizing or {}).get("electrico") or getattr(p, "electrico", None),
             },
             "paq": {},
         }
