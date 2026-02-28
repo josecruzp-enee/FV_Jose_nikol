@@ -11,6 +11,30 @@ from electrical.conductores.calculo_conductores import tramo_conductor
 from electrical.protecciones.protecciones import dimensionar_protecciones_fv
 
 # ============================
+# Imports backend REF (tolerantes)
+# ============================
+try:
+    from electrical.catalogos.modelos import ParametrosCableado  # type: ignore
+except Exception:  # pragma: no cover
+    ParametrosCableado = None  # type: ignore
+
+try:
+    from electrical.conductores.calculo_conductores import (
+        tramo_dc_ref,  # type: ignore
+        tramo_ac_1f_ref,  # type: ignore
+        tramo_ac_3f_ref,  # type: ignore
+    )
+except Exception:  # pragma: no cover
+    tramo_dc_ref = None  # type: ignore
+    tramo_ac_1f_ref = None  # type: ignore
+    tramo_ac_3f_ref = None  # type: ignore
+
+try:
+    from electrical.canalizacion import conduit_ac_heuristico  # type: ignore
+except Exception:  # pragma: no cover
+    conduit_ac_heuristico = None  # type: ignore
+
+# ============================
 # Imports opcionales (tolerantes)
 # ============================
 try:
@@ -24,10 +48,11 @@ except Exception:  # pragma: no cover
     recomendar_seccionamiento = None  # type: ignore
 
 try:
-    # Opción B (si NO existe electrical/canalizacion/conduit.py)
     from electrical.canalizacion.canalizacion import canalizacion_fv  # type: ignore
 except Exception:  # pragma: no cover
     canalizacion_fv = None  # type: ignore
+
+
 # ---------------------------
 # Utilidades de orquestación
 # ---------------------------
@@ -61,7 +86,6 @@ def _call_with_supported_kwargs(func: Callable[..., Any], **kwargs: Any) -> Any:
     Llama una función filtrando kwargs a solo los parámetros soportados.
     Evita romper por cambios de firmas durante el refactor.
     """
-    sig = None
     try:
         sig = inspect.signature(func)
     except Exception:
@@ -91,6 +115,220 @@ def _merge_warnings(base: Iterable[str], *more: Iterable[str]) -> list[str]:
 
 def _ensure_list(x: Any) -> list:
     return x if isinstance(x, list) else []
+
+
+# ---------------------------
+# Backend REF (legacy) — interno
+# ---------------------------
+
+def _ref_cfg(cfg: Optional[Dict[str, Any]], k: str, d: float) -> float:
+    try:
+        return float((cfg or {}).get(k, d))
+    except Exception:
+        return float(d)
+
+
+def _ref_tierra_awg(awg_fase: str) -> str:
+    return "10" if awg_fase in ["6", "4", "3", "2", "1", "1/0", "2/0", "3/0", "4/0"] else "12"
+
+
+def _ref_calc_tramos(
+    *,
+    p: Any,
+    vmp: float,
+    imp: float,
+    isc: Optional[float],
+    iac: float,
+    fases_ac: int,
+    cfg: Optional[Dict[str, Any]],
+) -> Dict[str, Any]:
+    if tramo_dc_ref is None or tramo_ac_1f_ref is None or tramo_ac_3f_ref is None:
+        raise RuntimeError("Backend REF no disponible: faltan tramo_dc_ref/tramo_ac_*_ref.")
+
+    fdc = _ref_cfg(cfg, "factor_seguridad_dc", 1.25)
+    fac = _ref_cfg(cfg, "factor_seguridad_ac", 1.25)
+    vdd = _ref_cfg(cfg, "vdrop_obj_dc_pct", float(getattr(p, "vdrop_obj_dc_pct", 2.0)))
+    vda = _ref_cfg(cfg, "vdrop_obj_ac_pct", float(getattr(p, "vdrop_obj_ac_pct", 2.0)))
+
+    dc = tramo_dc_ref(
+        vmp_v=vmp,
+        imp_a=imp,
+        isc_a=isc,
+        dist_m=float(getattr(p, "dist_dc_m", 0.0)),
+        factor_seguridad=fdc,
+        vd_obj_pct=vdd,
+    )
+
+    fn_ac = tramo_ac_3f_ref if int(fases_ac) == 3 else tramo_ac_1f_ref
+    ac = fn_ac(
+        vac_v=float(getattr(p, "vac", 0.0)),
+        iac_a=iac,
+        dist_m=float(getattr(p, "dist_ac_m", 0.0)),
+        factor_seguridad=fac,
+        vd_obj_pct=vda,
+    )
+
+    ac["tierra_awg"] = _ref_tierra_awg(str(ac.get("awg", "")))
+    return {"dc": dc, "ac": ac}
+
+
+def _ref_calc_protecciones(*, ac: Dict[str, Any], n_strings: int, isc_mod_a: float, has_combiner: bool) -> Dict[str, Any]:
+    # OJO: tu dimensionar_protecciones_fv soporta firmas distintas (a veces iac_nom_a directo).
+    # Aquí usamos _call_with_supported_kwargs para tolerancia.
+    return _call_with_supported_kwargs(
+        dimensionar_protecciones_fv,
+        iac_nom_a=float(ac.get("i_nom_a", 0.0)),
+        n_strings=int(n_strings),
+        isc_mod_a=float(isc_mod_a),
+        has_combiner=bool(has_combiner),
+    )
+
+
+def _ref_calc_canalizacion(*, p: Any, ac: Dict[str, Any], fases_ac: int) -> Dict[str, Any]:
+    conduit = "N/A"
+    if callable(conduit_ac_heuristico):
+        try:
+            conduit = str(
+                conduit_ac_heuristico(
+                    awg_ac=str(ac.get("awg", "")),
+                    incluye_neutro=bool(getattr(p, "incluye_neutro_ac", False)),
+                    extra_ccc=int(getattr(p, "otros_ccc", 0)),
+                )
+            )
+        except Exception:
+            conduit = "N/A"
+
+    # Canalización “nuevo” si existe canalizacion_fv (tu import tolerante)
+    can: Any = None
+    if callable(canalizacion_fv):
+        try:
+            can = _call_with_supported_kwargs(
+                canalizacion_fv,  # type: ignore[misc]
+                tiene_trunk=False,
+                fases_ac=int(fases_ac),
+                incluye_neutro=bool(getattr(p, "incluye_neutro_ac", False)),
+            )
+        except Exception:
+            can = None
+
+    return {"conduit_ac": conduit, "canalizacion": can}
+
+
+def _ref_disclaimer() -> str:
+    return (
+        "Cálculo referencial. Calibre final sujeto a: temperatura, agrupamiento (CCC), "
+        "factores de ajuste/corrección, fill real de tubería, terminales 75°C y normativa aplicable."
+    )
+
+
+def _armar_paquete_ref(entrada: Mapping[str, Any]) -> Dict[str, Any]:
+    """
+    Backend legacy: arma paquete con MISMAS llaves que NEC.
+    Entrada esperada:
+      - params o params_cableado: ParametrosCableado o dict compatible
+      - vmp_string_v, imp_a, isc_a, iac_estimado_a
+      - fases_ac (1/3)
+      - cfg_tecnicos (opcional)
+      - n_strings, isc_mod_a, has_combiner (opcional)
+    """
+    warnings_out: list[str] = []
+
+    params = entrada.get("params") or entrada.get("params_cableado")
+    if params is None:
+        raise ValueError("modo='ref': falta 'params' o 'params_cableado'.")
+
+    if isinstance(params, dict):
+        if ParametrosCableado is None:
+            raise RuntimeError("modo='ref': ParametrosCableado no disponible (import falló).")
+        params = ParametrosCableado(**params)  # type: ignore[misc]
+
+    cfg = entrada.get("cfg_tecnicos") or entrada.get("cfg") or None
+    fases_ac = int(entrada.get("fases_ac", 1))
+
+    vmp = float(entrada.get("vmp_string_v", 0.0))
+    imp = float(entrada.get("imp_a", 0.0))
+    isc = entrada.get("isc_a", None)
+    isc = float(isc) if isc is not None else None
+    iac = float(entrada.get("iac_estimado_a", 0.0))
+
+    tr = _ref_calc_tramos(p=params, vmp=vmp, imp=imp, isc=isc, iac=iac, fases_ac=fases_ac, cfg=cfg)
+
+    ocpd = _ref_calc_protecciones(
+        ac=tr["ac"],
+        n_strings=int(entrada.get("n_strings", 0)),
+        isc_mod_a=float(entrada.get("isc_mod_a", 0.0)),
+        has_combiner=bool(entrada.get("has_combiner", False)),
+    )
+
+    can = _ref_calc_canalizacion(p=params, ac=tr["ac"], fases_ac=fases_ac)
+
+    # En ref, construimos un "conductores" compatible con tu resumen NEC (usa circuitos con tipo DC/AC)
+    conductores: Dict[str, Any] = {
+        "circuitos": [
+            {**(tr["dc"] if isinstance(tr["dc"], dict) else {}), "tipo": "DC"},
+            {**(tr["ac"] if isinstance(tr["ac"], dict) else {}), "tipo": "AC", "conduit": can.get("conduit_ac")},
+        ],
+        "warnings": [],
+    }
+
+    # Canalización: si canalizacion_fv devolvió dict, le agregamos conduit legacy para UI/PDF
+    canalizacion_out: Optional[Dict[str, Any]] = None
+    if isinstance(can.get("canalizacion"), Mapping):
+        canalizacion_out = {**can["canalizacion"], "conduit": can.get("conduit_ac")}
+    else:
+        canalizacion_out = {"conduit": can.get("conduit_ac")}
+
+    # DC/AC base para resumen_pdf
+    dc_base = {
+        "potencia_dc_w": None,
+        "vdc_nom": None,
+        "idc_nom": tr["dc"].get("i_nom_a") if isinstance(tr["dc"], Mapping) else None,
+    }
+    if dc_base["idc_nom"] is None and isinstance(tr["dc"], Mapping):
+        dc_base["idc_nom"] = tr["dc"].get("i_a")
+
+    ac_base = {
+        "potencia_ac_w": None,
+        "vac_ll": getattr(params, "vac", None),
+        "vac_ln": getattr(params, "vac", None),
+        "fases": fases_ac,
+        "fp": 1.0,
+        "iac_nom": tr["ac"].get("i_nom_a") if isinstance(tr["ac"], Mapping) else None,
+    }
+    if ac_base["iac_nom"] is None and isinstance(tr["ac"], Mapping):
+        ac_base["iac_nom"] = tr["ac"].get("i_a")
+
+    # Armar resumen_pdf con la misma función NEC, y adjuntar info legacy adicional (no rompe consumidores)
+    resumen_pdf = _armar_resumen_pdf(
+        dc=dc_base,
+        ac=ac_base,
+        ocpd=ocpd if isinstance(ocpd, Mapping) else None,
+        spd=None,
+        seccionamiento=None,
+        conductores=conductores,
+        canalizacion=canalizacion_out,
+        warnings=warnings_out,
+    )
+
+    # Extras legacy (opcionales)
+    resumen_pdf["_ref_lineas"] = [
+        f"Conductores DC (string): {tr['dc'].get('awg') if isinstance(tr['dc'], Mapping) else None} AWG Cu PV Wire/USE-2. Dist {float(getattr(params, 'dist_dc_m', 0.0)):.1f} m.",
+        f"Conductores AC: {tr['ac'].get('awg') if isinstance(tr['ac'], Mapping) else None} AWG Cu THHN/THWN-2. Dist {float(getattr(params, 'dist_ac_m', 0.0)):.1f} m. Conduit: {can.get('conduit_ac')}.",
+    ]
+    resumen_pdf["_ref_disclaimer"] = _ref_disclaimer()
+
+    return {
+        "meta": {"modo": "ref"},
+        "dc": dc_base,
+        "ac": ac_base,
+        "ocpd": ocpd if isinstance(ocpd, dict) else None,
+        "spd": None,
+        "seccionamiento": None,
+        "conductores": conductores,
+        "canalizacion": canalizacion_out,
+        "warnings": warnings_out,
+        "resumen_pdf": resumen_pdf,
+    }
 
 
 # ---------------------------
@@ -230,6 +468,7 @@ def armar_paquete_nec(entrada: Mapping[str, Any]) -> Dict[str, Any]:
 
     Salida:
       {
+        "meta": {"modo": "nec"|"ref"},
         "dc": {...},
         "ac": {...},
         "ocpd": {...} | None,
@@ -243,6 +482,11 @@ def armar_paquete_nec(entrada: Mapping[str, Any]) -> Dict[str, Any]:
     """
     if not isinstance(entrada, Mapping):
         raise TypeError("armar_paquete_nec: 'entrada' debe ser Mapping (dict-like).")
+
+    # Router por modo (UN SOLO punto de salida)
+    modo = str(entrada.get("modo", "nec")).strip().lower()
+    if modo == "ref":
+        return _armar_paquete_ref(entrada)
 
     warnings_out: list[str] = []
 
@@ -408,6 +652,7 @@ def armar_paquete_nec(entrada: Mapping[str, Any]) -> Dict[str, Any]:
     )
 
     return {
+        "meta": {"modo": "nec"},
         "dc": dc,
         "ac": ac,
         "ocpd": ocpd,
@@ -432,9 +677,7 @@ def _armar_resumen_pdf(
     warnings: list[str],
 ) -> Dict[str, Any]:
     """
-    Resumen estable para UI/PDF (conservador):
-    - valores directos (corrientes/voltajes/potencias)
-    - referencias a selecciones (breaker/fuse/calibre/conduit) si existen
+    Resumen estable para UI/PDF (conservador).
     """
     circuitos = conductores.get("circuitos") or []
     mejor_dc = _mejor_tramo_por_tipo(circuitos, "DC")
@@ -445,7 +688,6 @@ def _armar_resumen_pdf(
         "potencia_dc_w": dc.get("potencia_dc_w"),
         "vdc_nom": dc.get("vdc_nom"),
         "idc_nom": dc.get("idc_nom"),
-
         # AC
         "potencia_ac_w": ac.get("potencia_ac_w"),
         "vac_ll": ac.get("vac_ll"),
@@ -453,17 +695,13 @@ def _armar_resumen_pdf(
         "fases": ac.get("fases"),
         "fp": ac.get("fp"),
         "iac_nom": ac.get("iac_nom"),
-
         # Selecciones (si existen)
         "ocpd_principal": _pick(ocpd, "principal", "ocpd_principal", "breaker_principal"),
         "spd": _pick(spd, "seleccion", "spd", "recomendacion"),
         "seccionamiento": _pick(seccionamiento, "seleccion", "seccionamiento", "recomendacion"),
-
         "conductor_dc": _pick(mejor_dc, "calibre", "awg", "kcmil", "conductor") if mejor_dc else None,
         "conductor_ac": _pick(mejor_ac, "calibre", "awg", "kcmil", "conductor") if mejor_ac else None,
-
         "canalizacion": _pick(canalizacion, "conduit", "seleccion", "canalizacion"),
-
         # Warnings
         "warnings": list(warnings or []),
     }
@@ -473,14 +711,10 @@ def _armar_resumen_pdf(
 # Criterios de aceptación (checks)
 # ---------------------------------
 CRITERIOS_ACEPTACION_SPRINT_1 = [
-    # Import graph no rompe
     "Importa sin error: from electrical.paquete_nec import armar_paquete_nec",
     "No hay imports a tablas_conductores/cables_conductores aquí; solo tramo_conductor del motor conductores.",
-    # Orquestación NEC mantiene llaves
-    "armar_paquete_nec(entrada) retorna dict con llaves: dc, ac, ocpd, conductores, warnings, resumen_pdf.",
+    "armar_paquete_nec(entrada) retorna dict con llaves: meta, dc, ac, ocpd, conductores, warnings, resumen_pdf.",
     "resumen_pdf contiene al menos: idc_nom, iac_nom y warnings.",
-    # Adaptador/core compat
     "adaptador_nec.py + core/orquestador.py siguen pudiendo consumir el paquete NEC (mismas llaves principales).",
-    # UI/PDF compat
     "UI/PDF siguen leyendo resumen_pdf y llaves principales (dc, ac, ocpd, conductores, warnings).",
 ]
