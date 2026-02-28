@@ -259,16 +259,7 @@ def _validar_string_catalogo(eq, e, n_paneles):
         imppt_max = 1e9
         imppt_max_fallback = True
 
-    inversor = InversorFV(
-        nombre=inv.nombre,
-        kw_ac=inv.kw_ac,
-        n_mppt=inv.n_mppt,
-        vmppt_min=inv.vmppt_min,
-        vmppt_max=inv.vmppt_max,
-        vdc_max_v=inv.vdc_max_v,
-        imppt_max=imppt_max,
-    )
-
+    inversor = inv   # ya viene correcto
 
 # ==========================================================
 # UI NEC display (cuadros bonitos)
