@@ -468,6 +468,8 @@ def _build_electrico_nec_safe(p: Datosproyecto, sizing: Dict[str, Any]) -> Dict[
         # 5) Ejecutar paquete NEC
         # -----------------------------
         paq = armar_paquete_nec(ee)
+        if paq is None:
+            print("⚠ NEC devolvió None")
 
         return {"ok": True, "errores": [], "input": ee, "paq": paq}
 
