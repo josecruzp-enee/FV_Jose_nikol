@@ -153,7 +153,7 @@ def cargar_inversores_yaml(path: str = "inversores.yaml") -> Dict[str, Inversor]
             n_mppt=int(dc["n_mppt"]),
             vmppt_min=float(dc["mppt_min_v"]),
             vmppt_max=float(dc["mppt_max_v"]),
-            vdc_max=float(dc["vdc_max_v"]),
+            vdc_max_v=float(dc["vdc_max_v"]),
         )
 
         # opcional: propagar imppt_max_a si tu modelo lo soporta (sin romper)
