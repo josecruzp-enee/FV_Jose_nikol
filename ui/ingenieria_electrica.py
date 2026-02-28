@@ -535,7 +535,7 @@ def render(ctx):
             or 10
         )
 
-        validacion = _validar_string_catalogo(eq, e, n_paneles)
+        validacion = _validar_string_catalogo(eq, e, n_paneles, res)
         ctx.validacion_string = validacion
 
         # 🔹 NEC viene directo en raíz
