@@ -163,62 +163,90 @@ def calcular_sizing_unificado(p: Datosproyecto) -> Dict[str, Any]:
     eq = _leer_equipos(p)
     dc_ac = _dc_ac_obj(eq)
 
+    # Catálogo (panel elegido por UI)
     panel = get_panel(_panel_id(eq))
 
-    # --- leer inputs desde p.sistema_fv y equipos ---
-sfv = getattr(p, "sistema_fv", None) or {}
-if not isinstance(sfv, dict):
-    sfv = {}
+    # =========================
+    # Entradas desde sistema_fv
+    # =========================
+    sfv = getattr(p, "sistema_fv", None) or {}
+    if not isinstance(sfv, dict):
+        sfv = {}
 
-# cobertura objetivo (0..1). Si viene en %, lo normalizamos.
-cobertura_obj = sfv.get("cobertura_obj", sfv.get("cobertura", 1.0))
-try:
-    cobertura_obj = float(cobertura_obj)
-except Exception:
-    cobertura_obj = 1.0
-if cobertura_obj > 1.0:
-    cobertura_obj = cobertura_obj / 100.0
-cobertura_obj = max(0.0, min(1.0, cobertura_obj))
+    # consumo_12m_kwh (lista 12) desde p.consumo_12m (canónico)
+    consumo_12m_kwh = list(getattr(p, "consumo_12m", None) or [])
+    if len(consumo_12m_kwh) != 12:
+        consumo_12m_kwh = (consumo_12m_kwh + [0.0] * 12)[:12]
+    consumo_12m_kwh = [float(x or 0.0) for x in consumo_12m_kwh]
 
-# panel_w: primero desde el panel seleccionado en equipos (catálogo), si existe
-panel_w = None
-try:
-    panel_w = float(getattr(panel, "w"))  # si 'panel' es dataclass Panel
-except Exception:
-    panel_w = None
-
-# fallback desde sistema_fv
-if panel_w is None:
+    # cobertura objetivo (0..1). Si viene en %, normalizamos.
+    cobertura_obj = sfv.get("cobertura_obj", sfv.get("cobertura", 1.0))
     try:
-        panel_w = float(sfv.get("panel_w", sfv.get("potencia_panel_w", 550.0)))
+        cobertura_obj = float(cobertura_obj)
     except Exception:
-        panel_w = 550.0
+        cobertura_obj = 1.0
+    if cobertura_obj > 1.0:
+        cobertura_obj = cobertura_obj / 100.0
+    cobertura_obj = max(0.0, min(1.0, cobertura_obj))
 
-panel_sizing = calcular_panel_sizing(
-    consumo_12m_kwh=consumo_12m_kwh,
-    cobertura_obj=cobertura_obj,   # ✅ OBLIGATORIO
-    panel_w=panel_w,               # ✅ OBLIGATORIO
-    hsp_12m=hsp_12m,
-    hsp=sfv.get("hsp"),
-    usar_modelo_conservador=bool(sfv.get("usar_modelo_conservador", False)),
-    usar_modelo_hn_conservador=bool(sfv.get("usar_modelo_hn_conservador", False)),
-    sombras_pct=float(sfv.get("sombras_pct", 0.0) or 0.0),
-    perdidas_sistema_pct=float(sfv.get("perdidas_sistema_pct", 0.0) or 0.0),
-    perdidas_detalle=sfv.get("perdidas_detalle"),
-)
+    # hsp_12m: preferir lo que venga de sistema_fv; si no, None (dimensionado_paneles decide)
+    hsp_12m = sfv.get("hsp_12m", None)
+    if isinstance(hsp_12m, (list, tuple)) and len(hsp_12m) == 12:
+        try:
+            hsp_12m = [float(x or 0.0) for x in hsp_12m]
+        except Exception:
+            hsp_12m = None
+    else:
+        hsp_12m = None
 
-kwp_req = float(panel_sizing.kwp_req) if panel_sizing.ok else 0.0
-n_pan = int(panel_sizing.n_paneles) if panel_sizing.ok else 0
-pdc = float(panel_sizing.pdc_kw) if panel_sizing.ok else 0.0
+    # panel_w: primero desde el panel seleccionado en catálogo; si no, fallback en sistema_fv
+    panel_w = None
+    try:
+        panel_w = float(getattr(panel, "w"))
+    except Exception:
+        panel_w = None
+
+    if panel_w is None:
+        try:
+            panel_w = float(sfv.get("panel_w", sfv.get("potencia_panel_w", 550.0)))
+        except Exception:
+            panel_w = 550.0
+
+    # =========================
+    # Panel sizing (OBLIGATORIOS: cobertura_obj, panel_w)
+    # =========================
+    panel_sizing = calcular_panel_sizing(
+        consumo_12m_kwh=consumo_12m_kwh,
+        cobertura_obj=cobertura_obj,   # ✅ obligatorio
+        panel_w=panel_w,               # ✅ obligatorio
+        hsp_12m=hsp_12m,
+        hsp=sfv.get("hsp"),
+        usar_modelo_conservador=bool(sfv.get("usar_modelo_conservador", False)),
+        usar_modelo_hn_conservador=bool(sfv.get("usar_modelo_hn_conservador", False)),
+        sombras_pct=float(sfv.get("sombras_pct", 0.0) or 0.0),
+        perdidas_sistema_pct=float(sfv.get("perdidas_sistema_pct", 0.0) or 0.0),
+        perdidas_detalle=sfv.get("perdidas_detalle"),
+    )
+
+    kwp_req = float(getattr(panel_sizing, "kwp_req", 0.0)) if panel_sizing.ok else 0.0
+    n_pan = int(getattr(panel_sizing, "n_paneles", 0)) if panel_sizing.ok else 0
+    pdc = float(getattr(panel_sizing, "pdc_kw", 0.0)) if panel_sizing.ok else 0.0
 
     # Producción anual por kWp (kWh/kWp-año)
     prod_anual_kwp = 0.0
-    for hsp_d, dias in zip(panel_sizing.hsp_12m, panel_sizing.meta.get("dias_mes", [])):
-        prod_anual_kwp += float(hsp_d) * float(panel_sizing.pr) * float(dias or 0)
+    try:
+        dias_mes = list((panel_sizing.meta or {}).get("dias_mes", []))
+        for hsp_d, dias in zip(panel_sizing.hsp_12m, dias_mes):
+            prod_anual_kwp += float(hsp_d or 0.0) * float(panel_sizing.pr or 0.0) * float(dias or 0.0)
+    except Exception:
+        prod_anual_kwp = 0.0
 
+    # =========================
+    # Recomendación inversor
+    # =========================
     sizing_inv = _recomendar_inversor(
         p=p,
-        panel_w=float(panel.w),
+        panel_w=float(panel_w),
         dc_ac=float(dc_ac),
         prod_anual_kwp=float(prod_anual_kwp),
         pdc_obj_kw=float(pdc) if pdc > 0 else None,
@@ -236,7 +264,7 @@ pdc = float(panel_sizing.pdc_kw) if panel_sizing.ok else 0.0
     electrico_inputs = build_inputs_electricos_ui(p)
 
     kwh_mes = _kwh_mes_prom(p)
-    prod_diaria_kwp = float(panel_sizing.hsp_prom) * float(panel_sizing.pr)
+    prod_diaria_kwp = float(getattr(panel_sizing, "hsp_prom", 0.0) or 0.0) * float(getattr(panel_sizing, "pr", 0.0) or 0.0)
 
     return {
         "kwh_mes_prom": float(kwh_mes),
@@ -262,17 +290,17 @@ pdc = float(panel_sizing.pdc_kw) if panel_sizing.ok else 0.0
             "panel_id": _panel_id(eq),
             "inversor_id": inv_id,
             "dc_ac_objetivo": float(dc_ac),
-            "hsp_usada": float(panel_sizing.hsp_prom),
-            "pr_usado": float(panel_sizing.pr),
+            "hsp_usada": float(getattr(panel_sizing, "hsp_prom", 0.0) or 0.0),
+            "pr_usado": float(getattr(panel_sizing, "pr", 0.0) or 0.0),
         },
 
         "panel_sizing": {
-            "ok": bool(panel_sizing.ok),
-            "errores": list(panel_sizing.errores),
-            "hsp_12m": list(panel_sizing.hsp_12m),
-            "hsp_prom": float(panel_sizing.hsp_prom),
-            "pr": float(panel_sizing.pr),
-            "meta": dict(panel_sizing.meta),
+            "ok": bool(getattr(panel_sizing, "ok", False)),
+            "errores": list(getattr(panel_sizing, "errores", []) or []),
+            "hsp_12m": list(getattr(panel_sizing, "hsp_12m", []) or []),
+            "hsp_prom": float(getattr(panel_sizing, "hsp_prom", 0.0) or 0.0),
+            "pr": float(getattr(panel_sizing, "pr", 0.0) or 0.0),
+            "meta": dict(getattr(panel_sizing, "meta", {}) or {}),
         },
 
         "electrico_inputs": electrico_inputs,
