@@ -217,7 +217,7 @@ def _ui_inputs_electricos(e: dict):
 # CORE — EJECUCIÓN CENTRAL
 # ==========================================================
 def _ejecutar_core(ctx) -> Dict[str, Any]:
-    from core.orquestador import ejecutar_estudio  # lazy import
+    from core.orquestador import ejecutar_estudio
 
     datos = _datosproyecto_desde_ctx(ctx)
     ctx.datos_proyecto = datos
@@ -225,15 +225,11 @@ def _ejecutar_core(ctx) -> Dict[str, Any]:
     resultado_proyecto = ejecutar_estudio(datos)
     ctx.resultado_proyecto = resultado_proyecto
 
-    # compat legacy
     ctx.resultado_core = resultado_proyecto.get("_compat", {}) or {}
 
     ctx.resultado_electrico = (
-    (resultado_proyecto.get("tecnico") or {}).get("electrico_nec") or {}
+        (resultado_proyecto.get("tecnico") or {}).get("electrico_nec") or {}
     )
-
-    # ✅ esto debe ser el PAQ (no el wrapper)
-    ctx.resultado_electrico = pkg
 
     return resultado_proyecto
 
