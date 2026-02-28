@@ -514,6 +514,8 @@ def render(ctx):
 
     try:
         res = _ejecutar_core(ctx)
+        st.markdown("### DEBUG RESULTADO PROYECTO")
+        st.json(res)
 
         tecnico = res.get("tecnico") or {}
         sizing = tecnico.get("sizing") or {}
