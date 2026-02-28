@@ -227,9 +227,7 @@ def _ejecutar_core(ctx) -> Dict[str, Any]:
 
     ctx.resultado_core = resultado_proyecto.get("_compat", {}) or {}
 
-    ctx.resultado_electrico = (
-        (resultado_proyecto.get("tecnico") or {}).get("electrico_nec") or {}
-    )
+    ctx.resultado_electrico = resultado_proyecto.get("electrico_nec") or {}
 
     return resultado_proyecto
 
@@ -510,25 +508,35 @@ def render(ctx):
 
     try:
         res = _ejecutar_core(ctx)
+
         st.markdown("### DEBUG RESULTADO PROYECTO")
         st.json(res)
 
-        tecnico = res.get("tecnico") or {}
-        sizing = tecnico.get("sizing") or {}
+        # ======================================================
+        # 🔹 CORE devuelve formato PLANO
+        # ======================================================
 
-        # ✅ usa n_paneles_string si existe, si no n_paneles
-        n_paneles = int(sizing.get("n_paneles_string") or sizing.get("n_paneles") or 10)
+        sizing = res.get("sizing") or {}
+
+        # usa n_paneles_string si existe, si no n_paneles
+        n_paneles = int(
+            sizing.get("n_paneles_string")
+            or sizing.get("n_paneles")
+            or 10
+        )
 
         validacion = _validar_string_catalogo(eq, e, n_paneles)
         ctx.validacion_string = validacion
 
-        wrapper = tecnico.get("electrico_nec") or {}
+        # 🔹 NEC viene directo en raíz
+        wrapper = res.get("electrico_nec") or {}
         pkg = wrapper.get("paq") or {}
 
         # guardar fingerprint para “stale”
         save_result_fingerprint(ctx)
 
         st.success("Ingeniería eléctrica generada.")
+
         _mostrar_validacion_string(validacion)
         _mostrar_nec(pkg)
 
@@ -538,7 +546,6 @@ def render(ctx):
         ctx.resultado_electrico = None
         setattr(ctx, "result_inputs_fingerprint", None)
         st.error(f"No se pudo generar ingeniería: {exc}")
-
 
 # ==========================================================
 # VALIDAR PASO
