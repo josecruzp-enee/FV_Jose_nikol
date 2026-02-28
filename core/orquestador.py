@@ -81,6 +81,7 @@ def ejecutar_estudio(p: Datosproyecto) -> Dict[str, Any]:
     """
     Flujo lineal estricto:
     Entradas → Sizing → Strings → NEC → Financiero
+    NEC SIEMPRE se ejecuta.
     """
 
     # -------------------------------------------------
@@ -99,37 +100,30 @@ def ejecutar_estudio(p: Datosproyecto) -> Dict[str, Any]:
         raise ValueError("Sizing inválido.")
 
     # -------------------------------------------------
-    # 3️⃣ Selección de equipos desde sizing
+    # 3️⃣ Selección de equipos
     # -------------------------------------------------
     from electrical.catalogos.catalogos import get_panel, get_inversor
     from electrical.paneles.orquestador_paneles import ejecutar_calculo_strings
+    from electrical.paquete_nec import armar_paquete_nec
 
-    panel_id = sizing.get("panel_id")
-    inversor_id = sizing.get("inversor_recomendado")
-
-    panel = get_panel(panel_id)
-    inversor = get_inversor(inversor_id)
+    panel = get_panel(sizing.get("panel_id"))
+    inversor = get_inversor(sizing.get("inversor_recomendado"))
 
     pdc_kw = float(sizing.get("pdc_kw", 0.0))
     pac_kw = float(getattr(inversor, "kw_ac", 0.0))
 
     # -------------------------------------------------
-    # 4️⃣ Validación DC/AC ratio (NO corta flujo)
+    # 4️⃣ DC/AC ratio (warning, NO bloqueo)
     # -------------------------------------------------
-    if pac_kw <= 0:
-        raise ValueError("Inversor inválido.")
-
-    dc_ac_ratio = pdc_kw / pac_kw
-
     dc_ac_warning = None
-    if dc_ac_ratio < 0.8 or dc_ac_ratio > 1.35:
-        dc_ac_warning = f"DC/AC ratio fuera de rango ({dc_ac_ratio:.2f})."
+    if pac_kw > 0:
+        dc_ac_ratio = pdc_kw / pac_kw
+        if dc_ac_ratio < 0.8 or dc_ac_ratio > 1.35:
+            dc_ac_warning = f"DC/AC ratio fuera de rango ({dc_ac_ratio:.2f})."
 
     # -------------------------------------------------
-    # 5️⃣ STRINGS (OBLIGATORIO)
+    # 5️⃣ STRINGS (NO corta flujo)
     # -------------------------------------------------
-    from electrical.paneles.orquestador_paneles import ejecutar_calculo_strings
-
     res_strings = ejecutar_calculo_strings(
         n_paneles_total=int(sizing["n_paneles"]),
         panel=panel,
@@ -140,28 +134,16 @@ def ejecutar_estudio(p: Datosproyecto) -> Dict[str, Any]:
         pdc_kw_objetivo=float(pdc_kw),
     )
 
-    if not res_strings.get("ok"):
-        return {
-            "params_fv": params_fv,
-            "sizing": sizing,
-            "cuota_mensual": 0,
-            "tabla_12m": [],
-            "evaluacion": None,
-            "decision": None,
-            "ahorro_anual_L": 0,
-            "payback_simple_anios": None,
-            "electrico_nec": {
-                "ok": False,
-                "errores": list(res_strings.get("errores") or []),
-                "paq": None,
-            },
-            "finanzas_lp": None,
-        }
-    # -------------------------------------------------
-    # 6️⃣ NEC (YA CON STRINGS VÁLIDO)
-    # -------------------------------------------------
-    from electrical.paquete_nec import armar_paquete_nec
+    strings_warning = None
+    strings_errors = []
 
+    if not res_strings.get("ok"):
+        strings_warning = "Strings inválido."
+        strings_errors = list(res_strings.get("errores") or [])
+
+    # -------------------------------------------------
+    # 6️⃣ NEC (SIEMPRE)
+    # -------------------------------------------------
     nec_input = {
         "potencia_dc_kw": pdc_kw,
         "potencia_ac_kw": pac_kw,
@@ -188,6 +170,12 @@ def ejecutar_estudio(p: Datosproyecto) -> Dict[str, Any]:
 
     if dc_ac_warning:
         electrico_nec["warnings"].append(dc_ac_warning)
+
+    if strings_warning:
+        electrico_nec["warnings"].append(strings_warning)
+
+    if strings_errors:
+        electrico_nec["warnings"].extend(strings_errors)
 
     # -------------------------------------------------
     # 7️⃣ FINANCIERO
@@ -225,7 +213,6 @@ def ejecutar_estudio(p: Datosproyecto) -> Dict[str, Any]:
         "electrico_nec": electrico_nec,
         "finanzas_lp": finanzas_lp,
     }
-
 
 # ==========================================================
 # Helpers pipeline
