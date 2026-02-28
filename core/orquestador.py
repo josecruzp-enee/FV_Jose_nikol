@@ -102,7 +102,7 @@ def ejecutar_estudio(p: Datosproyecto) -> Dict[str, Any]:
     # 3️⃣ Selección de equipos desde sizing
     # -------------------------------------------------
     from electrical.catalogos.catalogos import get_panel, get_inversor
-   from electrical.paneles.orquestador_paneles import ejecutar_calculo_strings
+    from electrical.paneles.orquestador_paneles import ejecutar_calculo_strings
 
     panel_id = sizing.get("panel_id")
     inversor_id = sizing.get("inversor_recomendado")
