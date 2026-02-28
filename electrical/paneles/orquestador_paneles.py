@@ -237,16 +237,9 @@ def ejecutar_paneles_por_demanda(
             panel_w = 550.0  # fallback razonable
 
     sizing = calcular_panel_sizing(
-        consumo_12m_kwh=consumo_12m_kwh,
-        cobertura_obj=cobertura_obj,          # ✅ OBLIGATORIO
-        panel_w=panel_w,                      # ✅ OBLIGATORIO
-        hsp_12m=hsp_12m,
-        hsp=hsp,
-        usar_modelo_conservador=usar_modelo_conservador,
-        usar_modelo_hn_conservador=usar_modelo_hn_conservador,
-        sombras_pct=sombras_pct,
-        perdidas_sistema_pct=perdidas_sistema_pct,
-        perdidas_detalle=perdidas_detalle,
+        consumo_12m_kwh=float(consumo_12m_kwh),
+        cobertura_obj=float(cobertura_obj),
+        panel_w=float(panel_w),
     )
 
     # Soporta dataclass o dict (sin adivinar demasiado)
