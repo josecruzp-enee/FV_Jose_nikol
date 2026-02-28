@@ -228,8 +228,9 @@ def _ejecutar_core(ctx) -> Dict[str, Any]:
     # compat legacy
     ctx.resultado_core = resultado_proyecto.get("_compat", {}) or {}
 
-    electrico_nec = ((resultado_proyecto.get("tecnico") or {}).get("electrico_nec") or {})
-    pkg = electrico_nec.get("paq") or {}
+    ctx.resultado_electrico = (
+    (resultado_proyecto.get("tecnico") or {}).get("electrico_nec") or {}
+    )
 
     # ✅ esto debe ser el PAQ (no el wrapper)
     ctx.resultado_electrico = pkg
@@ -519,8 +520,7 @@ def render(ctx):
         validacion = _validar_string_catalogo(eq, e, n_paneles)
         ctx.validacion_string = validacion
 
-        electrico_nec = tecnico.get("electrico_nec") or {}
-        pkg = electrico_nec.get("paq") or {}
+        pkg = tecnico.get("electrico_nec") or {}
 
         # guardar fingerprint para “stale”
         save_result_fingerprint(ctx)
