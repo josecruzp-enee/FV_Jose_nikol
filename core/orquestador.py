@@ -77,7 +77,7 @@ def ejecutar_evaluacion(p: Datosproyecto) -> Dict[str, Any]:
 # ==========================================================
 # ENTRYPOINT OFICIAL (ARQUITECTURA)
 # ==========================================================
-def ejecutar_evaluacion(p: Datosproyecto) -> Dict[str, Any]:
+def ejecutar_estudio(p: Datosproyecto) -> Dict[str, Any]:
     """
     Flujo lineal estricto:
     Entradas → Sizing → Strings → NEC → Financiero
