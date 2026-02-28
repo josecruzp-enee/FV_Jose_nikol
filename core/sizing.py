@@ -207,9 +207,9 @@ panel_sizing = calcular_panel_sizing(
     perdidas_detalle=sfv.get("perdidas_detalle"),
 )
 
-    kwp_req = float(panel_sizing.kwp_req) if panel_sizing.ok else 0.0
-    n_pan = int(panel_sizing.n_paneles) if panel_sizing.ok else 0
-    pdc = float(panel_sizing.pdc_kw) if panel_sizing.ok else 0.0
+kwp_req = float(panel_sizing.kwp_req) if panel_sizing.ok else 0.0
+n_pan = int(panel_sizing.n_paneles) if panel_sizing.ok else 0
+pdc = float(panel_sizing.pdc_kw) if panel_sizing.ok else 0.0
 
     # Producción anual por kWp (kWh/kWp-año)
     prod_anual_kwp = 0.0
