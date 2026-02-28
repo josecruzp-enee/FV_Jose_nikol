@@ -221,10 +221,32 @@ def ejecutar_paneles_por_demanda(
       - resumen (shape estable UI/PDF)
     """
     # 1) Dimensionado por energía
+    # --- defaults defensivos ---
+    # cobertura_pct suele venir como % (0..100). El motor pide cobertura_obj (0..1).
+    cobertura_pct = float(cobertura_pct or 0.0)
+    cobertura_obj = max(0.0, min(1.0, cobertura_pct / 100.0)) if cobertura_pct > 1.0 else max(0.0, min(1.0, cobertura_pct))
+
+    # panel_w: si viene PanelSpec/Panel dataclass tendrá .w; si viene dict tendrá ["w"]
+    panel_w = None
+    try:
+        panel_w = float(getattr(panel, "w"))
+    except Exception:
+        try:
+            panel_w = float(panel.get("w"))  # type: ignore[union-attr]
+        except Exception:
+            panel_w = 550.0  # fallback razonable
+
     sizing = calcular_panel_sizing(
-        consumo_12m_kwh=float(consumo_12m_kwh),
-        cobertura_pct=float(cobertura_pct),
-        panel=panel,
+        consumo_12m_kwh=consumo_12m_kwh,
+        cobertura_obj=cobertura_obj,          # ✅ OBLIGATORIO
+        panel_w=panel_w,                      # ✅ OBLIGATORIO
+        hsp_12m=hsp_12m,
+        hsp=hsp,
+        usar_modelo_conservador=usar_modelo_conservador,
+        usar_modelo_hn_conservador=usar_modelo_hn_conservador,
+        sombras_pct=sombras_pct,
+        perdidas_sistema_pct=perdidas_sistema_pct,
+        perdidas_detalle=perdidas_detalle,
     )
 
     # Soporta dataclass o dict (sin adivinar demasiado)
