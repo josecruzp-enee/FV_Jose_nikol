@@ -165,11 +165,47 @@ def calcular_sizing_unificado(p: Datosproyecto) -> Dict[str, Any]:
 
     panel = get_panel(_panel_id(eq))
 
-    panel_sizing = calcular_panel_sizing(
-        consumo_12m_kwh=float(sum(p.consumo_12m)),
-        cobertura_pct=float(p.cobertura_objetivo),
-        panel=panel,
-    )
+    # --- leer inputs desde p.sistema_fv y equipos ---
+sfv = getattr(p, "sistema_fv", None) or {}
+if not isinstance(sfv, dict):
+    sfv = {}
+
+# cobertura objetivo (0..1). Si viene en %, lo normalizamos.
+cobertura_obj = sfv.get("cobertura_obj", sfv.get("cobertura", 1.0))
+try:
+    cobertura_obj = float(cobertura_obj)
+except Exception:
+    cobertura_obj = 1.0
+if cobertura_obj > 1.0:
+    cobertura_obj = cobertura_obj / 100.0
+cobertura_obj = max(0.0, min(1.0, cobertura_obj))
+
+# panel_w: primero desde el panel seleccionado en equipos (catálogo), si existe
+panel_w = None
+try:
+    panel_w = float(getattr(panel, "w"))  # si 'panel' es dataclass Panel
+except Exception:
+    panel_w = None
+
+# fallback desde sistema_fv
+if panel_w is None:
+    try:
+        panel_w = float(sfv.get("panel_w", sfv.get("potencia_panel_w", 550.0)))
+    except Exception:
+        panel_w = 550.0
+
+panel_sizing = calcular_panel_sizing(
+    consumo_12m_kwh=consumo_12m_kwh,
+    cobertura_obj=cobertura_obj,   # ✅ OBLIGATORIO
+    panel_w=panel_w,               # ✅ OBLIGATORIO
+    hsp_12m=hsp_12m,
+    hsp=sfv.get("hsp"),
+    usar_modelo_conservador=bool(sfv.get("usar_modelo_conservador", False)),
+    usar_modelo_hn_conservador=bool(sfv.get("usar_modelo_hn_conservador", False)),
+    sombras_pct=float(sfv.get("sombras_pct", 0.0) or 0.0),
+    perdidas_sistema_pct=float(sfv.get("perdidas_sistema_pct", 0.0) or 0.0),
+    perdidas_detalle=sfv.get("perdidas_detalle"),
+)
 
     kwp_req = float(panel_sizing.kwp_req) if panel_sizing.ok else 0.0
     n_pan = int(panel_sizing.n_paneles) if panel_sizing.ok else 0
