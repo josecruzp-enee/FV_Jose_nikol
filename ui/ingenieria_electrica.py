@@ -522,7 +522,8 @@ def render(ctx):
         validacion = _validar_string_catalogo(eq, e, n_paneles)
         ctx.validacion_string = validacion
 
-        pkg = tecnico.get("electrico_nec") or {}
+        wrapper = tecnico.get("electrico_nec") or {}
+        pkg = wrapper.get("paq") or {}
 
         # guardar fingerprint para “stale”
         save_result_fingerprint(ctx)
