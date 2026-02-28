@@ -259,10 +259,15 @@ def _validar_string_catalogo(eq, e, n_paneles):
         imppt_max = 1e9
         imppt_max_fallback = True
 
-    inversor = InversorFV(inv.vdc_max, inv.vmppt_min, inv.vmppt_max, imppt_max, inv.n_mppt)
-    v = validar_string(panel, inversor, n_paneles, temp_min=float(e["t_min_c"])) or {}
-    v["_imppt_max_fallback"] = imppt_max_fallback
-    return v
+    inversor = InversorFV(
+        nombre=inv.nombre,
+        kw_ac=inv.kw_ac,
+        n_mppt=inv.n_mppt,
+        vmppt_min=inv.vmppt_min,
+        vmppt_max=inv.vmppt_max,
+        vdc_max_v=inv.vdc_max_v,
+        imppt_max=imppt_max,
+    )
 
 
 # ==========================================================
