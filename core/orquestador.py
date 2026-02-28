@@ -114,30 +114,16 @@ def ejecutar_estudio(p: Datosproyecto) -> Dict[str, Any]:
     pac_kw = float(getattr(inversor, "kw_ac", 0.0))
 
     # -------------------------------------------------
-    # 4️⃣ Guard DC/AC ratio (evita sabotaje técnico)
+    # 4️⃣ Validación DC/AC ratio (NO corta flujo)
     # -------------------------------------------------
     if pac_kw <= 0:
         raise ValueError("Inversor inválido.")
 
     dc_ac_ratio = pdc_kw / pac_kw
 
+    dc_ac_warning = None
     if dc_ac_ratio < 0.8 or dc_ac_ratio > 1.35:
-        return {
-            "params_fv": params_fv,
-            "sizing": sizing,
-            "cuota_mensual": 0,
-            "tabla_12m": [],
-            "evaluacion": None,
-            "decision": None,
-            "ahorro_anual_L": 0,
-            "payback_simple_anios": None,
-            "electrico_nec": {
-                "ok": False,
-                "errores": [f"DC/AC ratio inválido ({dc_ac_ratio:.2f})."],
-                "paq": None,
-            },
-            "finanzas_lp": None,
-        }
+        dc_ac_warning = f"DC/AC ratio fuera de rango ({dc_ac_ratio:.2f})."
 
     # -------------------------------------------------
     # 5️⃣ STRINGS (OBLIGATORIO)
@@ -191,11 +177,17 @@ def ejecutar_estudio(p: Datosproyecto) -> Dict[str, Any]:
         "vdrop_obj_ac_pct": getattr(p, "vdrop_obj_ac_pct", 2.0),
     }
 
+    paq = armar_paquete_nec(nec_input)
+
     electrico_nec = {
         "ok": True,
         "errores": [],
-        "paq": armar_paquete_nec(nec_input),
+        "warnings": [],
+        "paq": paq,
     }
+
+    if dc_ac_warning:
+        electrico_nec["warnings"].append(dc_ac_warning)
 
     # -------------------------------------------------
     # 7️⃣ FINANCIERO
