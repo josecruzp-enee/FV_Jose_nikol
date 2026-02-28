@@ -61,6 +61,8 @@ def _as_panel_spec(panel: Any) -> PanelSpec:
 
 # Normaliza inversor (legacy/nuevo/UI) al contrato interno InversorSpec.
 def _as_inversor_spec(inversor: Any) -> InversorSpec:
+    print("TIPO INVERSOR:", type(inversor))
+    print("ATRIBUTOS:", getattr(inversor, "__dict__", str(inversor)))
     if isinstance(inversor, InversorSpec):
         return inversor
 
