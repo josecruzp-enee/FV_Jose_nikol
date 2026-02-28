@@ -88,10 +88,17 @@ def _score_n(*, n_series: int, panel: PanelSpec, inv: InversorSpec, t_oper_c: fl
 
 
 # Divide la cantidad de strings entre MPPT según topología (1-agua / 2-aguas).
-def _split_por_mppt(*, n_strings_total: int, n_mppt: int, dos_aguas: bool) -> List[Dict[str, Any]]:
-    if n_strings_total <= 0:
+def _split_por_mppt(
+    *,
+    n_strings_total: int,
+    n_mppt: int,
+    dos_aguas: bool,
+) -> List[Dict[str, Any]]:
+
+    if n_strings_total <= 0 or n_mppt <= 0:
         return []
 
+    # Caso 2 aguas explícito (mantener comportamiento)
     if bool(dos_aguas) and n_mppt >= 2:
         s1 = n_strings_total // 2
         s2 = n_strings_total - s1
@@ -101,8 +108,24 @@ def _split_por_mppt(*, n_strings_total: int, n_mppt: int, dos_aguas: bool) -> Li
         ]
         return [r for r in ramas if r["n_strings"] > 0]
 
-    return [{"mppt": 1, "n_strings": int(n_strings_total), "etiqueta": "Arreglo FV"}]
+    # Caso general: distribución uniforme en todos los MPPT
+    base = n_strings_total // n_mppt
+    resto = n_strings_total % n_mppt
 
+    ramas: List[Dict[str, Any]] = []
+
+    for i in range(n_mppt):
+        n = base + (1 if i < resto else 0)
+        if n > 0:
+            ramas.append(
+                {
+                    "mppt": i + 1,
+                    "n_strings": n,
+                    "etiqueta": f"MPPT {i + 1}",
+                }
+            )
+
+    return ramas
 
 # Recomienda Ns y número total de strings en función de límites eléctricos y objetivo DC.
 def recomendar_string(
