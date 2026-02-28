@@ -133,7 +133,8 @@ def ejecutar_estudio(p: Datosproyecto) -> Dict[str, Any]:
         objetivo_dc_ac=(pdc_kw / pac_kw) if pac_kw > 0 else None,
         pdc_kw_objetivo=float(pdc_kw),
     )
-
+    
+    sizing["strings"] = res_strings
     strings_warning = None
     strings_errors = []
 
