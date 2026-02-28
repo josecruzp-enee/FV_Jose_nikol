@@ -244,7 +244,14 @@ def _validar_string_catalogo(eq, e, n_paneles):
     p = get_panel(eq["panel_id"])
     inv = get_inversor(eq["inversor_id"])
 
-    panel = PanelFV(p.voc, p.vmp, p.isc, p.imp, getattr(p, "coef_voc", -0.28))
+    panel = PanelFV(
+    nombre=p.nombre,
+    w=p.w,
+    vmp=p.vmp,
+    voc=p.voc,
+    imp=p.imp,
+    isc=p.isc,
+    )
 
     imppt_max = getattr(inv, "imppt_max", None)
     imppt_max_fallback = False
