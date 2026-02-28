@@ -71,7 +71,7 @@ def _inv_dict_to_candidato(i: Dict[str, Any]) -> InversorCandidato:
         n_mppt=int(i["n_mppt"]),
         mppt_min_v=float(i["mppt_min_v"]),
         mppt_max_v=float(i["mppt_max_v"]),
-        vdc_max_v=float(i["vmax_dc_v"]),
+        vdc_max_v=float(i.get("vdc_max", i.get("vmax_dc_v"))),
     )
 
 
