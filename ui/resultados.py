@@ -38,17 +38,31 @@ def _get_resultado_proyecto(ctx) -> dict:
 # KPIs
 # ==========================================================
 def _render_kpis(resultado_proyecto: dict) -> None:
+    # 🔒 Validación estructural mínima
+    if not isinstance(resultado_proyecto, dict):
+        st.error("resultado_proyecto inválido.")
+        return
+
     tecnico = resultado_proyecto.get("tecnico") or {}
     financiero = resultado_proyecto.get("financiero") or {}
 
+    if not tecnico or not financiero:
+        st.error("Estructura de resultado_proyecto incompleta.")
+        st.json(resultado_proyecto)
+        return
+
     sizing = tecnico.get("sizing") or {}
 
-    # 🔹 Canon oficial: pdc_kw
+    # ✅ Canon oficial del core
     pdc_kw = float(sizing.get("pdc_kw") or 0.0)
     cuota = float(financiero.get("cuota_mensual") or 0.0)
 
     evaluacion = financiero.get("evaluacion") or {}
-    estado = str(evaluacion.get("estado") or evaluacion.get("dictamen") or "N/D")
+    estado = str(
+        evaluacion.get("estado")
+        or evaluacion.get("dictamen")
+        or "N/D"
+    )
 
     c1, c2, c3 = st.columns(3)
     c1.metric("Sistema (kWp DC)", num(pdc_kw, 2))
@@ -57,6 +71,7 @@ def _render_kpis(resultado_proyecto: dict) -> None:
 
     if pdc_kw <= 0:
         st.warning("Sizing inválido.")
+
 
 
 # ==========================================================
