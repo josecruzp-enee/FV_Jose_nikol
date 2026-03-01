@@ -15,8 +15,10 @@ from electrical.nec.orquestador_nec import ejecutar_nec
 # ==========================================================
 # Validación estructural interna (contrato fuerte)
 # ==========================================================
+
 def _validar_sizing(s: Dict[str, Any]) -> None:
-    required = ["n_paneles", "kwp_dc", "pdc_kw", "pac_kw"]
+    required = ["n_paneles", "pdc_kw", "pac_kw"]
+
     for k in required:
         if k not in s:
             raise ValueError(f"Sizing incompleto. Falta clave: {k}")
@@ -24,9 +26,11 @@ def _validar_sizing(s: Dict[str, Any]) -> None:
     if not isinstance(s["n_paneles"], int) or s["n_paneles"] <= 0:
         raise ValueError("Sizing inválido: n_paneles debe ser > 0.")
 
-    if float(s["kwp_dc"]) <= 0:
-        raise ValueError("Sizing inválido: kwp_dc debe ser > 0.")
+    if float(s["pdc_kw"]) <= 0:
+        raise ValueError("Sizing inválido: pdc_kw debe ser > 0.")
 
+    if float(s["pac_kw"]) <= 0:
+        raise ValueError("Sizing inválido: pac_kw debe ser > 0.")
 
 def _validar_strings(st: Dict[str, Any]) -> None:
     if "ok" not in st:
