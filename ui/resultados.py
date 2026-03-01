@@ -82,7 +82,7 @@ def _render_nec_resumen(resultado_proyecto: dict) -> None:
     ocpd = paq.get("ocpd") or {}
 
     resumen = paq.get("resumen_pdf") or {}
-
+    c1, c2, c3, c4 = st.columns(4)
     c1.metric("Strings", "—")
     c2.metric("I DC diseño", f"{resumen.get('idc_nom','—')} A")
     c3.metric("I AC diseño", f"{resumen.get('iac_nom','—')} A")
