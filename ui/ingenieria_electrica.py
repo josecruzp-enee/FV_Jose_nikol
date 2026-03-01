@@ -562,6 +562,93 @@ def render(ctx):
         setattr(ctx, "result_inputs_fingerprint", None)
         st.error(f"No se pudo generar ingeniería: {exc}")
 
+def _mostrar_validacion_string(validacion: dict):
+    v = validacion or {}
+
+    st.subheader("Validación de string (catálogo)")
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Voc frío total", _fmt(v.get("voc_frio_total"), "V"))
+    c2.metric("Vmp operativo", _fmt(v.get("vmp_operativo"), "V"))
+    c3.metric("Corriente MPPT", _fmt(v.get("corriente_mppt"), "A"))
+
+    with c4:
+        st.write("**Estado**")
+        st.write(f"- Vdc: {_yn(bool(v.get('ok_vdc')))}")
+        st.write(f"- MPPT: {_yn(bool(v.get('ok_mppt')))}")
+        st.write(f"- Corriente: {_yn(bool(v.get('ok_corriente')))}")
+        st.write(f"- String: {_yn(bool(v.get('string_valido')))}")
+
+    if v.get("_imppt_max_fallback"):
+        st.warning("El inversor no trae `imppt_max` en el catálogo. Se usó un fallback (muy alto) para no falsear la validación de corriente.")
+
+    with st.expander("Ver validación (crudo)"):
+        st.json(v)
+
+
+# ==========================================================
+# RENDER
+# ==========================================================
+def render(ctx):
+    e = _defaults_electrico(ctx)
+    eq = _get_equipos(ctx)
+
+    if not (eq.get("panel_id") and eq.get("inversor_id")):
+        st.error("Complete Paso 4.")
+        return
+
+    st.markdown("### Ingeniería eléctrica automática")
+    _ui_inputs_electricos(e)
+
+    faltantes = campos_faltantes_para_paso5(ctx)
+    if faltantes:
+        st.warning("Complete estos datos antes de generar ingeniería:\n- " + "\n- ".join(faltantes))
+
+    st.divider()
+
+    if not st.button("Generar ingeniería eléctrica", type="primary", disabled=bool(faltantes)):
+        return
+
+    try:
+        res = _ejecutar_core(ctx)
+
+        st.markdown("### DEBUG RESULTADO PROYECTO")
+        st.json(res)
+
+        # ======================================================
+        # 🔹 CORE devuelve formato PLANO
+        # ======================================================
+
+        sizing = res.get("sizing") or {}
+
+        # usa n_paneles_string si existe, si no n_paneles
+        n_paneles = int(
+            sizing.get("n_paneles_string")
+            or sizing.get("n_paneles")
+            or 10
+        )
+
+        validacion = _validar_string_catalogo(eq, e, n_paneles, res)
+        ctx.validacion_string = validacion
+
+        # 🔹 NEC viene directo en raíz
+        wrapper = res.get("electrico_nec") or {}
+        pkg = wrapper.get("paq") or {}
+
+        # guardar fingerprint para “stale”
+        save_result_fingerprint(ctx)
+
+        st.success("Ingeniería eléctrica generada.")
+
+        _mostrar_validacion_string(validacion)
+        _mostrar_nec(pkg)
+
+    except Exception as exc:
+        ctx.resultado_proyecto = None
+        ctx.resultado_core = None
+        ctx.resultado_electrico = None
+        setattr(ctx, "result_inputs_fingerprint", None)
+        st.error(f"No se pudo generar ingeniería: {exc}")
+
 # ==========================================================
 # VALIDAR PASO
 # ==========================================================
