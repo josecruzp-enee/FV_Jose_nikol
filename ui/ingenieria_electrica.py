@@ -266,6 +266,11 @@ def render(ctx):
         datos = _datosproyecto_desde_ctx(ctx)
         resultado = ejecutar_estudio(datos)
 
+        # 🔥 GUARDAR RESULTADO (esto faltaba)
+        st.session_state["resultado_proyecto"] = resultado
+        ctx["resultado_proyecto"] = resultado
+
+        # Guardar fingerprint después de tener resultado
         save_result_fingerprint(ctx)
 
         st.success("Ingeniería generada correctamente.")
@@ -285,7 +290,6 @@ def render(ctx):
 
     except Exception as exc:
         st.error(f"No se pudo generar ingeniería: {exc}")
-
 
 # ==========================================================
 # VALIDAR PASO
