@@ -49,3 +49,13 @@ class ResultadoFinanciero(TypedDict):
     van: float
     payback_simple: float
     flujo_12m: List[Dict[str, float]]
+
+class ResultadoTecnico(TypedDict):
+    sizing: ResultadoSizing
+    strings: ResultadoStrings
+    nec: ResultadoNEC
+
+
+class ResultadoProyecto(TypedDict):
+    tecnico: ResultadoTecnico
+    financiero: ResultadoFinanciero
