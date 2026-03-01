@@ -1,5 +1,5 @@
 from typing import Dict, Any, List
-from .hsp import hsp_honduras_conservador_12m
+from .irradiancia import hsp_honduras_conservador_12m
 from .orientacion import factor_orientacion_total
 
 DIAS_MES: List[int] = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
