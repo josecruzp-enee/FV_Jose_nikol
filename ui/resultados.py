@@ -38,23 +38,24 @@ def _get_resultado_proyecto(ctx) -> dict:
 # KPIs
 # ==========================================================
 def _render_kpis(resultado_proyecto: dict) -> None:
-    tecnico = resultado_proyecto["tecnico"]
-    financiero = resultado_proyecto["financiero"]
+    tecnico = resultado_proyecto.get("tecnico") or {}
+    financiero = resultado_proyecto.get("financiero") or {}
 
-    sizing = tecnico["sizing"]
+    sizing = tecnico.get("sizing") or {}
 
-    kwp_dc = float(sizing["kwp_dc"])
+    # 🔹 Canon oficial: pdc_kw
+    pdc_kw = float(sizing.get("pdc_kw") or 0.0)
     cuota = float(financiero.get("cuota_mensual") or 0.0)
 
     evaluacion = financiero.get("evaluacion") or {}
     estado = str(evaluacion.get("estado") or evaluacion.get("dictamen") or "N/D")
 
     c1, c2, c3 = st.columns(3)
-    c1.metric("Sistema (kWp DC)", num(kwp_dc, 2))
+    c1.metric("Sistema (kWp DC)", num(pdc_kw, 2))
     c2.metric("Cuota mensual", money_L(cuota))
     c3.metric("Estado", estado)
 
-    if kwp_dc <= 0:
+    if pdc_kw <= 0:
         st.warning("Sizing inválido.")
 
 
