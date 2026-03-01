@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Tuple
 import streamlit as st
 
 from ui.state_helpers import is_result_stale
-from core.rutas import money_L, num, preparar_salida
+from ui.rutas import money_L, num, preparar_salida
 from reportes.generar_pdf_profesional import generar_pdf_profesional
 from reportes.imagenes import generar_artefactos
 
