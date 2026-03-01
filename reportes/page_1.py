@@ -17,7 +17,7 @@ from .helpers_pdf import (
     get_field,
 )
 
-from core.rutas import money_L, num
+from ui.rutas import money_L, num, preparar_salida
 
 
 # ---------------------------
