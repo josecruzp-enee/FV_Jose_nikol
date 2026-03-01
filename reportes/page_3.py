@@ -5,16 +5,21 @@ from typing import Any, Dict, List
 
 from reportlab.platypus import Paragraph, Spacer, PageBreak, TableStyle
 
-# ✅ Unifica helpers con el resto de páginas
 from .helpers_pdf import make_table, table_style_uniform, box_paragraph, get_field, money_L
-from core.result_accessors import get_capex_L
 
 
-def amortizacion_anual(principal: float, tasa_anual: float, cuota_mensual: float, plazo_anios: int) -> List[Dict[str, float]]:
+def amortizacion_anual(
+    principal: float,
+    tasa_anual: float,
+    cuota_mensual: float,
+    plazo_anios: int
+) -> List[Dict[str, float]]:
+
     tasa_m = float(tasa_anual) / 12.0
     saldo = float(principal)
 
     out: List[Dict[str, float]] = []
+
     for anio in range(1, int(plazo_anios) + 1):
         interes_y = 0.0
         principal_y = 0.0
@@ -23,10 +28,13 @@ def amortizacion_anual(principal: float, tasa_anual: float, cuota_mensual: float
         for _ in range(12):
             if saldo <= 0:
                 break
+
             interes_m = saldo * tasa_m
             principal_m = float(cuota_mensual) - interes_m
+
             if principal_m > saldo:
                 principal_m = saldo
+
             saldo -= principal_m
 
             interes_y += interes_m
@@ -46,34 +54,52 @@ def amortizacion_anual(principal: float, tasa_anual: float, cuota_mensual: float
     return out
 
 
-def build_page_3(resultado: Dict[str, Any], datos: Any, paths: Dict[str, Any], pal: dict, styles, content_w: float):
+def build_page_3(
+    resultado: Dict[str, Any],
+    datos: Any,
+    paths: Dict[str, Any],
+    pal: dict,
+    styles,
+    content_w: float,
+):
     story: List[Any] = []
+
     story.append(Paragraph("Financiamiento — Evolución del Préstamo", styles["Title"]))
     story.append(Spacer(1, 10))
 
-    # ===== Entradas (tolerantes a dict/dataclass) =====
-    capex = float(get_capex_L(resultado) or 0.0)
+    # ===== CONTRATO FUERTE =====
+    financiero = resultado["financiero"]
 
-    pct_fin = float(get_field(datos, "porcentaje_financiado", 1.0) or 1.0)
+    capex = float(financiero["capex_L"])
+    cuota = float(financiero["cuota_mensual"])
+
+    pct_fin = float(get_field(datos, "porcentaje_financiado", 1.0))
     pct_fin = max(0.0, min(1.0, pct_fin))
+
     principal = capex * pct_fin
 
-    tasa_anual = float(get_field(datos, "tasa_anual", 0.0) or 0.0)
-    plazo_anios = int(get_field(datos, "plazo_anios", 10) or 10)
-
-    cuota = float((resultado or {}).get("cuota_mensual", 0.0) or 0.0)
+    tasa_anual = float(get_field(datos, "tasa_anual", 0.0))
+    plazo_anios = int(get_field(datos, "plazo_anios", 10))
 
     anual = amortizacion_anual(principal, tasa_anual, cuota, plazo_anios)
 
     # ===== Tabla =====
-    header = ["Año", "Cuota (L/mes)", "Pago anual (L)", "Interés (L)", "Principal (L)", "Saldo fin (L)"]
+    header = [
+        "Año",
+        "Cuota (L/mes)",
+        "Pago anual (L)",
+        "Interés (L)",
+        "Principal (L)",
+        "Saldo fin (L)",
+    ]
+
     rows: List[List[str]] = []
 
     for a in anual:
         rows.append(
             [
                 str(int(a["anio"])),
-                money_L(cuota).replace("L ", ""),  # deja solo número si money_L devuelve "L x"
+                money_L(cuota).replace("L ", ""),
                 f"{a['pago_anual']:,.0f}",
                 f"{a['interes_anual']:,.0f}",
                 f"{a['principal_anual']:,.0f}",
@@ -90,6 +116,7 @@ def build_page_3(resultado: Dict[str, Any], datos: Any, paths: Dict[str, Any], p
         ratios=[0.8, 1.4, 1.5, 1.3, 1.3, 1.4],
         repeatRows=1,
     )
+
     t.setStyle(table_style_uniform(pal, font_header=9, font_body=9))
     t.setStyle(
         TableStyle(
@@ -103,17 +130,20 @@ def build_page_3(resultado: Dict[str, Any], datos: Any, paths: Dict[str, Any], p
             ]
         )
     )
+
     story.append(t)
     story.append(Spacer(1, 10))
 
     # ===== Lectura ejecutiva =====
     saldo_ultimo = float(anual[-1]["saldo_fin"]) if anual else float(principal)
+
     nota = (
         "<b>Lectura ejecutiva</b><br/>"
         f"• Cuota fija estimada: <b>{money_L(cuota)}/mes</b> por <b>{plazo_anios}</b> años.<br/>"
         f"• Monto financiado: <b>{money_L(principal)}</b> (sobre CAPEX).<br/>"
         f"• Saldo al cierre del plazo: <b>{money_L(saldo_ultimo)}</b> (≈ 0 por redondeos)."
     )
+
     story.append(box_paragraph(nota, pal, content_w, font_size=10))
 
     story.append(PageBreak())
