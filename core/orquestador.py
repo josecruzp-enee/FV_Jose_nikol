@@ -118,48 +118,36 @@ def ejecutar_estudio(p: Datosproyecto) -> Dict[str, Any]:
         Salida consolidada
     """
 
-    # ------------------------------------------------------
     # 1️⃣ Validación
-    # ------------------------------------------------------
     validar_entradas(p)
 
-    # ------------------------------------------------------
     # 2️⃣ Parámetros FV
-    # ------------------------------------------------------
     params_fv = _build_params_fv(p)
     _consolidar_parametros_fv_en_datos(p, params_fv)
 
-    # ------------------------------------------------------
     # 3️⃣ Sizing técnico
-    # ------------------------------------------------------
     sizing = calcular_sizing_unificado(p)
 
     if not sizing or sizing.get("n_paneles", 0) <= 0:
         raise ValueError("Sizing inválido.")
 
-    # ------------------------------------------------------
-    # 4️⃣ NEC (siempre)
-    # ------------------------------------------------------
+    # 4️⃣ Strings (dominio paneles)
+    from electrical.paneles.orquestador_paneles import ejecutar_paneles_desde_sizing
+    sizing["strings"] = ejecutar_paneles_desde_sizing(p, sizing)
+
+    # 5️⃣ NEC
     electrico_nec = _build_electrico_nec_safe(p, sizing)
 
-    # ------------------------------------------------------
-    # 5️⃣ Motor financiero
-    # ------------------------------------------------------
+    # 6️⃣ Finanzas
     finanzas = ejecutar_finanzas(
         datos=p,
         sizing=sizing,
     )
 
-    # ------------------------------------------------------
-    # 6️⃣ Salida consolidada
-    # ------------------------------------------------------
+    # 7️⃣ Salida consolidada
     return {
         "params_fv": params_fv,
         "sizing": sizing,
         "electrico_nec": electrico_nec,
         **finanzas,
     }
-
-
-def ejecutar_evaluacion(p: Datosproyecto) -> Dict[str, Any]:
-    return ejecutar_estudio(p)
