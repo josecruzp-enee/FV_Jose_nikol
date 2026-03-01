@@ -1,7 +1,7 @@
 # electrical/paneles/orquestador_paneles.py
 # Orquestador del dominio paneles: normaliza entradas, valida coherencia mínima y ejecuta el motor único de strings FV.
-from __future__ import annotations
 
+from __future__ import annotations
 from typing import Any, Dict, List, Optional
 
 from .calculo_de_strings import InversorSpec, PanelSpec, calcular_strings_fv
@@ -14,7 +14,10 @@ from .validacion_strings import (
 )
 
 
-# Convierte cualquier valor a float seguro usando un valor por defecto.
+# ================================
+# Helpers internos
+# ================================
+
 def _f(x: Any, default: float = 0.0) -> float:
     try:
         return float(x)
@@ -22,7 +25,6 @@ def _f(x: Any, default: float = 0.0) -> float:
         return float(default)
 
 
-# Convierte cualquier valor a entero seguro usando un valor por defecto.
 def _i(x: Any, default: int = 0) -> int:
     try:
         return int(x)
@@ -30,13 +32,18 @@ def _i(x: Any, default: int = 0) -> int:
         return int(default)
 
 
-# Normaliza panel (legacy/nuevo/UI) al contrato interno PanelSpec.
+# ================================
+# Normalización a contratos internos
+# ================================
+
 def _as_panel_spec(panel: Any) -> PanelSpec:
     if isinstance(panel, PanelSpec):
         return panel
 
     coef_voc = _f(
-        getattr(panel, "coef_voc_pct_c", getattr(panel, "coef_voc", getattr(panel, "tc_voc_pct_c", -0.28))),
+        getattr(panel, "coef_voc_pct_c",
+            getattr(panel, "coef_voc",
+                getattr(panel, "tc_voc_pct_c", -0.28))),
         -0.28,
     )
 
@@ -59,10 +66,7 @@ def _as_panel_spec(panel: Any) -> PanelSpec:
     )
 
 
-# Normaliza inversor (legacy/nuevo/UI) al contrato interno InversorSpec.
 def _as_inversor_spec(inversor: Any) -> InversorSpec:
-    print("TIPO INVERSOR:", type(inversor))
-    print("ATRIBUTOS:", getattr(inversor, "__dict__", str(inversor)))
     if isinstance(inversor, InversorSpec):
         return inversor
 
@@ -83,7 +87,10 @@ def _as_inversor_spec(inversor: Any) -> InversorSpec:
     )
 
 
-# Ejecuta el cálculo completo de strings: normaliza, valida, llama al motor y unifica salida.
+# ================================
+# Motor principal de strings
+# ================================
+
 def ejecutar_calculo_strings(
     *,
     n_paneles_total: Optional[int],
@@ -95,44 +102,20 @@ def ejecutar_calculo_strings(
     pdc_kw_objetivo: float | None = None,
     t_oper_c: float | None = None,
 ) -> Dict[str, Any]:
+
     errores: List[str] = []
     warnings: List[str] = []
 
     n_total = _i(n_paneles_total, 0) if n_paneles_total is not None else 0
     if n_total <= 0:
-        return {
-            "ok": False,
-            "errores": ["n_paneles_total inválido (<=0)."],
-            "warnings": [],
-            "topologia": "N/A",
-            "strings": [],
-            "recomendacion": {},
-            "bounds": {},
-            "meta": {"n_paneles_total": n_total, "dos_aguas": bool(dos_aguas)},
-        }
+        return {"ok": False, "errores": ["n_paneles_total inválido (<=0)."]}
 
-    try:
-        tmin = float(t_min_c)
-    except Exception:
-        return {
-            "ok": False,
-            "errores": ["t_min_c inválido (no convertible a número)."],
-            "warnings": [],
-            "topologia": "N/A",
-            "strings": [],
-            "recomendacion": {},
-            "bounds": {},
-            "meta": {"n_paneles_total": n_total, "dos_aguas": bool(dos_aguas)},
-        }
+    tmin = _f(t_min_c)
+    t_oper = _f(t_oper_c, 55.0) if t_oper_c is not None else 55.0
 
-    # Temperatura operativa (conservador por defecto).
-    t_oper = float(t_oper_c) if t_oper_c is not None else 55.0
-
-    # Normalización a contrato interno estable.
     p = _as_panel_spec(panel)
     inv = _as_inversor_spec(inversor)
 
-    # Validación dominio (pura, sin cálculos de strings).
     e, w = validar_panel(p)
     errores += e
     warnings += w
@@ -146,74 +129,44 @@ def ejecutar_calculo_strings(
     warnings += w
 
     if errores:
-        return {
-            "ok": False,
-            "errores": errores,
-            "warnings": warnings,
-            "topologia": "N/A",
-            "strings": [],
-            "recomendacion": {},
-            "bounds": {},
-            "meta": {
-                "n_paneles_total": n_total,
-                "dos_aguas": bool(dos_aguas),
-                "t_min_c": tmin,
-                "t_oper_c": t_oper,
-                "panel_spec": p.__dict__ if hasattr(p, "__dict__") else {},
-                "inversor_spec": inv.__dict__ if hasattr(inv, "__dict__") else {},
-            },
-        }
+        return {"ok": False, "errores": errores, "warnings": warnings}
 
-    # Motor FV (único).
     out = calcular_strings_fv(
         n_paneles_total=n_total,
         panel=p,
         inversor=inv,
         t_min_c=tmin,
         dos_aguas=bool(dos_aguas),
-        objetivo_dc_ac=float(objetivo_dc_ac) if objetivo_dc_ac is not None else None,
-        pdc_kw_objetivo=float(pdc_kw_objetivo) if pdc_kw_objetivo is not None else None,
+        objetivo_dc_ac=objetivo_dc_ac,
+        pdc_kw_objetivo=pdc_kw_objetivo,
         t_oper_c=t_oper,
     ) or {}
 
-    # Normaliza contrato de salida.
     out.setdefault("ok", False)
     out.setdefault("errores", [])
     out.setdefault("warnings", [])
-    out.setdefault("topologia", "N/A")
-    out.setdefault("strings", [])
-    out.setdefault("recomendacion", {})
-    out.setdefault("bounds", {})
-    out.setdefault("meta", {})
-
-    meta = out["meta"] if isinstance(out.get("meta"), dict) else {}
-    meta.setdefault("n_paneles_total", n_total)
-    meta.setdefault("dos_aguas", bool(dos_aguas))
-    meta.setdefault("t_min_c", tmin)
-    meta.setdefault("t_oper_c", t_oper)
-    meta.setdefault("panel_spec", p.__dict__ if hasattr(p, "__dict__") else {})
-    meta.setdefault("inversor_spec", inv.__dict__ if hasattr(inv, "__dict__") else {})
-    out["meta"] = meta
-
-    # Agrega warnings locales del orquestador.
-    out["warnings"] = list(out.get("warnings") or []) + warnings
 
     return out
-    
+
+
+# ================================
+# Entrada desde CORE
+# ================================
+
 def ejecutar_paneles_desde_sizing(p, sizing):
 
     from electrical.catalogos.catalogos import get_panel, get_inversor
 
-    sfv = getattr(p, "sistema_fv", {}) or {}
+    equipos = getattr(p, "equipos", {}) or {}
 
-    panel_id = sfv.get("panel_id")
-    inversor_id = sfv.get("inversor_id")
+    panel_id = equipos.get("panel_id")
+    inversor_id = equipos.get("inversor_id")
 
     if not panel_id:
-        raise ValueError(f"Panel no existe en catálogo: {panel_id}")
+        raise ValueError("Panel no seleccionado.")
 
     if not inversor_id:
-        raise ValueError(f"Inversor no existe en catálogo: {inversor_id}")
+        raise ValueError("Inversor no seleccionado.")
 
     panel = get_panel(panel_id)
     inversor = get_inversor(inversor_id)
@@ -224,153 +177,5 @@ def ejecutar_paneles_desde_sizing(p, sizing):
         inversor=inversor,
         t_min_c=float(getattr(p, "t_min_c", 10.0)),
         dos_aguas=bool(getattr(p, "dos_aguas", False)),
-        objetivo_dc_ac=None,
         pdc_kw_objetivo=sizing.get("pdc_kw"),
     )
-
-# Orquestador único del dominio (modo demanda): consumo + cobertura => sizing => strings => resumen.
-def ejecutar_paneles_por_demanda(
-    *,
-    consumo_12m_kwh: float,
-    cobertura_pct: float,
-    panel: Any,
-    inversor: Any,
-    t_min_c: float,
-    dos_aguas: bool = False,
-    objetivo_dc_ac: float | None = None,
-    t_oper_c: float | None = None,
-) -> Dict[str, Any]:
-    """
-    Entrada mínima UI:
-      - consumo_12m_kwh, cobertura_pct, panel(catálogo), inversor(catálogo), t_min_c, dos_aguas (opcional)
-
-    Devuelve paquete unificado:
-      - sizing (n_paneles, pdc_kw, etc)
-      - strings (raw)
-      - resumen (shape estable UI/PDF)
-    """
-    # 1) Dimensionado por energía
-    # --- defaults defensivos ---
-    # cobertura_pct suele venir como % (0..100). El motor pide cobertura_obj (0..1).
-    cobertura_pct = float(cobertura_pct or 0.0)
-    cobertura_obj = max(0.0, min(1.0, cobertura_pct / 100.0)) if cobertura_pct > 1.0 else max(0.0, min(1.0, cobertura_pct))
-
-    # panel_w: si viene PanelSpec/Panel dataclass tendrá .w; si viene dict tendrá ["w"]
-    panel_w = None
-    try:
-        panel_w = float(getattr(panel, "w"))
-    except Exception:
-        try:
-            panel_w = float(panel.get("w"))  # type: ignore[union-attr]
-        except Exception:
-            panel_w = 550.0  # fallback razonable
-
-    sizing = calcular_panel_sizing(
-        consumo_12m_kwh=float(consumo_12m_kwh),
-        cobertura_obj=float(cobertura_obj),
-        panel_w=float(panel_w),
-    )
-
-    # Soporta dataclass o dict (sin adivinar demasiado)
-    if isinstance(sizing, dict):
-        ok_sizing = bool(sizing.get("ok", True))
-        n_paneles = _i(sizing.get("n_paneles", 0), 0)
-        pdc_kw = _f(sizing.get("pdc_kw", 0.0), 0.0)
-        err_sizing = list(sizing.get("errores") or [])
-        warn_sizing = list(sizing.get("warnings") or [])
-    else:
-        ok_sizing = bool(getattr(sizing, "ok", True))
-        n_paneles = _i(getattr(sizing, "n_paneles", 0), 0)
-        pdc_kw = _f(getattr(sizing, "pdc_kw", 0.0), 0.0)
-        err_sizing = list(getattr(sizing, "errores", []) or [])
-        warn_sizing = list(getattr(sizing, "warnings", []) or [])
-
-    if (not ok_sizing) or n_paneles <= 0 or pdc_kw <= 0:
-        return {
-            "ok": False,
-            "errores": err_sizing or ["Dimensionado inválido (n_paneles/pdc_kw)."],
-            "warnings": warn_sizing,
-            "sizing": sizing,
-            "strings": {},
-            "resumen": {},
-        }
-
-    # 2) Strings (ingeniería DC) usando el motor único
-    strings_out = ejecutar_calculo_strings(
-        n_paneles_total=int(n_paneles),
-        panel=panel,
-        inversor=inversor,
-        t_min_c=float(t_min_c),
-        dos_aguas=bool(dos_aguas),
-        objetivo_dc_ac=float(objetivo_dc_ac) if objetivo_dc_ac is not None else None,
-        pdc_kw_objetivo=float(pdc_kw),
-        t_oper_c=float(t_oper_c) if t_oper_c is not None else None,
-    )
-
-    # 3) Resumen estable (UI/PDF)
-    resumen = resumen_strings(strings_out)
-
-    return {
-        "ok": bool(strings_out.get("ok")),
-        "errores": err_sizing + list(strings_out.get("errores") or []),
-        "warnings": warn_sizing + list(strings_out.get("warnings") or []),
-        "sizing": sizing,
-        "strings": strings_out,
-        "resumen": resumen,
-    }
-
-
-# Convierte resultado a líneas legibles (UI/PDF).
-def a_lineas_strings(cfg: Dict[str, Any]) -> List[str]:
-    lines: List[str] = []
-    cfg = dict(cfg or {})
-    rec = (cfg.get("recomendacion") or {}) if isinstance(cfg.get("recomendacion"), dict) else {}
-    p_string_kw = _f(rec.get("p_string_kw_stc", 0.0), 0.0)
-
-    for s in (cfg.get("strings") or []):
-        etiqueta = str(s.get("etiqueta") or "Arreglo FV")
-        ns = _i(s.get("n_series", s.get("ns", 0)), 0)
-        np_ = _i(s.get("n_paralelo", s.get("np", 1)), 1) or 1
-
-        vmp = _f(s.get("vmp_string_v", s.get("vmp_V", 0.0)), 0.0)  # Vmp caliente
-        voc_frio = _f(s.get("voc_frio_string_v", s.get("voc_frio_V", 0.0)), 0.0)
-        imp = _f(s.get("imp_a", s.get("imp_A", 0.0)), 0.0)
-
-        pdc_kw = p_string_kw * float(np_) if p_string_kw > 0 else 0.0
-
-        if pdc_kw > 0:
-            lines.append(
-                f"{etiqueta} — {ns}S×{np_}P ({np_} string): "
-                f"Vmp_hot≈{vmp:.0f} V | Voc_frío≈{voc_frio:.0f} V | Imp≈{imp:.1f} A | "
-                f"Pdc≈{pdc_kw:.2f} kW."
-            )
-        else:
-            lines.append(
-                f"{etiqueta} — {ns}S×{np_}P ({np_} string): "
-                f"Vmp_hot≈{vmp:.0f} V | Voc_frío≈{voc_frio:.0f} V | Imp≈{imp:.1f} A."
-            )
-
-    return lines
-
-
-# Alias simple: ejecuta strings DC desde inputs simples (compatibilidad).
-def calcular_strings_dc(
-    *,
-    n_paneles: int,
-    panel: Any,
-    inversor: Any,
-    dos_aguas: bool,
-    t_min_c: float = 10.0,
-) -> Dict[str, Any]:
-    return ejecutar_calculo_strings(
-        n_paneles_total=int(n_paneles),
-        panel=panel,
-        inversor=inversor,
-        dos_aguas=bool(dos_aguas),
-        t_min_c=float(t_min_c),
-    )
-
-
-# Alias de compatibilidad para líneas de salida.
-def a_lineas(cfg: Dict[str, Any]) -> List[str]:
-    return a_lineas_strings(cfg)
