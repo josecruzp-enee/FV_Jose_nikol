@@ -102,12 +102,32 @@ def calcular_sizing_unificado(
         hsp_12m = [float(x or 0.0) for x in hsp_12m]
 
     # =========================
-    # PANEL SIZING
+    # Modo dimensionamiento (desde UI)
+    # =========================
+    sf = getattr(p, "sistema_fv", {}) or {}
+
+    modo_dimensionado = str(
+        sf.get("modo_dimensionado", "auto")
+    ).strip().lower()
+
+    n_paneles_manual = None
+    if modo_dimensionado == "manual":
+        try:
+            n_paneles_manual = int(sf.get("n_paneles_manual"))
+            if n_paneles_manual <= 0:
+                raise ValueError
+        except Exception:
+            raise ValueError("n_paneles_manual inválido en modo manual")
+
+    # =========================
+    # PANEL SIZING (motor unificado)
     # =========================
     panel_sizing = calcular_panel_sizing(
         consumo_12m_kwh=consumo_12m_kwh,
         cobertura_obj=cobertura_obj,
         panel_w=panel_w,
+        modo=modo_dimensionado,
+        n_paneles_manual=n_paneles_manual,
         hsp_12m=hsp_12m,
         hsp=params_fv.get("hsp"),
         usar_modelo_conservador=bool(params_fv.get("usar_modelo_conservador", False)),
@@ -115,6 +135,7 @@ def calcular_sizing_unificado(
         sombras_pct=float(params_fv.get("sombras_pct", 0.0) or 0.0),
         perdidas_sistema_pct=float(params_fv.get("perdidas_sistema_pct", 0.0) or 0.0),
         perdidas_detalle=params_fv.get("perdidas_detalle"),
+        params_fv=params_fv,
     )
 
     if not panel_sizing.ok:
@@ -127,12 +148,15 @@ def calcular_sizing_unificado(
     if n_pan <= 0 or pdc <= 0:
         raise ValueError("Sizing resultó en sistema inválido")
 
-    prod_anual_kwp = float(panel_sizing.meta.get("prod_anual_por_kwp_kwh", 0.0))
+    prod_anual_kwp = float(
+        panel_sizing.meta.get("prod_anual_por_kwp_kwh", 0.0)
+    )
+
     if prod_anual_kwp <= 0:
         raise ValueError("Producción anual por kWp inválida")
 
     # =========================
-    # INVERSOR (delegado al dominio inversor)
+    # INVERSOR
     # =========================
     resultado_inv = ejecutar_inversor_desde_sizing(
         consumo_anual_kwh=consumo_anual_val,
@@ -148,6 +172,7 @@ def calcular_sizing_unificado(
     # Salida técnica pura
     # =========================
     return {
+        "modo_dimensionado": modo_dimensionado,
         "consumo_anual_kwh": consumo_anual_val,
         "consumo_promedio_kwh": consumo_prom_val,
         "kwp_req": round(kwp_req, 3),
