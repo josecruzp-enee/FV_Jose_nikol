@@ -1,6 +1,5 @@
-from core.sizing import calcular_sizing_unificado
-from core.finanzas_lp import ejecutar_finanzas
-
+from core.servicios.sizing import calcular_sizing_unificado
+from core.servicios.finanzas import ejecutar_finanzas
 from electrical.paneles.orquestador_paneles import ejecutar_paneles_desde_sizing
 from electrical.energia.orquestador_energia import ejecutar_motor_energia
 from electrical.nec.orquestador_nec import ejecutar_nec
