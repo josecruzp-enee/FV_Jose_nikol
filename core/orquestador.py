@@ -159,3 +159,7 @@ def ejecutar_estudio(p: Datosproyecto) -> Dict[str, Any]:
         "electrico_nec": electrico_nec,
         **finanzas,
     }
+
+
+def ejecutar_evaluacion(p: Datosproyecto) -> Dict[str, Any]:
+    return ejecutar_estudio(p)
