@@ -46,7 +46,7 @@ def om_mensual(capex_L_: float, om_anual_pct: float) -> float:
 
 
 # ==========================================================
-# 🔵 SIMULACIÓN OPERATIVA MENSUAL (INTEGRADA)
+# 🔵 SIMULACIÓN OPERATIVA MENSUAL
 # ==========================================================
 
 def simular_12_meses(
@@ -68,6 +68,9 @@ def simular_12_meses(
     if len(factores_12m) != 12:
         raise ValueError("factores_12m debe tener 12 valores")
 
+    if prod_base_kwh_kwp_mes <= 0:
+        raise ValueError("Producción base inválida (<=0)")
+
     tabla: List[Dict[str, float]] = []
 
     for i in range(12):
@@ -83,14 +86,12 @@ def simular_12_meses(
         )
 
         gen_util = min(consumo, gen_bruta)
-
         kwh_enee = consumo - gen_util
 
         factura_base = consumo * float(tarifa_energia) + float(cargos_fijos)
         pago_enee = kwh_enee * float(tarifa_energia) + float(cargos_fijos)
 
         ahorro = factura_base - pago_enee
-
         neto = ahorro - float(cuota_mensual) - float(om_mensual_val)
 
         tabla.append({
@@ -147,13 +148,14 @@ def _evaluacion_mensual(tabla: List[Dict[str, float]], cuota: float) -> Dict[str
 
 
 # ==========================================================
-# 🔵 ENTRYPOINT FINANCIERO
+# 🔵 ENTRYPOINT FINANCIERO (DETERMINISTA)
 # ==========================================================
 
 def ejecutar_finanzas(
     *,
     datos: Datosproyecto,
     sizing: Dict[str, Any],
+    params_fv: Dict[str, Any],
 ) -> Dict[str, Any]:
 
     kwp_dc = float(sizing.get("pdc_kw") or 0.0)
@@ -161,12 +163,14 @@ def ejecutar_finanzas(
     if kwp_dc <= 0:
         raise ValueError("Sizing incompleto para finanzas.")
 
+    # CAPEX
     capex = calcular_capex_L(
         pdc_kw=kwp_dc,
         costo_usd_kwp=datos.costo_usd_kwp,
         tcambio=datos.tcambio,
     )
 
+    # Deuda
     cuota = calcular_cuota_mensual(
         capex_L_=capex,
         tasa_anual=datos.tasa_anual,
@@ -176,12 +180,12 @@ def ejecutar_finanzas(
 
     om_mensual_val = om_mensual(capex, datos.om_anual_pct)
 
-    sfv = getattr(datos, "sistema_fv", {}) or {}
+    # Parámetros energéticos explícitos
+    prod_base = float(params_fv["prod_base_kwh_kwp_mes"])
+    factores_12m = params_fv["factores_fv_12m"]
+    factor_orientacion = float(params_fv.get("factor_orientacion", 1.0))
 
-    prod_base = float(sfv.get("prod_base_kwh_kwp_mes") or 0.0)
-    factores_12m = sfv.get("factores_fv_12m") or [1.0] * 12
-    factor_orientacion = float(sfv.get("factor_orientacion") or 1.0)
-
+    # Simulación
     tabla_12m = simular_12_meses(
         consumo_12m=datos.consumo_12m,
         factores_12m=factores_12m,
@@ -195,7 +199,6 @@ def ejecutar_finanzas(
     )
 
     evaluacion = _evaluacion_mensual(tabla_12m, cuota)
-
     ahorro_anual = sum(x["ahorro_L"] for x in tabla_12m)
 
     return {
