@@ -1,3 +1,4 @@
+from typing import TypedDict, List, Dict, Any
 class MesEnergia(TypedDict):
     mes: str
     consumo_kwh: float
