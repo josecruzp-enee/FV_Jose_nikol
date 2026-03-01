@@ -89,7 +89,7 @@ def generar_pdf_profesional(resultado_proyecto: dict, datos: Any, paths: Dict[st
     content_w = doc.width  # ✅ se pasa a páginas (no deberían recalcularlo)
 
     # ✅ Compat: páginas actuales pueden seguir esperando dict plano
-    resultado = _compat_resultado_plano(resultado_proyecto)
+    resultado = resultado_proyecto
 
     story += build_page_1(resultado, datos, paths, pal, styles, content_w)
     story += build_page_2(resultado, datos, paths, pal, styles, content_w)
