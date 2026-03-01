@@ -2,9 +2,39 @@ from __future__ import annotations
 from typing import Dict, Any, Optional
 
 from electrical.catalogos import get_inversor, ids_inversores
-from electrical.inversor.sizing_inversor import SizingInput, ejecutar_sizing
+from electrical.sizing_electric import (
+    SizingInput,
+    ejecutar_sizing,
+    InversorCandidato,
+)
 
 
+# ==========================================================
+# Adaptador: Modelo fuerte → Modelo de cálculo
+# ==========================================================
+def _build_candidatos() -> list[InversorCandidato]:
+    candidatos: list[InversorCandidato] = []
+
+    for iid in ids_inversores():
+        inv = get_inversor(iid)
+
+        candidatos.append(
+            InversorCandidato(
+                id=iid,
+                pac_kw=float(inv.kw_ac),          # dominio → cálculo
+                n_mppt=int(inv.n_mppt),
+                mppt_min_v=float(inv.vmppt_min),
+                mppt_max_v=float(inv.vmppt_max),
+                vdc_max_v=float(inv.vdc_max_v),
+            )
+        )
+
+    return candidatos
+
+
+# ==========================================================
+# API pública usada por core/sizing.py
+# ==========================================================
 def ejecutar_inversor_desde_sizing(
     *,
     consumo_anual_kwh: float,
@@ -27,7 +57,7 @@ def ejecutar_inversor_desde_sizing(
 
     resultado = ejecutar_sizing(
         inp=inp,
-        inversores_catalogo=[get_inversor(i) for i in ids_inversores()],
+        inversores_catalogo=_build_candidatos(),
     )
 
     inv_id_rec = resultado.get("inversor_recomendado")
