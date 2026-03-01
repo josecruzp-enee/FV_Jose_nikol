@@ -28,6 +28,112 @@ def _fmt(v, unit: str = "") -> str:
 def _asegurar_dict(ctx, nombre: str) -> dict:
     return ensure_dict(ctx, nombre, dict)
 
+def _ui_inputs_electricos(e: dict):
+    st.subheader("Parámetros eléctricos de instalación")
+
+    # ==============================
+    # Sistema eléctrico
+    # ==============================
+    c1, c2, c3 = st.columns(3)
+
+    with c1:
+        e["vac"] = st.number_input(
+            "Voltaje AC (V)",
+            min_value=100.0,
+            max_value=600.0,
+            value=float(e.get("vac", 240.0)),
+            step=1.0,
+        )
+
+    with c2:
+        opciones_fases = [1, 3]
+        actual = int(e.get("fases", 1))
+        idx = opciones_fases.index(actual) if actual in opciones_fases else 0
+        e["fases"] = st.selectbox("Fases", opciones_fases, index=idx)
+
+    with c3:
+        e["fp"] = st.number_input(
+            "Factor de potencia",
+            min_value=0.80,
+            max_value=1.00,
+            value=float(e.get("fp", 1.0)),
+            step=0.01,
+        )
+
+    # ==============================
+    # Distancias y regulación
+    # ==============================
+    st.markdown("### Distancias y regulación")
+
+    d1, d2 = st.columns(2)
+
+    with d1:
+        e["dist_dc_m"] = st.number_input(
+            "Distancia DC (m)",
+            min_value=1.0,
+            max_value=2000.0,
+            value=float(e.get("dist_dc_m", 15.0)),
+            step=1.0,
+        )
+
+        e["vdrop_obj_dc_pct"] = st.number_input(
+            "Regulación DC objetivo (%)",
+            min_value=0.5,
+            max_value=10.0,
+            value=float(e.get("vdrop_obj_dc_pct", 2.0)),
+            step=0.1,
+        )
+
+    with d2:
+        e["dist_ac_m"] = st.number_input(
+            "Distancia AC (m)",
+            min_value=1.0,
+            max_value=2000.0,
+            value=float(e.get("dist_ac_m", 25.0)),
+            step=1.0,
+        )
+
+        e["vdrop_obj_ac_pct"] = st.number_input(
+            "Regulación AC objetivo (%)",
+            min_value=0.5,
+            max_value=10.0,
+            value=float(e.get("vdrop_obj_ac_pct", 2.0)),
+            step=0.1,
+        )
+
+    # ==============================
+    # Condiciones NEC
+    # ==============================
+    st.markdown("### Condiciones de instalación")
+
+    k1, k2, k3 = st.columns(3)
+
+    with k1:
+        e["t_min_c"] = st.number_input(
+            "Temperatura mínima (°C)",
+            min_value=-40.0,
+            max_value=60.0,
+            value=float(e.get("t_min_c", 10.0)),
+            step=1.0,
+        )
+
+    with k2:
+        e["incluye_neutro_ac"] = st.checkbox(
+            "Incluye neutro en AC",
+            value=bool(e.get("incluye_neutro_ac", False)),
+        )
+
+    with k3:
+        e["otros_ccc"] = st.number_input(
+            "Otros conductores activos en tubería",
+            min_value=0,
+            max_value=20,
+            value=int(e.get("otros_ccc", 0)),
+            step=1,
+        )
+
+
+
 
 # ==========================================================
 # Defaults eléctricos
@@ -145,8 +251,8 @@ def _mostrar_nec(pkg: dict):
 
 def render(ctx):
 
-    _defaults_electrico(ctx)
-
+    e = _defaults_electrico(ctx)
+    _ui_inputs_electricos(e)
     st.markdown("### Ingeniería eléctrica automática")
 
     faltantes = campos_faltantes_para_paso5(ctx)
