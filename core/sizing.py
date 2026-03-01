@@ -178,6 +178,7 @@ def calcular_sizing_unificado(
         "kwp_req": round(kwp_req, 3),
         "n_paneles": n_pan,
         "pdc_kw": round(pdc, 3),
+        "kwp_dc": round(pdc, 3),
         "prod_anual_por_kwp_kwh": round(prod_anual_kwp, 2),
         "panel_id": _panel_id(eq),
         "inversor_id": resultado_inv["inversor_id"],
