@@ -1,65 +1,34 @@
 # core/sizing.py
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from .modelo import Datosproyecto
 
-from electrical.catalogos import get_panel, get_inversor, catalogo_inversores
-from electrical.inversor.sizing_inversor import (
-    SizingInput,
-    InversorCandidato,
-    ejecutar_sizing,
-)
+from electrical.catalogos import get_panel
 from electrical.paneles.dimensionado_paneles import calcular_panel_sizing
+from electrical.energia.balance import (
+    consumo_anual_kwh,
+    consumo_promedio_mensual_kwh,
+)
+from electrical.inversor.orquestador_inversor import (
+    ejecutar_inversor_desde_sizing,
+)
 
 
 # ==========================================================
-# 🔵 Cálculos básicos del proyecto (MOVIDOS AQUÍ)
+# Helpers mínimos
 # ==========================================================
-
-def consumo_anual(consumo_12m: List[float]) -> float:
-    return float(sum(float(x or 0.0) for x in consumo_12m))
-
-
-def consumo_promedio(consumo_12m: List[float]) -> float:
-    if not consumo_12m:
-        return 0.0
-    return consumo_anual(consumo_12m) / 12.0
-
-
-def capex_L(kwp: float, costo_usd_kwp: float, tcambio: float) -> float:
-    return float(kwp) * float(costo_usd_kwp) * float(tcambio)
-
-
-# ==========================================================
-# Utilitarios seguros
-# ==========================================================
-
-def _safe_float(x: Any, default: float) -> float:
-    try:
-        return float(x)
-    except Exception:
-        return float(default)
-
 
 def _clamp(x: float, lo: float, hi: float) -> float:
     return max(lo, min(hi, float(x)))
 
-
-# ==========================================================
-# Lectura equipos
-# ==========================================================
 
 def _leer_equipos(p: Datosproyecto) -> Dict[str, Any]:
     eq = getattr(p, "equipos", None) or {}
     if not isinstance(eq, dict):
         raise ValueError("Formato inválido en p.equipos")
     return eq
-
-
-def _dc_ac_obj(eq: Dict[str, Any]) -> float:
-    return _clamp(_safe_float(eq.get("sobredimension_dc_ac", 1.20), 1.20), 1.00, 2.00)
 
 
 def _panel_id(eq: Dict[str, Any]) -> str:
@@ -78,60 +47,7 @@ def _inv_id(eq: Dict[str, Any]) -> Optional[str]:
 
 
 # ==========================================================
-# Inversores candidatos
-# ==========================================================
-
-def _candidatos_inversores() -> List[InversorCandidato]:
-    out: List[InversorCandidato] = []
-
-    for i in (catalogo_inversores() or []):
-        out.append(
-            InversorCandidato(
-                id=str(i["id"]),
-                pac_kw=float(i["pac_kw"]),
-                n_mppt=int(i["n_mppt"]),
-                mppt_min_v=float(i["mppt_min_v"]),
-                mppt_max_v=float(i["mppt_max_v"]),
-                vdc_max_v=float(i.get("vdc_max", i.get("vmax_dc_v"))),
-            )
-        )
-
-    if not out:
-        raise ValueError("Catálogo de inversores vacío")
-
-    return out
-
-
-def _recomendar_inversor(
-    *,
-    p: Datosproyecto,
-    panel_w: float,
-    dc_ac: float,
-    prod_anual_kwp: float,
-    pdc_obj_kw: Optional[float],
-) -> Dict[str, Any]:
-
-    inp = SizingInput(
-        consumo_anual_kwh=consumo_anual(p.consumo_12m),
-        produccion_anual_por_kwp_kwh=float(prod_anual_kwp),
-        cobertura_obj=float(p.cobertura_objetivo),
-        dc_ac_obj=float(dc_ac),
-        pmax_panel_w=float(panel_w),
-        pdc_obj_kw=pdc_obj_kw,
-    )
-
-    return ejecutar_sizing(inp=inp, inversores_catalogo=_candidatos_inversores())
-
-
-def _pac_kw_desde_reco(meta: Dict[str, Any], inv_id: str) -> float:
-    for c in (meta.get("candidatos") or []):
-        if str(c.get("id")) == str(inv_id):
-            return float(c.get("pac_kw", 0.0))
-    return 0.0
-
-
-# ==========================================================
-# API pública
+# API pública — Sizing técnico puro
 # ==========================================================
 
 def calcular_sizing_unificado(
@@ -143,7 +59,6 @@ def calcular_sizing_unificado(
     # Equipos
     # =========================
     eq = _leer_equipos(p)
-    dc_ac = _dc_ac_obj(eq)
 
     panel = get_panel(_panel_id(eq))
     if panel is None:
@@ -152,6 +67,12 @@ def calcular_sizing_unificado(
     panel_w = float(getattr(panel, "w", 0.0))
     if panel_w <= 0:
         raise ValueError("Potencia de panel inválida")
+
+    dc_ac = _clamp(
+        float(eq.get("sobredimension_dc_ac", 1.20)),
+        1.00,
+        2.00,
+    )
 
     # =========================
     # Consumo
@@ -162,11 +83,17 @@ def calcular_sizing_unificado(
 
     consumo_12m_kwh = [float(x or 0.0) for x in consumo_12m_kwh]
 
+    consumo_anual_val = consumo_anual_kwh(consumo_12m_kwh)
+    consumo_prom_val = consumo_promedio_mensual_kwh(consumo_12m_kwh)
+
     # =========================
     # Parámetros FV
     # =========================
-    cobertura_obj = float(params_fv.get("cobertura_obj", 1.0))
-    cobertura_obj = max(0.0, min(1.0, cobertura_obj))
+    cobertura_obj = _clamp(
+        float(params_fv.get("cobertura_obj", 1.0)),
+        0.0,
+        1.0,
+    )
 
     hsp_12m = params_fv.get("hsp_12m")
     if hsp_12m is not None:
@@ -205,56 +132,29 @@ def calcular_sizing_unificado(
         raise ValueError("Producción anual por kWp inválida")
 
     # =========================
-    # INVERSOR
+    # INVERSOR (delegado al dominio inversor)
     # =========================
-    sizing_inv = _recomendar_inversor(
-        p=p,
+    resultado_inv = ejecutar_inversor_desde_sizing(
+        consumo_anual_kwh=consumo_anual_val,
+        prod_anual_por_kwp_kwh=prod_anual_kwp,
+        cobertura_obj=cobertura_obj,
+        dc_ac_obj=dc_ac,
         panel_w=panel_w,
-        dc_ac=dc_ac,
-        prod_anual_kwp=prod_anual_kwp,
-        pdc_obj_kw=pdc,
+        pdc_kw=pdc,
+        inversor_id_forzado=_inv_id(eq),
     )
-
-    inv_id_rec = sizing_inv.get("inversor_recomendado")
-    inv_id_final = _inv_id(eq) or inv_id_rec
-
-    if not inv_id_final:
-        raise ValueError("No se pudo determinar inversor recomendado")
-
-    inv = get_inversor(inv_id_final)
-    if inv is None:
-        raise ValueError("Inversor no encontrado en catálogo")
-
-    pac_kw_fb = (
-        _pac_kw_desde_reco(
-            sizing_inv.get("inversor_recomendado_meta", {}),
-            inv_id_final,
-        )
-        or float(getattr(inv, "kw_ac", 0.0))
-    )
-
-    if pac_kw_fb <= 0:
-        raise ValueError("Potencia AC inválida en inversor")
 
     # =========================
-    # Salida final
+    # Salida técnica pura
     # =========================
     return {
-        "consumo_anual_kwh": consumo_anual(consumo_12m_kwh),
-        "consumo_promedio_kwh": consumo_promedio(consumo_12m_kwh),
-
+        "consumo_anual_kwh": consumo_anual_val,
+        "consumo_promedio_kwh": consumo_prom_val,
         "kwp_req": round(kwp_req, 3),
         "n_paneles": n_pan,
         "pdc_kw": round(pdc, 3),
-
         "prod_anual_por_kwp_kwh": round(prod_anual_kwp, 2),
-
-        "capex_L": capex_L(pdc, p.costo_usd_kwp, p.tcambio),
-
         "panel_id": _panel_id(eq),
-
-        "inversor_recomendado": inv_id_final,
-        "inversor_recomendado_meta": sizing_inv.get("inversor_recomendado_meta", {}),
-
-        "pac_kw": float(pac_kw_fb),
+        "inversor_id": resultado_inv["inversor_id"],
+        "pac_kw": resultado_inv["pac_kw"],
     }
