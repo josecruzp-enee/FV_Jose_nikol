@@ -6,10 +6,7 @@ from typing import Any, Dict, List, Tuple
 import streamlit as st
 from ui.state_helpers import ensure_dict, merge_defaults
 
-from electrical.energia.energia_fv import (
-    normalizar_sistema_fv,
-    preview_generacion_anual,
-)
+from electrical.energia.generacion import (normalizar_sistema_fv, preview_generacion_anual)
 
 # ==========================================================
 # Defaults
