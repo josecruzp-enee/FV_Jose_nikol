@@ -6,14 +6,16 @@ from typing import Any, Dict, List
 from reportlab.platypus import Paragraph, Spacer, TableStyle, PageBreak
 
 from reportes.utils import make_table, table_style_uniform, box_paragraph, money_L
-from core.result_accessors import get_tabla_12m
 
 
 def tabla_impacto_mensual_anio1(resultado: Dict[str, Any], pal: dict, content_w: float) -> List:
     from reportlab.platypus import Spacer
 
-    tabla = get_tabla_12m(resultado)
-    cuota_m = float(resultado.get("cuota_mensual", 0.0))
+    tecnico = resultado["tecnico"]
+    financiero = resultado["financiero"]
+
+    energia_12m = tecnico["sizing"]["energia_12m"]
+    cuota_m = float(financiero["cuota_mensual"])
 
     header = [
         "Mes",
@@ -32,9 +34,10 @@ def tabla_impacto_mensual_anio1(resultado: Dict[str, Any], pal: dict, content_w:
     total_fv_cuota = 0.0
     total_ahorro = 0.0
 
-    for r in tabla:
-        mes = int(r.get("mes", 0))
-        pago_actual = float(r.get("factura_base_L", 0.0))
+    for r in energia_12m:
+        mes = r["mes"]
+
+        pago_actual = float(r.get("pago_actual_L", 0.0))
         con_fv_enee = float(r.get("pago_enee_L", 0.0))
 
         fv_cuota = con_fv_enee + cuota_m
@@ -70,9 +73,11 @@ def tabla_impacto_mensual_anio1(resultado: Dict[str, Any], pal: dict, content_w:
         ratios=[0.8, 1.7, 1.7, 1.7, 1.45, 1.9],
         repeatRows=1,
     )
+
     t.setStyle(table_style_uniform(pal, font_header=9, font_body=9))
 
-    last_row = len(rows)  # header=0, la última fila está en índice last_row
+    last_row = len(rows)
+
     t.setStyle(TableStyle([
         ("ALIGN", (0, 1), (0, -1), "CENTER"),
         ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
@@ -106,28 +111,43 @@ def build_page_4(
 
     story.append(Paragraph("Impacto mensual estimado — Año 1", styles["H2b"]))
     story.append(Spacer(1, 6))
+
     story += tabla_impacto_mensual_anio1(resultado, pal, content_w)
 
-    cfg_html = resultado.get("cfg_strings_html")
-    if cfg_html:
-        story.append(Paragraph("Configuración eléctrica (DC) — referencial", styles["H2b"]))
+    # ===== Configuración strings (contrato fuerte) =====
+    strings = resultado["tecnico"]["strings"]["strings"]
+
+    if strings:
+        story.append(Paragraph("Configuración eléctrica (DC)", styles["H2b"]))
         story.append(Spacer(1, 6))
-        story.append(box_paragraph(cfg_html, pal, content_w, font_size=9.5))
+
+        lines = []
+        for s in strings:
+            lines.append(
+                f"MPPT {s['mppt']}: "
+                f"{s['n_series']} módulos en serie × "
+                f"{s['n_paralelo']} paralelo "
+                f"(Vmp={s['vmp_string_v']} V, "
+                f"Voc frío={s['voc_frio_string_v']} V)"
+            )
+
+        story.append(box_paragraph("<br/>".join(lines), pal, content_w, font_size=9.5))
         story.append(Spacer(1, 8))
 
-    elect = resultado.get("electrico_ref") or resultado.get("electrico") or {}
-    texto_pdf = elect.get("texto_pdf") or []
-    disclaimer = elect.get("disclaimer")
+    # ===== NEC resumen técnico =====
+    nec_paq = resultado["tecnico"]["nec"]["paq"]
+    resumen_pdf = nec_paq.get("resumen_pdf")
 
-    if texto_pdf:
-        story.append(Paragraph("Conductores y canalización (referencial)", styles["H2b"]))
-        story.append(Spacer(1, 6))
-        bullets = "<br/>".join([f"• {line}" for line in texto_pdf])
-        story.append(box_paragraph(bullets, pal, content_w, font_size=9.5))
+    if resumen_pdf:
+        story.append(Paragraph("Resumen eléctrico (NEC 2023)", styles["H2b"]))
         story.append(Spacer(1, 6))
 
-    if disclaimer:
-        story.append(Paragraph(disclaimer, styles["BodyText"]))
+        lines = [
+            f"I DC diseño: {resumen_pdf.get('idc_nom', '—')} A",
+            f"I AC diseño: {resumen_pdf.get('iac_nom', '—')} A",
+        ]
+
+        story.append(box_paragraph("<br/>".join(lines), pal, content_w, font_size=9.5))
         story.append(Spacer(1, 8))
 
     story.append(PageBreak())
