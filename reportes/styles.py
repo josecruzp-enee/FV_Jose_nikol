@@ -9,7 +9,11 @@ def pdf_palette():
         "PRIMARY": colors.HexColor("#0B2E4A"),
         "BORDER": colors.HexColor("#D7DCE3"),
         "SOFT": colors.HexColor("#F5F7FA"),
-        "OK": colors.HexColor("#1B7F3A"),
+
+        # Estados financieros
+        "OK": colors.HexColor("#1B7F3A"),      # Verde
+        "WARN": colors.HexColor("#F9A825"),    # Amarillo
+        "BAD": colors.HexColor("#C62828"),     # Rojo
     }
 
 
