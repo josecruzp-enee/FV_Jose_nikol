@@ -167,10 +167,15 @@ def ejecutar_estudio(p: Datosproyecto) -> Dict[str, Any]:
         sizing=sizing,
     )
 
-    # 7️⃣ Salida consolidada
-    return {
-        "params_fv": params_fv,
-        "sizing": sizing,
-        "electrico_nec": electrico_nec,
-        **finanzas,
+    # 7️⃣ Salida consolidada (estructura moderna)
+
+    resultado_proyecto = {
+        "tecnico": {
+            "params_fv": params_fv,
+            "sizing": sizing,
+            "electrico_nec": electrico_nec,
+        },
+        "financiero": finanzas,
     }
+
+    return resultado_proyecto
