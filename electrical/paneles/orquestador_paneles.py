@@ -204,10 +204,19 @@ def ejecutar_paneles_desde_sizing(p, sizing):
 
     from electrical.catalogos.catalogos import get_panel, get_inversor
 
-    eq = getattr(p, "equipos", {}) or {}
+    sfv = getattr(p, "sistema_fv", {}) or {}
 
-    panel = get_panel(eq.get("panel_id"))
-    inversor = get_inversor(eq.get("inversor_id"))
+    panel_id = sfv.get("panel_id")
+    inversor_id = sfv.get("inversor_id")
+
+    if not panel_id:
+        raise ValueError(f"Panel no existe en catálogo: {panel_id}")
+
+    if not inversor_id:
+        raise ValueError(f"Inversor no existe en catálogo: {inversor_id}")
+
+    panel = get_panel(panel_id)
+    inversor = get_inversor(inversor_id)
 
     return ejecutar_calculo_strings(
         n_paneles_total=sizing.get("n_paneles"),
