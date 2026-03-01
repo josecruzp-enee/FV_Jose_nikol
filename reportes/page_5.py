@@ -68,15 +68,24 @@ def _int(x, d=0) -> int:
 
 def _get_dc(resultado: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Busca el bloque DC donde suele venir NEC:
-    resultado["electrico"]["dc"]  o  resultado["electrico_nec"]["dc"] ...
+    Extrae bloque DC desde estructura moderna:
+    resultado["tecnico"]["electrico_nec"]["paq"]["dc"]
     """
-    for k in ("electrico", "electrico_nec", "paquete_electrico", "ingenieria_electrica"):
-        e = (resultado or {}).get(k)
-        if isinstance(e, dict) and isinstance(e.get("dc"), dict):
-            return e.get("dc") or {}
-    return (resultado or {}).get("dc") or {}
+    if not isinstance(resultado, dict):
+        return {}
 
+    tecnico = resultado.get("tecnico") or {}
+    nec = tecnico.get("electrico_nec") or {}
+
+    # wrapper nuevo { ok, errores, input, paq }
+    if isinstance(nec, dict) and isinstance(nec.get("paq"), dict):
+        return nec["paq"].get("dc") or {}
+
+    # si algún día viene paq directo
+    if isinstance(nec, dict):
+        return nec.get("dc") or {}
+
+    return {}
 
 def _strings_desde_sizing_o_nec(resultado: Dict[str, Any]) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
     """
