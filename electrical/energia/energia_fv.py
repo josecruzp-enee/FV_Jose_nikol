@@ -1,3 +1,4 @@
+# electrical/energia/energia_fv.py
 from __future__ import annotations
 
 from typing import Dict, Any, List
@@ -23,12 +24,12 @@ def hsp_honduras_conservador_12m() -> List[float]:
 
 
 # ==========================================================
-# Normalización Sistema FV (UI → dominio)
+# Normalización Sistema FV (UI → dominio energético)
 # ==========================================================
 
 def normalizar_sistema_fv(sf: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Normaliza campos esperados por el motor energético.
+    Normaliza campos esperados por el dominio energético.
     No modifica el dict original.
     """
 
@@ -53,17 +54,11 @@ def normalizar_sistema_fv(sf: Dict[str, Any]) -> Dict[str, Any]:
         "dos_aguas" if label == "Techo dos aguas" else "plano"
     )
 
-    # Compatibilidad: motor espera azimut único
-    if sf.get("tipo_superficie") == "Techo dos aguas":
-        sf["azimut_deg"] = int(
-            sf.get("azimut_a_deg", sf.get("azimut_deg", 180))
-        )
-
     return sf
 
 
 # ==========================================================
-# Preview energético (modelo simplificado UI)
+# Preview energético (modelo simplificado)
 # ==========================================================
 
 def preview_generacion_anual(sf: Dict[str, Any]) -> Dict[str, Any]:
@@ -78,21 +73,45 @@ def preview_generacion_anual(sf: Dict[str, Any]) -> Dict[str, Any]:
     perd = float(sf.get("perdidas_sistema_pct", 15.0))
     sombras = float(sf.get("sombras_pct", 0.0))
 
+    # -------------------------
     # PR simplificado
+    # -------------------------
     pr = (1.0 - perd / 100.0) * (1.0 - sombras / 100.0)
     pr = max(0.10, min(1.00, pr))
 
+    # -------------------------
     # HSP mensual
+    # -------------------------
     if bool(sf.get("hsp_override", False)):
         hsp_12m = [float(sf.get("hsp_kwh_m2_d", 5.2))] * 12
     else:
         hsp_12m = hsp_honduras_conservador_12m()
 
-    # Generación mensual
-    gen_mes = [
-        kwp * h * pr * d
-        for h, d in zip(hsp_12m, DIAS_MES)
-    ]
+    # -------------------------
+    # Caso DOS AGUAS
+    # -------------------------
+    if sf.get("tipo_superficie_code") == "dos_aguas":
+
+        reparto_a = float(sf.get("reparto_pct_a", 50.0)) / 100.0
+        reparto_b = 1.0 - reparto_a
+
+        kwp_a = kwp * reparto_a
+        kwp_b = kwp * reparto_b
+
+        gen_mes = [
+            (kwp_a * h * pr * d) + (kwp_b * h * pr * d)
+            for h, d in zip(hsp_12m, DIAS_MES)
+        ]
+
+    # -------------------------
+    # Caso PLANO
+    # -------------------------
+    else:
+
+        gen_mes = [
+            kwp * h * pr * d
+            for h, d in zip(hsp_12m, DIAS_MES)
+        ]
 
     gen_dia = [
         (g / d) if d else 0.0
