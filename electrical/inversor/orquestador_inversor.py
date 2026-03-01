@@ -29,7 +29,7 @@ def ejecutar_inversor_desde_sizing(
 
     resultado = ejecutar_sizing(
         inp=inp,
-        inversores_catalogo=candidatos_inversores(),
+        inversores_catalogo=catalogo_inversores(),
     )
 
     inv_id_rec = resultado.get("inversor_recomendado")
