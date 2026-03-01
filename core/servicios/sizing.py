@@ -1,9 +1,11 @@
-# core/sizing.py
+# core/servicios/sizing.py
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 
 from core.dominio.modelo import Datosproyecto
+from core.dominio.contrato import ResultadoSizing, MesEnergia
+
 from core.servicios.consumo import (
     consumo_anual_kwh,
     consumo_promedio_mensual_kwh,
@@ -48,12 +50,12 @@ def _inv_id(eq: Dict[str, Any]) -> Optional[str]:
 
 
 # ==========================================================
-# API pública — Sizing técnico puro
+# API pública — Sizing técnico formal
 # ==========================================================
 
 def calcular_sizing_unificado(
     p: Datosproyecto,
-) -> Dict[str, Any]:
+) -> ResultadoSizing:
 
     # =========================
     # Equipos
@@ -83,12 +85,6 @@ def calcular_sizing_unificado(
 
     consumo_12m_kwh = [float(x or 0.0) for x in consumo_12m_kwh]
 
-    consumo_anual_val = consumo_anual_kwh(consumo_12m_kwh)
-    consumo_prom_val = consumo_promedio_mensual_kwh(consumo_12m_kwh)
-
-    # =========================
-    # Cobertura objetivo
-    # =========================
     cobertura_obj = normalizar_cobertura(
         getattr(p, "cobertura_obj", 1.0)
     )
@@ -112,7 +108,7 @@ def calcular_sizing_unificado(
             raise ValueError("n_paneles_manual inválido en modo manual")
 
     # =========================
-    # PANEL SIZING (SOLO PANEL)
+    # PANEL SIZING
     # =========================
     panel_sizing = calcular_panel_sizing(
         consumo_12m_kwh=consumo_12m_kwh,
@@ -133,7 +129,7 @@ def calcular_sizing_unificado(
         raise ValueError("Sizing resultó en sistema inválido")
 
     # =========================
-    # INVERSOR (por potencia DC)
+    # INVERSOR
     # =========================
     resultado_inv = ejecutar_inversor_desde_sizing(
         pdc_kw=pdc,
@@ -144,18 +140,17 @@ def calcular_sizing_unificado(
     pac_kw = float(resultado_inv["pac_kw"])
 
     # =========================
-    # Salida técnica pura
+    # Energía inicial vacía (la calcula el motor energía)
     # =========================
-    return {
-        "modo_dimensionado": modo_dimensionado,
-        "consumo_anual_kwh": consumo_anual_val,
-        "consumo_promedio_kwh": consumo_prom_val,
-        "kwp_req": round(kwp_req, 3),
-        "n_paneles": n_pan,
-        "pdc_kw": round(pdc, 3),
-        "kwp_dc": round(pdc, 3),
-        "panel_id": _panel_id(eq),
-        "inversor_id": resultado_inv["inversor_id"],
-        "pac_kw": pac_kw,
-        "dc_ac_ratio": round(pdc / pac_kw, 3) if pac_kw > 0 else 0.0,
-    }
+    energia_12m: List[MesEnergia] = []
+
+    # =========================
+    # Retorno formal
+    # =========================
+    return ResultadoSizing(
+        n_paneles=n_pan,
+        kwp_dc=round(pdc, 3),
+        pdc_kw=round(pdc, 3),
+        pac_kw=pac_kw,
+        energia_12m=energia_12m,
+    )
