@@ -4,19 +4,20 @@ from __future__ import annotations
 from typing import Any, Dict, List
 
 from reportlab.platypus import Paragraph, Spacer, TableStyle, PageBreak
+from reportlab.lib.units import inch
 
 from reportes.utils import make_table, table_style_uniform, box_paragraph, money_L
 
 
+# ==========================================================
+# Tabla impacto mensual año 1
+# ==========================================================
+
 def tabla_impacto_mensual_anio1(resultado: Dict[str, Any], pal: dict, content_w: float) -> List:
-    from reportlab.platypus import Spacer
 
-    tecnico = resultado["tecnico"]
-    financiero = resultado["financiero"]
-
-    financiero = resultado["financiero"]
+    financiero = resultado.get("financiero", {})
     tabla_12m = financiero.get("tabla_12m", [])
-    cuota_m = float(financiero["cuota_mensual"])
+    cuota_m = float(financiero.get("cuota_mensual", 0.0))
 
     header = [
         "Mes",
@@ -35,10 +36,12 @@ def tabla_impacto_mensual_anio1(resultado: Dict[str, Any], pal: dict, content_w:
     total_fv_cuota = 0.0
     total_ahorro = 0.0
 
-    for r in energia_12m:
-        mes = r["mes"]
+    for r in tabla_12m:
 
-        pago_actual = float(r.get("pago_actual_L", 0.0))
+        mes = r.get("mes", 0)
+
+        # 🔥 Contrato real actual
+        pago_actual = float(r.get("factura_base_L", 0.0))
         con_fv_enee = float(r.get("pago_enee_L", 0.0))
 
         fv_cuota = con_fv_enee + cuota_m
@@ -59,6 +62,7 @@ def tabla_impacto_mensual_anio1(resultado: Dict[str, Any], pal: dict, content_w:
             money_L(acum),
         ])
 
+    # ===== Fila TOTAL =====
     rows.append([
         "TOTAL",
         money_L(total_pago_actual),
@@ -97,6 +101,10 @@ def tabla_impacto_mensual_anio1(resultado: Dict[str, Any], pal: dict, content_w:
     return [t, Spacer(1, 10)]
 
 
+# ==========================================================
+# Página 4 completa
+# ==========================================================
+
 def build_page_4(
     resultado: Dict[str, Any],
     datos: Any,
@@ -105,6 +113,7 @@ def build_page_4(
     styles,
     content_w: float,
 ):
+
     story: List = []
 
     story.append(Paragraph("Tabla Comparativa de Pagos", styles["Title"]))
@@ -115,8 +124,12 @@ def build_page_4(
 
     story += tabla_impacto_mensual_anio1(resultado, pal, content_w)
 
-    # ===== Configuración strings (contrato fuerte) =====
-    strings = resultado["tecnico"]["strings"]["strings"]
+    # ======================================================
+    # Configuración eléctrica DC
+    # ======================================================
+
+    strings_block = resultado.get("tecnico", {}).get("strings", {})
+    strings = strings_block.get("strings", [])
 
     if strings:
         story.append(Paragraph("Configuración eléctrica (DC)", styles["H2b"]))
@@ -125,18 +138,22 @@ def build_page_4(
         lines = []
         for s in strings:
             lines.append(
-                f"MPPT {s['mppt']}: "
-                f"{s['n_series']} módulos en serie × "
-                f"{s['n_paralelo']} paralelo "
-                f"(Vmp={s['vmp_string_v']} V, "
-                f"Voc frío={s['voc_frio_string_v']} V)"
+                f"MPPT {s.get('mppt')}: "
+                f"{s.get('n_series')} módulos en serie × "
+                f"{s.get('n_paralelo')} paralelo "
+                f"(Vmp={s.get('vmp_string_v')} V, "
+                f"Voc frío={s.get('voc_frio_string_v')} V)"
             )
 
         story.append(box_paragraph("<br/>".join(lines), pal, content_w, font_size=9.5))
         story.append(Spacer(1, 8))
 
-    # ===== NEC resumen técnico =====
-    nec_paq = resultado["tecnico"]["nec"]["paq"]
+    # ======================================================
+    # Resumen NEC
+    # ======================================================
+
+    nec_block = resultado.get("tecnico", {}).get("nec", {})
+    nec_paq = nec_block.get("paq", {})
     resumen_pdf = nec_paq.get("resumen_pdf")
 
     if resumen_pdf:
@@ -152,4 +169,5 @@ def build_page_4(
         story.append(Spacer(1, 8))
 
     story.append(PageBreak())
+
     return story
