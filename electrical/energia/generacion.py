@@ -1,5 +1,5 @@
 from typing import Dict, Any, List
-from .irradiancia import hsp_honduras_conservador_12m
+from .irradiancia import hsp_12m_base
 from .orientacion import factor_orientacion_total
 
 DIAS_MES: List[int] = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
@@ -38,7 +38,7 @@ def preview_generacion_anual(sf: Dict[str, Any]) -> Dict[str, Any]:
     if bool(sf.get("hsp_override", False)):
         hsp_12m = [float(sf.get("hsp_kwh_m2_d", 5.2))] * 12
     else:
-        hsp_12m = hsp_honduras_conservador_12m()
+        hsp_12m = hsp_12m_base()
 
     f_orient = factor_orientacion_total(
         tipo_superficie=sf.get("tipo_superficie_code"),
