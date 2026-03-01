@@ -2,9 +2,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
-from .modelo import Datosproyecto
+from core.dominio.modelo import Datosproyecto
 from electrical.energia.contrato import EnergiaResultado
-
 
 # ==========================================================
 # 🔵 CAPEX
