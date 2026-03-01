@@ -65,7 +65,7 @@ def _render_nec_resumen(resultado_proyecto: dict) -> None:
     st.subheader("Ingeniería eléctrica (NEC 2023)")
 
     tecnico = resultado_proyecto.get("tecnico") or {}
-    nec = tecnico.get("electrico_nec") or {}
+    nec = tecnico.get("nec") or {}
 
     # wrapper nuevo
     if isinstance(nec, dict) and "paq" in nec:
