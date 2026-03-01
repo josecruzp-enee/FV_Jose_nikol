@@ -1,7 +1,7 @@
 # core/finanzas_lp.py
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 from .modelo import Datosproyecto
 from .simular_12_meses import (
@@ -9,80 +9,177 @@ from .simular_12_meses import (
     calcular_cuota_mensual,
     om_mensual,
 )
-from .evaluacion import (
-    evaluar_viabilidad,
-    resumen_decision_mensual,
-    payback_simple,
-)
 
 
 # ==========================================================
-# Herramientas financieras base
+# Utilidades matemáticas base
 # ==========================================================
 
 def _npv(rate: float, cashflows: List[float]) -> float:
-    r = float(rate)
-    return sum(float(cf) / ((1.0 + r) ** t) for t, cf in enumerate(cashflows))
+    return sum(cf / ((1.0 + rate) ** t) for t, cf in enumerate(cashflows))
 
 
-def _irr_bisection(
-    cashflows: List[float],
-    low: float = -0.9,
-    high: float = 2.0,
-    tol: float = 1e-7,
-    max_iter: int = 300,
-) -> Optional[float]:
-
+def _irr_bisection(cashflows: List[float]) -> Optional[float]:
+    low, high = -0.9, 2.0
     f_low = _npv(low, cashflows)
     f_high = _npv(high, cashflows)
 
-    # Si no hay cruce de signo, intentar ampliar rango
     if f_low * f_high > 0:
         high = 5.0
         f_high = _npv(high, cashflows)
         if f_low * f_high > 0:
             return None
 
-    a, b = low, high
-    fa, fb = f_low, f_high
-
-    for _ in range(max_iter):
-        m = 0.5 * (a + b)
-        fm = _npv(m, cashflows)
-
-        if abs(fm) < tol:
-            return m
-
-        if fa * fm > 0:
-            a, fa = m, fm
+    for _ in range(300):
+        mid = (low + high) / 2
+        f_mid = _npv(mid, cashflows)
+        if abs(f_mid) < 1e-7:
+            return mid
+        if f_low * f_mid > 0:
+            low, f_low = mid, f_mid
         else:
-            b, fb = m, fm
+            high, f_high = mid, f_mid
 
-    return 0.5 * (a + b)
+    return (low + high) / 2
 
 
-def _payback_descontado_anios(rate: float, cashflows: List[float]) -> Optional[float]:
-    r = float(rate)
+def _payback_descontado(rate: float, cashflows: List[float]) -> Optional[float]:
     acumulado = 0.0
-
     for t, cf in enumerate(cashflows):
-        pv = float(cf) / ((1.0 + r) ** t)
+        pv = cf / ((1.0 + rate) ** t)
         anterior = acumulado
         acumulado += pv
-
-        if t == 0:
-            continue
-
-        if acumulado >= 0:
+        if t > 0 and acumulado >= 0:
             delta = acumulado - anterior
             frac = (0 - anterior) / delta if abs(delta) > 1e-12 else 0.0
             return (t - 1) + frac
-
     return None
 
 
 # ==========================================================
-# Motor financiero completo
+# Evaluación mensual
+# ==========================================================
+
+def _evaluacion_mensual(tabla: List[Dict[str, float]], cuota: float) -> Dict[str, Any]:
+    ahorros = [x["ahorro_L"] for x in tabla]
+    netos = [x["neto_L"] for x in tabla]
+    oms = [x["om_L"] for x in tabla]
+
+    ahorro_prom = sum(ahorros) / len(ahorros)
+    neto_prom = sum(netos) / len(netos)
+    peor_mes = min(netos)
+    om_prom = sum(oms) / len(oms)
+
+    dscr = (ahorro_prom - om_prom) / cuota if cuota > 0 else 0.0
+
+    if dscr >= 1.2 and peor_mes >= 0:
+        estado = "✅ VIABLE"
+        nota = "Se paga cómodamente y no hay meses negativos."
+    elif dscr >= 1.0:
+        estado = "⚠️ MARGINAL"
+        nota = "Se sostiene en promedio, pero hay meses con flujo bajo/negativo."
+    else:
+        estado = "❌ NO VIABLE"
+        nota = "Los ahorros no cubren bien la cuota; ajustar tamaño/plazo/costo."
+
+    return {
+        "estado": estado,
+        "nota": nota,
+        "dscr": dscr,
+        "ahorro_prom": ahorro_prom,
+        "neto_prom": neto_prom,
+        "peor_mes": peor_mes,
+    }
+
+
+def _resumen_mensual(tabla: List[Dict[str, float]], cuota: float, p: Datosproyecto) -> Dict[str, float]:
+    pago_actual = 0.0
+    pago_residual = 0.0
+
+    for f in tabla:
+        consumo = f["consumo_kwh"]
+        pago_actual += consumo * p.tarifa_energia + p.cargos_fijos
+        pago_residual += f["pago_enee_L"]
+
+    pago_actual /= 12.0
+    pago_residual /= 12.0
+
+    pago_total_fv = pago_residual + cuota
+    ahorro_mensual = pago_actual - pago_total_fv
+
+    return {
+        "pago_actual": pago_actual,
+        "pago_residual": pago_residual,
+        "cuota": cuota,
+        "pago_total_fv": pago_total_fv,
+        "ahorro_mensual": ahorro_mensual,
+        "pago_post_fv": pago_residual,
+    }
+
+
+def _payback_simple(capex: float, ahorro_anual: float) -> float:
+    return capex / ahorro_anual if ahorro_anual > 0 else float("inf")
+
+
+# ==========================================================
+# Proyección financiera larga
+# ==========================================================
+
+def _proyeccion_larga(
+    *,
+    datos: Datosproyecto,
+    capex: float,
+    cuota: float,
+    tabla_12m: List[Dict[str, float]],
+    horizonte: int,
+    crecimiento_tarifa: float,
+    degradacion_fv: float,
+    tasa_descuento: float,
+    reemplazo_anio: Optional[int],
+    reemplazo_pct: float,
+) -> Dict[str, Any]:
+
+    om_y1 = om_mensual(capex, getattr(datos, "om_anual_pct", 0.0)) * 12
+    pago_cuota_y1 = cuota * 12
+
+    pago_base_y1 = sum(r["factura_base_L"] for r in tabla_12m)
+    pago_residual_y1 = sum(r["pago_enee_L"] for r in tabla_12m)
+
+    cashflows = [-capex]
+    tabla_anual = []
+
+    for anio in range(1, horizonte + 1):
+        f_tar = (1 + crecimiento_tarifa) ** (anio - 1)
+        f_deg = (1 - degradacion_fv) ** (anio - 1)
+
+        pago_base = pago_base_y1 * f_tar
+        pago_residual = pago_residual_y1 * f_tar * f_deg
+        ahorro = pago_base - pago_residual
+
+        cuota_anual = pago_cuota_y1 if anio <= datos.plazo_anios else 0.0
+        reemplazo = reemplazo_pct * capex if reemplazo_anio and anio == reemplazo_anio else 0.0
+
+        flujo = ahorro - cuota_anual - om_y1 - reemplazo
+
+        tabla_anual.append({
+            "anio": anio,
+            "ahorro_L": ahorro,
+            "flujo_neto_L": flujo,
+        })
+
+        cashflows.append(flujo)
+
+    return {
+        "cashflows": cashflows,
+        "tabla_anual": tabla_anual,
+        "npv_L": _npv(tasa_descuento, cashflows),
+        "irr": _irr_bisection(cashflows),
+        "payback_descontado_anios": _payback_descontado(tasa_descuento, cashflows),
+    }
+
+
+# ==========================================================
+# ENTRYPOINT ÚNICO
 # ==========================================================
 
 def ejecutar_finanzas(
@@ -97,113 +194,46 @@ def ejecutar_finanzas(
     reemplazo_inversor_pct_capex: float = 0.15,
 ) -> Dict[str, Any]:
 
-    # ------------------------------------------------------
-    # 1️⃣ Extraer datos técnicos necesarios
-    # ------------------------------------------------------
     kwp_dc = float(sizing.get("kwp_dc") or sizing.get("pdc_kw") or 0.0)
     capex = float(sizing.get("capex_L") or 0.0)
 
     if kwp_dc <= 0 or capex <= 0:
-        raise ValueError("Sizing incompleto para ejecutar finanzas.")
+        raise ValueError("Sizing incompleto para finanzas.")
 
-    # ------------------------------------------------------
-    # 2️⃣ Cuota mensual
-    # ------------------------------------------------------
-    cuota_mensual = calcular_cuota_mensual(
+    cuota = calcular_cuota_mensual(
         capex_L_=capex,
-        tasa_anual=float(datos.tasa_anual),
-        plazo_anios=int(datos.plazo_anios),
-        pct_fin=float(datos.porcentaje_financiado),
+        tasa_anual=datos.tasa_anual,
+        plazo_anios=datos.plazo_anios,
+        pct_fin=datos.porcentaje_financiado,
     )
 
-    # ------------------------------------------------------
-    # 3️⃣ Simulación 12 meses
-    # ------------------------------------------------------
-    tabla_12m = simular_12_meses(datos, kwp_dc, cuota_mensual, capex)
+    tabla_12m = simular_12_meses(datos, kwp_dc, cuota, capex)
 
-    # ------------------------------------------------------
-    # 4️⃣ Evaluación mensual
-    # ------------------------------------------------------
-    evaluacion = evaluar_viabilidad(tabla_12m, cuota_mensual)
-    decision = resumen_decision_mensual(tabla_12m, cuota_mensual, datos)
+    evaluacion = _evaluacion_mensual(tabla_12m, cuota)
+    decision = _resumen_mensual(tabla_12m, cuota, datos)
 
-    ahorro_anual = sum(float(x.get("ahorro_L", 0.0)) for x in tabla_12m)
-    payback_simple_anios = payback_simple(capex, ahorro_anual)
+    ahorro_anual = sum(x["ahorro_L"] for x in tabla_12m)
+    pb_simple = _payback_simple(capex, ahorro_anual)
 
-    # ------------------------------------------------------
-    # 5️⃣ Proyección financiera larga
-    # ------------------------------------------------------
-    om_pct = float(getattr(datos, "om_anual_pct", 0.0))
-    om_y1 = om_mensual(capex, om_pct) * 12.0
-    pago_cuota_y1 = cuota_mensual * 12.0
+    finanzas_lp = _proyeccion_larga(
+        datos=datos,
+        capex=capex,
+        cuota=cuota,
+        tabla_12m=tabla_12m,
+        horizonte=horizonte_anios,
+        crecimiento_tarifa=crecimiento_tarifa_anual,
+        degradacion_fv=degradacion_fv_anual,
+        tasa_descuento=tasa_descuento,
+        reemplazo_anio=reemplazo_inversor_anio,
+        reemplazo_pct=reemplazo_inversor_pct_capex,
+    )
 
-    pago_base_y1 = sum(float(r["factura_base_L"]) for r in tabla_12m)
-    pago_residual_y1 = sum(float(r["pago_enee_L"]) for r in tabla_12m)
-
-    fv_util_kwh_y1 = sum(float(r["fv_kwh"]) for r in tabla_12m)
-    cons_kwh_y1 = sum(float(r["consumo_kwh"]) for r in tabla_12m)
-
-    cashflows = [-capex]
-    tabla_anual = []
-
-    for anio in range(1, horizonte_anios + 1):
-
-        f_tar = (1.0 + crecimiento_tarifa_anual) ** (anio - 1)
-        f_deg = (1.0 - degradacion_fv_anual) ** (anio - 1)
-
-        pago_base = pago_base_y1 * f_tar
-        pago_residual = pago_residual_y1 * f_tar * f_deg
-
-        ahorro = pago_base - pago_residual
-
-        pagos_cuota = pago_cuota_y1 if anio <= int(datos.plazo_anios) else 0.0
-
-        reemplazo = 0.0
-        if reemplazo_inversor_anio and anio == reemplazo_inversor_anio:
-            reemplazo = reemplazo_inversor_pct_capex * capex
-
-        flujo_neto = ahorro - pagos_cuota - om_y1 - reemplazo
-
-        tabla_anual.append({
-            "anio": anio,
-            "ahorro_L": ahorro,
-            "pago_cuota_L": pagos_cuota,
-            "om_L": om_y1,
-            "reemplazo_L": reemplazo,
-            "flujo_neto_L": flujo_neto,
-        })
-
-        cashflows.append(flujo_neto)
-
-    npv = _npv(tasa_descuento, cashflows)
-    irr = _irr_bisection(cashflows)
-    payback_desc = _payback_descontado_anios(tasa_descuento, cashflows)
-
-    finanzas_lp = {
-        "supuestos": {
-            "horizonte_anios": horizonte_anios,
-            "crecimiento_tarifa_anual": crecimiento_tarifa_anual,
-            "degradacion_fv_anual": degradacion_fv_anual,
-            "tasa_descuento": tasa_descuento,
-            "reemplazo_inversor_anio": reemplazo_inversor_anio,
-            "reemplazo_inversor_pct_capex": reemplazo_inversor_pct_capex,
-        },
-        "cashflows": cashflows,
-        "tabla_anual": tabla_anual,
-        "npv_L": float(npv),
-        "irr": None if irr is None else float(irr),
-        "payback_descontado_anios": payback_desc,
-    }
-
-    # ------------------------------------------------------
-    # 6️⃣ Retorno consolidado financiero
-    # ------------------------------------------------------
     return {
-        "cuota_mensual": cuota_mensual,
+        "cuota_mensual": cuota,
         "tabla_12m": tabla_12m,
         "evaluacion": evaluacion,
         "decision": decision,
         "ahorro_anual_L": ahorro_anual,
-        "payback_simple_anios": payback_simple_anios,
+        "payback_simple_anios": pb_simple,
         "finanzas_lp": finanzas_lp,
     }
