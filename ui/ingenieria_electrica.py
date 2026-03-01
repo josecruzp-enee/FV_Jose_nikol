@@ -308,8 +308,8 @@ def render(ctx):
         # =========================
         # Mostrar NEC
         # =========================
-        wrapper = tecnico.get("electrico_nec") or {}
-        pkg = wrapper.get("paq") or {}
+        nec = tecnico.get("nec") or {}
+        pkg = nec.get("paq") or {}
         _mostrar_nec(pkg)
 
         # =========================
