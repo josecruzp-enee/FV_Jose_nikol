@@ -1,10 +1,5 @@
-# electrical/inversor/orquestador_inversor.py
-from __future__ import annotations
-from typing import Dict, Any, Optional
-
-from electrical.catalogos import get_inversor
+from electrical.catalogos import get_inversor, ids_inversores
 from electrical.inversor.sizing_inversor import SizingInput, ejecutar_sizing
-from electrical.catalogos import catalogo_inversores
 
 
 def ejecutar_inversor_desde_sizing(
@@ -29,7 +24,7 @@ def ejecutar_inversor_desde_sizing(
 
     resultado = ejecutar_sizing(
         inp=inp,
-        inversores_catalogo=catalogo_inversores(),
+        inversores_catalogo=[get_inversor(i) for i in ids_inversores()],
     )
 
     inv_id_rec = resultado.get("inversor_recomendado")
@@ -39,10 +34,8 @@ def ejecutar_inversor_desde_sizing(
         raise ValueError("No se pudo determinar inversor recomendado")
 
     inv = get_inversor(inv_id_final)
-    if inv is None:
-        raise ValueError("Inversor no encontrado en catálogo")
 
-    pac_kw = float(getattr(inv, "kw_ac", 0.0))
+    pac_kw = float(inv.kw_ac)
     if pac_kw <= 0:
         raise ValueError("Potencia AC inválida en inversor")
 
