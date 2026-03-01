@@ -1,7 +1,8 @@
 # ui/ingenieria_electrica.py
 from __future__ import annotations
 
-from typing import List, Tuple, Dict, Any
+from typing import List, Tuple
+from dataclasses import asdict
 
 import pandas as pd
 import streamlit as st
@@ -183,7 +184,6 @@ def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
         om_anual_pct=float(sf.get("om_anual_pct", 0.01)),
     )
 
-    # Inyecciones adicionales controladas
     p.sistema_fv = dict(sf)
     p.electrico = dict(_asegurar_dict(ctx, "electrico"))
     p.equipos = dict(eq)
@@ -276,22 +276,19 @@ def render(ctx):
 
         st.success("Ingeniería generada correctamente.")
 
-        # Estructura nueva directa
-        sizing = resultado.get("sizing") or {}
-        strings = resultado.get("strings") or {}
-        energia = resultado.get("energia") or {}
-        nec = resultado.get("nec") or {}
-        financiero = resultado.get("financiero") or {}
+        # Ahora es dataclass fuerte
+        sizing = resultado.sizing
+        nec = resultado.nec
+        financiero = resultado.financiero
 
         st.subheader("Sizing")
-        st.json(sizing)
+        st.json(asdict(sizing))
 
         st.subheader("NEC")
-        pkg = nec.get("paq") if isinstance(nec, dict) else nec
-        _mostrar_nec(pkg)
+        _mostrar_nec(nec.paq)
 
         st.subheader("Finanzas")
-        st.json(financiero)
+        st.json(asdict(financiero))
 
     except Exception as exc:
         st.error(f"No se pudo generar ingeniería: {exc}")
