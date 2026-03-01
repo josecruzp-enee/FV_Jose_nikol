@@ -4,7 +4,7 @@ from typing import Dict, Any, Optional
 
 from electrical.catalogos import get_inversor
 from electrical.inversor.sizing_inversor import SizingInput, ejecutar_sizing
-from electrical.inversor.catalogo_adapter import candidatos_inversores
+from electrical.catalogos import catalogo_inversores
 
 
 def ejecutar_inversor_desde_sizing(
