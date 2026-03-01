@@ -6,7 +6,10 @@ from typing import Any, Dict, List, Tuple
 import streamlit as st
 from ui.state_helpers import ensure_dict, merge_defaults
 
-from electrical.energia.generacion import (normalizar_sistema_fv, preview_generacion_anual)
+from electrical.energia.generacion import (
+    normalizar_sistema_fv,
+    preview_generacion_anual,
+)
 
 # ==========================================================
 # Defaults
@@ -14,6 +17,8 @@ from electrical.energia.generacion import (normalizar_sistema_fv, preview_genera
 
 def _defaults_sistema_fv() -> Dict[str, Any]:
     return {
+        "modo_dimensionado": "auto",        # 🔥 NUEVO
+        "n_paneles_manual": 10,             # 🔥 NUEVO
         "hsp_kwh_m2_d": 5.2,
         "hsp_override": False,
         "inclinacion_deg": 15,
@@ -39,7 +44,37 @@ def _get_sf(ctx) -> Dict[str, Any]:
 
 
 # ==========================================================
-# Render secciones
+# 🔥 MODO DIMENSIONAMIENTO
+# ==========================================================
+
+def _render_modo_dimensionado(sf: Dict[str, Any]) -> None:
+    st.markdown("#### Dimensionamiento del sistema")
+
+    modo = st.radio(
+        "Seleccione modo de dimensionamiento",
+        options=["Automático (por cobertura)", "Manual (definir cantidad de paneles)"],
+        index=0 if sf.get("modo_dimensionado") != "manual" else 1,
+        key="sf_modo_dim",
+    )
+
+    if "Manual" in modo:
+        sf["modo_dimensionado"] = "manual"
+    else:
+        sf["modo_dimensionado"] = "auto"
+
+    if sf["modo_dimensionado"] == "manual":
+        sf["n_paneles_manual"] = st.number_input(
+            "Cantidad de paneles a instalar",
+            min_value=1,
+            max_value=1000,
+            step=1,
+            value=int(sf.get("n_paneles_manual", 10)),
+            key="sf_n_paneles_manual",
+        )
+
+
+# ==========================================================
+# Radiación
 # ==========================================================
 
 def _render_radiacion(sf: Dict[str, Any]) -> None:
@@ -62,6 +97,10 @@ def _render_radiacion(sf: Dict[str, Any]) -> None:
     )
 
 
+# ==========================================================
+# Geometría
+# ==========================================================
+
 def _render_geometria(sf: Dict[str, Any]) -> None:
     st.markdown("#### Geometría del arreglo")
 
@@ -71,9 +110,6 @@ def _render_geometria(sf: Dict[str, Any]) -> None:
         index=0 if sf.get("tipo_superficie") != "Techo dos aguas" else 1,
     )
 
-    # ------------------------------------------------------
-    # DOS AGUAS
-    # ------------------------------------------------------
     if sf["tipo_superficie"] == "Techo dos aguas":
 
         st.caption("Agua A")
@@ -103,9 +139,6 @@ def _render_geometria(sf: Dict[str, Any]) -> None:
             key="sf_reparto_a",
         )
 
-    # ------------------------------------------------------
-    # PLANO ÚNICO
-    # ------------------------------------------------------
     else:
         sf["azimut_deg"] = st.number_input(
             "Azimut (°)",
@@ -115,7 +148,6 @@ def _render_geometria(sf: Dict[str, Any]) -> None:
             key="sf_azimut",
         )
 
-    # Inclinación común
     sf["inclinacion_deg"] = st.number_input(
         "Inclinación (°)",
         min_value=0,
@@ -124,6 +156,10 @@ def _render_geometria(sf: Dict[str, Any]) -> None:
         key="sf_inclinacion",
     )
 
+
+# ==========================================================
+# Condiciones
+# ==========================================================
 
 def _render_condiciones(sf: Dict[str, Any]) -> None:
     st.markdown("#### Condiciones de instalación")
@@ -145,25 +181,6 @@ def _render_condiciones(sf: Dict[str, Any]) -> None:
         value=float(sf.get("perdidas_sistema_pct", 15.0)),
         key="sf_perdidas",
     )
-
-
-def _render_resumen(sf: Dict[str, Any]) -> None:
-    st.divider()
-    st.markdown("#### Resumen (entradas)")
-
-    st.write(f"HSP: {sf['hsp_kwh_m2_d']:.1f} h/día")
-    st.write(f"Tipo superficie: {sf['tipo_superficie']}")
-
-    if sf["tipo_superficie"] == "Techo dos aguas":
-        st.write(f"Agua A: {sf['azimut_a_deg']}°")
-        st.write(f"Agua B: {sf['azimut_b_deg']}°")
-        st.write(f"Reparto A: {sf['reparto_pct_a']}%")
-    else:
-        st.write(f"Azimut: {sf['azimut_deg']}°")
-
-    st.write(f"Inclinación: {sf['inclinacion_deg']}°")
-    st.write(f"Sombras: {sf['sombras_pct']}%")
-    st.write(f"Pérdidas: {sf['perdidas_sistema_pct']}%")
 
 
 # ==========================================================
@@ -206,10 +223,10 @@ def render(ctx) -> None:
 
     sf = _get_sf(ctx)
 
+    _render_modo_dimensionado(sf)   # 🔥 NUEVO
     _render_radiacion(sf)
     _render_geometria(sf)
     _render_condiciones(sf)
-    _render_resumen(sf)
     _render_grafica_teorica(sf)
 
 
@@ -222,5 +239,9 @@ def validar(ctx) -> Tuple[bool, List[str]]:
 
     if int(sf.get("inclinacion_deg", 0)) < 0:
         errs.append("Inclinación inválida.")
+
+    if sf.get("modo_dimensionado") == "manual":
+        if int(sf.get("n_paneles_manual", 0)) <= 0:
+            errs.append("Debe definir una cantidad válida de paneles.")
 
     return (len(errs) == 0), errs
