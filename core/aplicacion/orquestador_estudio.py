@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Any
 
-from core.dominio.contrato import 
+from core.dominio.contrato import (
     ResultadoProyecto,
     ResultadoSizing,
     ResultadoStrings,
@@ -9,7 +9,7 @@ from core.dominio.contrato import
     ResultadoFinanciero,
 )
 
-from core.dominio.puertos import (
+from core.aplicacion.puertos import (
     PuertoSizing,
     PuertoPaneles,
     PuertoEnergia,
