@@ -4,249 +4,62 @@ from __future__ import annotations
 from typing import Any, Dict, List, Tuple
 
 import streamlit as st
-from ui.state_helpers import ensure_dict, merge_defaults, sync_fields
-from electrical.paneles.dimensionado_paneles import _hsp_modelo_conservador_12m
+from ui.state_helpers import ensure_dict, merge_defaults
+
+from electrical.energia.energia_fv import (
+    normalizar_sistema_fv,
+    preview_generacion_anual,
+)
 
 # ==========================================================
-# Defaults / Modelo UI
+# Defaults
 # ==========================================================
 
 def _defaults_sistema_fv() -> Dict[str, Any]:
     return {
-        # Radiación / recurso solar
         "hsp_kwh_m2_d": 5.2,
         "hsp_override": False,
-
-        # Geometría (compat)
         "inclinacion_deg": 15,
-        "azimut_deg": 180,                 # 0=N, 90=E, 180=S, 270=O
+        "azimut_deg": 180,
         "orientacion_label": "Sur (óptimo)",
-
-        # Geometría (dos aguas)
-        "tipo_superficie": "Un plano (suelo/losa/estructura)",  # label UI
+        "tipo_superficie": "Un plano (suelo/losa/estructura)",
         "azimut_a_deg": 90,
         "azimut_b_deg": 270,
         "reparto_pct_a": 50.0,
-
-        # Inclinación
-        "tilt_modo": "auto",  # auto | manual
+        "tilt_modo": "auto",
         "tilt_techo": "Techo residencial",
-
-        # Condición de instalación
         "tipo_montaje": "Techo ventilado",
         "sombras_pct": 0.0,
         "perdidas_sistema_pct": 15.0,
-
-        # Preview
         "kwp_preview": 5.0,
     }
 
 
 def _asegurar_dict(ctx, nombre: str) -> Dict[str, Any]:
-    # compat wrapper
     return ensure_dict(ctx, nombre, dict)
-
-
-def _tipo_superficie_code(label: str) -> str:
-    return "dos_aguas" if str(label).strip() == "Techo dos aguas" else "plano"
-
-
-def _sync_campos_normalizados(sf: Dict[str, Any]) -> None:
-    """
-    Mantiene campos que el motor puede consumir, sin romper UI/compat.
-    - sf["hsp"] numérico
-    - sf["tipo_superficie_code"] = plano|dos_aguas
-    - sf["azimut_deg"] siempre existe
-    """
-    # HSP normalizada
-    hsp = sf.get("hsp")
-    if hsp is None:
-        hsp = float(sf.get("hsp_kwh_m2_d", 5.2))
-    sf["hsp"] = float(hsp)
-    sf["hsp_kwh_m2_d"] = float(sf["hsp"])
-
-    # tipo superficie code
-    sf["tipo_superficie_code"] = _tipo_superficie_code(sf.get("tipo_superficie", "Un plano (suelo/losa/estructura)"))
-
-    # compat azimut_deg
-    if sf.get("tipo_superficie") == "Techo dos aguas":
-        sf["azimut_deg"] = int(sf.get("azimut_a_deg", sf.get("azimut_deg", 180)))
 
 
 def _get_sf(ctx) -> Dict[str, Any]:
     sf = _asegurar_dict(ctx, "sistema_fv")
     merge_defaults(sf, _defaults_sistema_fv())
-    sync_fields(sf, _sync_campos_normalizados)
     return sf
 
 
 # ==========================================================
-# Catálogos UI
-# ==========================================================
-
-def _opciones_orientacion() -> List[Dict[str, Any]]:
-    return [
-        {"label": "Sur (óptimo)", "azimut": 180},
-        {"label": "Sureste", "azimut": 135},
-        {"label": "Suroeste", "azimut": 225},
-        {"label": "Este", "azimut": 90},
-        {"label": "Oeste", "azimut": 270},
-        {"label": "Norte (no recomendado)", "azimut": 0},
-    ]
-
-
-def _opciones_sombras() -> List[Dict[str, Any]]:
-    return [
-        {"label": "Sin sombras (0%)", "pct": 0.0},
-        {"label": "Sombras ligeras (5%)", "pct": 5.0},
-        {"label": "Sombras medias (10%)", "pct": 10.0},
-        {"label": "Sombras severas (20%)", "pct": 20.0},
-    ]
-
-
-def _opciones_montaje() -> List[str]:
-    return [
-        "Techo ventilado",
-        "Techo pegado (poca ventilación)",
-        "Estructura elevada (suelo)",
-    ]
-
-
-# ==========================================================
-# Geometría — helpers UI
-# ==========================================================
-
-def _ui_select_orientacion(label_widget: str, az_actual: int, *, key: str) -> Tuple[str, int]:
-    opciones = _opciones_orientacion()
-    labels = [o["label"] for o in opciones]
-
-    idx = 0
-    for i, o in enumerate(opciones):
-        if int(o["azimut"]) == int(az_actual):
-            idx = i
-            break
-
-    sel_label = st.selectbox(label_widget, options=labels, index=idx, key=key)
-    sel = next(o for o in opciones if o["label"] == sel_label)
-    return str(sel_label), int(sel["azimut"])
-
-
-def _ui_tipo_superficie(sf: Dict[str, Any]) -> None:
-    sf["tipo_superficie"] = st.selectbox(
-        "Tipo de superficie",
-        options=["Un plano (suelo/losa/estructura)", "Techo dos aguas"],
-        index=0 if sf.get("tipo_superficie") != "Techo dos aguas" else 1,
-        key="sf_tipo_superficie",
-        help="Dos aguas: dos orientaciones + reparto de paneles por cada agua.",
-    )
-
-
-def _ui_orientacion_plano(sf: Dict[str, Any]) -> None:
-    label, az = _ui_select_orientacion("Orientación", int(sf.get("azimut_deg", 180)), key="sf_orientacion")
-    sf["orientacion_label"] = label
-    sf["azimut_deg"] = az
-
-
-def _ui_orientacion_dos_aguas(sf: Dict[str, Any]) -> None:
-    st.caption("Agua A")
-    label_a, az_a = _ui_select_orientacion("Orientación agua A", int(sf.get("azimut_a_deg", 90)), key="sf_orient_a")
-    sf["azimut_a_deg"] = az_a
-
-    st.caption("Agua B")
-    label_b, az_b = _ui_select_orientacion("Orientación agua B", int(sf.get("azimut_b_deg", 270)), key="sf_orient_b")
-    sf["azimut_b_deg"] = az_b
-
-    sf["reparto_pct_a"] = float(
-        st.number_input(
-            "Reparto paneles en agua A (%)",
-            min_value=0.0,
-            max_value=100.0,
-            step=5.0,
-            value=float(sf.get("reparto_pct_a", 50.0)),
-            key="sf_reparto_a",
-        )
-    )
-    st.write(f"Reparto agua B: **{100.0 - sf['reparto_pct_a']:.0f}%**")
-
-    sf["orientacion_label"] = f"Dos aguas: {label_a} / {label_b}"
-
-    # compat: resto del sistema hoy espera un azimut único
-    sf["azimut_deg"] = int(sf["azimut_a_deg"])
-
-
-def _ui_inclinacion(sf: Dict[str, Any]) -> None:
-    modo = st.radio(
-        "Definir inclinación",
-        options=["Automática (por tipo de techo)", "Manual (°)"],
-        index=0 if sf.get("tilt_modo") == "auto" else 1,
-        horizontal=True,
-        key="sf_tilt_modo",
-    )
-    sf["tilt_modo"] = "auto" if "Automática" in modo else "manual"
-
-    if sf["tilt_modo"] == "auto":
-        tipos = ["Techo plano", "Techo residencial", "Techo pronunciado"]
-        actual = str(sf.get("tilt_techo", "Techo residencial"))
-        if actual not in tipos:
-            actual = "Techo residencial"
-        tipo_techo = st.selectbox("Tipo de techo", options=tipos, index=tipos.index(actual), key="sf_tilt_techo")
-        sf["tilt_techo"] = tipo_techo
-
-        defaults = {"Techo plano": 12, "Techo residencial": 20, "Techo pronunciado": 30}
-        sf["inclinacion_deg"] = int(defaults[tipo_techo])
-        st.caption(f"Inclinación sugerida: {sf['inclinacion_deg']}° (modo manual si la quieres exacta).")
-    else:
-        sf["inclinacion_deg"] = int(
-            st.number_input(
-                "Inclinación (°)",
-                min_value=0,
-                max_value=45,
-                step=1,
-                value=int(sf.get("inclinacion_deg", 15)),
-                key="sf_inclinacion_manual",
-            )
-        )
-
-
-def _render_geometria(sf: Dict[str, Any]) -> None:
-    st.markdown("#### Geometría del arreglo")
-
-    _ui_tipo_superficie(sf)
-
-    c1, c2 = st.columns(2)
-    with c1:
-        if sf["tipo_superficie"] == "Techo dos aguas":
-            _ui_orientacion_dos_aguas(sf)
-        else:
-            _ui_orientacion_plano(sf)
-
-    with c2:
-        _ui_inclinacion(sf)
-
-    _sync_campos_normalizados(sf)
-
-
-# ==========================================================
-# Render: otras secciones
+# Render secciones
 # ==========================================================
 
 def _render_radiacion(sf: Dict[str, Any]) -> None:
-    st.markdown("#### Recurso solar (HSP / Radiación)")
+    st.markdown("#### Recurso solar (HSP)")
 
-    c1, c2 = st.columns([1, 2])
-    with c1:
-        # ✅ key estable para que Streamlit no “pegue” estados raros
-        sf["hsp_override"] = st.checkbox(
-            "Editar manualmente HSP",
-            value=bool(sf.get("hsp_override", False)),
-            key="sf_hsp_override",
-            help="Si no, este valor debería venir de la ubicación (modelo futuro).",
-        )
-    with c2:
-        st.caption("HSP típico en Honduras: 4.8–5.6 h/día (depende de zona, nubosidad y época).")
+    sf["hsp_override"] = st.checkbox(
+        "Editar manualmente HSP",
+        value=bool(sf.get("hsp_override", False)),
+        key="sf_hsp_override",
+    )
 
     sf["hsp_kwh_m2_d"] = st.number_input(
-        "HSP (kWh/m²·día) / Horas sol pico",
+        "HSP (kWh/m²·día)",
         min_value=3.0,
         max_value=7.0,
         step=0.1,
@@ -255,133 +68,92 @@ def _render_radiacion(sf: Dict[str, Any]) -> None:
         key="sf_hsp",
     )
 
-    # ✅ Normalización: si NO está en override, no dejamos “hsp” manual pegado
-    sf["hsp"] = float(sf["hsp_kwh_m2_d"])
-    _sync_campos_normalizados(sf)
+
+def _render_geometria(sf: Dict[str, Any]) -> None:
+    st.markdown("#### Geometría del arreglo")
+
+    sf["tipo_superficie"] = st.selectbox(
+        "Tipo de superficie",
+        options=["Un plano (suelo/losa/estructura)", "Techo dos aguas"],
+        index=0 if sf.get("tipo_superficie") != "Techo dos aguas" else 1,
+    )
+
+    sf["azimut_deg"] = st.number_input(
+        "Azimut (°)",
+        min_value=0,
+        max_value=360,
+        value=int(sf.get("azimut_deg", 180)),
+    )
+
+    sf["inclinacion_deg"] = st.number_input(
+        "Inclinación (°)",
+        min_value=0,
+        max_value=45,
+        value=int(sf.get("inclinacion_deg", 15)),
+    )
 
 
 def _render_condiciones(sf: Dict[str, Any]) -> None:
     st.markdown("#### Condiciones de instalación")
 
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        opciones = _opciones_montaje()
-        actual = str(sf.get("tipo_montaje", opciones[0]))
-        idx = opciones.index(actual) if actual in opciones else 0
-        sf["tipo_montaje"] = st.selectbox("Tipo de montaje", options=opciones, index=idx, key="sf_montaje")
+    sf["sombras_pct"] = st.number_input(
+        "Sombras (%)",
+        min_value=0.0,
+        max_value=30.0,
+        step=1.0,
+        value=float(sf.get("sombras_pct", 0.0)),
+    )
 
-    with c2:
-        sombras = _opciones_sombras()
-        labels = [x["label"] for x in sombras]
-        pct = float(sf.get("sombras_pct", 0.0))
-        idx = next((i for i, it in enumerate(sombras) if float(it["pct"]) == pct), 0)
-        sel_label = st.selectbox("Sombras (pérdida)", options=labels, index=idx, key="sf_sombras")
-        sel = next(x for x in sombras if x["label"] == sel_label)
-        sf["sombras_pct"] = float(sel["pct"])
-
-    with c3:
-        sf["perdidas_sistema_pct"] = st.number_input(
-            "Pérdidas del sistema (%)",
-            min_value=5.0,
-            max_value=30.0,
-            step=0.5,
-            value=float(sf.get("perdidas_sistema_pct", 15.0)),
-            key="sf_perdidas",
-        )
-
-    _sync_campos_normalizados(sf)
+    sf["perdidas_sistema_pct"] = st.number_input(
+        "Pérdidas del sistema (%)",
+        min_value=5.0,
+        max_value=30.0,
+        step=0.5,
+        value=float(sf.get("perdidas_sistema_pct", 15.0)),
+    )
 
 
 def _render_resumen(sf: Dict[str, Any]) -> None:
     st.divider()
     st.markdown("#### Resumen (entradas)")
 
-    st.write(
-        f"• HSP: **{sf['hsp_kwh_m2_d']:.1f}** h/día "
-        f"{'(manual)' if sf.get('hsp_override', False) else '(estimado)'}"
-    )
-    st.write(f"• Superficie: **{sf['tipo_superficie']}**")
-    st.write(f"• Orientación: **{sf['orientacion_label']}** (azimut compat {int(sf['azimut_deg'])}°)")
-    if sf["tipo_superficie"] == "Techo dos aguas":
-        st.write(f"  - Agua A: {int(sf['azimut_a_deg'])}° | reparto {sf['reparto_pct_a']:.0f}%")
-        st.write(f"  - Agua B: {int(sf['azimut_b_deg'])}° | reparto {100.0 - sf['reparto_pct_a']:.0f}%")
-    st.write(f"• Inclinación: **{int(sf['inclinacion_deg'])}°**")
-    st.write(f"• Montaje: **{sf['tipo_montaje']}**")
-    st.write(f"• Sombras: **{sf['sombras_pct']:.0f}%**")
-    st.write(f"• Pérdidas del sistema: **{sf['perdidas_sistema_pct']:.1f}%**")
+    st.write(f"HSP: {sf['hsp_kwh_m2_d']:.1f} h/día")
+    st.write(f"Azimut: {sf['azimut_deg']}°")
+    st.write(f"Inclinación: {sf['inclinacion_deg']}°")
+    st.write(f"Sombras: {sf['sombras_pct']}%")
+    st.write(f"Pérdidas: {sf['perdidas_sistema_pct']}%")
 
 
 # ==========================================================
-# NUEVO: gráfica teórica (preview)
+# Preview energético (usa dominio energía)
 # ==========================================================
 
-def _render_grafica_teorica(ctx, sf: Dict[str, Any]) -> None:
+def _render_grafica_teorica(sf: Dict[str, Any]) -> None:
     st.divider()
     st.markdown("#### Gráfica teórica de generación FV (preview)")
 
     import matplotlib.pyplot as plt
 
-    # ✅ Fuente local (UI) para no depender de funciones privadas de paneles
-    def _hsp_honduras_conservador_12m() -> List[float]:
-        return [5.1, 5.4, 5.8, 5.6, 5.0, 4.5, 4.3, 4.4, 4.1, 4.0, 4.4, 4.7]
+    sf = normalizar_sistema_fv(sf)
+    preview = preview_generacion_anual(sf)
 
-    DIAS_MES = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-    MESES = list(range(1, 13))
+    gen = preview["gen_mes"]
+    total = preview["total_kwh_anual"]
+    pr = preview["pr"]
 
-    kwp = float(sf.get("kwp_preview", 5.0))
+    meses = list(range(1, 13))
 
-    c1, c2 = st.columns([1, 2])
-    with c1:
-        kwp = st.number_input(
-            "kWp DC para preview",
-            min_value=0.5,
-            max_value=100.0,
-            step=0.5,
-            value=float(kwp),
-            key="sf_kwp_preview",
-            help="Si todavía no seleccionaste equipos, usamos este valor provisional.",
-        )
-        sf["kwp_preview"] = float(kwp)
+    fig, ax = plt.subplots()
+    ax.bar(meses, gen)
+    ax.set_xticks(meses)
+    ax.set_xlabel("Mes")
+    ax.set_ylabel("Generación estimada (kWh/mes)")
+    ax.set_title(f"Estimación anual: {total:,.0f} kWh/año")
 
-        perd = float(sf.get("perdidas_sistema_pct", 15.0))
-        sh = float(sf.get("sombras_pct", 0.0))
+    st.pyplot(fig, clear_figure=True)
 
-        # PR simple de preview (UI). El PR “real” lo debe calcular el motor energético.
-        pr = (1.0 - perd / 100.0) * (1.0 - sh / 100.0)
-        pr = max(0.10, min(1.00, pr))
+    st.caption(f"Modelo simplificado preview. PR={pr:.3f}")
 
-        usar_hsp_manual = bool(sf.get("hsp_override", False))
-        hsp_manual = float(sf.get("hsp_kwh_m2_d", 5.2))
-
-        if usar_hsp_manual:
-            hsp_12m = [hsp_manual] * 12
-            st.caption("Preview usando HSP manual (mismo valor todos los meses).")
-        else:
-            hsp_12m = _hsp_honduras_conservador_12m()
-            st.caption("Preview usando HSP mensual (modelo Honduras conservador).")
-
-        gen = [float(kwp) * float(h) * float(pr) * float(d) for h, d in zip(hsp_12m, DIAS_MES)]
-        total = sum(gen)
-        gen_dia = [(g / d) if d else 0.0 for g, d in zip(gen, DIAS_MES)]
-
-    with c2:
-        fig, ax = plt.subplots()
-        ax.bar(MESES, gen)
-        ax.set_xticks(MESES)
-        ax.set_xlabel("Mes")
-        ax.set_ylabel("Generación estimada (kWh/mes)")
-        ax.set_title(f"Estimación anual: {total:,.0f} kWh/año")
-        st.pyplot(fig, clear_figure=True)
-
-    st.caption(
-        f"Modelo: kWh/mes = kWp·HSP_mes·PR·días. "
-        f"PR={pr:.3f} (pérdidas {perd:.1f}% + sombras {sh:.1f}%). "
-        "Preview teórico; no reemplaza simulación detallada."
-    )
-
-    with st.expander("Ver HSP y promedio diario (preview)", expanded=False):
-        st.write({"hsp_12m": hsp_12m})
-        st.write({"kwh_dia_prom_12m": [round(x, 2) for x in gen_dia]})
 
 # ==========================================================
 # API del paso
@@ -389,41 +161,24 @@ def _render_grafica_teorica(ctx, sf: Dict[str, Any]) -> None:
 
 def render(ctx) -> None:
     st.markdown("### Sistema Fotovoltaico")
+
     sf = _get_sf(ctx)
 
     _render_radiacion(sf)
     _render_geometria(sf)
     _render_condiciones(sf)
     _render_resumen(sf)
-    _render_grafica_teorica(ctx, sf)
-
-
-def _errores(sf: Dict[str, Any]) -> List[str]:
-    errs: List[str] = []
-
-    if float(sf.get("hsp_kwh_m2_d", 0.0)) <= 0:
-        errs.append("HSP debe ser mayor que 0.")
-
-    inc = int(sf.get("inclinacion_deg", 0))
-    if inc < 0 or inc > 45:
-        errs.append("Inclinación fuera de rango (0–45°).")
-
-    az = int(sf.get("azimut_deg", -1))
-    if az < 0 or az > 360:
-        errs.append("Azimut fuera de rango (0–360°).")
-
-    perd = float(sf.get("perdidas_sistema_pct", 0.0))
-    if perd < 5.0 or perd > 30.0:
-        errs.append("Pérdidas del sistema fuera de rango (5–30%).")
-
-    sh = float(sf.get("sombras_pct", 0.0))
-    if sh < 0.0 or sh > 30.0:
-        errs.append("Sombras fuera de rango (0–30%).")
-
-    return errs
+    _render_grafica_teorica(sf)
 
 
 def validar(ctx) -> Tuple[bool, List[str]]:
     sf = _get_sf(ctx)
-    errs = _errores(sf)
+    errs: List[str] = []
+
+    if float(sf.get("hsp_kwh_m2_d", 0)) <= 0:
+        errs.append("HSP debe ser mayor que 0.")
+
+    if int(sf.get("inclinacion_deg", 0)) < 0:
+        errs.append("Inclinación inválida.")
+
     return (len(errs) == 0), errs
