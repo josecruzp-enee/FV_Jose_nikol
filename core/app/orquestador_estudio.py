@@ -1,5 +1,13 @@
 from dataclasses import dataclass
-from typing import Any, Dict
+from typing import Any
+
+from core.contrato import (
+    ResultadoProyecto,
+    ResultadoSizing,
+    ResultadoStrings,
+    ResultadoNEC,
+    ResultadoFinanciero,
+)
 
 from .puertos import (
     PuertoSizing,
@@ -19,17 +27,22 @@ class DependenciasEstudio:
     finanzas: PuertoFinanzas
 
 
-def ejecutar_estudio(datos: Any, deps: DependenciasEstudio) -> Dict[str, Any]:
-    sizing = deps.sizing.ejecutar(datos)
-    strings = deps.paneles.ejecutar(datos, sizing)
-    energia = deps.energia.ejecutar(datos, sizing, strings)
-    nec = deps.nec.ejecutar(datos, sizing, strings)
-    finanzas = deps.finanzas.ejecutar(datos, sizing, energia)
+def ejecutar_estudio(datos: Any, deps: DependenciasEstudio) -> ResultadoProyecto:
+    sizing_raw = deps.sizing.ejecutar(datos)
+    strings_raw = deps.paneles.ejecutar(datos, sizing_raw)
+    energia_raw = deps.energia.ejecutar(datos, sizing_raw, strings_raw)
+    nec_raw = deps.nec.ejecutar(datos, sizing_raw, strings_raw)
+    finanzas_raw = deps.finanzas.ejecutar(datos, sizing_raw, energia_raw)
 
-    return {
-        "sizing": sizing,
-        "strings": strings,
-        "energia": energia,
-        "nec": nec,
-        "financiero": finanzas,
-    }
+    # 🔹 Conversión a contratos fuertes
+    sizing = ResultadoSizing(**sizing_raw)
+    strings = ResultadoStrings(**strings_raw)
+    nec = ResultadoNEC(**nec_raw)
+    financiero = ResultadoFinanciero(**finanzas_raw)
+
+    return ResultadoProyecto(
+        sizing=sizing,
+        strings=strings,
+        nec=nec,
+        financiero=financiero,
+    )
