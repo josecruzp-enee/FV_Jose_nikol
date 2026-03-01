@@ -7,14 +7,9 @@ from typing import Any, Dict, List, Tuple
 import streamlit as st
 
 from ui.state_helpers import is_result_stale
-from core.result_accessors import (
-    get_sizing,
-    get_kwp_dc,
-)
-from core.rutas import money_L, num
+from core.rutas import money_L, num, preparar_salida
 from reportes.generar_pdf_profesional import generar_pdf_profesional
 from reportes.imagenes import generar_artefactos
-from core.rutas import preparar_salida
 
 
 # ==========================================================
@@ -24,28 +19,33 @@ def _validar_ctx(ctx) -> bool:
     if getattr(ctx, "resultado_proyecto", None) is None:
         st.error("No hay resultados del estudio. Genere primero la ingeniería eléctrica (Paso 5).")
         return False
+
     if not hasattr(ctx, "datos_proyecto") or ctx.datos_proyecto is None:
         st.error("Falta ctx.datos_proyecto. En Paso 5 debes guardar Datosproyecto en ctx.datos_proyecto.")
         return False
+
     return True
 
 
 def _get_resultado_proyecto(ctx) -> dict:
-    rp = getattr(ctx, "resultado_proyecto", None) or {}
-    return rp if isinstance(rp, dict) else {}
+    rp = getattr(ctx, "resultado_proyecto", None)
+    if not isinstance(rp, dict):
+        raise ValueError("resultado_proyecto inválido.")
+    return rp
 
 
 # ==========================================================
 # KPIs
 # ==========================================================
 def _render_kpis(resultado_proyecto: dict) -> None:
-    tecnico = resultado_proyecto.get("tecnico") or {}
-    financiero = resultado_proyecto.get("financiero") or {}
+    tecnico = resultado_proyecto["tecnico"]
+    financiero = resultado_proyecto["financiero"]
 
-    sizing = tecnico.get("sizing") or {}
+    sizing = tecnico["sizing"]
 
-    kwp_dc = get_kwp_dc({"sizing": dict(sizing or {})})
+    kwp_dc = float(sizing["kwp_dc"])
     cuota = float(financiero.get("cuota_mensual") or 0.0)
+
     evaluacion = financiero.get("evaluacion") or {}
     estado = str(evaluacion.get("estado") or evaluacion.get("dictamen") or "N/D")
 
@@ -55,7 +55,7 @@ def _render_kpis(resultado_proyecto: dict) -> None:
     c3.metric("Estado", estado)
 
     if kwp_dc <= 0:
-        st.warning("Sizing incompleto.")
+        st.warning("Sizing inválido.")
 
 
 # ==========================================================
@@ -64,30 +64,25 @@ def _render_kpis(resultado_proyecto: dict) -> None:
 def _render_nec_resumen(resultado_proyecto: dict) -> None:
     st.subheader("Ingeniería eléctrica (NEC 2023)")
 
-    tecnico = resultado_proyecto.get("tecnico") or {}
-    nec = tecnico.get("nec") or {}
-
-    # wrapper nuevo
-    if isinstance(nec, dict) and "paq" in nec:
-        paq = nec.get("paq") or {}
-    else:
-        paq = nec or {}
+    nec = resultado_proyecto["tecnico"]["nec"]
+    paq = nec["paq"]
 
     if not paq:
         st.info("Sin paquete NEC disponible.")
         return
 
-    dc = paq.get("dc") or {}
-    ac = paq.get("ac") or {}
-    ocpd = paq.get("ocpd") or {}
+    dc = paq.get("dc", {})
+    ac = paq.get("ac", {})
+    ocpd = paq.get("ocpd", {})
+    resumen = paq.get("resumen_pdf", {})
 
-    resumen = paq.get("resumen_pdf") or {}
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Strings", "—")
-    c2.metric("I DC diseño", f"{resumen.get('idc_nom','—')} A")
-    c3.metric("I AC diseño", f"{resumen.get('iac_nom','—')} A")
-    br = (ocpd.get("breaker_ac") or {}) if isinstance(ocpd, dict) else {}
-    c4.metric("Breaker AC", f"{br.get('tamano_a','—')} A")
+    c1.metric("Strings", len(resultado_proyecto["tecnico"]["strings"]["strings"]))
+    c2.metric("I DC diseño", f"{resumen.get('idc_nom', '—')} A")
+    c3.metric("I AC diseño", f"{resumen.get('iac_nom', '—')} A")
+
+    br = ocpd.get("breaker_ac", {}) if isinstance(ocpd, dict) else {}
+    c4.metric("Breaker AC", f"{br.get('tamano_a', '—')} A")
 
     with st.expander("Ver paquete NEC (crudo)", expanded=False):
         st.json(paq)
@@ -99,27 +94,30 @@ def _render_nec_resumen(resultado_proyecto: dict) -> None:
 def _ui_boton_pdf(disabled: bool = False) -> bool:
     st.markdown("#### Generar propuesta (PDF)")
     col_a, col_b = st.columns([1, 2])
+
     with col_a:
         run = st.button("Generar PDF", type="primary", disabled=disabled)
+
     with col_b:
         st.caption("Genera charts, layout y PDF profesional usando los datos ya calculados.")
+
     return bool(run)
 
 
 def _ejecutar_pipeline_pdf(ctx, resultado_proyecto: dict) -> None:
     paths = preparar_salida("salidas")
-
     out_dir = paths.get("out_dir") or paths.get("base_dir") or "salidas"
 
     # Generar artefactos (charts + layout)
     try:
         arte = generar_artefactos(
-            res=resultado_proyecto,  # ahora pasamos estructura moderna
+            res=resultado_proyecto,
             out_dir=out_dir,
             vista_resultados={},
             dos_aguas=True,
         )
         paths.update(arte)
+
     except Exception as e:
         st.exception(e)
         st.warning("No se pudieron generar artefactos (charts/layout). Se intentará generar el PDF igual.")
@@ -163,7 +161,10 @@ def render(ctx) -> None:
 
     stale_inputs = is_result_stale(ctx)
     if stale_inputs:
-        st.warning("Los datos de entrada cambiaron después del cálculo del Paso 5. Regenera la ingeniería antes del PDF.")
+        st.warning(
+            "Los datos de entrada cambiaron después del cálculo del Paso 5. "
+            "Regenera la ingeniería antes del PDF."
+        )
 
     if not _ui_boton_pdf(disabled=stale_inputs):
         return
