@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from math import ceil
 from typing import Any, Dict, List, Optional
 
+from electrical.energia.irradiancia import hsp_12m_base
 from electrical.energia.orientacion import factor_orientacion_total
 
 
@@ -53,29 +54,16 @@ def _pct_factor(pct: float) -> float:
     return 1.0 - float(pct) / 100.0
 
 
-def _hsp_modelo_conservador_12m() -> List[float]:
-    return [5.1, 5.4, 5.8, 5.6, 5.0, 4.5, 4.3, 4.4, 4.1, 4.0, 4.4, 4.7]
-
-
 # ==========================================================
-# HSP
+# HSP (ÚNICO ORIGEN OFICIAL)
 # ==========================================================
 
-def _leer_hsp_12m(
-    *,
-    hsp_12m: Optional[List[float]] = None,
-    hsp: Optional[float] = None,
-    usar_modelo_conservador: bool = True,
-) -> List[float]:
-
-    if isinstance(hsp_12m, (list, tuple)) and len(hsp_12m) == 12:
-        return [_clamp(_safe_float(v, 4.5), 0.5, 9.0) for v in hsp_12m]
-
-    if usar_modelo_conservador:
-        return _hsp_modelo_conservador_12m()
-
-    h = _clamp(_safe_float(hsp, 4.5), 0.5, 9.0)
-    return [h] * 12
+def _leer_hsp_12m() -> List[float]:
+    """
+    Devuelve el perfil mensual oficial del sistema.
+    No permite overrides ni modelos alternos.
+    """
+    return hsp_12m_base()
 
 
 # ==========================================================
@@ -181,12 +169,8 @@ def calcular_panel_sizing(
     consumo_12m_kwh: List[float],
     cobertura_obj: float,
     panel_w: float,
-    modo: str = "auto",                       # 🔥 NUEVO
-    n_paneles_manual: Optional[int] = None,   # 🔥 NUEVO
-    hsp_12m: Optional[List[float]] = None,
-    hsp: Optional[float] = None,
-    usar_modelo_conservador: bool = True,
-    usar_modelo_hn_conservador: Optional[bool] = None,
+    modo: str = "auto",
+    n_paneles_manual: Optional[int] = None,
     sombras_pct: float = 0.0,
     perdidas_sistema_pct: Optional[float] = None,
     perdidas_detalle: Optional[Dict[str, float]] = None,
@@ -195,9 +179,6 @@ def calcular_panel_sizing(
 ) -> PanelSizingResultado:
 
     errores: List[str] = []
-
-    if usar_modelo_hn_conservador is not None:
-        usar_modelo_conservador = bool(usar_modelo_hn_conservador)
 
     if not isinstance(consumo_12m_kwh, list) or len(consumo_12m_kwh) != 12:
         errores.append("consumo_12m_kwh debe ser lista de 12 valores.")
@@ -215,12 +196,7 @@ def calcular_panel_sizing(
         panel_w_f = 0.0
         errores.append("panel_w inválido (no numérico).")
 
-    hsp12 = _leer_hsp_12m(
-        hsp_12m=hsp_12m,
-        hsp=hsp,
-        usar_modelo_conservador=usar_modelo_conservador,
-    )
-
+    hsp12 = _leer_hsp_12m()
     hsp_prom = sum(hsp12) / 12.0
 
     pr = _leer_pr(
