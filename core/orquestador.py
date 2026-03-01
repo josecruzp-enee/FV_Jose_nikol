@@ -7,13 +7,14 @@ from core.validacion import validar_entradas
 from core.sizing import calcular_sizing_unificado
 from core.finanzas_lp import ejecutar_finanzas
 from core.modelo import Datosproyecto
+
 from electrical.energia.parametros_fv import construir_parametros_fv
 from electrical.paneles.orquestador_paneles import ejecutar_paneles_desde_sizing
 from electrical.nec.orquestador_nec import ejecutar_nec
 
 
 # ==========================================================
-# Validación estructural interna (contrato fuerte)
+# Validaciones internas de contrato fuerte
 # ==========================================================
 
 def _validar_sizing(s: Dict[str, Any]) -> None:
@@ -31,6 +32,7 @@ def _validar_sizing(s: Dict[str, Any]) -> None:
 
     if float(s["pac_kw"]) <= 0:
         raise ValueError("Sizing inválido: pac_kw debe ser > 0.")
+
 
 def _validar_strings(st: Dict[str, Any]) -> None:
     if "ok" not in st:
@@ -55,7 +57,13 @@ def _validar_nec(nec: Dict[str, Any]) -> None:
 
 
 def _validar_financiero(fin: Dict[str, Any]) -> None:
-    required = ["capex_L", "tir", "van", "payback_simple"]
+    required = [
+        "capex_L",
+        "cuota_mensual",
+        "tabla_12m",
+        "evaluacion",
+    ]
+
     for k in required:
         if k not in fin:
             raise ValueError(f"ResultadoFinanciero incompleto. Falta clave: {k}")
@@ -64,6 +72,7 @@ def _validar_financiero(fin: Dict[str, Any]) -> None:
 # ==========================================================
 # Pipeline principal
 # ==========================================================
+
 def ejecutar_estudio(p: Datosproyecto) -> ResultadoProyecto:
     """
     Flujo lineal estricto:
@@ -92,14 +101,15 @@ def ejecutar_estudio(p: Datosproyecto) -> ResultadoProyecto:
     nec = ejecutar_nec(p, sizing, strings)
     _validar_nec(nec)
 
-    # 6️⃣ Finanzas (depende de sizing)
+    # 6️⃣ Finanzas (usa sizing + params_fv explícito)
     financiero = ejecutar_finanzas(
         datos=p,
         sizing=sizing,
+        params_fv=params_fv,
     )
     _validar_financiero(financiero)
 
-    # 7️⃣ Contrato final fuerte (sin fallback, sin legacy)
+    # 7️⃣ Contrato final fuerte
     resultado: ResultadoProyecto = {
         "tecnico": {
             "sizing": sizing,
