@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, Dict, List
 
 from .modelo import Datosproyecto
+from electrical.energia.contrato import EnergiaResultado
 
 
 # ==========================================================
@@ -46,46 +47,33 @@ def om_mensual(capex_L_: float, om_anual_pct: float) -> float:
 
 
 # ==========================================================
-# 🔵 SIMULACIÓN OPERATIVA MENSUAL
+# 🔵 SIMULACIÓN OPERATIVA MENSUAL (YA NO CALCULA ENERGÍA)
 # ==========================================================
 
 def simular_12_meses(
     *,
     consumo_12m: List[float],
-    factores_12m: List[float],
+    energia_fv_12m: List[float],
     tarifa_energia: float,
     cargos_fijos: float,
-    prod_base_kwh_kwp_mes: float,
-    kwp: float,
     cuota_mensual: float,
     om_mensual_val: float,
-    factor_orientacion: float,
 ) -> List[Dict[str, float]]:
 
     if len(consumo_12m) != 12:
         raise ValueError("consumo_12m debe tener 12 valores")
 
-    if len(factores_12m) != 12:
-        raise ValueError("factores_12m debe tener 12 valores")
-
-    if prod_base_kwh_kwp_mes <= 0:
-        raise ValueError("Producción base inválida (<=0)")
+    if len(energia_fv_12m) != 12:
+        raise ValueError("energia_fv_12m debe tener 12 valores")
 
     tabla: List[Dict[str, float]] = []
 
     for i in range(12):
 
         consumo = float(consumo_12m[i])
-        factor = float(factores_12m[i])
+        gen_real = float(energia_fv_12m[i])
 
-        gen_bruta = (
-            float(kwp)
-            * float(prod_base_kwh_kwp_mes)
-            * factor
-            * float(factor_orientacion)
-        )
-
-        gen_util = min(consumo, gen_bruta)
+        gen_util = min(consumo, gen_real)
         kwh_enee = consumo - gen_util
 
         factura_base = consumo * float(tarifa_energia) + float(cargos_fijos)
@@ -148,20 +136,23 @@ def _evaluacion_mensual(tabla: List[Dict[str, float]], cuota: float) -> Dict[str
 
 
 # ==========================================================
-# 🔵 ENTRYPOINT FINANCIERO (DETERMINISTA)
+# 🔵 ENTRYPOINT FINANCIERO (YA USA MOTOR ENERGÉTICO REAL)
 # ==========================================================
 
 def ejecutar_finanzas(
     *,
     datos: Datosproyecto,
     sizing: Dict[str, Any],
-    params_fv: Dict[str, Any],
+    energia: EnergiaResultado,
 ) -> Dict[str, Any]:
 
     kwp_dc = float(sizing.get("pdc_kw") or 0.0)
 
     if kwp_dc <= 0:
         raise ValueError("Sizing incompleto para finanzas.")
+
+    if not energia.ok:
+        raise ValueError("Motor energético inválido.")
 
     # CAPEX
     capex = calcular_capex_L(
@@ -180,22 +171,17 @@ def ejecutar_finanzas(
 
     om_mensual_val = om_mensual(capex, datos.om_anual_pct)
 
-    # Parámetros energéticos explícitos
-    prod_base = float(params_fv["prod_base_kwh_kwp_mes"])
-    factores_12m = params_fv["factores_fv_12m"]
-    factor_orientacion = float(params_fv.get("factor_orientacion", 1.0))
+    # Energía real mensual (ya física)
+    energia_fv_12m = energia.energia_util_12m
 
     # Simulación
     tabla_12m = simular_12_meses(
         consumo_12m=datos.consumo_12m,
-        factores_12m=factores_12m,
+        energia_fv_12m=energia_fv_12m,
         tarifa_energia=datos.tarifa_energia,
         cargos_fijos=datos.cargos_fijos,
-        prod_base_kwh_kwp_mes=prod_base,
-        kwp=kwp_dc,
         cuota_mensual=cuota,
         om_mensual_val=om_mensual_val,
-        factor_orientacion=factor_orientacion,
     )
 
     evaluacion = _evaluacion_mensual(tabla_12m, cuota)
