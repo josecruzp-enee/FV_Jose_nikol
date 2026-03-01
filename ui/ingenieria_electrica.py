@@ -165,6 +165,7 @@ def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
     dc = _asegurar_dict(ctx, "datos_cliente")
     c = _asegurar_dict(ctx, "consumo")
     sf = _asegurar_dict(ctx, "sistema_fv")
+    eq = _asegurar_dict(ctx, "equipos")  # 🔹 AGREGAR ESTO
 
     consumo_12m = c.get("kwh_12m", [0.0] * 12)
 
@@ -185,8 +186,10 @@ def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
         om_anual_pct=float(sf.get("om_anual_pct", 0.01)),
     )
 
+    # 🔹 Inyecciones adicionales
     setattr(p, "sistema_fv", dict(sf))
     setattr(p, "electrico", dict(_asegurar_dict(ctx, "electrico")))
+    setattr(p, "equipos", dict(eq))  # 🔥 ESTA ES LA CLAVE
 
     return p
 
