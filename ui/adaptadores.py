@@ -2,7 +2,7 @@
 from __future__ import annotations
 from typing import List
 
-from core.modelo import Datosproyecto
+from core.dominio.modelo import Datosproyecto
 
 
 def datosproyecto_desde_ctx(ctx) -> Datosproyecto:
