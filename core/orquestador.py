@@ -353,7 +353,7 @@ def _build_electrico_nec_safe(p: Datosproyecto, sizing: Dict[str, Any]) -> Dict[
         ee["strings"] = strings
 
         vdc_nom = (strings.get("recomendacion") or {}).get("vmp_string_v")
-        if vdc_nom:
+        if vdc_nom is not None:
             ee["vdc_nom"] = float(vdc_nom)
 
         # ------------------------------------------------
