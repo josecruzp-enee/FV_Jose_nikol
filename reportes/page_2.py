@@ -39,7 +39,8 @@ def build_page_2(resultado, datos, paths, pal, styles, content_w):
     # ===== CONTRATO FUERTE =====
     tecnico = resultado["tecnico"]
     sizing = tecnico["sizing"]
-    tabla_12m = sizing["energia_12m"]
+    financiero = resultado["financiero"]
+    tabla_12m = financiero.get("tabla_12m", [])
 
     header = ["Mes", "Consumo (kWh)", "FV útil (kWh)", "ENEE (kWh)"]
 
