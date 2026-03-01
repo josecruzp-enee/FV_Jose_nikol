@@ -6,7 +6,12 @@ from typing import Any, Dict, List, Optional, Union
 
 import matplotlib.pyplot as plt
 
-
+def _get_sizing_moderno(res: Dict[str, Any]) -> Dict[str, Any]:
+    if not isinstance(res, dict):
+        return {}
+    tecnico = res.get("tecnico") or {}
+    return tecnico.get("sizing") or {}
+    
 # -------------------------
 # Helpers básicos
 # -------------------------
@@ -91,7 +96,7 @@ def _fv_aprox_desde_panel_sizing(res: Dict[str, Any]) -> Dict[str, Any]:
         "fv_kwh_dia": [float]*12,
       }
     """
-    sizing = (res or {}).get("sizing") or {}
+    sizing = _get_sizing_moderno(res)
     if not isinstance(sizing, dict):
         return {}
 
