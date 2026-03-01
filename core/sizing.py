@@ -4,13 +4,17 @@ from __future__ import annotations
 from typing import Any, Dict, Optional
 
 from .modelo import Datosproyecto
+from core.consumo import (
+    consumo_anual_kwh,
+    consumo_promedio_mensual_kwh,
+    normalizar_cobertura,
+)
 
 from electrical.catalogos import get_panel
-from electrical.paneles.dimensionado_paneles import calcular_panel_sizing
-from core.consumo import consumo_anual_kwh, consumo_promedio_mensual_kwh, normalizar_cobertura
 from electrical.inversor.orquestador_inversor import (
     ejecutar_inversor_desde_sizing,
 )
+from electrical.paneles.dimensionado_paneles import calcular_panel_sizing
 
 
 # ==========================================================
@@ -49,7 +53,6 @@ def _inv_id(eq: Dict[str, Any]) -> Optional[str]:
 
 def calcular_sizing_unificado(
     p: Datosproyecto,
-    params_fv: Dict[str, Any],
 ) -> Dict[str, Any]:
 
     # =========================
@@ -65,7 +68,7 @@ def calcular_sizing_unificado(
     if panel_w <= 0:
         raise ValueError("Potencia de panel inválida")
 
-    dc_ac = _clamp(
+    dc_ac_obj = _clamp(
         float(eq.get("sobredimension_dc_ac", 1.20)),
         1.00,
         2.00,
@@ -84,22 +87,14 @@ def calcular_sizing_unificado(
     consumo_prom_val = consumo_promedio_mensual_kwh(consumo_12m_kwh)
 
     # =========================
-    # Parámetros FV
+    # Cobertura objetivo
     # =========================
-    cobertura_obj = _clamp(
-        float(params_fv.get("cobertura_obj", 1.0)),
-        0.0,
-        1.0,
+    cobertura_obj = normalizar_cobertura(
+        getattr(p, "cobertura_obj", 1.0)
     )
 
-    hsp_12m = params_fv.get("hsp_12m")
-    if hsp_12m is not None:
-        if not isinstance(hsp_12m, (list, tuple)) or len(hsp_12m) != 12:
-            raise ValueError("hsp_12m debe tener 12 valores")
-        hsp_12m = [float(x or 0.0) for x in hsp_12m]
-
     # =========================
-    # Modo dimensionamiento (desde UI)
+    # Modo dimensionamiento
     # =========================
     sf = getattr(p, "sistema_fv", {}) or {}
 
@@ -117,7 +112,7 @@ def calcular_sizing_unificado(
             raise ValueError("n_paneles_manual inválido en modo manual")
 
     # =========================
-    # PANEL SIZING (motor unificado)
+    # PANEL SIZING (SOLO PANEL)
     # =========================
     panel_sizing = calcular_panel_sizing(
         consumo_12m_kwh=consumo_12m_kwh,
@@ -125,14 +120,6 @@ def calcular_sizing_unificado(
         panel_w=panel_w,
         modo=modo_dimensionado,
         n_paneles_manual=n_paneles_manual,
-        hsp_12m=hsp_12m,
-        hsp=params_fv.get("hsp"),
-        usar_modelo_conservador=bool(params_fv.get("usar_modelo_conservador", False)),
-        usar_modelo_hn_conservador=bool(params_fv.get("usar_modelo_hn_conservador", False)),
-        sombras_pct=float(params_fv.get("sombras_pct", 0.0) or 0.0),
-        perdidas_sistema_pct=float(params_fv.get("perdidas_sistema_pct", 0.0) or 0.0),
-        perdidas_detalle=params_fv.get("perdidas_detalle"),
-        params_fv=params_fv,
     )
 
     if not panel_sizing.ok:
@@ -145,25 +132,16 @@ def calcular_sizing_unificado(
     if n_pan <= 0 or pdc <= 0:
         raise ValueError("Sizing resultó en sistema inválido")
 
-    prod_anual_kwp = float(
-        panel_sizing.meta.get("prod_anual_por_kwp_kwh", 0.0)
-    )
-
-    if prod_anual_kwp <= 0:
-        raise ValueError("Producción anual por kWp inválida")
-
     # =========================
-    # INVERSOR
+    # INVERSOR (por potencia DC)
     # =========================
     resultado_inv = ejecutar_inversor_desde_sizing(
-        consumo_anual_kwh=consumo_anual_val,
-        prod_anual_por_kwp_kwh=prod_anual_kwp,
-        cobertura_obj=cobertura_obj,
-        dc_ac_obj=dc_ac,
-        panel_w=panel_w,
         pdc_kw=pdc,
+        dc_ac_obj=dc_ac_obj,
         inversor_id_forzado=_inv_id(eq),
     )
+
+    pac_kw = float(resultado_inv["pac_kw"])
 
     # =========================
     # Salida técnica pura
@@ -176,8 +154,8 @@ def calcular_sizing_unificado(
         "n_paneles": n_pan,
         "pdc_kw": round(pdc, 3),
         "kwp_dc": round(pdc, 3),
-        "prod_anual_por_kwp_kwh": round(prod_anual_kwp, 2),
         "panel_id": _panel_id(eq),
         "inversor_id": resultado_inv["inversor_id"],
-        "pac_kw": resultado_inv["pac_kw"],
+        "pac_kw": pac_kw,
+        "dc_ac_ratio": round(pdc / pac_kw, 3) if pac_kw > 0 else 0.0,
     }
