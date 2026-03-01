@@ -21,14 +21,10 @@ def _defaults_sistema_fv() -> Dict[str, Any]:
         "hsp_override": False,
         "inclinacion_deg": 15,
         "azimut_deg": 180,
-        "orientacion_label": "Sur (óptimo)",
         "tipo_superficie": "Un plano (suelo/losa/estructura)",
         "azimut_a_deg": 90,
         "azimut_b_deg": 270,
         "reparto_pct_a": 50.0,
-        "tilt_modo": "auto",
-        "tilt_techo": "Techo residencial",
-        "tipo_montaje": "Techo ventilado",
         "sombras_pct": 0.0,
         "perdidas_sistema_pct": 15.0,
         "kwp_preview": 5.0,
@@ -78,18 +74,57 @@ def _render_geometria(sf: Dict[str, Any]) -> None:
         index=0 if sf.get("tipo_superficie") != "Techo dos aguas" else 1,
     )
 
-    sf["azimut_deg"] = st.number_input(
-        "Azimut (°)",
-        min_value=0,
-        max_value=360,
-        value=int(sf.get("azimut_deg", 180)),
-    )
+    # ------------------------------------------------------
+    # DOS AGUAS
+    # ------------------------------------------------------
+    if sf["tipo_superficie"] == "Techo dos aguas":
 
+        st.caption("Agua A")
+        sf["azimut_a_deg"] = st.number_input(
+            "Azimut agua A (°)",
+            min_value=0,
+            max_value=360,
+            value=int(sf.get("azimut_a_deg", 90)),
+            key="sf_azimut_a",
+        )
+
+        st.caption("Agua B")
+        sf["azimut_b_deg"] = st.number_input(
+            "Azimut agua B (°)",
+            min_value=0,
+            max_value=360,
+            value=int(sf.get("azimut_b_deg", 270)),
+            key="sf_azimut_b",
+        )
+
+        sf["reparto_pct_a"] = st.number_input(
+            "Reparto paneles agua A (%)",
+            min_value=0.0,
+            max_value=100.0,
+            step=5.0,
+            value=float(sf.get("reparto_pct_a", 50.0)),
+            key="sf_reparto_a",
+        )
+
+    # ------------------------------------------------------
+    # PLANO ÚNICO
+    # ------------------------------------------------------
+    else:
+        sf["azimut_deg"] = st.number_input(
+            "Azimut (°)",
+            min_value=0,
+            max_value=360,
+            value=int(sf.get("azimut_deg", 180)),
+            key="sf_azimut",
+        )
+
+    # Inclinación común
     sf["inclinacion_deg"] = st.number_input(
         "Inclinación (°)",
         min_value=0,
         max_value=45,
         value=int(sf.get("inclinacion_deg", 15)),
+        key="sf_inclinacion",
     )
 
 
@@ -102,6 +137,7 @@ def _render_condiciones(sf: Dict[str, Any]) -> None:
         max_value=30.0,
         step=1.0,
         value=float(sf.get("sombras_pct", 0.0)),
+        key="sf_sombras",
     )
 
     sf["perdidas_sistema_pct"] = st.number_input(
@@ -110,6 +146,7 @@ def _render_condiciones(sf: Dict[str, Any]) -> None:
         max_value=30.0,
         step=0.5,
         value=float(sf.get("perdidas_sistema_pct", 15.0)),
+        key="sf_perdidas",
     )
 
 
@@ -118,14 +155,22 @@ def _render_resumen(sf: Dict[str, Any]) -> None:
     st.markdown("#### Resumen (entradas)")
 
     st.write(f"HSP: {sf['hsp_kwh_m2_d']:.1f} h/día")
-    st.write(f"Azimut: {sf['azimut_deg']}°")
+    st.write(f"Tipo superficie: {sf['tipo_superficie']}")
+
+    if sf["tipo_superficie"] == "Techo dos aguas":
+        st.write(f"Agua A: {sf['azimut_a_deg']}°")
+        st.write(f"Agua B: {sf['azimut_b_deg']}°")
+        st.write(f"Reparto A: {sf['reparto_pct_a']}%")
+    else:
+        st.write(f"Azimut: {sf['azimut_deg']}°")
+
     st.write(f"Inclinación: {sf['inclinacion_deg']}°")
     st.write(f"Sombras: {sf['sombras_pct']}%")
     st.write(f"Pérdidas: {sf['perdidas_sistema_pct']}%")
 
 
 # ==========================================================
-# Preview energético (usa dominio energía)
+# Preview energético
 # ==========================================================
 
 def _render_grafica_teorica(sf: Dict[str, Any]) -> None:
