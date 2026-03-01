@@ -2,78 +2,76 @@ from __future__ import annotations
 from typing import Dict, Any, Optional
 
 from electrical.catalogos import get_inversor, ids_inversores
-from electrical.inversor.sizing_inversor import (
-    SizingInput,
-    ejecutar_sizing,
-    InversorCandidato,
-)
 
 
 # ==========================================================
-# Adaptador: Modelo fuerte → Modelo de cálculo
+# API pública — Selección por potencia DC
 # ==========================================================
-def _build_candidatos() -> list[InversorCandidato]:
-    candidatos: list[InversorCandidato] = []
 
-    for iid in ids_inversores():
-        inv = get_inversor(iid)
-
-        candidatos.append(
-            InversorCandidato(
-                id=iid,
-                pac_kw=float(inv.kw_ac),          # dominio → cálculo
-                n_mppt=int(inv.n_mppt),
-                mppt_min_v=float(inv.vmppt_min),
-                mppt_max_v=float(inv.vmppt_max),
-                vdc_max_v=float(inv.vdc_max_v),
-            )
-        )
-
-    return candidatos
-
-
-# ==========================================================
-# API pública usada por core/sizing.py
-# ==========================================================
 def ejecutar_inversor_desde_sizing(
     *,
-    consumo_anual_kwh: float,
-    prod_anual_por_kwp_kwh: float,
-    cobertura_obj: float,
-    dc_ac_obj: float,
-    panel_w: float,
     pdc_kw: float,
+    dc_ac_obj: float,
     inversor_id_forzado: Optional[str] = None,
 ) -> Dict[str, Any]:
 
-    inp = SizingInput(
-        consumo_anual_kwh=consumo_anual_kwh,
-        produccion_anual_por_kwp_kwh=prod_anual_por_kwp_kwh,
-        cobertura_obj=cobertura_obj,
-        dc_ac_obj=dc_ac_obj,
-        pmax_panel_w=panel_w,
-        pdc_obj_kw=pdc_kw,
-    )
+    if pdc_kw <= 0:
+        raise ValueError("pdc_kw inválido para selección de inversor")
 
-    resultado = ejecutar_sizing(
-        inp=inp,
-        inversores_catalogo=_build_candidatos(),
-    )
+    if dc_ac_obj <= 0:
+        raise ValueError("dc_ac_obj inválido")
 
-    inv_id_rec = resultado.get("inversor_recomendado")
-    inv_id_final = inversor_id_forzado or inv_id_rec
+    # ------------------------------------------------------
+    # Potencia AC objetivo
+    # ------------------------------------------------------
+    pac_obj_kw = pdc_kw / dc_ac_obj
 
-    if not inv_id_final:
-        raise ValueError("No se pudo determinar inversor recomendado")
+    # ------------------------------------------------------
+    # Si hay inversor forzado
+    # ------------------------------------------------------
+    if inversor_id_forzado:
+        inv = get_inversor(inversor_id_forzado)
+        if inv is None:
+            raise ValueError("Inversor forzado no encontrado")
 
-    inv = get_inversor(inv_id_final)
+        return {
+            "inversor_id": inversor_id_forzado,
+            "pac_kw": float(inv.kw_ac),
+            "pac_obj_kw": pac_obj_kw,
+        }
 
-    pac_kw = float(inv.kw_ac)
-    if pac_kw <= 0:
-        raise ValueError("Potencia AC inválida en inversor")
+    # ------------------------------------------------------
+    # Selección automática
+    # ------------------------------------------------------
+    mejor_id = None
+    mejor_pac = None
+
+    for iid in ids_inversores():
+        inv = get_inversor(iid)
+        pac = float(inv.kw_ac)
+
+        # buscamos el más cercano >= pac_obj
+        if pac >= pac_obj_kw:
+            if mejor_pac is None or pac < mejor_pac:
+                mejor_id = iid
+                mejor_pac = pac
+
+    # Si ninguno cumple >= objetivo, tomar el mayor disponible
+    if mejor_id is None:
+        max_pac = -1.0
+        for iid in ids_inversores():
+            inv = get_inversor(iid)
+            pac = float(inv.kw_ac)
+            if pac > max_pac:
+                max_pac = pac
+                mejor_id = iid
+                mejor_pac = pac
+
+    if mejor_id is None:
+        raise ValueError("No hay inversores disponibles en catálogo")
 
     return {
-        "inversor_id": inv_id_final,
-        "pac_kw": pac_kw,
-        "meta": resultado.get("inversor_recomendado_meta", {}),
+        "inversor_id": mejor_id,
+        "pac_kw": float(mejor_pac),
+        "pac_obj_kw": pac_obj_kw,
     }
