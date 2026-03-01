@@ -292,34 +292,35 @@ def _mostrar_nec(pkg: dict):
 
     tabs = st.tabs(["⚡ DC", "🔌 AC", "🛡️ Protecciones", "🧵 Conductores", "🔎 Datos crudos"])
 
+    
+
     with tabs[0]:
         st.markdown("### Corrientes DC")
+
         c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Strings", _fmt(dc.get("n_strings")))
-        c2.metric("I string oper.", _fmt(dc.get("i_string_oper_a"), "A"))
-        c3.metric("I diseño", _fmt(dc.get("i_array_design_a"), "A"))
-        c4.metric("Voc frío string", _fmt(dc.get("voc_frio_string_v"), "V"))
+        c1.metric("Vdc nominal", _fmt(dc.get("vdc_nom"), "V"))
+        c2.metric("Idc nominal", _fmt(dc.get("idc_nom"), "A"))
+        c3.metric("Potencia DC", _fmt(dc.get("potencia_dc_w"), "W"))
+        c4.metric("—", "")
 
         df_dc = pd.DataFrame(
             [
-                ("I string operativa", _fmt(dc.get("i_string_oper_a"), "A")),
-                ("I string máxima", _fmt(dc.get("i_string_max_a"), "A")),
-                ("I array Isc", _fmt(dc.get("i_array_isc_a"), "A")),
-                ("I array diseño", _fmt(dc.get("i_array_design_a"), "A")),
-                ("Vmp string", _fmt(dc.get("vmp_string_v"), "V")),
-                ("Voc frío string", _fmt(dc.get("voc_frio_string_v"), "V")),
+                ("Vdc nominal", _fmt(dc.get("vdc_nom"), "V")),
+                ("Idc nominal", _fmt(dc.get("idc_nom"), "A")),
+                ("Potencia DC", _fmt(dc.get("potencia_dc_w"), "W")),
             ],
-            columns=["Parámetro", "Valor"],
-        )
-        try:
-            st.dataframe(df_dc, use_container_width=True, hide_index=True)
-        except TypeError:
-            st.dataframe(df_dc, use_container_width=True)
+        columns=["Parámetro", "Valor"],
+    )
 
-        cfg = dc.get("config_strings", {}) or {}
-        if cfg:
-            st.markdown("#### Configuración de strings")
+    try:
+        st.dataframe(df_dc, use_container_width=True, hide_index=True)
+    except TypeError:
+        st.dataframe(df_dc, use_container_width=True)
 
+    _render_warnings(dc.get("warnings", []) or [])
+
+
+    
             # ---------------------------------------------------------
             # FIX UI: evitar "Módulos por string = 0"
             # Si el motor NEC no llenó modulos_por_string, lo inferimos
