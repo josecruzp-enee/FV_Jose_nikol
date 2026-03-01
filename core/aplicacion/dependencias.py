@@ -15,7 +15,7 @@ from .puertos import (
 )
 
 from .orquestador_estudio import DependenciasEstudio
-
+from dataclasses import asdict
 
 # ==========================================================
 # ADAPTADORES
@@ -23,7 +23,8 @@ from .orquestador_estudio import DependenciasEstudio
 
 class SizingAdapter(PuertoSizing):
     def ejecutar(self, datos):
-        return calcular_sizing_unificado(datos)
+        resultado = calcular_sizing_unificado(datos)
+        return asdict(resultado)
 
 
 class PanelesAdapter(PuertoPaneles):
