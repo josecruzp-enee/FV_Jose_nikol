@@ -8,8 +8,8 @@ import pandas as pd
 import streamlit as st
 
 from core.modelo import Datosproyecto
-from core.app.orquestador_estudio import ejecutar_estudio
-from core.app.dependencias import construir_dependencias
+from core.aplicacion.orquestador_estudio import ejecutar_estudio
+from core.aplicacion.dependencias import construir_dependencias
 from ui.validaciones_ui import campos_faltantes_para_paso5
 from ui.state_helpers import ensure_dict, merge_defaults, save_result_fingerprint
 
