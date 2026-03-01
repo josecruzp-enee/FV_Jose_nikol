@@ -81,11 +81,12 @@ def _render_nec_resumen(resultado_proyecto: dict) -> None:
     ac = paq.get("ac") or {}
     ocpd = paq.get("ocpd") or {}
 
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Strings", str(dc.get("n_strings", "—")))
-    c2.metric("I DC diseño", f"{dc.get('i_array_design_a','—')} A")
-    c3.metric("I AC diseño", f"{ac.get('i_ac_design_a','—')} A")
-    br = (ocpd.get("breaker_ac") or {})
+    resumen = paq.get("resumen_pdf") or {}
+
+    c1.metric("Strings", "—")
+    c2.metric("I DC diseño", f"{resumen.get('idc_nom','—')} A")
+    c3.metric("I AC diseño", f"{resumen.get('iac_nom','—')} A")
+    br = (ocpd.get("breaker_ac") or {}) if isinstance(ocpd, dict) else {}
     c4.metric("Breaker AC", f"{br.get('tamano_a','—')} A")
 
     with st.expander("Ver paquete NEC (crudo)", expanded=False):
