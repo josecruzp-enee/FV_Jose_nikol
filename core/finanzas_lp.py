@@ -1,10 +1,9 @@
-# core/finanzas_lp.py
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
 from .modelo import Datosproyecto
-from .simular_12_meses import simular_12_meses
+from .simulacion_12m import simular_12_meses
 
 
 # ==========================================================
@@ -45,56 +44,6 @@ def calcular_cuota_mensual(
 
 def om_mensual(capex_L_: float, om_anual_pct: float) -> float:
     return (float(om_anual_pct) * float(capex_L_)) / 12.0
-
-
-# ==========================================================
-# 🔵 Utilidades matemáticas base
-# ==========================================================
-
-def _npv(rate: float, cashflows: List[float]) -> float:
-    return sum(cf / ((1.0 + rate) ** t) for t, cf in enumerate(cashflows))
-
-
-def _irr_bisection(cashflows: List[float]) -> Optional[float]:
-    low, high = -0.9, 2.0
-    f_low = _npv(low, cashflows)
-    f_high = _npv(high, cashflows)
-
-    if f_low * f_high > 0:
-        high = 5.0
-        f_high = _npv(high, cashflows)
-        if f_low * f_high > 0:
-            return None
-
-    for _ in range(300):
-        mid = (low + high) / 2
-        f_mid = _npv(mid, cashflows)
-
-        if abs(f_mid) < 1e-7:
-            return mid
-
-        if f_low * f_mid > 0:
-            low, f_low = mid, f_mid
-        else:
-            high, f_high = mid, f_mid
-
-    return (low + high) / 2
-
-
-def _payback_descontado(rate: float, cashflows: List[float]) -> Optional[float]:
-    acumulado = 0.0
-
-    for t, cf in enumerate(cashflows):
-        pv = cf / ((1.0 + rate) ** t)
-        anterior = acumulado
-        acumulado += pv
-
-        if t > 0 and acumulado >= 0:
-            delta = acumulado - anterior
-            frac = (0 - anterior) / delta if abs(delta) > 1e-12 else 0.0
-            return (t - 1) + frac
-
-    return None
 
 
 # ==========================================================
@@ -142,12 +91,6 @@ def ejecutar_finanzas(
     *,
     datos: Datosproyecto,
     sizing: Dict[str, Any],
-    horizonte_anios: int = 15,
-    crecimiento_tarifa_anual: float = 0.06,
-    degradacion_fv_anual: float = 0.006,
-    tasa_descuento: float = 0.14,
-    reemplazo_inversor_anio: Optional[int] = 12,
-    reemplazo_inversor_pct_capex: float = 0.15,
 ) -> Dict[str, Any]:
 
     kwp_dc = float(sizing.get("pdc_kw") or 0.0)
@@ -155,12 +98,19 @@ def ejecutar_finanzas(
     if kwp_dc <= 0:
         raise ValueError("Sizing incompleto para finanzas.")
 
-    # 🔵 CAPEX ahora se calcula aquí
+    # --------------------------
+    # CAPEX
+    # --------------------------
+
     capex = calcular_capex_L(
         pdc_kw=kwp_dc,
         costo_usd_kwp=datos.costo_usd_kwp,
         tcambio=datos.tcambio,
     )
+
+    # --------------------------
+    # Cuota
+    # --------------------------
 
     cuota = calcular_cuota_mensual(
         capex_L_=capex,
@@ -169,7 +119,40 @@ def ejecutar_finanzas(
         pct_fin=datos.porcentaje_financiado,
     )
 
-    tabla_12m = simular_12_meses(datos, kwp_dc, cuota, capex)
+    om_mensual_val = om_mensual(
+        capex_L_=capex,
+        om_anual_pct=datos.om_anual_pct,
+    )
+
+    # --------------------------
+    # Parámetros energéticos (desde sistema_fv ya validado)
+    # --------------------------
+
+    sfv = getattr(datos, "sistema_fv", {}) or {}
+
+    prod_base = float(sfv.get("prod_base_kwh_kwp_mes") or 0.0)
+    factores_12m = sfv.get("factores_fv_12m") or [1.0] * 12
+    factor_orientacion = float(sfv.get("factor_orientacion") or 1.0)
+
+    # --------------------------
+    # Simulación mensual pura
+    # --------------------------
+
+    tabla_12m = simular_12_meses(
+        consumo_12m=datos.consumo_12m,
+        factores_12m=factores_12m,
+        tarifa_energia=datos.tarifa_energia,
+        cargos_fijos=datos.cargos_fijos,
+        prod_base_kwh_kwp_mes=prod_base,
+        kwp=kwp_dc,
+        cuota_mensual=cuota,
+        om_mensual_val=om_mensual_val,
+        factor_orientacion=factor_orientacion,
+    )
+
+    # --------------------------
+    # Evaluación
+    # --------------------------
 
     evaluacion = _evaluacion_mensual(tabla_12m, cuota)
 
