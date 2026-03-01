@@ -113,8 +113,14 @@ def _leer_pr(
 
 
 # Calcula kWp requerido anual para producir kWh objetivo, usando HSP mensual y PR.
-def _kwp_req_anual(kwh_obj_anual: float, hsp_12m: List[float], pr: float) -> float:
+def _kwp_req_anual(
+    kwh_obj_anual: float,
+    hsp_12m: List[float],
+    pr: float,
+) -> tuple[float, float]:
+
     prod_anual_por_kwp = 0.0
+
     for hsp_dia, dias in zip(hsp_12m, _DIAS_MES):
         prod_anual_por_kwp += float(hsp_dia) * float(pr) * float(dias)
 
@@ -124,7 +130,9 @@ def _kwp_req_anual(kwh_obj_anual: float, hsp_12m: List[float], pr: float) -> flo
     if float(kwh_obj_anual) <= 0:
         raise ValueError("kwh_obj_anual inválido (<=0).")
 
-    return float(kwh_obj_anual) / prod_anual_por_kwp
+    kwp_req = float(kwh_obj_anual) / prod_anual_por_kwp
+
+    return kwp_req, prod_anual_por_kwp
 
 
 # Convierte kWp requerido a número de paneles por potencia del panel (W).
