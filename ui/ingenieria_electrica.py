@@ -217,21 +217,25 @@ def _ui_inputs_electricos(e: dict):
 # CORE — EJECUCIÓN CENTRAL
 # ==========================================================
 def _ejecutar_core(ctx) -> Dict[str, Any]:
+    import streamlit as st
     from core.orquestador import ejecutar_estudio
 
     datos = _datosproyecto_desde_ctx(ctx)
     ctx.datos_proyecto = datos
 
     resultado_proyecto = ejecutar_estudio(datos)
+
+    # 🔹 Persistencia real en Streamlit
+    st.session_state["resultado_proyecto"] = resultado_proyecto
+    st.session_state["resultado_core"] = resultado_proyecto.get("_compat", {}) or {}
+    st.session_state["resultado_electrico"] = resultado_proyecto.get("electrico_nec") or {}
+
+    # 🔹 Mantén compatibilidad con ctx 
     ctx.resultado_proyecto = resultado_proyecto
-
-    ctx.resultado_core = resultado_proyecto.get("_compat", {}) or {}
-
-    ctx.resultado_electrico = resultado_proyecto.get("electrico_nec") or {}
+    ctx.resultado_core = st.session_state["resultado_core"]
+    ctx.resultado_electrico = st.session_state["resultado_electrico"]
 
     return resultado_proyecto
-
-
 # ==========================================================
 # Validación string catálogo
 # ==========================================================
