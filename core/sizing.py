@@ -107,37 +107,33 @@ def _pac_kw_desde_reco(meta: Dict[str, Any], inv_id: str) -> float:
 # ==========================================================
 # API pública
 # ==========================================================
-def calcular_sizing_unificado(p: Datosproyecto) -> Dict[str, Any]:
+def calcular_sizing_unificado(
+    p: Datosproyecto,
+    params_fv: Dict[str, Any],
+) -> Dict[str, Any]:
 
     eq = _leer_equipos(p)
     dc_ac = _dc_ac_obj(eq)
 
     panel = get_panel(_panel_id(eq))
 
-    sfv = getattr(p, "sistema_fv", None) or {}
-    if not isinstance(sfv, dict):
-        sfv = {}
-
+    # =========================
+    # Consumo
+    # =========================
     consumo_12m_kwh = list(getattr(p, "consumo_12m", None) or [])
     if len(consumo_12m_kwh) != 12:
         consumo_12m_kwh = (consumo_12m_kwh + [0.0] * 12)[:12]
     consumo_12m_kwh = [float(x or 0.0) for x in consumo_12m_kwh]
 
-    cobertura_obj = sfv.get("cobertura_obj", sfv.get("cobertura", 1.0))
-    try:
-        cobertura_obj = float(cobertura_obj)
-    except Exception:
-        cobertura_obj = 1.0
-    if cobertura_obj > 1.0:
-        cobertura_obj /= 100.0
+    # =========================
+    # Parámetros FV explícitos
+    # =========================
+    cobertura_obj = float(params_fv.get("cobertura_obj", 1.0))
     cobertura_obj = max(0.0, min(1.0, cobertura_obj))
 
-    hsp_12m = sfv.get("hsp_12m", None)
+    hsp_12m = params_fv.get("hsp_12m")
     if isinstance(hsp_12m, (list, tuple)) and len(hsp_12m) == 12:
-        try:
-            hsp_12m = [float(x or 0.0) for x in hsp_12m]
-        except Exception:
-            hsp_12m = None
+        hsp_12m = [float(x or 0.0) for x in hsp_12m]
     else:
         hsp_12m = None
 
@@ -151,12 +147,12 @@ def calcular_sizing_unificado(p: Datosproyecto) -> Dict[str, Any]:
         cobertura_obj=cobertura_obj,
         panel_w=panel_w,
         hsp_12m=hsp_12m,
-        hsp=sfv.get("hsp"),
-        usar_modelo_conservador=bool(sfv.get("usar_modelo_conservador", False)),
-        usar_modelo_hn_conservador=bool(sfv.get("usar_modelo_hn_conservador", False)),
-        sombras_pct=float(sfv.get("sombras_pct", 0.0) or 0.0),
-        perdidas_sistema_pct=float(sfv.get("perdidas_sistema_pct", 0.0) or 0.0),
-        perdidas_detalle=sfv.get("perdidas_detalle"),
+        hsp=params_fv.get("hsp"),
+        usar_modelo_conservador=bool(params_fv.get("usar_modelo_conservador", False)),
+        usar_modelo_hn_conservador=bool(params_fv.get("usar_modelo_hn_conservador", False)),
+        sombras_pct=float(params_fv.get("sombras_pct", 0.0) or 0.0),
+        perdidas_sistema_pct=float(params_fv.get("perdidas_sistema_pct", 0.0) or 0.0),
+        perdidas_detalle=params_fv.get("perdidas_detalle"),
     )
 
     if not panel_sizing.ok:
@@ -166,7 +162,9 @@ def calcular_sizing_unificado(p: Datosproyecto) -> Dict[str, Any]:
     n_pan = int(panel_sizing.n_paneles or 0)
     pdc = float(panel_sizing.pdc_kw or 0.0)
 
+    # =========================
     # Producción anual estimada
+    # =========================
     prod_anual_kwp = 0.0
     try:
         dias_mes = list((panel_sizing.meta or {}).get("dias_mes", []))
