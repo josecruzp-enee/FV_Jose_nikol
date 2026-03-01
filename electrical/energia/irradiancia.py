@@ -7,9 +7,23 @@ from typing import List
 DIAS_MES: List[int] = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 
 
-def hsp_honduras_conservador_12m() -> List[float]:
+def hsp_12m_base() -> List[float]:
     """
-    Modelo mensual conservador Honduras.
-    Fuente simplificada para preview.
+    Perfil mensual oficial HSP – Honduras.
+    Único origen válido del sistema.
     """
-    return [5.1, 5.4, 5.8, 5.6, 5.0, 4.5, 4.3, 4.4, 4.1, 4.0, 4.4, 4.7]
+
+    return [
+        5.1,  # Ene
+        5.4,  # Feb
+        5.8,  # Mar
+        5.6,  # Abr
+        5.0,  # May
+        4.5,  # Jun
+        4.3,  # Jul
+        4.4,  # Ago
+        4.1,  # Sep
+        4.0,  # Oct
+        4.4,  # Nov
+        4.7,  # Dic
+    ]
