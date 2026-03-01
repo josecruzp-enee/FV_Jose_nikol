@@ -4,16 +4,21 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional
 
 from .modelo import Datosproyecto
-from .simular_12_meses import capex_L, consumo_anual, consumo_promedio
+from .simular_12_meses import capex_L, consumo_anual
 
 from electrical.catalogos import get_panel, get_inversor, catalogo_inversores
-from electrical.inversor.sizing_inversor import SizingInput, InversorCandidato, ejecutar_sizing
+from electrical.inversor.sizing_inversor import (
+    SizingInput,
+    InversorCandidato,
+    ejecutar_sizing,
+)
 from electrical.paneles.dimensionado_paneles import calcular_panel_sizing
 
 
 # ==========================================================
-# Utilitarios
+# Utilitarios seguros
 # ==========================================================
+
 def _safe_float(x: Any, default: float) -> float:
     try:
         return float(x)
@@ -26,11 +31,14 @@ def _clamp(x: float, lo: float, hi: float) -> float:
 
 
 # ==========================================================
-# Lectura Paso 4
+# Lectura equipos
 # ==========================================================
+
 def _leer_equipos(p: Datosproyecto) -> Dict[str, Any]:
     eq = getattr(p, "equipos", None) or {}
-    return eq if isinstance(eq, dict) else {}
+    if not isinstance(eq, dict):
+        raise ValueError("Formato inválido en p.equipos")
+    return eq
 
 
 def _dc_ac_obj(eq: Dict[str, Any]) -> float:
@@ -38,24 +46,24 @@ def _dc_ac_obj(eq: Dict[str, Any]) -> float:
 
 
 def _panel_id(eq: Dict[str, Any]) -> str:
-    return str(eq.get("panel_id") or "panel_550w")
+    pid = str(eq.get("panel_id") or "").strip()
+    if not pid:
+        raise ValueError("panel_id no definido en equipos")
+    return pid
 
 
 def _inv_id(eq: Dict[str, Any]) -> Optional[str]:
     v = eq.get("inversor_id")
-    return None if (v is None or str(v).strip() == "") else str(v)
-
-
-# ==========================================================
-# Consumo promedio
-# ==========================================================
-def _kwh_mes_prom(p: Datosproyecto) -> float:
-    return float(consumo_promedio(p.consumo_12m))
+    if v is None:
+        return None
+    v = str(v).strip()
+    return v if v else None
 
 
 # ==========================================================
 # Inversores candidatos
 # ==========================================================
+
 def _candidatos_inversores() -> List[InversorCandidato]:
     out: List[InversorCandidato] = []
     for i in (catalogo_inversores() or []):
@@ -69,6 +77,8 @@ def _candidatos_inversores() -> List[InversorCandidato]:
                 vdc_max_v=float(i.get("vdc_max", i.get("vmax_dc_v"))),
             )
         )
+    if not out:
+        raise ValueError("Catálogo de inversores vacío")
     return out
 
 
@@ -78,7 +88,7 @@ def _recomendar_inversor(
     panel_w: float,
     dc_ac: float,
     prod_anual_kwp: float,
-    pdc_obj_kw: Optional[float] = None,
+    pdc_obj_kw: Optional[float],
 ) -> Dict[str, Any]:
 
     inp = SizingInput(
@@ -93,10 +103,6 @@ def _recomendar_inversor(
     return ejecutar_sizing(inp=inp, inversores_catalogo=_candidatos_inversores())
 
 
-def _inv_final(eq: Dict[str, Any], inv_rec: Optional[str]) -> str:
-    return str(_inv_id(eq) or inv_rec or "inv_5kw_2mppt")
-
-
 def _pac_kw_desde_reco(meta: Dict[str, Any], inv_id: str) -> float:
     for c in (meta.get("candidatos") or []):
         if str(c.get("id")) == str(inv_id):
@@ -107,22 +113,33 @@ def _pac_kw_desde_reco(meta: Dict[str, Any], inv_id: str) -> float:
 # ==========================================================
 # API pública
 # ==========================================================
+
 def calcular_sizing_unificado(
     p: Datosproyecto,
     params_fv: Dict[str, Any],
 ) -> Dict[str, Any]:
 
+    # =========================
+    # Equipos
+    # =========================
     eq = _leer_equipos(p)
     dc_ac = _dc_ac_obj(eq)
 
     panel = get_panel(_panel_id(eq))
+    if panel is None:
+        raise ValueError("Panel no encontrado en catálogo")
+
+    panel_w = float(getattr(panel, "w", 0.0))
+    if panel_w <= 0:
+        raise ValueError("Potencia de panel inválida")
 
     # =========================
     # Consumo
     # =========================
     consumo_12m_kwh = list(getattr(p, "consumo_12m", None) or [])
     if len(consumo_12m_kwh) != 12:
-        consumo_12m_kwh = (consumo_12m_kwh + [0.0] * 12)[:12]
+        raise ValueError("consumo_12m debe contener 12 valores")
+
     consumo_12m_kwh = [float(x or 0.0) for x in consumo_12m_kwh]
 
     # =========================
@@ -132,12 +149,10 @@ def calcular_sizing_unificado(
     cobertura_obj = max(0.0, min(1.0, cobertura_obj))
 
     hsp_12m = params_fv.get("hsp_12m")
-    if isinstance(hsp_12m, (list, tuple)) and len(hsp_12m) == 12:
+    if hsp_12m is not None:
+        if not isinstance(hsp_12m, (list, tuple)) or len(hsp_12m) != 12:
+            raise ValueError("hsp_12m debe tener 12 valores")
         hsp_12m = [float(x or 0.0) for x in hsp_12m]
-    else:
-        hsp_12m = None
-
-    panel_w = float(getattr(panel, "w", 550.0))
 
     # =========================
     # PANEL SIZING
@@ -156,22 +171,21 @@ def calcular_sizing_unificado(
     )
 
     if not panel_sizing.ok:
-        return {}
+        raise ValueError(f"Panel sizing inválido: {panel_sizing.errores}")
 
-    kwp_req = float(panel_sizing.kwp_req or 0.0)
-    n_pan = int(panel_sizing.n_paneles or 0)
-    pdc = float(panel_sizing.pdc_kw or 0.0)
+    kwp_req = float(panel_sizing.kwp_req)
+    n_pan = int(panel_sizing.n_paneles)
+    pdc = float(panel_sizing.pdc_kw)
+
+    if n_pan <= 0 or pdc <= 0:
+        raise ValueError("Sizing resultó en sistema inválido")
 
     # =========================
     # Producción anual estimada
     # =========================
-    prod_anual_kwp = 0.0
-    try:
-        dias_mes = list((panel_sizing.meta or {}).get("dias_mes", []))
-        for hsp_d, dias in zip(panel_sizing.hsp_12m, dias_mes):
-            prod_anual_kwp += float(hsp_d or 0.0) * float(panel_sizing.pr or 0.0) * float(dias or 0.0)
-    except Exception:
-        pass
+    prod_anual_kwp = float(panel_sizing.meta.get("prod_anual_por_kwp_kwh", 0.0))
+    if prod_anual_kwp <= 0:
+        raise ValueError("Producción anual por kWp inválida")
 
     # =========================
     # INVERSOR
@@ -181,22 +195,34 @@ def calcular_sizing_unificado(
         panel_w=panel_w,
         dc_ac=dc_ac,
         prod_anual_kwp=prod_anual_kwp,
-        pdc_obj_kw=pdc if pdc > 0 else None,
+        pdc_obj_kw=pdc,
     )
 
     inv_id_rec = sizing_inv.get("inversor_recomendado")
-    inv_id = _inv_final(eq, inv_id_rec)
-    inv = get_inversor(inv_id)
+    inv_id_final = _inv_id(eq) or inv_id_rec
+
+    if not inv_id_final:
+        raise ValueError("No se pudo determinar inversor recomendado")
+
+    inv = get_inversor(inv_id_final)
+    if inv is None:
+        raise ValueError("Inversor no encontrado en catálogo")
 
     pac_kw_fb = (
         _pac_kw_desde_reco(
-            sizing_inv.get("inversor_recomendado_meta", {}), inv_id
+            sizing_inv.get("inversor_recomendado_meta", {}),
+            inv_id_final,
         )
-        or float(getattr(inv, "kw_ac", 0.0) or 0.0)
+        or float(getattr(inv, "kw_ac", 0.0))
     )
 
+    if pac_kw_fb <= 0:
+        raise ValueError("Potencia AC inválida en inversor")
+
+    # =========================
+    # Salida final estable
+    # =========================
     return {
-        "kwh_mes_prom": float(_kwh_mes_prom(p)),
         "consumo_anual_kwh": float(consumo_anual(p.consumo_12m)),
 
         "kwp_req": round(kwp_req, 3),
@@ -208,7 +234,8 @@ def calcular_sizing_unificado(
         "capex_L": capex_L(pdc, p.costo_usd_kwp, p.tcambio),
 
         "panel_id": _panel_id(eq),
-        "inversor_recomendado": inv_id,
+
+        "inversor_recomendado": inv_id_final,
         "inversor_recomendado_meta": sizing_inv.get("inversor_recomendado_meta", {}),
 
         "pac_kw": float(pac_kw_fb),
