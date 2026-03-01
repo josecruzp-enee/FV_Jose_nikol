@@ -291,15 +291,15 @@ def _build_electrico_nec_safe(p: Datosproyecto, sizing: Dict[str, Any]) -> Dict[
         # -----------------------------
         s = dict(sizing or {})
 
-    entrada_electrica = (
-        s.get("electrico")
-        or s.get("electrico_inputs")
-        or getattr(p, "electrico", {})
-        or {}
-    )
+        entrada_electrica = (
+            s.get("electrico")
+            or s.get("electrico_inputs")
+            or getattr(p, "electrico", {})
+            or {}
+        )
 
-if not isinstance(entrada_electrica, dict):
-    entrada_electrica = {}
+        if not isinstance(entrada_electrica, dict):
+            entrada_electrica = {}
 
         # Copia defensiva (evita mutar el dict original)
         ee = dict(entrada_electrica)
