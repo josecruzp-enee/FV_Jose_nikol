@@ -7,7 +7,7 @@ from core.validacion import validar_entradas
 from core.sizing import calcular_sizing_unificado
 from core.finanzas_lp import ejecutar_finanzas
 from core.modelo import Datosproyecto
-from core.sistema_fv_mapper import construir_parametros_fv_desde_dict
+from electrical.energia.parametros_fv import construir_parametros_fv
 from electrical.paneles.orquestador_paneles import ejecutar_paneles_desde_sizing
 from electrical.nec.orquestador_nec import ejecutar_nec
 
@@ -78,7 +78,7 @@ def ejecutar_estudio(p: Datosproyecto) -> ResultadoProyecto:
     if not isinstance(sistema_fv, dict):
         raise ValueError("sistema_fv debe ser dict.")
 
-    params_fv = construir_parametros_fv_desde_dict(sistema_fv)
+    params_fv = construir_parametros_fv(sistema_fv)
 
     # 3️⃣ Sizing energético
     sizing = calcular_sizing_unificado(p, params_fv)
