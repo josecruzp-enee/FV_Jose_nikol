@@ -7,14 +7,9 @@ from reportlab.lib.units import inch
 from reportlab.platypus import Spacer, Paragraph, Image, Table, TableStyle, PageBreak
 
 from .helpers_pdf import make_table, table_style_uniform, box_paragraph, get_field
-from core.result_accessors import get_tabla_12m
 
 
 def _append_layout_paneles(story, paths, styles, content_w):
-    """
-    Inserta el layout de paneles si existe.
-    Mantenerlo como helper evita ensuciar build_page_2.
-    """
     layout = paths.get("layout_paneles")
     if layout and Path(str(layout)).exists():
         story.append(Spacer(1, 10))
@@ -30,8 +25,9 @@ def _append_layout_paneles(story, paths, styles, content_w):
 
 def build_page_2(resultado, datos, paths, pal, styles, content_w):
     """
-    Página 2
-    ✅ Usa el content_w que viene del builder (doc.width) para consistencia.
+    Página 2 — Energía mensual.
+    Contrato fuerte:
+        resultado["tecnico"]["sizing"]["energia_12m"]
     """
     story = []
     story.append(Paragraph("Reporte de Demanda / Energía", styles["Title"]))
@@ -40,14 +36,19 @@ def build_page_2(resultado, datos, paths, pal, styles, content_w):
     story.append(Paragraph("Energía mensual (Consumo vs FV útil vs ENEE)", styles["H2b"]))
     story.append(Spacer(1, 6))
 
+    # ===== CONTRATO FUERTE =====
+    tecnico = resultado["tecnico"]
+    sizing = tecnico["sizing"]
+    tabla_12m = sizing["energia_12m"]
+
     header = ["Mes", "Consumo (kWh)", "FV útil (kWh)", "ENEE (kWh)"]
-    tabla_12m = get_tabla_12m(resultado) or []
+
     rows = [
         [
-            r.get("mes", ""),
-            f"{float(r.get('consumo_kwh', 0.0)):,.0f}",
-            f"{float(r.get('fv_kwh', 0.0)):,.0f}",
-            f"{float(r.get('kwh_enee', 0.0)):,.0f}",
+            r["mes"],
+            f"{float(r['consumo_kwh']):,.0f}",
+            f"{float(r['generacion_kwh']):,.0f}",
+            f"{float(r['energia_red_kwh']):,.0f}",
         ]
         for r in tabla_12m
     ]
@@ -65,6 +66,7 @@ def build_page_2(resultado, datos, paths, pal, styles, content_w):
             ]
         )
     )
+
     story.append(t)
     story.append(Spacer(1, 8))
 
@@ -110,7 +112,8 @@ def build_page_2(resultado, datos, paths, pal, styles, content_w):
         "• El dimensionamiento evita sobredimensionar en meses de baja demanda.<br/>"
         f"• Cobertura objetivo: <b>{float(get_field(datos,'cobertura_objetivo',0.0))*100:.0f}%</b>."
     )
-    story.append(box_paragraph(interp, pal, content_w, font_size=9))
 
+    story.append(box_paragraph(interp, pal, content_w, font_size=9))
     story.append(PageBreak())
+
     return story
