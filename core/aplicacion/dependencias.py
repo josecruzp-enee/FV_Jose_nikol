@@ -1,7 +1,9 @@
 from core.servicios.sizing import calcular_sizing_unificado
 from core.servicios.finanzas import ejecutar_finanzas
+
 from electrical.paneles.orquestador_paneles import ejecutar_paneles_desde_sizing
 from electrical.energia.orquestador_energia import ejecutar_motor_energia
+from electrical.energia.contrato import EnergiaInput
 from electrical.nec.orquestador_nec import ejecutar_nec
 
 from .puertos import (
@@ -11,8 +13,13 @@ from .puertos import (
     PuertoNEC,
     PuertoFinanzas,
 )
+
 from .orquestador_estudio import DependenciasEstudio
 
+
+# -----------------------------
+# ADAPTADORES
+# -----------------------------
 
 class SizingAdapter(PuertoSizing):
     def ejecutar(self, datos):
@@ -26,7 +33,15 @@ class PanelesAdapter(PuertoPaneles):
 
 class EnergiaAdapter(PuertoEnergia):
     def ejecutar(self, datos, sizing, strings):
-        return ejecutar_motor_energia(datos, sizing, strings)
+
+        # Construimos el contrato que espera el motor de energía
+        inp = EnergiaInput(
+            datos=datos,
+            sizing=sizing,
+            strings=strings,
+        )
+
+        return ejecutar_motor_energia(inp)
 
 
 class NECAdapter(PuertoNEC):
@@ -36,8 +51,16 @@ class NECAdapter(PuertoNEC):
 
 class FinanzasAdapter(PuertoFinanzas):
     def ejecutar(self, datos, sizing, energia):
-        return ejecutar_finanzas(datos=datos, sizing=sizing, energia=energia)
+        return ejecutar_finanzas(
+            datos=datos,
+            sizing=sizing,
+            energia=energia,
+        )
 
+
+# -----------------------------
+# FACTORY DE DEPENDENCIAS
+# -----------------------------
 
 def construir_dependencias() -> DependenciasEstudio:
     return DependenciasEstudio(
