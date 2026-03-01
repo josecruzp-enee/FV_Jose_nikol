@@ -26,14 +26,11 @@ def _append_layout_paneles(story, paths, styles, content_w):
 
 
 # ==========================================================
-# Helpers básicos
+# Helpers
 # ==========================================================
 
 def _sum_float(tabla: List[Dict[str, Any]], key: str) -> float:
-    s = 0.0
-    for r in tabla:
-        s += float(r.get(key, 0.0))
-    return float(s)
+    return sum(float(r.get(key, 0.0)) for r in tabla)
 
 
 # ==========================================================
@@ -41,19 +38,19 @@ def _sum_float(tabla: List[Dict[str, Any]], key: str) -> float:
 # ==========================================================
 
 def _tabla_strings(strings: List[Dict[str, Any]], pal, content_w):
-    header = ["MPPT", "Serie (S)", "Paralelo (P)", "Vmp (V)", "Voc frío (V)", "Imp (A)", "Isc (A)"]
 
+    header = ["MPPT", "Serie (S)", "Paralelo (P)", "Vmp (V)", "Voc frío (V)", "Imp (A)", "Isc (A)"]
     rows = [header]
 
     for s in strings:
         rows.append([
-            str(int(s["mppt"])),
-            str(int(s["n_series"])),
-            str(int(s["n_paralelo"])),
-            f"{float(s['vmp_string_v']):.0f}",
-            f"{float(s['voc_frio_string_v']):.0f}",
-            f"{float(s['imp_a']):.1f}",
-            f"{float(s['isc_a']):.1f}",
+            str(int(s.get("mppt", 0))),
+            str(int(s.get("n_series", 0))),
+            str(int(s.get("n_paralelo", 0))),
+            f"{float(s.get('vmp_string_v', 0.0)):.0f}",
+            f"{float(s.get('voc_frio_string_v', 0.0)):.0f}",
+            f"{float(s.get('imp_a', 0.0)):.1f}",
+            f"{float(s.get('isc_a', 0.0)):.1f}",
         ])
 
     colw = [
@@ -87,32 +84,28 @@ def _tabla_strings(strings: List[Dict[str, Any]], pal, content_w):
 
 
 # ==========================================================
-# Página 5
+# Página 5 — Resumen técnico
 # ==========================================================
 
 def build_page_5(resultado, datos, paths, pal, styles, content_w):
-    """
-    Página 5 — Resumen técnico + Strings DC + Layout
-    Contrato fuerte:
-        resultado["tecnico"]
-        resultado["financiero"]
-    """
 
     story: List[Any] = []
 
-    tecnico = resultado["tecnico"]
-    financiero = resultado["financiero"]
+    tecnico = resultado.get("tecnico", {})
+    financiero = resultado.get("financiero", {})
 
-    sizing = tecnico["sizing"]
-    strings = tecnico["strings"]["strings"]
-    energia_12m = sizing["energia_12m"]
+    sizing = tecnico.get("sizing", {})
+    strings_block = tecnico.get("strings", {})
+    strings = strings_block.get("strings", [])
 
-    kwp_dc = float(sizing["kwp_dc"])
-    n_paneles = int(sizing["n_paneles"])
-    capex_L = float(financiero["capex_L"])
+    tabla_12m = financiero.get("tabla_12m", [])
 
-    consumo_anual_kwh = _sum_float(energia_12m, "consumo_kwh")
-    fv_anual_kwh = _sum_float(energia_12m, "generacion_kwh")
+    kwp_dc = float(sizing.get("kwp_dc", 0.0))
+    n_paneles = int(sizing.get("n_paneles", 0))
+    capex_L = float(financiero.get("capex_L", 0.0))
+
+    consumo_anual_kwh = _sum_float(tabla_12m, "consumo_kwh")
+    fv_anual_kwh = _sum_float(tabla_12m, "fv_kwh")
     ahorro_anual_L = float(financiero.get("ahorro_anual_L", 0.0))
 
     story.append(Paragraph("Resumen técnico", styles["Title"]))
