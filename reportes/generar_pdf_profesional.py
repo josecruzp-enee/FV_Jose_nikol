@@ -15,42 +15,7 @@ from .page_4 import build_page_4
 from .page_5 import build_page_5  # ✅ FIX: typo
 
 
-def _compat_resultado_plano(resultado_proyecto: dict) -> dict:
-    """
-    Muchas páginas legacy esperan llaves planas (sizing, tabla_12m, etc.).
-    Este adaptador las reconstruye desde ResultadoProyecto SIN recalcular.
-    """
-    if not isinstance(resultado_proyecto, dict):
-        return {}
 
-    # Si ya viene plano (legacy), lo devolvemos tal cual
-    if "sizing" in resultado_proyecto and "tabla_12m" in resultado_proyecto:
-        return resultado_proyecto
-
-    tecnico = (resultado_proyecto.get("tecnico") or {}) if isinstance(resultado_proyecto.get("tecnico"), dict) else {}
-    energetico = (resultado_proyecto.get("energetico") or {}) if isinstance(resultado_proyecto.get("energetico"), dict) else {}
-    financiero = (resultado_proyecto.get("financiero") or {}) if isinstance(resultado_proyecto.get("financiero"), dict) else {}
-
-    # Si el orquestador incluyó _compat, úsalo como base (cero riesgo)
-    base = resultado_proyecto.get("_compat")
-    out = dict(base) if isinstance(base, dict) else {}
-
-    # Asegurar llaves planas importantes
-    out.setdefault("params_fv", tecnico.get("params_fv"))
-    out.setdefault("sizing", tecnico.get("sizing"))
-    out.setdefault("electrico_ref", tecnico.get("electrico_ref"))
-    out.setdefault("electrico_nec", tecnico.get("electrico_nec"))
-
-    out.setdefault("tabla_12m", energetico.get("tabla_12m"))
-
-    out.setdefault("cuota_mensual", financiero.get("cuota_mensual"))
-    out.setdefault("evaluacion", financiero.get("evaluacion"))
-    out.setdefault("decision", financiero.get("decision"))
-    out.setdefault("ahorro_anual_L", financiero.get("ahorro_anual_L"))
-    out.setdefault("payback_simple_anios", financiero.get("payback_simple_anios"))
-    out.setdefault("finanzas_lp", financiero.get("finanzas_lp"))
-
-    return out
 
 
 def _ensure_pdf_path(paths: Dict[str, Any]) -> str:
