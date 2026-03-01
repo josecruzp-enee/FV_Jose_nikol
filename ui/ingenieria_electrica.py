@@ -29,12 +29,14 @@ def _fmt(v, unit: str = "") -> str:
 def _asegurar_dict(ctx, nombre: str) -> dict:
     return ensure_dict(ctx, nombre, dict)
 
+
+# ==========================================================
+# Inputs eléctricos
+# ==========================================================
+
 def _ui_inputs_electricos(e: dict):
     st.subheader("Parámetros eléctricos de instalación")
 
-    # ==============================
-    # Sistema eléctrico
-    # ==============================
     c1, c2, c3 = st.columns(3)
 
     with c1:
@@ -61,9 +63,6 @@ def _ui_inputs_electricos(e: dict):
             step=0.01,
         )
 
-    # ==============================
-    # Distancias y regulación
-    # ==============================
     st.markdown("### Distancias y regulación")
 
     d1, d2 = st.columns(2)
@@ -102,9 +101,6 @@ def _ui_inputs_electricos(e: dict):
             step=0.1,
         )
 
-    # ==============================
-    # Condiciones NEC
-    # ==============================
     st.markdown("### Condiciones de instalación")
 
     k1, k2, k3 = st.columns(3)
@@ -134,8 +130,6 @@ def _ui_inputs_electricos(e: dict):
         )
 
 
-
-
 # ==========================================================
 # Defaults eléctricos
 # ==========================================================
@@ -153,6 +147,8 @@ def _defaults_electrico(ctx) -> dict:
             "vdrop_obj_dc_pct": 2.0,
             "vdrop_obj_ac_pct": 2.0,
             "t_min_c": 10.0,
+            "incluye_neutro_ac": False,
+            "otros_ccc": 0,
         },
     )
     return e
@@ -166,7 +162,7 @@ def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
     dc = _asegurar_dict(ctx, "datos_cliente")
     c = _asegurar_dict(ctx, "consumo")
     sf = _asegurar_dict(ctx, "sistema_fv")
-    eq = _asegurar_dict(ctx, "equipos")  # 🔹 AGREGAR ESTO
+    eq = _asegurar_dict(ctx, "equipos")
 
     consumo_12m = c.get("kwh_12m", [0.0] * 12)
 
@@ -187,16 +183,16 @@ def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
         om_anual_pct=float(sf.get("om_anual_pct", 0.01)),
     )
 
-    # 🔹 Inyecciones adicionales
-    setattr(p, "sistema_fv", dict(sf))
-    setattr(p, "electrico", dict(_asegurar_dict(ctx, "electrico")))
-    setattr(p, "equipos", dict(eq))  # 🔥 ESTA ES LA CLAVE
+    # Inyecciones adicionales controladas
+    p.sistema_fv = dict(sf)
+    p.electrico = dict(_asegurar_dict(ctx, "electrico"))
+    p.equipos = dict(eq)
 
     return p
 
 
 # ==========================================================
-# NEC Display (solo presentación)
+# NEC Display
 # ==========================================================
 
 def _mostrar_nec(pkg: dict):
@@ -255,9 +251,6 @@ def _mostrar_nec(pkg: dict):
 
 def render(ctx):
 
-    # =========================
-    # Inputs eléctricos
-    # =========================
     e = _defaults_electrico(ctx)
     _ui_inputs_electricos(e)
 
@@ -271,21 +264,11 @@ def render(ctx):
         return
 
     try:
-        # =========================
-        # Construir Datosproyecto
-        # =========================
         datos = _datosproyecto_desde_ctx(ctx)
 
-        # Guardar en ctx y session_state
-        ctx.datos_proyecto = datos
-        st.session_state["datos_proyecto"] = datos
+        deps = construir_dependencias()
+        resultado = ejecutar_estudio(datos, deps)
 
-        # =========================
-        # Ejecutar estudio
-        # =========================
-        resultado = ejecutar_estudio(datos)
-
-        # Guardar resultado moderno
         ctx.resultado_proyecto = resultado
         st.session_state["resultado_proyecto"] = resultado
 
@@ -293,34 +276,26 @@ def render(ctx):
 
         st.success("Ingeniería generada correctamente.")
 
-        # =========================
-        # Estructura moderna
-        # =========================
-        tecnico = resultado.get("tecnico") or {}
+        # Estructura nueva directa
+        sizing = resultado.get("sizing") or {}
+        strings = resultado.get("strings") or {}
+        energia = resultado.get("energia") or {}
+        nec = resultado.get("nec") or {}
         financiero = resultado.get("financiero") or {}
 
-        # =========================
-        # Mostrar Sizing
-        # =========================
         st.subheader("Sizing")
-        sizing = tecnico.get("sizing") or {}
         st.json(sizing)
 
-        # =========================
-        # Mostrar NEC
-        # =========================
-        nec = tecnico.get("nec") or {}
-        pkg = nec.get("paq") or {}
+        st.subheader("NEC")
+        pkg = nec.get("paq") if isinstance(nec, dict) else nec
         _mostrar_nec(pkg)
 
-        # =========================
-        # Mostrar Finanzas
-        # =========================
         st.subheader("Finanzas")
         st.json(financiero)
 
     except Exception as exc:
         st.error(f"No se pudo generar ingeniería: {exc}")
+
 
 # ==========================================================
 # VALIDAR PASO
@@ -329,7 +304,7 @@ def render(ctx):
 def validar(ctx) -> Tuple[bool, List[str]]:
     errores = []
 
-    if "resultado_proyecto" not in st.session_state:
+    if not getattr(ctx, "resultado_proyecto", None):
         errores.append("Debe generar ingeniería.")
 
     return len(errores) == 0, errores
