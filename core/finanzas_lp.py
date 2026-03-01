@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from .modelo import Datosproyecto
-from .simulacion_12m import simular_12_meses
 
 
 # ==========================================================
@@ -47,6 +46,70 @@ def om_mensual(capex_L_: float, om_anual_pct: float) -> float:
 
 
 # ==========================================================
+# 🔵 SIMULACIÓN OPERATIVA MENSUAL (INTEGRADA)
+# ==========================================================
+
+def simular_12_meses(
+    *,
+    consumo_12m: List[float],
+    factores_12m: List[float],
+    tarifa_energia: float,
+    cargos_fijos: float,
+    prod_base_kwh_kwp_mes: float,
+    kwp: float,
+    cuota_mensual: float,
+    om_mensual_val: float,
+    factor_orientacion: float,
+) -> List[Dict[str, float]]:
+
+    if len(consumo_12m) != 12:
+        raise ValueError("consumo_12m debe tener 12 valores")
+
+    if len(factores_12m) != 12:
+        raise ValueError("factores_12m debe tener 12 valores")
+
+    tabla: List[Dict[str, float]] = []
+
+    for i in range(12):
+
+        consumo = float(consumo_12m[i])
+        factor = float(factores_12m[i])
+
+        gen_bruta = (
+            float(kwp)
+            * float(prod_base_kwh_kwp_mes)
+            * factor
+            * float(factor_orientacion)
+        )
+
+        gen_util = min(consumo, gen_bruta)
+
+        kwh_enee = consumo - gen_util
+
+        factura_base = consumo * float(tarifa_energia) + float(cargos_fijos)
+        pago_enee = kwh_enee * float(tarifa_energia) + float(cargos_fijos)
+
+        ahorro = factura_base - pago_enee
+
+        neto = ahorro - float(cuota_mensual) - float(om_mensual_val)
+
+        tabla.append({
+            "mes": i + 1,
+            "consumo_kwh": consumo,
+            "fv_kwh": gen_util,
+            "kwh_enee": kwh_enee,
+            "factura_base_L": factura_base,
+            "pago_enee_L": pago_enee,
+            "ahorro_L": ahorro,
+            "cuota_L": float(cuota_mensual),
+            "om_L": float(om_mensual_val),
+            "neto_L": neto,
+        })
+
+    return tabla
+
+
+# ==========================================================
 # 🔵 Evaluación mensual
 # ==========================================================
 
@@ -68,7 +131,7 @@ def _evaluacion_mensual(tabla: List[Dict[str, float]], cuota: float) -> Dict[str
         nota = "Se paga cómodamente y no hay meses negativos."
     elif dscr >= 1.0:
         estado = "MARGINAL"
-        nota = "Se sostiene en promedio, pero hay meses con flujo bajo/negativo."
+        nota = "Se sostiene en promedio."
     else:
         estado = "NO VIABLE"
         nota = "Los ahorros no cubren bien la cuota."
@@ -98,19 +161,11 @@ def ejecutar_finanzas(
     if kwp_dc <= 0:
         raise ValueError("Sizing incompleto para finanzas.")
 
-    # --------------------------
-    # CAPEX
-    # --------------------------
-
     capex = calcular_capex_L(
         pdc_kw=kwp_dc,
         costo_usd_kwp=datos.costo_usd_kwp,
         tcambio=datos.tcambio,
     )
-
-    # --------------------------
-    # Cuota
-    # --------------------------
 
     cuota = calcular_cuota_mensual(
         capex_L_=capex,
@@ -119,24 +174,13 @@ def ejecutar_finanzas(
         pct_fin=datos.porcentaje_financiado,
     )
 
-    om_mensual_val = om_mensual(
-        capex_L_=capex,
-        om_anual_pct=datos.om_anual_pct,
-    )
-
-    # --------------------------
-    # Parámetros energéticos (desde sistema_fv ya validado)
-    # --------------------------
+    om_mensual_val = om_mensual(capex, datos.om_anual_pct)
 
     sfv = getattr(datos, "sistema_fv", {}) or {}
 
     prod_base = float(sfv.get("prod_base_kwh_kwp_mes") or 0.0)
     factores_12m = sfv.get("factores_fv_12m") or [1.0] * 12
     factor_orientacion = float(sfv.get("factor_orientacion") or 1.0)
-
-    # --------------------------
-    # Simulación mensual pura
-    # --------------------------
 
     tabla_12m = simular_12_meses(
         consumo_12m=datos.consumo_12m,
@@ -149,10 +193,6 @@ def ejecutar_finanzas(
         om_mensual_val=om_mensual_val,
         factor_orientacion=factor_orientacion,
     )
-
-    # --------------------------
-    # Evaluación
-    # --------------------------
 
     evaluacion = _evaluacion_mensual(tabla_12m, cuota)
 
