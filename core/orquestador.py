@@ -160,14 +160,7 @@ def ejecutar_estudio(p: Datosproyecto) -> Dict[str, Any]:
         "vdrop_obj_ac_pct": getattr(p, "vdrop_obj_ac_pct", 2.0),
     }
 
-    paq = armar_paquete_nec(nec_input)
-
-    electrico_nec = {
-        "ok": True,
-        "errores": [],
-        "warnings": [],
-        "paq": paq,
-    }
+    electrico_nec = _build_electrico_nec_safe(p, sizing)
 
     if dc_ac_warning:
         electrico_nec["warnings"].append(dc_ac_warning)
