@@ -1,4 +1,6 @@
-# Dimensionado energético FV: convierte consumo + cobertura + HSP + PR en kWp requerido y número de paneles.
+# Dimensionado energético FV: convierte consumo + cobertura + HSP + PR
+# en kWp requerido y número de paneles.
+# Soporta modo automático y modo manual sin duplicar modelo físico.
 
 from __future__ import annotations
 
@@ -179,6 +181,8 @@ def calcular_panel_sizing(
     consumo_12m_kwh: List[float],
     cobertura_obj: float,
     panel_w: float,
+    modo: str = "auto",                       # 🔥 NUEVO
+    n_paneles_manual: Optional[int] = None,   # 🔥 NUEVO
     hsp_12m: Optional[List[float]] = None,
     hsp: Optional[float] = None,
     usar_modelo_conservador: bool = True,
@@ -202,8 +206,6 @@ def calcular_panel_sizing(
         consumo = [_safe_float(x, 0.0) for x in consumo_12m_kwh]
 
     cov = _normalizar_cobertura(cobertura_obj)
-    if cov <= 0:
-        errores.append("cobertura_obj inválida (<=0).")
 
     try:
         panel_w_f = float(panel_w)
@@ -227,9 +229,6 @@ def calcular_panel_sizing(
         perdidas_detalle=perdidas_detalle,
     )
 
-    # --------------------------------------------
-    # FACTOR DE ORIENTACIÓN
-    # --------------------------------------------
     factor_orient = 1.0
 
     if isinstance(params_fv, dict):
@@ -246,9 +245,6 @@ def calcular_panel_sizing(
             factor_orient = 1.0
 
     consumo_anual = float(sum(consumo))
-    if consumo_anual <= 0:
-        errores.append("consumo_anual_kwh inválido (<=0).")
-
     kwh_obj_anual = consumo_anual * cov
 
     kwp_req = 0.0
@@ -265,7 +261,17 @@ def calcular_panel_sizing(
                 factor_orientacion=factor_orient,
             )
 
-            n_pan = _n_paneles(kwp_req, panel_w_f)
+            if modo == "auto":
+                n_pan = _n_paneles(kwp_req, panel_w_f)
+
+            elif modo == "manual":
+                if not isinstance(n_paneles_manual, int) or n_paneles_manual <= 0:
+                    raise ValueError("n_paneles_manual inválido en modo manual.")
+                n_pan = int(n_paneles_manual)
+
+            else:
+                raise ValueError("Modo de dimensionamiento desconocido.")
+
             pdc = _pdc_kw(n_pan, panel_w_f)
 
         except Exception as e:
@@ -274,19 +280,8 @@ def calcular_panel_sizing(
     ok = len(errores) == 0
 
     meta = {
-        "dias_mes": list(_DIAS_MES),
-        "hsp_fuente": "hsp_12m"
-            if (isinstance(hsp_12m, (list, tuple)) and len(hsp_12m) == 12)
-            else ("CONSERVADOR_12M" if usar_modelo_conservador else "hsp"),
         "prod_anual_por_kwp_kwh": float(prod_anual_por_kwp),
         "factor_orientacion": float(factor_orient),
-        "sombras_pct": float(_clamp(_safe_float(sombras_pct, 0.0), 0.0, 95.0)),
-        "perdidas_sistema_pct": None
-            if perdidas_sistema_pct is None
-            else float(_clamp(_safe_float(perdidas_sistema_pct, 0.0), 0.0, 95.0)),
-        "perdidas_detalle_usadas": dict(perdidas_detalle)
-            if isinstance(perdidas_detalle, dict)
-            else {},
     }
 
     return PanelSizingResultado(
