@@ -251,8 +251,12 @@ def _mostrar_nec(pkg: dict):
 
 def render(ctx):
 
+    # =========================
+    # Inputs eléctricos
+    # =========================
     e = _defaults_electrico(ctx)
     _ui_inputs_electricos(e)
+
     st.markdown("### Ingeniería eléctrica automática")
 
     faltantes = campos_faltantes_para_paso5(ctx)
@@ -263,31 +267,53 @@ def render(ctx):
         return
 
     try:
+        # =========================
+        # Construir Datosproyecto
+        # =========================
         datos = _datosproyecto_desde_ctx(ctx)
+
+        # Guardar en ctx y session_state
         ctx.datos_proyecto = datos
         st.session_state["datos_proyecto"] = datos
+
+        # =========================
+        # Ejecutar estudio
+        # =========================
         resultado = ejecutar_estudio(datos)
 
-        # 🔥 GUARDAR RESULTADO
-        st.session_state["resultado_proyecto"] = resultado
+        # Guardar resultado moderno
         ctx.resultado_proyecto = resultado
+        st.session_state["resultado_proyecto"] = resultado
 
         save_result_fingerprint(ctx)
 
         st.success("Ingeniería generada correctamente.")
 
-        # Mostrar sizing
-        st.subheader("Sizing")
-        st.json(resultado.get("sizing"))
+        # =========================
+        # Estructura moderna
+        # =========================
+        tecnico = resultado.get("tecnico") or {}
+        financiero = resultado.get("financiero") or {}
 
+        # =========================
+        # Mostrar Sizing
+        # =========================
+        st.subheader("Sizing")
+        sizing = tecnico.get("sizing") or {}
+        st.json(sizing)
+
+        # =========================
         # Mostrar NEC
-        wrapper = resultado.get("electrico_nec") or {}
+        # =========================
+        wrapper = tecnico.get("electrico_nec") or {}
         pkg = wrapper.get("paq") or {}
         _mostrar_nec(pkg)
 
-        # Mostrar finanzas
+        # =========================
+        # Mostrar Finanzas
+        # =========================
         st.subheader("Finanzas")
-        st.json(resultado.get("finanzas_lp"))
+        st.json(financiero)
 
     except Exception as exc:
         st.error(f"No se pudo generar ingeniería: {exc}")
