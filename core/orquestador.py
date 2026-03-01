@@ -347,81 +347,14 @@ if not isinstance(entrada_electrica, dict):
         # --------------------------------------
         # 3) Calcular STRINGS (para DC “real”)
         # --------------------------------------
-        # Esto NO dimensiona NEC; solo produce:
-        # - n_strings_total, voc_frio_string_v, vmp_string_v, etc.
-        try:
-            from electrical.catalogos.catalogos import get_panel, get_inversor
-            from electrical.paneles.calculo_de_strings import (
-                PanelSpec,
-                InversorSpec,
-                calcular_strings_fv,
-            )
+    
 
-            eq = getattr(p, "equipos", {}) or {}
-            panel_id = (eq or {}).get("panel_id")
-            inversor_id = (eq or {}).get("inversor_id")
+        strings = s.get("strings") or {}
+        ee["strings"] = strings
 
-            if panel_id and inversor_id:
-                pan = get_panel(panel_id)
-                inv = get_inversor(inversor_id)
-
-                # Normalización a contrato interno estable (PanelSpec/InversorSpec)
-                # Panel catálogo: w,vmp,voc,imp,isc,tc_voc_frac_c
-                coef_voc_pct_c = float(getattr(pan, "tc_voc_frac_c", -0.0029) or -0.0029) * 100.0  # frac/°C → %/°C
-
-                panel_spec = PanelSpec(
-                    pmax_w=float(getattr(pan, "w")),
-                    vmp_v=float(getattr(pan, "vmp")),
-                    voc_v=float(getattr(pan, "voc")),
-                    imp_a=float(getattr(pan, "imp")),
-                    isc_a=float(getattr(pan, "isc")),
-                    coef_voc_pct_c=float(coef_voc_pct_c),
-                    # coef_vmp_pct_c queda default (-0.34) en tu dataclass
-                )
-
-                imppt = getattr(inv, "imppt_max", None)
-                if imppt is None:
-                    # fallback ultra alto para no falsear corriente (como tú ya haces)
-                    imppt = 1e9
-
-                inversor_spec = InversorSpec(
-                    pac_kw=float(getattr(inv, "kw_ac")),
-                    vdc_max_v=float(getattr(inv, "vdc_max_v", getattr(inv, "vdc_max"))),  # tolera legacy
-                    mppt_min_v=float(getattr(inv, "vmppt_min")),
-                    mppt_max_v=float(getattr(inv, "vmppt_max")),
-                    n_mppt=int(getattr(inv, "n_mppt", 1) or 1),
-                    imppt_max_a=float(imppt),
-                )
-
-                # n_paneles_total: sizing["n_paneles"]
-                n_paneles_total = int(s.get("n_paneles") or 0)
-                t_min_c = float(ee.get("t_min_c", 10.0) or 10.0)
-                dos_aguas = bool(ee.get("dos_aguas", True))
-
-                strings = calcular_strings_fv(
-                    n_paneles_total=n_paneles_total,
-                    panel=panel_spec,
-                    inversor=inversor_spec,
-                    t_min_c=t_min_c,
-                    dos_aguas=dos_aguas,
-                    objetivo_dc_ac=float((s.get("traza") or {}).get("dc_ac_objetivo", 1.2) or 1.2),
-                    pdc_kw_objetivo=float(pdc_kw) if pdc_kw > 0 else None,
-                    t_oper_c=55.0,
-                )
-
-                ee["strings"] = strings
-
-                # Usar Vmp string como Vdc nominal para conductores (si no venía)
-                try:
-                    vdc_nom = (strings.get("recomendacion") or {}).get("vmp_string_v")
-                    if vdc_nom and "vdc_nom" not in ee and "vdc" not in ee:
-                        ee["vdc_nom"] = float(vdc_nom)
-                except Exception:
-                    pass
-
-        except Exception:
-            # Si strings falla, NEC igual corre con lo base
-            pass
+        vdc_nom = (strings.get("recomendacion") or {}).get("vmp_string_v")
+        if vdc_nom:
+            ee["vdc_nom"] = float(vdc_nom)
 
         # ------------------------------------------------
         # 4) Circuitos mínimos (DC y AC) para conductores
