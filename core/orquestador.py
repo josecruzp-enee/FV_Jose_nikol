@@ -290,9 +290,16 @@ def _build_electrico_nec_safe(p: Datosproyecto, sizing: Dict[str, Any]) -> Dict[
         # 1) Fuente canónica de inputs
         # -----------------------------
         s = dict(sizing or {})
-        entrada_electrica = (s.get("electrico") or s.get("electrico_inputs") or {})  # ✅ FIX
-        if not isinstance(entrada_electrica, dict) or not entrada_electrica:
-            return {"ok": False, "errores": ["NEC: sizing sin 'electrico_inputs' (ni 'electrico')"], "input": {}, "paq": {}}
+
+    entrada_electrica = (
+        s.get("electrico")
+        or s.get("electrico_inputs")
+        or getattr(p, "electrico", {})
+        or {}
+    )
+
+if not isinstance(entrada_electrica, dict):
+    entrada_electrica = {}
 
         # Copia defensiva (evita mutar el dict original)
         ee = dict(entrada_electrica)
