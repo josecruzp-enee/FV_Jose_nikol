@@ -7,7 +7,7 @@ from dataclasses import asdict
 import pandas as pd
 import streamlit as st
 
-from core.modelo import Datosproyecto
+from core.dominio.modelo import Datosproyecto
 from core.aplicacion.orquestador_estudio import ejecutar_estudio
 from core.aplicacion.dependencias import construir_dependencias
 from ui.validaciones_ui import campos_faltantes_para_paso5
