@@ -118,21 +118,6 @@ def _build_electrico_nec_safe(
 # ==========================================================
 
 def ejecutar_estudio(p: Datosproyecto) -> Dict[str, Any]:
-    """
-    Flujo lineal estricto:
-
-        Entradas
-            ↓
-        Sizing
-            ↓
-        Strings
-            ↓
-        NEC
-            ↓
-        Finanzas
-            ↓
-        Salida consolidada
-    """
 
     # 1️⃣ Validación
     validar_entradas(p)
@@ -141,25 +126,26 @@ def ejecutar_estudio(p: Datosproyecto) -> Dict[str, Any]:
     params_fv = _build_params_fv(p)
     _consolidar_parametros_fv_en_datos(p, params_fv)
 
-    # 3️⃣ Sizing técnico
+    # 3️⃣ Sizing
     sizing = calcular_sizing_unificado(p)
 
     if not sizing or sizing.get("n_paneles", 0) <= 0:
         raise ValueError("Sizing inválido.")
 
-    if not hasattr(p, "sistema_fv") or not isinstance(p.sistema_fv, dict):
-        p.sistema_fv = {}
-
-    p.sistema_fv["panel_id"] = sizing.get("panel_id")
-    p.sistema_fv["inversor_id"] = sizing.get("inversor_recomendado")
-
-    
-    # 4️⃣ Strings (dominio paneles)
+    # 4️⃣ Strings
     from electrical.paneles.orquestador_paneles import ejecutar_paneles_desde_sizing
-    sizing["strings"] = ejecutar_paneles_desde_sizing(p, sizing)
+
+    strings = ejecutar_paneles_desde_sizing(p, sizing)
+    sizing["strings"] = strings
+
+    if not strings.get("ok"):
+        raise ValueError("Error en cálculo de strings.")
 
     # 5️⃣ NEC
     electrico_nec = _build_electrico_nec_safe(p, sizing)
+
+    if not electrico_nec.get("ok"):
+        raise ValueError("Error en cálculo NEC.")
 
     # 6️⃣ Finanzas
     finanzas = ejecutar_finanzas(
@@ -167,14 +153,14 @@ def ejecutar_estudio(p: Datosproyecto) -> Dict[str, Any]:
         sizing=sizing,
     )
 
-    # 7️⃣ Salida consolidada (estructura moderna)
-
-    resultado_proyecto = {
+    return {
         "tecnico": {
             "params_fv": params_fv,
             "sizing": sizing,
             "electrico_nec": electrico_nec,
         },
+        "financiero": finanzas,
+    }
         "financiero": finanzas,
     }
 
