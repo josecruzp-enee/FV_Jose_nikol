@@ -12,7 +12,7 @@ from electrical.paneles.dimensionado_paneles import calcular_panel_sizing
 
 
 # ==========================================================
-# Utilitarios (cortos)
+# Utilitarios
 # ==========================================================
 def _safe_float(x: Any, default: float) -> float:
     try:
@@ -26,7 +26,7 @@ def _clamp(x: float, lo: float, hi: float) -> float:
 
 
 # ==========================================================
-# Lectura Paso 4: equipos + objetivos
+# Lectura Paso 4
 # ==========================================================
 def _leer_equipos(p: Datosproyecto) -> Dict[str, Any]:
     eq = getattr(p, "equipos", None) or {}
@@ -34,7 +34,6 @@ def _leer_equipos(p: Datosproyecto) -> Dict[str, Any]:
 
 
 def _dc_ac_obj(eq: Dict[str, Any]) -> float:
-    # default 1.20, clamp 1.00-2.00
     return _clamp(_safe_float(eq.get("sobredimension_dc_ac", 1.20), 1.20), 1.00, 2.00)
 
 
@@ -48,31 +47,29 @@ def _inv_id(eq: Dict[str, Any]) -> Optional[str]:
 
 
 # ==========================================================
-# Sizing energético (kWp, n paneles)
+# Consumo promedio
 # ==========================================================
 def _kwh_mes_prom(p: Datosproyecto) -> float:
     return float(consumo_promedio(p.consumo_12m))
 
 
 # ==========================================================
-# Catálogo → candidatos inversor
+# Inversores candidatos
 # ==========================================================
 def _candidatos_inversores() -> List[InversorCandidato]:
     out: List[InversorCandidato] = []
     for i in (catalogo_inversores() or []):
-        out.append(_inv_dict_to_candidato(i))
+        out.append(
+            InversorCandidato(
+                id=str(i["id"]),
+                pac_kw=float(i["pac_kw"]),
+                n_mppt=int(i["n_mppt"]),
+                mppt_min_v=float(i["mppt_min_v"]),
+                mppt_max_v=float(i["mppt_max_v"]),
+                vdc_max_v=float(i.get("vdc_max", i.get("vmax_dc_v"))),
+            )
+        )
     return out
-
-
-def _inv_dict_to_candidato(i: Dict[str, Any]) -> InversorCandidato:
-    return InversorCandidato(
-        id=str(i["id"]),
-        pac_kw=float(i["pac_kw"]),
-        n_mppt=int(i["n_mppt"]),
-        mppt_min_v=float(i["mppt_min_v"]),
-        mppt_max_v=float(i["mppt_max_v"]),
-        vdc_max_v=float(i.get("vdc_max", i.get("vmax_dc_v"))),
-    )
 
 
 def _recomendar_inversor(
@@ -83,15 +80,16 @@ def _recomendar_inversor(
     prod_anual_kwp: float,
     pdc_obj_kw: Optional[float] = None,
 ) -> Dict[str, Any]:
+
     inp = SizingInput(
         consumo_anual_kwh=float(sum(p.consumo_12m)),
         produccion_anual_por_kwp_kwh=float(prod_anual_kwp),
         cobertura_obj=float(p.cobertura_objetivo),
         dc_ac_obj=float(dc_ac),
         pmax_panel_w=float(panel_w),
-        # si tu sizing_inversor acepta esto, se usa; si no, bórralo aquí y en SizingInput
         pdc_obj_kw=pdc_obj_kw,
     )
+
     return ejecutar_sizing(inp=inp, inversores_catalogo=_candidatos_inversores())
 
 
@@ -107,68 +105,15 @@ def _pac_kw_desde_reco(meta: Dict[str, Any], inv_id: str) -> float:
 
 
 # ==========================================================
-# Inputs eléctricos (mapper puro para Paso 5)
-# ==========================================================
-def build_inputs_electricos_ui(p: Datosproyecto) -> Dict[str, Any]:
-    """
-    NO es UI de Streamlit. Solo normaliza lo que venga en p.electrico/equipos
-    a un contrato estable para Paso 5 / paquete NEC.
-    """
-    ui_e = getattr(p, "electrico", {}) or {}
-    if not isinstance(ui_e, dict):
-        ui_e = {}
-
-    eq = getattr(p, "equipos", {}) or {}
-    if not isinstance(eq, dict):
-        eq = {}
-
-    vac = float(ui_e.get("vac", 240.0))
-    fases = int(ui_e.get("fases", 1))
-    fp = float(ui_e.get("fp", 1.0))
-
-    tension_sistema = str(eq.get("tension_sistema", "2F+N_120/240"))
-
-    # Regla simple: 1φ => vac_ln ; 3φ => vac_ll
-    vac_ln = vac if fases == 1 else None
-    vac_ll = vac if fases == 3 else None
-
-    t_amb_c = float(ui_e.get("t_amb_c", 30.0)) if "t_amb_c" in ui_e else 30.0
-
-    return {
-        # --- AC base ---
-        "fases": fases,
-        "fp": fp,
-        "vac_ln": vac_ln,
-        "vac_ll": vac_ll,
-        # --- instalación ---
-        "tension_sistema": tension_sistema,
-        "dist_dc_m": float(ui_e.get("dist_dc_m", 10.0)),
-        "dist_dc_trunk_m": float(ui_e.get("dist_dc_trunk_m", 0.0)),
-        "dist_ac_m": float(ui_e.get("dist_ac_m", 15.0)),
-        "vdrop_obj_dc_pct": float(ui_e.get("vdrop_obj_dc_pct", 2.0)),
-        "vdrop_obj_ac_pct": float(ui_e.get("vdrop_obj_ac_pct", 2.0)),
-        "t_amb_c": float(t_amb_c),
-        "material_conductor": str(ui_e.get("material_conductor", "Cu")),
-        "has_combiner": bool(ui_e.get("has_combiner", False)),
-        "dc_arch": str(ui_e.get("dc_arch", "string_to_inverter")),
-        "otros_ccc": int(ui_e.get("otros_ccc", 0)),
-        "incluye_neutro_ac": bool(ui_e.get("incluye_neutro_ac", False)),
-    }
-
-
-# ==========================================================
-# API pública: ORQUESTA sizing unificado
+# API pública
 # ==========================================================
 def calcular_sizing_unificado(p: Datosproyecto) -> Dict[str, Any]:
+
     eq = _leer_equipos(p)
     dc_ac = _dc_ac_obj(eq)
 
-    # Catálogo (panel elegido por UI)
     panel = get_panel(_panel_id(eq))
 
-    # =========================
-    # Entradas desde sistema_fv
-    # =========================
     sfv = getattr(p, "sistema_fv", None) or {}
     if not isinstance(sfv, dict):
         sfv = {}
@@ -196,11 +141,7 @@ def calcular_sizing_unificado(p: Datosproyecto) -> Dict[str, Any]:
     else:
         hsp_12m = None
 
-    # potencia panel
-    try:
-        panel_w = float(getattr(panel, "w"))
-    except Exception:
-        panel_w = float(sfv.get("panel_w", 550.0))
+    panel_w = float(getattr(panel, "w", 550.0))
 
     # =========================
     # PANEL SIZING
@@ -218,11 +159,14 @@ def calcular_sizing_unificado(p: Datosproyecto) -> Dict[str, Any]:
         perdidas_detalle=sfv.get("perdidas_detalle"),
     )
 
-    kwp_req = float(getattr(panel_sizing, "kwp_req", 0.0)) if panel_sizing.ok else 0.0
-    n_pan = int(getattr(panel_sizing, "n_paneles", 0)) if panel_sizing.ok else 0
-    pdc = float(getattr(panel_sizing, "pdc_kw", 0.0)) if panel_sizing.ok else 0.0
+    if not panel_sizing.ok:
+        return {}
 
-    # producción anual
+    kwp_req = float(panel_sizing.kwp_req or 0.0)
+    n_pan = int(panel_sizing.n_paneles or 0)
+    pdc = float(panel_sizing.pdc_kw or 0.0)
+
+    # Producción anual estimada
     prod_anual_kwp = 0.0
     try:
         dias_mes = list((panel_sizing.meta or {}).get("dias_mes", []))
@@ -236,10 +180,10 @@ def calcular_sizing_unificado(p: Datosproyecto) -> Dict[str, Any]:
     # =========================
     sizing_inv = _recomendar_inversor(
         p=p,
-        panel_w=float(panel_w),
-        dc_ac=float(dc_ac),
-        prod_anual_kwp=float(prod_anual_kwp),
-        pdc_obj_kw=float(pdc) if pdc > 0 else None,
+        panel_w=panel_w,
+        dc_ac=dc_ac,
+        prod_anual_kwp=prod_anual_kwp,
+        pdc_obj_kw=pdc if pdc > 0 else None,
     )
 
     inv_id_rec = sizing_inv.get("inversor_recomendado")
@@ -253,49 +197,21 @@ def calcular_sizing_unificado(p: Datosproyecto) -> Dict[str, Any]:
         or float(getattr(inv, "kw_ac", 0.0) or 0.0)
     )
 
-    # Inputs eléctricos UI
-    electrico_inputs = build_inputs_electricos_ui(p)
-
-    # ======================================================
-    # ✅ BLOQUE CANÓNICO PARA MOTOR NEC (LA CLAVE DEL FIX)
-    # ======================================================
-    try:
-        electrico_nec = {
-            "potencia_dc_kw": float(pdc),
-            "potencia_ac_kw": float(pac_kw_fb),
-            "vdc_nom": float(getattr(panel_sizing, "vmp_string_v", 0.0) or 0.0),
-            "vac_ll": float(electrico_inputs.get("vac", 240.0)),
-            "fases": int(electrico_inputs.get("fases", 1)),
-            "fp": float(electrico_inputs.get("fp", 1.0)),
-        }
-    except Exception:
-        electrico_nec = {}
-
-    kwh_mes = _kwh_mes_prom(p)
-    prod_diaria_kwp = float(getattr(panel_sizing, "hsp_prom", 0.0) or 0.0) * float(
-        getattr(panel_sizing, "pr", 0.0) or 0.0
-    )
-
     return {
-        "kwh_mes_prom": float(kwh_mes),
+        "kwh_mes_prom": float(_kwh_mes_prom(p)),
         "consumo_anual_kwh": float(consumo_anual(p.consumo_12m)),
 
-        "kwp_req": round(float(kwp_req), 3),
-        "n_paneles": int(n_pan),
-        "pdc_kw": round(float(pdc), 3),
+        "kwp_req": round(kwp_req, 3),
+        "n_paneles": n_pan,
+        "pdc_kw": round(pdc, 3),
 
-        "prod_anual_por_kwp_kwh": round(float(prod_anual_kwp), 2),
-        "prod_diaria_por_kwp_kwh": round(float(prod_diaria_kwp), 3),
+        "prod_anual_por_kwp_kwh": round(prod_anual_kwp, 2),
 
-        "capex_L": capex_L(float(pdc), p.costo_usd_kwp, p.tcambio),
+        "capex_L": capex_L(pdc, p.costo_usd_kwp, p.tcambio),
 
         "panel_id": _panel_id(eq),
         "inversor_recomendado": inv_id,
         "inversor_recomendado_meta": sizing_inv.get("inversor_recomendado_meta", {}),
 
-        "strings": {"ok": False, "warnings": ["Strings se calculan en Paso 5."]},
-
-        "electrico_inputs": electrico_inputs,
-        "electrico": electrico_nec,   # ⭐⭐⭐ ESTE ERA EL PROBLEMA
         "pac_kw": float(pac_kw_fb),
     }
