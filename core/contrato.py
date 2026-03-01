@@ -1,12 +1,30 @@
-# core/dto.py
+# core/contrato.py
+
 from typing import TypedDict, List, Dict, Any
 
 
-class ResultadoTecnico(TypedDict):
-    sizing: Dict[str, Any]
-    strings: Dict[str, Any]
-    nec: Dict[str, Any]
+class ResultadoSizing(TypedDict):
+    n_paneles: int
+    kwp_dc: float
+    pdc_kw: float
+    pac_kw: float
     energia_12m: List[Dict[str, Any]]
+
+
+class ResultadoStrings(TypedDict):
+    ok: bool
+    strings: List[Dict[str, Any]]
+
+
+class ResultadoNEC(TypedDict):
+    ok: bool
+    paq: Dict[str, Any]
+
+
+class ResultadoTecnico(TypedDict):
+    sizing: ResultadoSizing
+    strings: ResultadoStrings
+    nec: ResultadoNEC
 
 
 class ResultadoFinanciero(TypedDict):
