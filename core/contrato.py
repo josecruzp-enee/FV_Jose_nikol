@@ -1,12 +1,25 @@
-from typing import TypedDict, List, Dict, Any
-class MesEnergia(TypedDict):
+from dataclasses import dataclass
+from typing import List, Dict, Any
+
+
+# =============================
+# Energía mensual
+# =============================
+
+@dataclass(frozen=True)
+class MesEnergia:
     mes: str
     consumo_kwh: float
     generacion_kwh: float
     energia_red_kwh: float
 
 
-class ResultadoSizing(TypedDict):
+# =============================
+# Sizing
+# =============================
+
+@dataclass(frozen=True)
+class ResultadoSizing:
     n_paneles: int
     kwp_dc: float
     pdc_kw: float
@@ -14,7 +27,12 @@ class ResultadoSizing(TypedDict):
     energia_12m: List[MesEnergia]
 
 
-class StringInfo(TypedDict):
+# =============================
+# Strings
+# =============================
+
+@dataclass(frozen=True)
+class StringInfo:
     mppt: int
     n_series: int
     n_paralelo: int
@@ -24,25 +42,37 @@ class StringInfo(TypedDict):
     isc_a: float
 
 
-class ResultadoStrings(TypedDict):
+@dataclass(frozen=True)
+class ResultadoStrings:
     ok: bool
     strings: List[StringInfo]
 
 
-class NECResumen(TypedDict):
+# =============================
+# NEC
+# =============================
+
+@dataclass(frozen=True)
+class NECResumen:
     idc_nom: float
     iac_nom: float
     vdc_nom: float
     vac_nom: float
 
 
-class ResultadoNEC(TypedDict):
+@dataclass(frozen=True)
+class ResultadoNEC:
     ok: bool
     resumen: NECResumen
-    paq: Dict[str, Any]  # si necesitas detalle bruto
+    paq: Dict[str, Any]
 
 
-class ResultadoFinanciero(TypedDict):
+# =============================
+# Finanzas
+# =============================
+
+@dataclass(frozen=True)
+class ResultadoFinanciero:
     capex_L: float
     opex_L: float
     tir: float
@@ -50,12 +80,14 @@ class ResultadoFinanciero(TypedDict):
     payback_simple: float
     flujo_12m: List[Dict[str, float]]
 
-class ResultadoTecnico(TypedDict):
+
+# =============================
+# Proyecto final
+# =============================
+
+@dataclass(frozen=True)
+class ResultadoProyecto:
     sizing: ResultadoSizing
     strings: ResultadoStrings
     nec: ResultadoNEC
-
-
-class ResultadoProyecto(TypedDict):
-    tecnico: ResultadoTecnico
     financiero: ResultadoFinanciero
