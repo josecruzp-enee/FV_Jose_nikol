@@ -2,7 +2,7 @@ from __future__ import annotations
 from typing import Dict, Any, Optional
 
 from electrical.catalogos import get_inversor, ids_inversores
-from electrical.sizing_electric import (
+from electrical.inversor.sizing_inversor import (
     SizingInput,
     ejecutar_sizing,
     InversorCandidato,
