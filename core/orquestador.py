@@ -116,7 +116,6 @@ def _build_electrico_nec_safe(
 # ==========================================================
 # ENTRYPOINT OFICIAL
 # ==========================================================
-
 def ejecutar_estudio(p: Datosproyecto) -> Dict[str, Any]:
 
     # 1️⃣ Validación
@@ -161,7 +160,3 @@ def ejecutar_estudio(p: Datosproyecto) -> Dict[str, Any]:
         },
         "financiero": finanzas,
     }
-        "financiero": finanzas,
-    }
-
-    return resultado_proyecto
