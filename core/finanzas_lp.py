@@ -8,7 +8,19 @@ from .simular_12_meses import simular_12_meses
 
 
 # ==========================================================
-# 🔵 Funciones financieras básicas (MOVIDAS)
+# 🔵 CAPEX
+# ==========================================================
+
+def calcular_capex_L(
+    pdc_kw: float,
+    costo_usd_kwp: float,
+    tcambio: float,
+) -> float:
+    return float(pdc_kw) * float(costo_usd_kwp) * float(tcambio)
+
+
+# ==========================================================
+# 🔵 Funciones financieras básicas
 # ==========================================================
 
 def calcular_cuota_mensual(
@@ -123,7 +135,7 @@ def _evaluacion_mensual(tabla: List[Dict[str, float]], cuota: float) -> Dict[str
 
 
 # ==========================================================
-# 🔵 ENTRYPOINT
+# 🔵 ENTRYPOINT FINANCIERO
 # ==========================================================
 
 def ejecutar_finanzas(
@@ -139,10 +151,16 @@ def ejecutar_finanzas(
 ) -> Dict[str, Any]:
 
     kwp_dc = float(sizing.get("pdc_kw") or 0.0)
-    capex = float(sizing.get("capex_L") or 0.0)
 
-    if kwp_dc <= 0 or capex <= 0:
+    if kwp_dc <= 0:
         raise ValueError("Sizing incompleto para finanzas.")
+
+    # 🔵 CAPEX ahora se calcula aquí
+    capex = calcular_capex_L(
+        pdc_kw=kwp_dc,
+        costo_usd_kwp=datos.costo_usd_kwp,
+        tcambio=datos.tcambio,
+    )
 
     cuota = calcular_cuota_mensual(
         capex_L_=capex,
@@ -158,6 +176,7 @@ def ejecutar_finanzas(
     ahorro_anual = sum(x["ahorro_L"] for x in tabla_12m)
 
     return {
+        "capex_L": capex,
         "cuota_mensual": cuota,
         "tabla_12m": tabla_12m,
         "evaluacion": evaluacion,
