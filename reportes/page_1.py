@@ -174,7 +174,7 @@ def build_page_1(resultado: Dict[str, Any], datos, paths, pal, styles, content_w
 
     fecha = datetime.now().strftime("%Y-%m-%d")
 
-    kwp = float(sizing["kwp_dc"])
+    kwp = float(sizing.get("kwp_dc", 0.0))
     capex = float(financiero["capex_L"])
 
     cobertura_objetivo = float(get_field(datos, "cobertura_objetivo", 0.0))
