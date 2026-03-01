@@ -6,7 +6,7 @@ from reportlab.lib import colors
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.platypus import Paragraph, Table, TableStyle
 
-from core.rutas import money_L as _money_L_core
+from ui.rutas import money_L, num, preparar_salida
 
 
 
