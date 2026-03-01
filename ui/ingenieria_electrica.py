@@ -565,13 +565,16 @@ def render(ctx):
 # VALIDAR PASO
 # ==========================================================
 def validar(ctx) -> Tuple[bool, List[str]]:
+    import streamlit as st
+
     errores = []
     eq = getattr(ctx, "equipos", {}) or {}
 
     if not (eq.get("panel_id") and eq.get("inversor_id")):
         errores.append("Falta seleccionar equipos.")
 
-    if getattr(ctx, "resultado_proyecto", None) is None:
+    # 🔹 Validar contra estado persistente real
+    if "resultado_proyecto" not in st.session_state:
         errores.append("Debe generar ingeniería.")
 
     return len(errores) == 0, errores
