@@ -2,90 +2,78 @@
 from __future__ import annotations
 
 from typing import Dict, List
-from .modelo import Datosproyecto
-from core.finanzas_lp import om_mensual
-from electrical.energia.orientacion import factor_orientacion_total
-
-
-def gen_bruta_mes(kwp: float, prod_base_kwh_kwp_mes: float, factor: float) -> float:
-    return float(kwp) * float(prod_base_kwh_kwp_mes) * float(factor)
-
-
-def gen_util_mes(consumo_kwh: float, gen_bruta_kwh: float) -> float:
-    return min(float(consumo_kwh), float(gen_bruta_kwh))
-
-
-def kwh_enee_mes(consumo_kwh: float, gen_util_kwh: float) -> float:
-    return float(consumo_kwh) - float(gen_util_kwh)
-
-
-def factura_base_mes(consumo_kwh: float, tarifa_L_kwh: float, cargos_fijos_L: float) -> float:
-    return float(consumo_kwh) * float(tarifa_L_kwh) + float(cargos_fijos_L)
-
-
-def pago_enee_mes(kwh_enee: float, tarifa_L_kwh: float, cargos_fijos_L: float) -> float:
-    return float(kwh_enee) * float(tarifa_L_kwh) + float(cargos_fijos_L)
-
-
-def ahorro_mes(factura_base: float, pago_enee: float) -> float:
-    return float(factura_base) - float(pago_enee)
-
-
-def neto_mes(ahorro: float, cuota: float, om: float) -> float:
-    return float(ahorro) - float(cuota) - float(om)
 
 
 def simular_12_meses(
-    p: Datosproyecto,
+    *,
+    consumo_12m: List[float],
+    factores_12m: List[float],
+    tarifa_energia: float,
+    cargos_fijos: float,
+    prod_base_kwh_kwp_mes: float,
     kwp: float,
-    cuota_mensual_: float,
-    capex_L_: float,
+    cuota_mensual: float,
+    om_mensual_val: float,
+    factor_orientacion: float,
 ) -> List[Dict[str, float]]:
+    """
+    Modelo operativo mensual FV.
+
+    No depende de Datosproyecto.
+    No depende de finanzas.
+    No depende de orientación interna.
+
+    Función pura.
+    """
+
+    if len(consumo_12m) != 12:
+        raise ValueError("consumo_12m debe tener 12 valores")
+
+    if len(factores_12m) != 12:
+        raise ValueError("factores_12m debe tener 12 valores")
 
     tabla: List[Dict[str, float]] = []
-
-    consumo_12m = list(p.consumo_12m)
-    factores_12m = list(p.factores_fv_12m)
-    tarifa = float(p.tarifa_energia)
-    cargos = float(p.cargos_fijos)
-    prod_base = float(p.prod_base_kwh_kwp_mes)
-
-    om_ = om_mensual(capex_L_, p.om_anual_pct)
-
-    f_orient = factor_orientacion_total(
-        tipo_superficie=p.tipo_superficie,
-        azimut_deg=p.azimut_deg,
-        azimut_a_deg=getattr(p, "azimut_a_deg", None),
-        azimut_b_deg=getattr(p, "azimut_b_deg", None),
-        reparto_pct_a=getattr(p, "reparto_pct_a", None),
-    )
 
     for i in range(12):
 
         consumo = float(consumo_12m[i])
         factor = float(factores_12m[i])
 
-        gb = gen_bruta_mes(kwp, prod_base, factor) * f_orient
-        gu = gen_util_mes(consumo, gb)
-        ke = kwh_enee_mes(consumo, gu)
+        # Generación bruta
+        gen_bruta = (
+            float(kwp)
+            * float(prod_base_kwh_kwp_mes)
+            * factor
+            * float(factor_orientacion)
+        )
 
-        fb = factura_base_mes(consumo, tarifa, cargos)
-        pe = pago_enee_mes(ke, tarifa, cargos)
+        # Generación útil (sin exportación)
+        gen_util = min(consumo, gen_bruta)
 
-        ah = ahorro_mes(fb, pe)
-        nt = neto_mes(ah, cuota_mensual_, om_)
+        # Energía comprada a red
+        kwh_enee = consumo - gen_util
+
+        # Facturación
+        factura_base = consumo * float(tarifa_energia) + float(cargos_fijos)
+        pago_enee = kwh_enee * float(tarifa_energia) + float(cargos_fijos)
+
+        # Ahorro
+        ahorro = factura_base - pago_enee
+
+        # Flujo neto
+        neto = ahorro - float(cuota_mensual) - float(om_mensual_val)
 
         tabla.append({
             "mes": i + 1,
             "consumo_kwh": consumo,
-            "fv_kwh": gu,
-            "kwh_enee": ke,
-            "factura_base_L": fb,
-            "pago_enee_L": pe,
-            "ahorro_L": ah,
-            "cuota_L": float(cuota_mensual_),
-            "om_L": float(om_),
-            "neto_L": nt,
+            "fv_kwh": gen_util,
+            "kwh_enee": kwh_enee,
+            "factura_base_L": factura_base,
+            "pago_enee_L": pago_enee,
+            "ahorro_L": ahorro,
+            "cuota_L": float(cuota_mensual),
+            "om_L": float(om_mensual_val),
+            "neto_L": neto,
         })
 
     return tabla
