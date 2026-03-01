@@ -7,10 +7,7 @@ from .modelo import Datosproyecto
 
 from electrical.catalogos import get_panel
 from electrical.paneles.dimensionado_paneles import calcular_panel_sizing
-from electrical.energia.balance import (
-    consumo_anual_kwh,
-    consumo_promedio_mensual_kwh,
-)
+from core.consumo import consumo_anual_kwh, consumo_promedio_mensual_kwh, normalizar_cobertura
 from electrical.inversor.orquestador_inversor import (
     ejecutar_inversor_desde_sizing,
 )
