@@ -11,7 +11,7 @@ if str(ROOT) not in sys.path:
 
 from ui.router import PasoWizard, render_wizard
 import ui.ingenieria_electrica as ingenieria_electrica
-from core.configuracion import cargar_configuracion, construir_config_efectiva
+from core.servicios.configuracion import cargar_configuracion, construir_config_efectiva
 import ui.datos_cliente as datos_cliente
 import ui.consumo_energetico as consumo_energetico
 import ui.sistema_fv as sistema_fv
