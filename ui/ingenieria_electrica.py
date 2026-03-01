@@ -264,6 +264,8 @@ def render(ctx):
 
     try:
         datos = _datosproyecto_desde_ctx(ctx)
+        ctx.datos_proyecto = datos
+        st.session_state["datos_proyecto"] = datos
         resultado = ejecutar_estudio(datos)
 
         # 🔥 GUARDAR RESULTADO
