@@ -41,44 +41,61 @@ def _build_electrico_nec_safe(
     p: Datosproyecto,
     sizing: Dict[str, Any],
 ) -> Dict[str, Any]:
-    """
-    Wrapper seguro para construir el paquete NEC.
-    Contrato:
-        {
-            ok: bool,
-            errores: [...],
-            input: {...},
-            paq: {...}
-        }
-    """
+
     try:
         from electrical.paquete_nec import armar_paquete_nec
 
         s = dict(sizing or {})
+        ee = {}
 
-        entrada = (
-            s.get("electrico")
-            or s.get("electrico_inputs")
+        # -------------------------------
+        # 1️⃣ Base eléctrica UI
+        # -------------------------------
+        base = (
+            s.get("electrico_inputs")
+            or s.get("electrico")
             or getattr(p, "electrico", {})
             or {}
         )
 
-        if not isinstance(entrada, dict):
-            entrada = {}
+        if isinstance(base, dict):
+            ee.update(base)
 
-        ee = dict(entrada)
-
-        # Enriquecer potencias
+        # -------------------------------
+        # 2️⃣ Potencias desde sizing
+        # -------------------------------
         pdc_kw = float(s.get("pdc_kw") or 0.0)
         pac_kw = float(s.get("pac_kw") or 0.0)
 
         if pdc_kw > 0:
-            ee.setdefault("potencia_dc_kw", pdc_kw)
+            ee["potencia_dc_kw"] = pdc_kw
 
         if pac_kw > 0:
-            ee.setdefault("potencia_ac_kw", pac_kw)
+            ee["potencia_ac_kw"] = pac_kw
 
-        # Ejecutar NEC
+        # -------------------------------
+        # 3️⃣ Información real desde strings
+        # -------------------------------
+        strings = s.get("strings") or {}
+
+        if strings.get("ok"):
+            rec = strings.get("recomendacion") or {}
+
+            vmp_string = float(rec.get("vmp_string_v") or 0.0)
+            if vmp_string > 0:
+                ee["vdc_nom"] = vmp_string
+
+            # Corriente nominal DC recomendada
+            idesign = 0.0
+            for st in strings.get("strings", []):
+                idesign = max(idesign, float(st.get("idesign_cont_a") or 0.0))
+
+            if idesign > 0:
+                ee["idc_nom"] = idesign
+
+        # -------------------------------
+        # 4️⃣ Ejecutar NEC
+        # -------------------------------
         paq = armar_paquete_nec(ee)
 
         return {
@@ -95,7 +112,6 @@ def _build_electrico_nec_safe(
             "input": {},
             "paq": {},
         }
-
 
 # ==========================================================
 # ENTRYPOINT OFICIAL
