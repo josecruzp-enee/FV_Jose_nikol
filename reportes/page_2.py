@@ -22,13 +22,13 @@ def _append_layout_paneles(story, paths, styles, content_w):
         story.append(Paragraph("Layout de paneles no disponible.", styles["BodyText"]))
         story.append(Spacer(1, 8))
 
-
 def build_page_2(resultado, datos, paths, pal, styles, content_w):
     """
     Página 2 — Energía mensual.
-    Contrato fuerte:
-        resultado["tecnico"]["sizing"]["energia_12m"]
+    Contrato actualizado:
+        resultado["financiero"]["tabla_12m"]
     """
+
     story = []
     story.append(Paragraph("Reporte de Demanda / Energía", styles["Title"]))
     story.append(Spacer(1, 8))
@@ -36,9 +36,7 @@ def build_page_2(resultado, datos, paths, pal, styles, content_w):
     story.append(Paragraph("Energía mensual (Consumo vs FV útil vs ENEE)", styles["H2b"]))
     story.append(Spacer(1, 6))
 
-    # ===== CONTRATO FUERTE =====
-    tecnico = resultado["tecnico"]
-    sizing = tecnico["sizing"]
+    # ===== CONTRATO ACTUAL =====
     financiero = resultado["financiero"]
     tabla_12m = financiero.get("tabla_12m", [])
 
@@ -46,10 +44,10 @@ def build_page_2(resultado, datos, paths, pal, styles, content_w):
 
     rows = [
         [
-            r["mes"],
-            f"{float(r['consumo_kwh']):,.0f}",
-            f"{float(r['generacion_kwh']):,.0f}",
-            f"{float(r['energia_red_kwh']):,.0f}",
+            r.get("mes", 0),
+            f"{float(r.get('consumo_kwh', 0.0)):,.0f}",
+            f"{float(r.get('fv_kwh', 0.0)):,.0f}",
+            f"{float(r.get('kwh_enee', 0.0)):,.0f}",
         ]
         for r in tabla_12m
     ]
@@ -109,8 +107,8 @@ def build_page_2(resultado, datos, paths, pal, styles, content_w):
 
     interp = (
         "<b>Interpretación</b><br/>"
-        "• Esta página muestra energía (kWh).<br/>"
-        "• El dimensionamiento evita sobredimensionar en meses de baja demanda.<br/>"
+        "• Esta página muestra energía mensual real simulada.<br/>"
+        "• La generación FV se limita al consumo (sin exportación).<br/>"
         f"• Cobertura objetivo: <b>{float(get_field(datos,'cobertura_objetivo',0.0))*100:.0f}%</b>."
     )
 
