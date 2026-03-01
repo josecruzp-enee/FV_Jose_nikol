@@ -146,7 +146,10 @@ def ejecutar_estudio(p: Datosproyecto) -> Dict[str, Any]:
 
     if not sizing or sizing.get("n_paneles", 0) <= 0:
         raise ValueError("Sizing inválido.")
+    p.panel_id = sizing.get("panel_id")
+    p.inversor_id = sizing.get("inversor_recomendado")
 
+    
     # 4️⃣ Strings (dominio paneles)
     from electrical.paneles.orquestador_paneles import ejecutar_paneles_desde_sizing
     sizing["strings"] = ejecutar_paneles_desde_sizing(p, sizing)
