@@ -161,7 +161,7 @@ def ejecutar_estudio(p: Datosproyecto) -> Dict[str, Any]:
     }
 
     electrico_nec = _build_electrico_nec_safe(p, sizing)
-
+    electrico_nec.setdefault("warnings", [])
     if dc_ac_warning:
         electrico_nec["warnings"].append(dc_ac_warning)
 
