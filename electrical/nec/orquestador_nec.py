@@ -17,6 +17,11 @@ def ejecutar_nec(
     if isinstance(base, dict):
         ee.update(base)
 
+        ee["vac_ll"] = base.get("vac")
+        ee["vac_ln"] = base.get("vac")
+        ee["fases"] = base.get("fases")
+        ee["fp"] = base.get("fp")
+
     # Potencias
     ee["potencia_dc_kw"] = float(sizing["pdc_kw"])
     ee["potencia_ac_kw"] = float(sizing["pac_kw"])
