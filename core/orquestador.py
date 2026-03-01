@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Dict, Any
+
 from core.contrato import ResultadoProyecto
 from core.validacion import validar_entradas
 from core.sizing import calcular_sizing_unificado
@@ -10,48 +12,91 @@ from electrical.paneles.orquestador_paneles import ejecutar_paneles_desde_sizing
 from electrical.nec.orquestador_nec import ejecutar_nec
 
 
+# ==========================================================
+# Validación estructural interna (contrato fuerte)
+# ==========================================================
+def _validar_sizing(s: Dict[str, Any]) -> None:
+    required = ["n_paneles", "kwp_dc", "pdc_kw", "pac_kw"]
+    for k in required:
+        if k not in s:
+            raise ValueError(f"Sizing incompleto. Falta clave: {k}")
+
+    if not isinstance(s["n_paneles"], int) or s["n_paneles"] <= 0:
+        raise ValueError("Sizing inválido: n_paneles debe ser > 0.")
+
+    if float(s["kwp_dc"]) <= 0:
+        raise ValueError("Sizing inválido: kwp_dc debe ser > 0.")
+
+
+def _validar_strings(st: Dict[str, Any]) -> None:
+    if "ok" not in st:
+        raise ValueError("ResultadoStrings inválido: falta 'ok'.")
+
+    if st["ok"] is not True:
+        raise ValueError("Error en cálculo de strings.")
+
+    if "strings" not in st or not isinstance(st["strings"], list):
+        raise ValueError("ResultadoStrings inválido: falta lista de strings.")
+
+
+def _validar_nec(nec: Dict[str, Any]) -> None:
+    if "ok" not in nec:
+        raise ValueError("ResultadoNEC inválido: falta 'ok'.")
+
+    if nec["ok"] is not True:
+        raise ValueError("Error en cálculo NEC.")
+
+    if "paq" not in nec or not isinstance(nec["paq"], dict):
+        raise ValueError("ResultadoNEC inválido: falta 'paq'.")
+
+
+def _validar_financiero(fin: Dict[str, Any]) -> None:
+    required = ["capex_L", "tir", "van", "payback_simple"]
+    for k in required:
+        if k not in fin:
+            raise ValueError(f"ResultadoFinanciero incompleto. Falta clave: {k}")
+
+
+# ==========================================================
+# Pipeline principal
+# ==========================================================
 def ejecutar_estudio(p: Datosproyecto) -> ResultadoProyecto:
     """
     Flujo lineal estricto:
     Entradas → Validación → Sizing → Strings → NEC → Finanzas → Salida
     """
 
-    # 1️⃣ Validación
+    # 1️⃣ Validación de entradas
     validar_entradas(p)
 
     # 2️⃣ Construcción explícita de parámetros FV
     sistema_fv = getattr(p, "sistema_fv", {}) or {}
     if not isinstance(sistema_fv, dict):
-        sistema_fv = {}
+        raise ValueError("sistema_fv debe ser dict.")
 
     params_fv = construir_parametros_fv_desde_dict(sistema_fv)
 
     # 3️⃣ Sizing energético
     sizing = calcular_sizing_unificado(p, params_fv)
-
-    if sizing.get("n_paneles", 0) <= 0:
-        raise ValueError("Sizing inválido.")
+    _validar_sizing(sizing)
 
     # 4️⃣ Strings
     strings = ejecutar_paneles_desde_sizing(p, sizing)
-
-    if not strings.get("ok"):
-        raise ValueError("Error en cálculo de strings.")
+    _validar_strings(strings)
 
     # 5️⃣ NEC
     nec = ejecutar_nec(p, sizing, strings)
+    _validar_nec(nec)
 
-    if not nec.get("ok", True):
-        raise ValueError("Error en cálculo NEC.")
-
-    # 6️⃣ Finanzas (solo depende de sizing)
+    # 6️⃣ Finanzas (depende de sizing)
     financiero = ejecutar_finanzas(
         datos=p,
         sizing=sizing,
     )
+    _validar_financiero(financiero)
 
-    # 7️⃣ Contrato final estable
-    return {
+    # 7️⃣ Contrato final fuerte (sin fallback, sin legacy)
+    resultado: ResultadoProyecto = {
         "tecnico": {
             "sizing": sizing,
             "strings": strings,
@@ -59,3 +104,5 @@ def ejecutar_estudio(p: Datosproyecto) -> ResultadoProyecto:
         },
         "financiero": financiero,
     }
+
+    return resultado
