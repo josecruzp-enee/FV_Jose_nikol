@@ -4,7 +4,6 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional
 
 from .modelo import Datosproyecto
-from .simular_12_meses import capex_L, consumo_anual
 
 from electrical.catalogos import get_panel, get_inversor, catalogo_inversores
 from electrical.inversor.sizing_inversor import (
@@ -13,6 +12,24 @@ from electrical.inversor.sizing_inversor import (
     ejecutar_sizing,
 )
 from electrical.paneles.dimensionado_paneles import calcular_panel_sizing
+
+
+# ==========================================================
+# 🔵 Cálculos básicos del proyecto (MOVIDOS AQUÍ)
+# ==========================================================
+
+def consumo_anual(consumo_12m: List[float]) -> float:
+    return float(sum(float(x or 0.0) for x in consumo_12m))
+
+
+def consumo_promedio(consumo_12m: List[float]) -> float:
+    if not consumo_12m:
+        return 0.0
+    return consumo_anual(consumo_12m) / 12.0
+
+
+def capex_L(kwp: float, costo_usd_kwp: float, tcambio: float) -> float:
+    return float(kwp) * float(costo_usd_kwp) * float(tcambio)
 
 
 # ==========================================================
@@ -66,6 +83,7 @@ def _inv_id(eq: Dict[str, Any]) -> Optional[str]:
 
 def _candidatos_inversores() -> List[InversorCandidato]:
     out: List[InversorCandidato] = []
+
     for i in (catalogo_inversores() or []):
         out.append(
             InversorCandidato(
@@ -77,8 +95,10 @@ def _candidatos_inversores() -> List[InversorCandidato]:
                 vdc_max_v=float(i.get("vdc_max", i.get("vmax_dc_v"))),
             )
         )
+
     if not out:
         raise ValueError("Catálogo de inversores vacío")
+
     return out
 
 
@@ -92,7 +112,7 @@ def _recomendar_inversor(
 ) -> Dict[str, Any]:
 
     inp = SizingInput(
-        consumo_anual_kwh=float(sum(p.consumo_12m)),
+        consumo_anual_kwh=consumo_anual(p.consumo_12m),
         produccion_anual_por_kwp_kwh=float(prod_anual_kwp),
         cobertura_obj=float(p.cobertura_objetivo),
         dc_ac_obj=float(dc_ac),
@@ -143,7 +163,7 @@ def calcular_sizing_unificado(
     consumo_12m_kwh = [float(x or 0.0) for x in consumo_12m_kwh]
 
     # =========================
-    # Parámetros FV explícitos
+    # Parámetros FV
     # =========================
     cobertura_obj = float(params_fv.get("cobertura_obj", 1.0))
     cobertura_obj = max(0.0, min(1.0, cobertura_obj))
@@ -180,9 +200,6 @@ def calcular_sizing_unificado(
     if n_pan <= 0 or pdc <= 0:
         raise ValueError("Sizing resultó en sistema inválido")
 
-    # =========================
-    # Producción anual estimada
-    # =========================
     prod_anual_kwp = float(panel_sizing.meta.get("prod_anual_por_kwp_kwh", 0.0))
     if prod_anual_kwp <= 0:
         raise ValueError("Producción anual por kWp inválida")
@@ -220,10 +237,11 @@ def calcular_sizing_unificado(
         raise ValueError("Potencia AC inválida en inversor")
 
     # =========================
-    # Salida final estable
+    # Salida final
     # =========================
     return {
-        "consumo_anual_kwh": float(consumo_anual(p.consumo_12m)),
+        "consumo_anual_kwh": consumo_anual(consumo_12m_kwh),
+        "consumo_promedio_kwh": consumo_promedio(consumo_12m_kwh),
 
         "kwp_req": round(kwp_req, 3),
         "n_paneles": n_pan,
