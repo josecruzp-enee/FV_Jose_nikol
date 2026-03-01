@@ -1,9 +1,12 @@
 # Dimensionado energético FV: convierte consumo + cobertura + HSP + PR en kWp requerido y número de paneles.
+
 from __future__ import annotations
 
 from dataclasses import dataclass
 from math import ceil
 from typing import Any, Dict, List, Optional
+
+from electrical.energia.orientacion import factor_orientacion_total
 
 
 @dataclass(frozen=True)
@@ -123,12 +126,19 @@ def _kwp_req_anual(
     kwh_obj_anual: float,
     hsp_12m: List[float],
     pr: float,
+    *,
+    factor_orientacion: float = 1.0,
 ) -> tuple[float, float]:
 
     prod_anual_por_kwp = 0.0
 
     for hsp_dia, dias in zip(hsp_12m, _DIAS_MES):
-        prod_anual_por_kwp += float(hsp_dia) * float(pr) * float(dias)
+        prod_anual_por_kwp += (
+            float(hsp_dia)
+            * float(pr)
+            * float(factor_orientacion)
+            * float(dias)
+        )
 
     if prod_anual_por_kwp <= 0:
         raise ValueError("Producción anual por kWp inválida (<=0).")
@@ -176,6 +186,7 @@ def calcular_panel_sizing(
     sombras_pct: float = 0.0,
     perdidas_sistema_pct: Optional[float] = None,
     perdidas_detalle: Optional[Dict[str, float]] = None,
+    params_fv: Optional[Dict[str, Any]] = None,
     **_extra,
 ) -> PanelSizingResultado:
 
@@ -216,6 +227,24 @@ def calcular_panel_sizing(
         perdidas_detalle=perdidas_detalle,
     )
 
+    # --------------------------------------------
+    # FACTOR DE ORIENTACIÓN
+    # --------------------------------------------
+    factor_orient = 1.0
+
+    if isinstance(params_fv, dict):
+        try:
+            factor_orient = factor_orientacion_total(
+                tipo_superficie=params_fv.get("tipo_superficie"),
+                azimut_deg=params_fv.get("azimut_deg"),
+                azimut_a_deg=params_fv.get("azimut_a_deg"),
+                azimut_b_deg=params_fv.get("azimut_b_deg"),
+                reparto_pct_a=params_fv.get("reparto_pct_a"),
+                hemisferio=params_fv.get("hemisferio", "norte"),
+            )
+        except Exception:
+            factor_orient = 1.0
+
     consumo_anual = float(sum(consumo))
     if consumo_anual <= 0:
         errores.append("consumo_anual_kwh inválido (<=0).")
@@ -233,6 +262,7 @@ def calcular_panel_sizing(
                 kwh_obj_anual,
                 hsp12,
                 pr,
+                factor_orientacion=factor_orient,
             )
 
             n_pan = _n_paneles(kwp_req, panel_w_f)
@@ -249,6 +279,7 @@ def calcular_panel_sizing(
             if (isinstance(hsp_12m, (list, tuple)) and len(hsp_12m) == 12)
             else ("CONSERVADOR_12M" if usar_modelo_conservador else "hsp"),
         "prod_anual_por_kwp_kwh": float(prod_anual_por_kwp),
+        "factor_orientacion": float(factor_orient),
         "sombras_pct": float(_clamp(_safe_float(sombras_pct, 0.0), 0.0, 95.0)),
         "perdidas_sistema_pct": None
             if perdidas_sistema_pct is None
