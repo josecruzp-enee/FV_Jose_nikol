@@ -277,31 +277,25 @@ def _mostrar_nec(pkg: dict):
     st.divider()
     st.subheader("Ingeniería NEC 2023")
 
-    st.markdown("### DEBUG")
-    st.json(pkg)
-
-    
     if not pkg:
         st.info("Sin resultados NEC.")
         return
 
-    dc = pkg.get("dc", {}) or {}
-    ac = pkg.get("ac", {}) or {}
-    cond = pkg.get("conductores", {}) or {}
-    ocpd = pkg.get("ocpd", {}) or {}
+    dc = pkg.get("dc") or {}
+    ac = pkg.get("ac") or {}
+    conductores = (pkg.get("conductores") or {}).get("circuitos") or []
+    warnings_global = pkg.get("warnings") or []
 
-    tabs = st.tabs(["⚡ DC", "🔌 AC", "🛡️ Protecciones", "🧵 Conductores", "🔎 Datos crudos"])
+    tabs = st.tabs(["⚡ DC", "🔌 AC", "🧵 Conductores", "⚠ Warnings", "🔎 Datos crudos"])
 
-    
-
+    # ========================= DC =========================
     with tabs[0]:
         st.markdown("### Corrientes DC")
 
-        c1, c2, c3, c4 = st.columns(4)
+        c1, c2, c3 = st.columns(3)
         c1.metric("Vdc nominal", _fmt(dc.get("vdc_nom"), "V"))
         c2.metric("Idc nominal", _fmt(dc.get("idc_nom"), "A"))
         c3.metric("Potencia DC", _fmt(dc.get("potencia_dc_w"), "W"))
-        c4.metric("—", "")
 
         df_dc = pd.DataFrame(
             [
@@ -309,171 +303,76 @@ def _mostrar_nec(pkg: dict):
                 ("Idc nominal", _fmt(dc.get("idc_nom"), "A")),
                 ("Potencia DC", _fmt(dc.get("potencia_dc_w"), "W")),
             ],
-        columns=["Parámetro", "Valor"],
-    )
+            columns=["Parámetro", "Valor"],
+        )
 
-    try:
         st.dataframe(df_dc, use_container_width=True, hide_index=True)
-    except TypeError:
-        st.dataframe(df_dc, use_container_width=True)
 
-    _render_warnings(dc.get("warnings", []) or [])
-
-
-    
-            # ---------------------------------------------------------
-            # FIX UI: evitar "Módulos por string = 0"
-            # Si el motor NEC no llenó modulos_por_string, lo inferimos
-            # desde n_paneles y n_strings (y mostramos reparto real).
-            # ---------------------------------------------------------
-            def _to_int(x, default=0):
-                try:
-                    return int(float(x))
-                except Exception:
-                    return default
-
-            n_strings = _to_int(cfg.get("n_strings"), 0)
-
-            # Intentar resolver n_paneles desde varias rutas posibles
-            n_paneles = 0
-            # 1) si el motor NEC ya lo puso en dc
-            n_paneles = _to_int(dc.get("n_paneles"), 0)
-
-            # 2) si viene en config_strings
-            if n_paneles <= 0:
-                n_paneles = _to_int(cfg.get("n_paneles"), 0)
-
-            # 3) si viene en params (algunos motores lo guardan ahí)
-            if n_paneles <= 0:
-                params = dc.get("params", {}) or {}
-                n_paneles = _to_int(params.get("n_paneles"), 0)
-
-            # Si modulos_por_string viene 0 o no viene, lo rellenamos
-            mps_raw = _to_int(cfg.get("modulos_por_string"), 0)
-            if mps_raw <= 0:
-                if n_strings > 0 and n_paneles > 0:
-                    base = n_paneles // n_strings
-                    resto = n_paneles % n_strings
-                    reparto = [base + (1 if i < resto else 0) for i in range(n_strings)]
-                    cfg["modulos_por_string"] = " / ".join(str(x) for x in reparto)
-                else:
-                    cfg["modulos_por_string"] = "—"
-
-            df_cfg = _kv_df(
-                cfg,
-                rename={"n_strings": "Número de strings", "modulos_por_string": "Módulos por string", "tipo": "Tipo"},
-            )
-            try:
-                st.dataframe(df_cfg, use_container_width=True, hide_index=True)
-            except TypeError:
-                st.dataframe(df_cfg, use_container_width=True)
-
-        _render_warnings(dc.get("warnings", []) or [])
-
+    # ========================= AC =========================
     with tabs[1]:
         st.markdown("### Corrientes AC")
+
         c1, c2, c3, c4 = st.columns(4)
-        c1.metric("P AC", _fmt(ac.get("p_ac_w"), "W"))
-        c2.metric("Voltaje", _fmt(ac.get("v_ll_v"), "V"))
-        c3.metric("I nominal", _fmt(ac.get("i_ac_nom_a"), "A"))
-        c4.metric("I diseño", _fmt(ac.get("i_ac_design_a"), "A"))
+        c1.metric("Potencia AC", _fmt(ac.get("potencia_ac_w"), "W"))
+        c2.metric("Voltaje", _fmt(ac.get("vac_ll") or ac.get("vac_ln"), "V"))
+        c3.metric("I nominal", _fmt(ac.get("iac_nom"), "A"))
+        c4.metric("FP", _fmt(ac.get("fp")))
 
         df_ac = pd.DataFrame(
             [
                 ("Fases", _fmt(ac.get("fases"))),
-                ("FP", _fmt(ac.get("pf"))),
-                ("I nominal", _fmt(ac.get("i_ac_nom_a"), "A")),
-                ("I diseño", _fmt(ac.get("i_ac_design_a"), "A")),
+                ("FP", _fmt(ac.get("fp"))),
+                ("I nominal", _fmt(ac.get("iac_nom"), "A")),
+                ("Potencia AC", _fmt(ac.get("potencia_ac_w"), "W")),
             ],
             columns=["Parámetro", "Valor"],
         )
-        try:
-            st.dataframe(df_ac, use_container_width=True, hide_index=True)
-        except TypeError:
-            st.dataframe(df_ac, use_container_width=True)
 
-        _render_warnings(ac.get("warnings", []) or [])
+        st.dataframe(df_ac, use_container_width=True, hide_index=True)
 
+    # ====================== CONDUCTORES ======================
     with tabs[2]:
-        st.markdown("### Protecciones")
+        st.markdown("### Conductores calculados")
 
-        br = (ocpd.get("breaker_ac") or {})
-        fs = (ocpd.get("fusible_string") or {})
-
-        # ✅ NUEVO: vienen en el PAQ (ya calculados por el motor NEC)
-        spd = (pkg.get("spd") or {})
-        sec = (pkg.get("seccionamiento") or {})
-
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown("#### Breaker AC")
-            st.metric("I diseño", _fmt(br.get("i_diseno_a"), "A"))
-            st.metric("Tamaño seleccionado", _fmt(br.get("tamano_a"), "A"))
-
-        with col2:
-            st.markdown("#### Fusible por string")
-            req = bool(fs.get("requerido", False))
-            st.write("**Requerido:**", "Sí" if req else "No")
-            nota = fs.get("nota")
-            if nota:
-                st.info(nota)
-
-        st.divider()
-
-        # ✅ NUEVO: Protecciones DC / AC (SPD + Seccionamiento)
-        cdc, cac = st.columns(2)
-        with cdc:
-            st.markdown("#### Protecciones DC")
-            if spd.get("dc"):
-                st.write("**SPD DC:**", str(spd.get("dc")))
-            if sec.get("dc"):
-                st.write("**Seccionamiento DC:**", str(sec.get("dc")))
-
-        with cac:
-            st.markdown("#### Protecciones AC")
-            if spd.get("ac"):
-                st.write("**SPD AC:**", str(spd.get("ac")))
-            if sec.get("ac"):
-                st.write("**Seccionamiento AC:**", str(sec.get("ac")))
-
-        if spd.get("nota"):
-            st.caption(str(spd.get("nota")))
-
-    with tabs[3]:
-        st.markdown("### Conductores")
-        st.caption(f"Material: **{_fmt(cond.get('material'))}**")
-
-        rows = []
-        for key in ["dc_string", "dc_trunk", "ac_out"]:
-            c = cond.get(key)
-            if not c:
-                continue
-            rows.append(
-                {
-                    "Circuito": c.get("nombre", key),
-                    "I diseño": _fmt(c.get("i_a"), "A"),
-                    "L": _fmt(c.get("l_m"), "m"),
-                    "V base": _fmt(c.get("v_base_v"), "V"),
-                    "AWG": _fmt(c.get("awg")),
-                    "Amp. ajustada": _fmt(c.get("amp_ajustada_a"), "A"),
-                    "VD %": _fmt(c.get("vd_pct"), "%"),
-                    "Objetivo": _fmt(c.get("vd_obj_pct"), "%"),
-                    "OK": "✅" if c.get("ok") else "❌",
-                }
-            )
-
-        if rows:
-            df_cond = pd.DataFrame(rows)
-            try:
-                st.dataframe(df_cond, use_container_width=True, hide_index=True)
-            except TypeError:
-                st.dataframe(df_cond, use_container_width=True)
-        else:
+        if not conductores:
             st.info("Sin datos de conductores.")
+        else:
+            rows = []
 
+            for c in conductores:
+                rows.append(
+                    {
+                        "Circuito": c.get("nombre"),
+                        "I diseño (A)": c.get("i_diseno_a"),
+                        "Longitud (m)": c.get("l_m"),
+                        "V base (V)": c.get("v_base_v"),
+                        "Calibre": c.get("calibre"),
+                        "Ampacidad ajustada (A)": c.get("ampacidad_ajustada_a"),
+                        "VD (%)": c.get("vd_pct"),
+                        "VD objetivo (%)": c.get("vd_obj_pct"),
+                        "Cumple": "✅" if c.get("cumple") else "❌",
+                    }
+                )
+
+            df_cond = pd.DataFrame(rows)
+            st.dataframe(df_cond, use_container_width=True, hide_index=True)
+
+    # ========================= WARNINGS =========================
+    with tabs[3]:
+        st.markdown("### Advertencias")
+
+        if not warnings_global:
+            st.success("Sin advertencias.")
+        else:
+            for w in warnings_global:
+                st.warning(w)
+
+    # ========================= DEBUG =========================
     with tabs[4]:
-        st.markdown("### Datos crudos (para depurar)")
         st.json(pkg)
+
+
+
 
 def _mostrar_validacion_string(validacion: dict):
     v = validacion or {}
