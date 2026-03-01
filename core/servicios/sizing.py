@@ -3,8 +3,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
-from .modelo import Datosproyecto
-from core.consumo import (
+from core.dominio.modelo import Datosproyecto
+from core.servicios.consumo import (
     consumo_anual_kwh,
     consumo_promedio_mensual_kwh,
     normalizar_cobertura,
