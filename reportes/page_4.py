@@ -14,7 +14,8 @@ def tabla_impacto_mensual_anio1(resultado: Dict[str, Any], pal: dict, content_w:
     tecnico = resultado["tecnico"]
     financiero = resultado["financiero"]
 
-    energia_12m = tecnico["sizing"]["energia_12m"]
+    financiero = resultado["financiero"]
+    tabla_12m = financiero.get("tabla_12m", [])
     cuota_m = float(financiero["cuota_mensual"])
 
     header = [
