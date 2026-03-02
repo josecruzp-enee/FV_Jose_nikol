@@ -3,7 +3,9 @@ from __future__ import annotations
 from typing import Any, Dict, List
 
 from core.dominio.modelo import Datosproyecto
+from core.dominio.contrato import ResultadoSizing
 from electrical.energia.contrato import EnergiaResultado
+
 
 # ==========================================================
 # 🔵 CAPEX
@@ -46,7 +48,7 @@ def om_mensual(capex_L_: float, om_anual_pct: float) -> float:
 
 
 # ==========================================================
-# 🔵 SIMULACIÓN OPERATIVA MENSUAL (YA NO CALCULA ENERGÍA)
+# 🔵 SIMULACIÓN OPERATIVA MENSUAL
 # ==========================================================
 
 def simular_12_meses(
@@ -135,17 +137,17 @@ def _evaluacion_mensual(tabla: List[Dict[str, float]], cuota: float) -> Dict[str
 
 
 # ==========================================================
-# 🔵 ENTRYPOINT FINANCIERO (YA USA MOTOR ENERGÉTICO REAL)
+# 🔵 ENTRYPOINT FINANCIERO
 # ==========================================================
 
 def ejecutar_finanzas(
     *,
     datos: Datosproyecto,
-    sizing: Dict[str, Any],
+    sizing: ResultadoSizing,   # ← YA NO Dict
     energia: EnergiaResultado,
 ) -> Dict[str, Any]:
 
-    kwp_dc = float(sizing.get("pdc_kw") or 0.0)
+    kwp_dc = float(sizing.pdc_kw)   # ← CONTRATO FUERTE
 
     if kwp_dc <= 0:
         raise ValueError("Sizing incompleto para finanzas.")
@@ -153,14 +155,12 @@ def ejecutar_finanzas(
     if not energia.ok:
         raise ValueError("Motor energético inválido.")
 
-    # CAPEX
     capex = calcular_capex_L(
         pdc_kw=kwp_dc,
         costo_usd_kwp=datos.costo_usd_kwp,
         tcambio=datos.tcambio,
     )
 
-    # Deuda
     cuota = calcular_cuota_mensual(
         capex_L_=capex,
         tasa_anual=datos.tasa_anual,
@@ -170,10 +170,8 @@ def ejecutar_finanzas(
 
     om_mensual_val = om_mensual(capex, datos.om_anual_pct)
 
-    # Energía real mensual (ya física)
     energia_fv_12m = energia.energia_util_12m
 
-    # Simulación
     tabla_12m = simular_12_meses(
         consumo_12m=datos.consumo_12m,
         energia_fv_12m=energia_fv_12m,
