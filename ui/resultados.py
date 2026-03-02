@@ -81,33 +81,38 @@ def _render_nec_resumen(resultado_proyecto: dict) -> None:
         st.info("Sin paquete NEC disponible.")
         return
 
-    ocpd = paq.get("ocpd", {})
-    resumen = paq.get("resumen_pdf", {})
+    resumen = paq.get("resumen_pdf") or {}
+    ocpd = paq.get("ocpd") or {}
 
     c1, c2, c3, c4 = st.columns(4)
 
+    # Strings
     c1.metric(
         "Strings",
         len(strings.get("strings", []))
     )
 
+    # Corrientes con 2 decimales
     idc = resumen.get("idc_nom")
     iac = resumen.get("iac_nom")
 
     c2.metric(
         "I DC diseño",
-        f"{float(idc):.2f} A" if idc is not None else "—"
+        f"{float(idc):.2f} A" if isinstance(idc, (int, float)) else "—"
     )
 
     c3.metric(
         "I AC diseño",
-        f"{float(iac):.2f} A" if iac is not None else "—"
+        f"{float(iac):.2f} A" if isinstance(iac, (int, float)) else "—"
     )
 
-    br = ocpd.get("breaker_ac", {}) if isinstance(ocpd, dict) else {}
+    # Breaker AC robusto
+    breaker = ocpd.get("breaker_ac") if isinstance(ocpd, dict) else None
+    tam = breaker.get("tamano_a") if isinstance(breaker, dict) else None
+
     c4.metric(
         "Breaker AC",
-        f"{br.get('tamano_a', '—')} A"
+        f"{int(tam)} A" if isinstance(tam, (int, float)) else "—"
     )
 
     with st.expander("Ver paquete NEC (crudo)", expanded=False):
