@@ -1,5 +1,6 @@
 # electrical/paneles/orquestador_paneles.py
-# Orquestador del dominio paneles: normaliza entradas, valida coherencia mínima y ejecuta el motor único de strings FV.
+# Orquestador del dominio paneles: normaliza entradas, valida coherencia mínima
+# y ejecuta el motor único de strings FV.
 
 from __future__ import annotations
 from typing import Any, Dict, List, Optional
@@ -171,11 +172,12 @@ def ejecutar_paneles_desde_sizing(p, sizing):
     panel = get_panel(panel_id)
     inversor = get_inversor(inversor_id)
 
+    # 🔒 sizing ahora es ResultadoSizing (dataclass fuerte)
     return ejecutar_calculo_strings(
-        n_paneles_total=sizing.get("n_paneles"),
+        n_paneles_total=sizing.n_paneles,
         panel=panel,
         inversor=inversor,
         t_min_c=float(getattr(p, "t_min_c", 10.0)),
         dos_aguas=bool(getattr(p, "dos_aguas", False)),
-        pdc_kw_objetivo=sizing.get("pdc_kw"),
+        pdc_kw_objetivo=sizing.pdc_kw,
     )
