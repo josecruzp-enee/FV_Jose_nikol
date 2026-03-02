@@ -116,10 +116,10 @@ def _evaluacion_mensual(tabla: List[Dict[str, float]], cuota: float) -> Dict[str
 
     dscr = (ahorro_prom - om_prom) / cuota if cuota > 0 else 0.0
 
-    if dscr >= 1.2 and peor_mes >= 0:
+    if dscr >= 0.80 and peor_mes >= 0:
         estado = "VIABLE"
         nota = "Se paga cómodamente y no hay meses negativos."
-    elif dscr >= 1.0:
+    elif dscr >= 0.60:
         estado = "MARGINAL"
         nota = "Se sostiene en promedio."
     else:
