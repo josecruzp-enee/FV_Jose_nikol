@@ -91,14 +91,17 @@ def _render_nec_resumen(resultado_proyecto: dict) -> None:
         len(strings.get("strings", []))
     )
 
+    idc = resumen.get("idc_nom")
+    iac = resumen.get("iac_nom")
+
     c2.metric(
         "I DC diseño",
-        f"{resumen.get('idc_nom', '—')} A"
+        f"{float(idc):.2f} A" if idc is not None else "—"
     )
 
     c3.metric(
         "I AC diseño",
-        f"{resumen.get('iac_nom', '—')} A"
+        f"{float(iac):.2f} A" if iac is not None else "—"
     )
 
     br = ocpd.get("breaker_ac", {}) if isinstance(ocpd, dict) else {}
