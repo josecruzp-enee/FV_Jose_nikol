@@ -1,12 +1,13 @@
 # electrical/nec/orquestador_nec.py
 
 from typing import Dict, Any
+from core.dominio.contrato import ResultadoSizing
 from electrical.paquete_nec import armar_paquete_nec
 
 
 def ejecutar_nec(
     p: Any,
-    sizing: Dict[str, Any],
+    sizing: ResultadoSizing,   # ← YA NO Dict
     strings: Dict[str, Any],
 ) -> Dict[str, Any]:
 
@@ -22,20 +23,20 @@ def ejecutar_nec(
         ee["fases"] = base.get("fases")
         ee["fp"] = base.get("fp")
 
-    # Potencias
-    ee["potencia_dc_kw"] = float(sizing["pdc_kw"])
-    ee["potencia_ac_kw"] = float(sizing["pac_kw"])
+    # 🔒 Potencias desde contrato fuerte
+    ee["potencia_dc_kw"] = float(sizing.pdc_kw)
+    ee["potencia_ac_kw"] = float(sizing.pac_kw)
 
     # Información desde strings
-    if strings["ok"]:
-        rec = strings.get("recomendacion", {})
+    if strings.get("ok"):
+        rec = strings.get("recomendacion", {}) or {}
 
         vmp_string = float(rec.get("vmp_string_v", 0.0))
         if vmp_string > 0:
             ee["vdc_nom"] = vmp_string
 
         idesign = 0.0
-        for st in strings.get("strings", []):
+        for st in strings.get("strings", []) or []:
             idesign = max(idesign, float(st.get("idesign_cont_a", 0.0)))
 
         if idesign > 0:
