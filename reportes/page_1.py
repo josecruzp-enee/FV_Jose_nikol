@@ -17,7 +17,7 @@ from .helpers_pdf import (
     get_field,
 )
 
-from ui.rutas import money_L, num, preparar_salida
+from ui.rutas import money_L, num
 
 
 # ---------------------------
@@ -84,7 +84,11 @@ def p1_tabla_solucion_unica(datos, kwp, capex, ds, estado, pal, content_w):
 
     t = make_table(data, content_w, ratios=[1.25, 2.15, 1.25, 2.15], repeatRows=1)
 
-    bg_estado = pal["OK"] if "VIABLE" in estado_txt else pal["WARN"] if "MARGINAL" in estado_txt else pal["BAD"]
+    bg_estado = (
+        pal["OK"] if "VIABLE" in estado_txt
+        else pal["WARN"] if "MARGINAL" in estado_txt
+        else pal["BAD"]
+    )
 
     t.setStyle(table_style_uniform(pal, font_header=9, font_body=9))
     t.setStyle(
@@ -164,18 +168,19 @@ def p1_conclusion(financiero, kwp, cobertura_objetivo, pal, content_w):
     return [box_paragraph(concl, pal, content_w, font_size=10)]
 
 
+# ==========================================================
+# BUILD PAGE 1 (CONTRATO NUEVO SIN "tecnico")
+# ==========================================================
 def build_page_1(resultado: Dict[str, Any], datos, paths, pal, styles, content_w):
     story = []
 
-    tecnico = resultado["tecnico"]
-    financiero = resultado["financiero"]
-
-    sizing = tecnico["sizing"]
+    sizing = resultado.get("sizing", {})
+    financiero = resultado.get("financiero", {})
 
     fecha = datetime.now().strftime("%Y-%m-%d")
 
-    kwp = float(sizing.get("kwp_dc", 0.0))
-    capex = float(financiero["capex_L"])
+    kwp = float(sizing.get("kwp_dc", sizing.get("pdc_kw", 0.0)))
+    capex = float(financiero.get("capex_L", 0.0))
 
     cobertura_objetivo = float(get_field(datos, "cobertura_objetivo", 0.0))
 
