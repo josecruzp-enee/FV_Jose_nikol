@@ -23,7 +23,7 @@ except Exception:
 
 
 # ==========================================================
-# UTILIDADES BÁSICAS
+# UTILIDADES
 # ==========================================================
 
 def _num(m: Mapping[str, Any], *keys: str) -> Optional[float]:
@@ -64,6 +64,7 @@ def _sqrt3() -> float:
 # ==========================================================
 
 def _resolver_corrientes(entrada: Mapping[str, Any]) -> Tuple[Dict, Dict, list[str]]:
+
     warnings = []
 
     pdc_w = _num(entrada, "potencia_dc_w")
@@ -102,7 +103,12 @@ def _resolver_corrientes(entrada: Mapping[str, Any]) -> Tuple[Dict, Dict, list[s
     if iac is None:
         warnings.append("No se pudo calcular iac_nom.")
 
-    dc = {"potencia_dc_w": pdc_w, "vdc_nom": vdc, "idc_nom": idc}
+    dc = {
+        "potencia_dc_w": pdc_w,
+        "vdc_nom": vdc,
+        "idc_nom": idc,
+    }
+
     ac = {
         "potencia_ac_w": pac_w,
         "vac_ll": vac_ll,
@@ -116,23 +122,29 @@ def _resolver_corrientes(entrada: Mapping[str, Any]) -> Tuple[Dict, Dict, list[s
 
 
 # ==========================================================
-# 2️⃣ PROTECCIONES
+# 2️⃣ PROTECCIONES (CORREGIDO)
 # ==========================================================
 
 def _resolver_protecciones(entrada, dc, ac):
+
     warnings = []
-    ocpd = None
 
     try:
+        iac = float(ac.get("iac_nom") or 0.0)
+
+        # Opcionales (no afectan breaker AC si faltan)
+        n_strings = int(entrada.get("n_strings", 1))
+        isc_mod = float(entrada.get("isc_mod_a", 0.0))
+
         ocpd = dimensionar_protecciones_fv(
-            entrada=entrada,
-            dc=dc,
-            ac=ac,
-            idc_nom=dc.get("idc_nom"),
-            iac_nom=ac.get("iac_nom"),
+            iac_nom_a=iac,
+            n_strings=n_strings,
+            isc_mod_a=isc_mod,
         )
+
     except Exception as e:
         warnings.append(f"OCPD error: {e}")
+        ocpd = None
 
     return ocpd, warnings
 
@@ -142,10 +154,12 @@ def _resolver_protecciones(entrada, dc, ac):
 # ==========================================================
 
 def _resolver_conductores(entrada, dc, ac):
+
     warnings = []
     circuitos = []
 
     try:
+
         if dc.get("idc_nom"):
             circuitos.append(
                 tramo_conductor(
@@ -171,7 +185,7 @@ def _resolver_conductores(entrada, dc, ac):
     except Exception as e:
         warnings.append(f"Conductores error: {e}")
 
-    return {"circuitos": circuitos, "warnings": warnings}, warnings
+    return {"circuitos": circuitos}, warnings
 
 
 # ==========================================================
@@ -179,8 +193,10 @@ def _resolver_conductores(entrada, dc, ac):
 # ==========================================================
 
 def _resolver_canalizacion(entrada, dc, ac, ocpd, conductores):
+
     if not callable(canalizacion_fv):
         return None, ["Canalización no disponible."]
+
     try:
         return canalizacion_fv(
             entrada=entrada,
@@ -189,6 +205,7 @@ def _resolver_canalizacion(entrada, dc, ac, ocpd, conductores):
             ocpd=ocpd,
             conductores=conductores,
         ), []
+
     except Exception as e:
         return None, [f"Canalización error: {e}"]
 
@@ -198,6 +215,7 @@ def _resolver_canalizacion(entrada, dc, ac, ocpd, conductores):
 # ==========================================================
 
 def _armar_resumen(dc, ac, ocpd, conductores, warnings):
+
     circuitos = conductores.get("circuitos") or []
 
     dc_tramo = next((c for c in circuitos if c.get("nombre") == "DC"), None)
@@ -206,6 +224,11 @@ def _armar_resumen(dc, ac, ocpd, conductores, warnings):
     return {
         "idc_nom": dc.get("idc_nom"),
         "iac_nom": ac.get("iac_nom"),
+        "breaker_ac": (
+            ocpd.get("breaker_ac", {}).get("tamano_a")
+            if isinstance(ocpd, dict)
+            else None
+        ),
         "conductor_dc": dc_tramo.get("calibre") if dc_tramo else None,
         "conductor_ac": ac_tramo.get("calibre") if ac_tramo else None,
         "warnings": warnings,
