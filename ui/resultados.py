@@ -38,22 +38,15 @@ def _get_resultado_proyecto(ctx) -> dict:
 # KPIs
 # ==========================================================
 def _render_kpis(resultado_proyecto: dict) -> None:
-    # 🔒 Validación estructural mínima
-    if not isinstance(resultado_proyecto, dict):
-        st.error("resultado_proyecto inválido.")
-        return
 
-    tecnico = resultado_proyecto.get("tecnico") or {}
+    sizing = resultado_proyecto.get("sizing") or {}
     financiero = resultado_proyecto.get("financiero") or {}
 
-    if not tecnico or not financiero:
+    if not sizing or not financiero:
         st.error("Estructura de resultado_proyecto incompleta.")
         st.json(resultado_proyecto)
         return
 
-    sizing = tecnico.get("sizing") or {}
-
-    # ✅ Canon oficial del core
     pdc_kw = float(sizing.get("pdc_kw") or 0.0)
     cuota = float(financiero.get("cuota_mensual") or 0.0)
 
@@ -73,32 +66,46 @@ def _render_kpis(resultado_proyecto: dict) -> None:
         st.warning("Sizing inválido.")
 
 
-
 # ==========================================================
 # NEC resumen
 # ==========================================================
 def _render_nec_resumen(resultado_proyecto: dict) -> None:
     st.subheader("Ingeniería eléctrica (NEC 2023)")
 
-    nec = resultado_proyecto["tecnico"]["nec"]
-    paq = nec["paq"]
+    nec = resultado_proyecto.get("nec") or {}
+    strings = resultado_proyecto.get("strings") or {}
+
+    paq = nec.get("paq")
 
     if not paq:
         st.info("Sin paquete NEC disponible.")
         return
 
-    dc = paq.get("dc", {})
-    ac = paq.get("ac", {})
     ocpd = paq.get("ocpd", {})
     resumen = paq.get("resumen_pdf", {})
 
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Strings", len(resultado_proyecto["tecnico"]["strings"]["strings"]))
-    c2.metric("I DC diseño", f"{resumen.get('idc_nom', '—')} A")
-    c3.metric("I AC diseño", f"{resumen.get('iac_nom', '—')} A")
+
+    c1.metric(
+        "Strings",
+        len(strings.get("strings", []))
+    )
+
+    c2.metric(
+        "I DC diseño",
+        f"{resumen.get('idc_nom', '—')} A"
+    )
+
+    c3.metric(
+        "I AC diseño",
+        f"{resumen.get('iac_nom', '—')} A"
+    )
 
     br = ocpd.get("breaker_ac", {}) if isinstance(ocpd, dict) else {}
-    c4.metric("Breaker AC", f"{br.get('tamano_a', '—')} A")
+    c4.metric(
+        "Breaker AC",
+        f"{br.get('tamano_a', '—')} A"
+    )
 
     with st.expander("Ver paquete NEC (crudo)", expanded=False):
         st.json(paq)
@@ -124,7 +131,6 @@ def _ejecutar_pipeline_pdf(ctx, resultado_proyecto: dict) -> None:
     paths = preparar_salida("salidas")
     out_dir = paths.get("out_dir") or paths.get("base_dir") or "salidas"
 
-    # Generar artefactos (charts + layout)
     try:
         arte = generar_artefactos(
             res=resultado_proyecto,
@@ -138,7 +144,6 @@ def _ejecutar_pipeline_pdf(ctx, resultado_proyecto: dict) -> None:
         st.exception(e)
         st.warning("No se pudieron generar artefactos (charts/layout). Se intentará generar el PDF igual.")
 
-    # Generar PDF
     try:
         datos_pdf = dict(getattr(ctx.datos_proyecto, "__dict__", {}))
         pdf_path = generar_pdf_profesional(resultado_proyecto, datos_pdf, paths)
