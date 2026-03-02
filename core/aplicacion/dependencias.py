@@ -15,7 +15,7 @@ from .puertos import (
 )
 
 from .orquestador_estudio import DependenciasEstudio
-from dataclasses import asdict
+
 
 # ==========================================================
 # ADAPTADORES
@@ -23,23 +23,24 @@ from dataclasses import asdict
 
 class SizingAdapter(PuertoSizing):
     def ejecutar(self, datos):
-        resultado = calcular_sizing_unificado(datos)
-        return asdict(resultado)
+        # Devuelve ResultadoSizing (dataclass fuerte)
+        return calcular_sizing_unificado(datos)
 
 
 class PanelesAdapter(PuertoPaneles):
     def ejecutar(self, datos, sizing):
+        # sizing es ResultadoSizing (dataclass)
         return ejecutar_paneles_desde_sizing(datos, sizing)
 
 
 class EnergiaAdapter(PuertoEnergia):
     def ejecutar(self, datos, sizing, strings):
 
-        # sizing ahora es ResultadoSizing (dataclass)
+        # sizing es ResultadoSizing
         pdc_instalada_kw = sizing.pdc_kw
         pac_nominal_kw = sizing.pac_kw
 
-        # Irradiancia mensual
+        # Irradiancia mensual obligatoria
         hsp_12m = getattr(datos, "factores_fv_12m", None)
         if not hsp_12m:
             raise ValueError(
@@ -64,16 +65,19 @@ class EnergiaAdapter(PuertoEnergia):
             permitir_curtailment=sf.get("permitir_curtailment", True),
         )
 
+        # Devuelve EnergiaResultado (dataclass fuerte)
         return ejecutar_motor_energia(inp)
 
 
 class NECAdapter(PuertoNEC):
     def ejecutar(self, datos, sizing, strings):
+        # Devuelve ResultadoNEC (dataclass fuerte)
         return ejecutar_nec(datos, sizing, strings)
 
 
 class FinanzasAdapter(PuertoFinanzas):
     def ejecutar(self, datos, sizing, energia):
+        # Devuelve ResultadoFinanciero (dataclass fuerte)
         return ejecutar_finanzas(
             datos=datos,
             sizing=sizing,
