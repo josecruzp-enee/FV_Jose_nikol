@@ -13,7 +13,7 @@ from core.aplicacion.puertos import (
     PuertoFinanzas,
 )
 
-
+print("VERSIÓN ORQUESTADOR NUEVA ACTIVA")
 @dataclass
 class DependenciasEstudio:
     sizing: PuertoSizing
