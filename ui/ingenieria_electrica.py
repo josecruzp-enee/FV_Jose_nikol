@@ -2,8 +2,6 @@
 from __future__ import annotations
 
 from typing import List, Tuple
-from dataclasses import asdict
-
 import pandas as pd
 import streamlit as st
 
@@ -213,7 +211,6 @@ def _mostrar_nec(pkg: dict):
     with tabs[0]:
         st.metric("Vdc nominal", _fmt(dc.get("vdc_nom"), "V"))
         st.metric("Idc nominal", _fmt(dc.get("idc_nom"), "A"))
-        st.metric("Potencia DC", _fmt(dc.get("potencia_dc_w"), "W"))
 
     with tabs[1]:
         st.metric("Potencia AC", _fmt(ac.get("potencia_ac_w"), "W"))
@@ -276,19 +273,19 @@ def render(ctx):
 
         st.success("Ingeniería generada correctamente.")
 
-        # Ahora es dataclass fuerte
-        sizing = resultado.sizing
-        nec = resultado.nec
-        financiero = resultado.financiero
+        # 🔥 CORREGIDO: resultado es dict plano
+        sizing = resultado["sizing"]
+        nec = resultado["nec"]
+        financiero = resultado["financiero"]
 
         st.subheader("Sizing")
-        st.json(asdict(sizing))
+        st.json(sizing)
 
         st.subheader("NEC")
-        _mostrar_nec(nec.paq)
+        _mostrar_nec(nec.get("paq"))
 
         st.subheader("Finanzas")
-        st.json(asdict(financiero))
+        st.json(financiero)
 
     except Exception as exc:
         st.error(f"No se pudo generar ingeniería: {exc}")
