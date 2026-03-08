@@ -287,7 +287,7 @@ def armar_paquete_nec(entrada: Mapping[str, Any]) -> Dict[str, Any]:
 
         else:
 
-            strings_data = {}
+            strings_data = strings_result.get("corrientes_input", {})
 
         inversor_data = entrada.get("inversor", {})
 
