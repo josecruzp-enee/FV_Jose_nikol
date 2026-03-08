@@ -27,7 +27,7 @@ def render_analisis_cobertura(ctx):
 
             escenarios = analizar_cobertura(
                 consumo_anual_kwh=consumo_anual,
-                potencia_panel_kw=0.330,
+                potencia_panel_kw=0.55,
                 energia_1kwp_anual=1450,
                 tarifa_energia=ctx.consumo["tarifa_energia_L_kwh"],
             )
@@ -52,13 +52,23 @@ def render_analisis_cobertura(ctx):
                 "payback": "Payback (años)",
             })
 
+            # redondear potencia
+            df["Sistema FV (kW)"] = df["Sistema FV (kW)"].round(2)
+
+            # formatear dinero
+            df["Inversión"] = df["Inversión"].map(lambda x: f"L. {x:,.0f}")
+            df["Ahorro anual"] = df["Ahorro anual"].map(lambda x: f"L. {x:,.0f}")
+
+            # redondear métricas
+            df["ROI"] = df["ROI"].round(2)
+            df["Payback (años)"] = df["Payback (años)"].round(2)
+
             st.dataframe(df, use_container_width=True)
 
             if "ROI" in df.columns:
 
                 st.markdown("#### ROI vs Cobertura")
 
-                # para graficar necesitamos convertir cobertura nuevamente a número
                 chart_df = df.copy()
                 chart_df["Cobertura %"] = chart_df["Cobertura %"].str.replace(" %", "").astype(int)
 
