@@ -38,6 +38,9 @@ def render_analisis_cobertura(ctx):
 
             df = pd.DataFrame([e.__dict__ for e in escenarios])
 
+            # convertir cobertura a porcentaje
+            df["cobertura"] = (df["cobertura"] * 100).astype(int).astype(str) + " %"
+
             df = df.rename(columns={
                 "cobertura": "Cobertura %",
                 "potencia_fv_kw": "Sistema FV (kW)",
@@ -55,14 +58,17 @@ def render_analisis_cobertura(ctx):
 
                 st.markdown("#### ROI vs Cobertura")
 
-                chart = df.set_index("Cobertura %")["ROI"]
+                # para graficar necesitamos convertir cobertura nuevamente a número
+                chart_df = df.copy()
+                chart_df["Cobertura %"] = chart_df["Cobertura %"].str.replace(" %", "").astype(int)
+
+                chart = chart_df.set_index("Cobertura %")["ROI"]
 
                 st.line_chart(chart)
 
         except Exception as e:
 
             st.error(f"Error ejecutando análisis de cobertura: {e}")
-
 
 # ---------------------------------------------------------
 # UI Consumo energético
