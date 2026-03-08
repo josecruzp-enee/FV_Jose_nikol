@@ -261,12 +261,32 @@ def armar_paquete_nec(entrada: Mapping[str, Any]) -> Dict[str, Any]:
     warnings = _merge(warnings, w)
 
     # ======================================================
-    # Corrientes FV reales (panel → string → MPPT → inversor)
+    # Adaptar resultado de strings → motor corrientes
     # ======================================================
 
     try:
 
-        strings_data = entrada.get("strings", {})
+        strings_result = entrada.get("strings_resultado", {})
+
+        strings_list = strings_result.get("strings", [])
+
+        if strings_list:
+
+            s0 = strings_list[0]
+
+            strings_data = {
+                "imp_string_a": s0.get("imp_a", 0),
+                "isc_string_a": s0.get("isc_a", 0),
+                "strings_por_mppt": s0.get("n_paralelo", 1),
+                "n_strings_total": strings_result.get(
+                    "recomendacion", {}
+                ).get("n_strings_total", 0),
+            }
+
+        else:
+
+            strings_data = {}
+
         inversor_data = entrada.get("inversor", {})
 
         corrientes = calcular_corrientes(
