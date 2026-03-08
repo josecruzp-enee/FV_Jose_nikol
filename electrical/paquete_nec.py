@@ -282,7 +282,8 @@ def armar_paquete_nec(entrada: Mapping[str, Any]) -> Dict[str, Any]:
     )
 
     warnings = _merge(warnings, w)
-
+    if corrientes and "ac" in corrientes:
+        ac["iac_nom"] = corrientes["ac"].get("i_operacion_a")
     resumen = _armar_resumen(dc, ac, ocpd, conductores, warnings)
     print("DEBUG NEC ENTRADA:", entrada.keys())
     return {
