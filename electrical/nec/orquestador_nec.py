@@ -38,8 +38,8 @@ def ejecutar_nec(
     # Potencias desde sizing
     # -------------------------
 
-    ee["potencia_dc_kw"] = float(sizing.pdc_kw)
-    ee["potencia_ac_kw"] = float(sizing.pac_kw)
+    ee["potencia_dc_w"] = float(sizing.pdc_kw) * 1000
+    ee["potencia_ac_w"] = float(sizing.pac_kw) * 1000
 
     # -------------------------
     # Datos desde strings
