@@ -149,7 +149,7 @@ def calcular_sizing_unificado(
     paneles_por_inversor = ceil(n_pan / n_inversores)
 
     # =========================
-    # Energía inicial vacía (la calcula el motor energía)
+    # Energía inicial vacía
     # =========================
     energia_12m: List[MesEnergia] = []
 
@@ -162,5 +162,6 @@ def calcular_sizing_unificado(
         pdc_kw=round(pdc, 3),
         pac_kw=pac_total_kw,
         n_inversores=n_inversores,
+        paneles_por_inversor=paneles_por_inversor,
         energia_12m=energia_12m,
     )
