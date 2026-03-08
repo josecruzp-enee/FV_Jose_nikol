@@ -174,7 +174,7 @@ def render(ctx) -> None:
     render_analisis_cobertura(ctx)
 
     # generación FV estimada para la gráfica (provisional)
-    energia_mensual_fv = [total * 0.22 / 12] * 12
+    energia_mensual_fv = [total * 0.75 / 12] * 12
 
     render_demanda_vs_fv(ctx, energia_mensual_fv)
 
