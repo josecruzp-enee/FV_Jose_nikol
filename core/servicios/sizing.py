@@ -1,7 +1,7 @@
-# core/servicios/sizing.py
 from __future__ import annotations
 
 from typing import Any, Dict, Optional, List
+from math import ceil
 
 from core.dominio.modelo import Datosproyecto
 from core.dominio.contrato import ResultadoSizing, MesEnergia
@@ -143,7 +143,10 @@ def calcular_sizing_unificado(
     # potencia AC total instalada
     pac_total_kw = pac_kw * n_inversores
 
-    
+    # =========================
+    # DIVISIÓN DEL ARREGLO
+    # =========================
+    paneles_por_inversor = ceil(n_pan / n_inversores)
 
     # =========================
     # Energía inicial vacía (la calcula el motor energía)
