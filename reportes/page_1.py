@@ -1,7 +1,5 @@
-# reportes/page_1.py
 from __future__ import annotations
 
-import math
 from datetime import datetime
 from typing import Any, Dict
 
@@ -23,6 +21,7 @@ from ui.rutas import money_L, num
 # ---------------------------
 # Página 1
 # ---------------------------
+
 def p1_tabla_cliente(datos, sizing, fecha, pal, content_w):
     story = []
     story.append(section_bar("Datos del cliente y situación energética", pal, content_w))
@@ -52,20 +51,24 @@ def p1_tabla_cliente(datos, sizing, fecha, pal, content_w):
     return story
 
 
-def p1_tabla_solucion_unica(datos, kwp, capex, ds, estado, pal, content_w):
+def p1_tabla_solucion_unica(datos, sizing, financiero, pal, content_w):
     from reportlab.platypus import TableStyle
 
-    prod_base_kwh_kwp_mes = float(get_field(datos, "prod_base_kwh_kwp_mes", 0.0))
+    kwp = float(sizing.get("kwp_dc", sizing.get("pdc_kw", 0.0)))
+    capex = float(financiero.get("capex_L", 0.0))
+
+    prod_anual = float(sizing.get("produccion_anual_kwh", 0.0))
+
+    n_paneles = int(sizing.get("n_paneles", 0))
+    panel_wp = int(sizing.get("panel_w", sizing.get("panel_wp", 0)))
+
     tasa_anual = float(get_field(datos, "tasa_anual", 0.0))
     plazo_anios = int(get_field(datos, "plazo_anios", 0))
     porcentaje_financiado = float(get_field(datos, "porcentaje_financiado", 0.0))
     cobertura_objetivo = float(get_field(datos, "cobertura_objetivo", 0.0))
 
-    prod_anual = float(kwp) * prod_base_kwh_kwp_mes * 12.0
-    n_paneles = int(math.ceil(float(kwp) * 1000.0 / 550.0)) if float(kwp) > 0 else 0
-    panel_wp = 550
-
-    estado_txt = (estado or "").upper().strip()
+    estado_txt = str(financiero.get("estado", "")).upper().strip()
+    ds = float(financiero.get("dscr", 0.0))
 
     barra = section_bar("Solución propuesta e indicadores clave", pal, content_w)
 
@@ -117,8 +120,10 @@ def p1_tabla_decision(financiero, pal, content_w):
     pago_actual = float(financiero.get("pago_actual", 0.0))
     pago_residual = float(financiero.get("pago_residual", 0.0))
     cuota = float(financiero.get("cuota_mensual", 0.0))
+
     pago_total = float(financiero.get("pago_total_fv", pago_residual + cuota))
     ahorro = float(financiero.get("ahorro_mensual", pago_actual - pago_total))
+
     plazo_anios = int(financiero.get("plazo_anios", 0))
 
     rows = [
@@ -145,11 +150,14 @@ def p1_tabla_decision(financiero, pal, content_w):
     return story
 
 
-def p1_conclusion(financiero, kwp, cobertura_objetivo, pal, content_w):
+def p1_conclusion(financiero, sizing, datos, pal, content_w):
     impacto = float(financiero.get("ahorro_mensual", 0.0))
     ds = float(financiero.get("dscr", 0.0))
     peor = float(financiero.get("peor_mes", 0.0))
     estado = str(financiero.get("estado", "")).upper()
+
+    kwp = float(sizing.get("kwp_dc", sizing.get("pdc_kw", 0.0)))
+    cobertura_objetivo = float(get_field(datos, "cobertura_objetivo", 0.0))
 
     recomend = (
         "Se recomienda avanzar a visita técnica y propuesta final."
@@ -168,9 +176,6 @@ def p1_conclusion(financiero, kwp, cobertura_objetivo, pal, content_w):
     return [box_paragraph(concl, pal, content_w, font_size=10)]
 
 
-# ==========================================================
-# BUILD PAGE 1 (CONTRATO NUEVO SIN "tecnico")
-# ==========================================================
 def build_page_1(resultado: Dict[str, Any], datos, paths, pal, styles, content_w):
     story = []
 
@@ -179,26 +184,13 @@ def build_page_1(resultado: Dict[str, Any], datos, paths, pal, styles, content_w
 
     fecha = datetime.now().strftime("%Y-%m-%d")
 
-    kwp = float(sizing.get("kwp_dc", sizing.get("pdc_kw", 0.0)))
-    capex = float(financiero.get("capex_L", 0.0))
-
-    cobertura_objetivo = float(get_field(datos, "cobertura_objetivo", 0.0))
-
     story.append(Paragraph("Reporte Ejecutivo — Evaluación Fotovoltaica", styles["Title"]))
     story.append(Spacer(1, 10))
 
     story += p1_tabla_cliente(datos, sizing, fecha, pal, content_w)
-    story += p1_tabla_solucion_unica(
-        datos,
-        kwp,
-        capex,
-        float(financiero.get("dscr", 0.0)),
-        str(financiero.get("estado", "")),
-        pal,
-        content_w,
-    )
+    story += p1_tabla_solucion_unica(datos, sizing, financiero, pal, content_w)
     story += p1_tabla_decision(financiero, pal, content_w)
-    story += p1_conclusion(financiero, kwp, cobertura_objetivo, pal, content_w)
+    story += p1_conclusion(financiero, sizing, datos, pal, content_w)
 
     story.append(PageBreak())
     return story
