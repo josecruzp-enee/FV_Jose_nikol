@@ -44,7 +44,6 @@ def _tabla_strings(strings: List[Dict[str, Any]], n_inversores: int, pal, conten
     rows = [header]
 
     for inv in range(1, n_inversores + 1):
-
         for s in strings:
             rows.append([
                 str(inv),
@@ -88,6 +87,39 @@ def _tabla_strings(strings: List[Dict[str, Any]], n_inversores: int, pal, conten
 
     return tbl
 
+
+# ==========================================================
+# Tabla Resumen Técnico
+# ==========================================================
+
+def _tabla_resumen_tecnico(data, pal, content_w):
+
+    colw = [content_w * 0.55, content_w * 0.45]
+
+    tbl = Table(data, colWidths=colw, hAlign="LEFT")
+
+    tbl.setStyle(
+        TableStyle(
+            [
+                ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
+                ("BACKGROUND", (0,0), (-1,0), pal.get("SOFT", colors.HexColor("#F5F7FA"))),
+                ("TEXTCOLOR", (0,0), (-1,0), pal.get("PRIMARY", colors.HexColor("#0B2E4A"))),
+
+                ("ALIGN", (1,1), (-1,-1), "RIGHT"),
+
+                ("GRID", (0,0), (-1,-1), 0.3, pal.get("BORDER", colors.HexColor("#D7DCE3"))),
+
+                ("FONTSIZE", (0,0), (-1,-1), 10),
+
+                ("TOPPADDING", (0,0), (-1,-1), 6),
+                ("BOTTOMPADDING", (0,0), (-1,-1), 6),
+            ]
+        )
+    )
+
+    return tbl
+
+
 # ==========================================================
 # Página 5 — Resumen técnico
 # ==========================================================
@@ -112,7 +144,6 @@ def build_page_5(resultado, datos, paths, pal, styles, content_w):
 
     panel_wp = (kwp_dc * 1000) / n_paneles if n_paneles > 0 else 0
 
-    # inversores
     pac_kw = float(sizing.get("pac_kw", 0.0))
     n_inv = int(sizing.get("n_inversores", 1))
     inv_kw = pac_kw / n_inv if n_inv > 0 else 0
@@ -124,27 +155,25 @@ def build_page_5(resultado, datos, paths, pal, styles, content_w):
     ahorro_anual_L = float(financiero.get("ahorro_anual_L", 0.0))
 
     # ======================================================
-    # Resumen técnico
+    # Tabla Resumen Técnico
     # ======================================================
 
     story.append(Paragraph("Resumen técnico", styles["Title"]))
     story.append(Spacer(1, 10))
 
-    story.append(Paragraph(f"Sistema FV estimado: {kwp_dc:.2f} kWp DC", styles["BodyText"]))
-    story.append(Paragraph(f"Número de paneles: {n_paneles} × {panel_wp:.0f} Wp", styles["BodyText"]))
+    data = [
+        ["Parámetro", "Valor"],
+        ["Sistema FV estimado", f"{kwp_dc:.2f} kWp DC"],
+        ["Número de paneles", f"{n_paneles} × {panel_wp:.0f} Wp"],
+        ["Inversores", f"{n_inv} × {inv_kw:.1f} kW"],
+        ["Potencia AC instalada", f"{pac_kw:.1f} kW"],
+        ["CAPEX estimado", f"L {capex_L:,.2f}"],
+        ["Consumo anual (12m)", f"{consumo_anual_kwh:,.0f} kWh"],
+        ["Generación FV útil (12m)", f"{fv_anual_kwh:,.0f} kWh"],
+        ["Ahorro anual estimado (12m)", f"L {ahorro_anual_L:,.2f}"],
+    ]
 
-    # NUEVO
-    story.append(Paragraph(f"Inversores: {n_inv} × {inv_kw:.1f} kW", styles["BodyText"]))
-    story.append(Paragraph(f"Potencia AC instalada: {pac_kw:.1f} kW", styles["BodyText"]))
-
-    story.append(Paragraph(f"CAPEX estimado: L {capex_L:,.2f}", styles["BodyText"]))
-
-    story.append(Spacer(1, 8))
-
-    story.append(Paragraph(f"Consumo anual (12m): {consumo_anual_kwh:,.0f} kWh", styles["BodyText"]))
-    story.append(Paragraph(f"Generación FV útil (12m): {fv_anual_kwh:,.0f} kWh", styles["BodyText"]))
-    story.append(Paragraph(f"Ahorro anual estimado (12m): L {ahorro_anual_L:,.2f}", styles["BodyText"]))
-
+    story.append(_tabla_resumen_tecnico(data, pal, content_w))
     story.append(Spacer(1, 12))
 
     # ======================================================
@@ -162,7 +191,7 @@ def build_page_5(resultado, datos, paths, pal, styles, content_w):
         story.append(Paragraph("<i>No hay configuración de strings disponible.</i>", styles["BodyText"]))
 
     story.append(Spacer(1, 10))
-    
+
     # ======================================================
     # Layout paneles
     # ======================================================
