@@ -26,11 +26,15 @@ def render_analisis_cobertura(ctx):
 
             consumo_anual = sum(ctx.consumo.get("kwh_12m", [0]*12))
 
+            # wrapper que adapta ejecutar_estudio al servicio
+            def ejecutar_pipeline(potencia_kw):
+                return ejecutar_estudio(ctx, None, potencia_kw)
+
             escenarios = analizar_cobertura(
                 consumo_anual_kwh=consumo_anual,
                 potencia_panel_kw=0.55,
-                energia_1kwp_anual=1500,   # temporal hasta conectar el motor energético
-                ejecutar_pipeline=ejecutar_estudio,
+                energia_1kwp_anual=1500,
+                ejecutar_pipeline=ejecutar_pipeline,
             )
 
             if not escenarios:
@@ -50,15 +54,11 @@ def render_analisis_cobertura(ctx):
             st.dataframe(df, use_container_width=True)
 
             if "ROI" in df.columns:
-
                 st.markdown("#### ROI vs Cobertura")
-
                 chart = df.set_index("Cobertura %")["ROI"]
-
                 st.line_chart(chart)
 
         except Exception as e:
-
             st.error(f"Error ejecutando análisis de cobertura: {e}")
 
 # ---------------------------------------------------------
