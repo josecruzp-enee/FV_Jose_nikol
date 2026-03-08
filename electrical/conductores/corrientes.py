@@ -56,39 +56,16 @@ def calcular_corrientes(
     strings: ResultadoStrings,
     inv: EntradaInversor,
     cfg_tecnicos: Mapping[str, Any] | None = None,
-) -> ResultadoCorrientes:
-    """
-    Calcula corrientes eléctricas del sistema FV.
-
-    Niveles eléctricos:
-
-    Panel
-        ↓
-    String
-        ↓
-    MPPT
-        ↓
-    Inversor DC
-        ↓
-    Inversor AC
-        ↓
-    Sistema AC
-
-    Entrega corrientes útiles para:
-        - protecciones
-        - conductores
-        - reportes
-    """
+) -> Dict[str, Any]:
 
     cfg_tecnicos = cfg_tecnicos or {}
 
-    # Factores de diseño NEC
     f_dc = float(cfg_tecnicos.get("factor_seguridad_dc", 1.25))
     f_ac = float(cfg_tecnicos.get("factor_seguridad_ac", 1.25))
 
-    # ======================================================
+    # ================================
     # Datos strings
-    # ======================================================
+    # ================================
 
     imp_string = _f(strings, "imp_string_a", 0.0)
     isc_string = _f(strings, "isc_string_a", 0.0)
@@ -98,48 +75,55 @@ def calcular_corrientes(
 
     mppt_por_inv = _i(inv, "mppt", 1)
 
-    # ======================================================
-    # Corrientes DC
-    # ======================================================
+    # ================================
+    # Panel
+    # ================================
 
-    # panel
     i_panel = imp_string
 
-    # string
-    i_string = imp_string
+    # ================================
+    # String
+    # ================================
 
-    # MPPT (strings en paralelo)
-    i_mppt = imp_string * float(strings_por_mppt)
+    i_string_operacion = imp_string
+    isc_string_val = isc_string
 
-    # corriente total DC
-    if n_strings_total > 0:
-        isc_total = isc_string * float(n_strings_total)
-    else:
-        isc_total = isc_string
+    # ================================
+    # MPPT
+    # ================================
 
-    # NEC DC
-    i_dc_diseno = float(isc_total) * float(f_dc)
+    i_mppt_operacion = imp_string * strings_por_mppt
+    isc_mppt = isc_string * strings_por_mppt
 
-    # ======================================================
-    # Corrientes AC
-    # ======================================================
+    # NEC 690.8
+    i_mppt_diseno = isc_mppt * f_dc
+
+    # ================================
+    # Sistema DC total
+    # ================================
+
+    i_dc_total_operacion = imp_string * n_strings_total
+    isc_total = isc_string * n_strings_total
+
+    # ================================
+    # AC
+    # ================================
 
     i_ac_max_ds = _f(inv, "i_ac_max_a", 0.0)
 
-    if i_ac_max_ds > 0.0:
-
-        i_ac_max = i_ac_max_ds
+    if i_ac_max_ds > 0:
+        i_ac = i_ac_max_ds
 
     else:
 
         kw_ac = _f(inv, "kw_ac", 0.0)
-        if kw_ac <= 0.0:
+        if kw_ac <= 0:
             kw_ac = _f(inv, "potencia_ac_kw", 0.0)
 
         p_w = kw_ac * 1000.0
 
         v = _f(inv, "v_ac_nom_v", 0.0)
-        if v <= 0.0:
+        if v <= 0:
             v = _f(inv, "vac", 0.0)
 
         fases = _i(inv, "fases", 1)
@@ -150,38 +134,52 @@ def calcular_corrientes(
 
         if v <= 0 or p_w <= 0:
 
-            i_ac_max = 0.0
+            i_ac = 0.0
 
         else:
 
             if fases == 3:
-                i_ac_max = p_w / (math.sqrt(3) * v * fp)
+                i_ac = p_w / (math.sqrt(3) * v * fp)
             else:
-                i_ac_max = p_w / (v * fp)
+                i_ac = p_w / (v * fp)
 
-    i_ac_diseno = i_ac_max * f_ac
+    i_ac_diseno = i_ac * f_ac
 
-    # ======================================================
+    # ================================
     # Shape estable
-    # ======================================================
+    # ================================
 
     return {
 
-        # DC niveles
-        "i_panel_a": float(i_panel),
-        "i_string_a": float(i_string),
-        "i_mppt_a": float(i_mppt),
-        "i_dc_inversor_a": float(i_dc_diseno),
+        "panel": {
+            "i_operacion_a": float(i_panel),
+        },
 
-        # AC
-        "i_ac_inversor_a": float(i_ac_max),
-        "i_ac_diseno_a": float(i_ac_diseno),
+        "string": {
+            "i_operacion_a": float(i_string_operacion),
+            "isc_a": float(isc_string_val),
+        },
 
-        # Compatibilidad legacy
-        "i_dc_diseno_a": float(i_dc_diseno),
+        "mppt": {
+            "strings_paralelo": int(strings_por_mppt),
+            "i_operacion_a": float(i_mppt_operacion),
+            "isc_a": float(isc_mppt),
+            "i_diseno_nec_a": float(i_mppt_diseno),
+        },
 
-        # Datos auxiliares
-        "isc_total_a": float(isc_total),
-        "f_dc": float(f_dc),
-        "f_ac": float(f_ac),
+        "dc_total": {
+            "strings_total": int(n_strings_total),
+            "i_operacion_a": float(i_dc_total_operacion),
+            "isc_total_a": float(isc_total),
+        },
+
+        "ac": {
+            "i_operacion_a": float(i_ac),
+            "i_diseno_a": float(i_ac_diseno),
+        },
+
+        "factores": {
+            "factor_dc": float(f_dc),
+            "factor_ac": float(f_ac),
+        }
     }
