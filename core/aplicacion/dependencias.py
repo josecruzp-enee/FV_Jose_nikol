@@ -73,10 +73,6 @@ class NECAdapter(PuertoNEC):
 
     def ejecutar(self, datos, sizing, strings):
 
-        # ===============================
-        # Extraer datos del sistema FV
-        # ===============================
-
         sf = getattr(datos, "sistema_fv", {}) or {}
 
         vdc_nom = sf.get("vdc_nom", 600)
@@ -84,10 +80,6 @@ class NECAdapter(PuertoNEC):
         vac_ln = sf.get("vac_ln", None)
         fases = sf.get("fases", 3)
         fp = sf.get("fp", 1.0)
-
-        # ===============================
-        # Adaptar resultado de strings
-        # ===============================
 
         strings_list = strings.get("strings", [])
 
@@ -108,10 +100,6 @@ class NECAdapter(PuertoNEC):
         n_strings_total = strings.get("recomendacion", {}).get(
             "n_strings_total", 0
         )
-
-        # ===============================
-        # Construir entrada NEC
-        # ===============================
 
         entrada_nec = {
 
@@ -140,11 +128,7 @@ class NECAdapter(PuertoNEC):
             },
         }
 
-        # ===============================
-        # Ejecutar NEC
-        # ===============================
-
-        return ejecutar_nec(entrada_nec)
+        return ejecutar_nec(entrada_nec, sizing, strings)
 
 
 class FinanzasAdapter(PuertoFinanzas):
