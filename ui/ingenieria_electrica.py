@@ -319,6 +319,7 @@ def render(ctx):
     try:
 
         datos = _datosproyecto_desde_ctx(ctx)
+        ctx.datos_proyecto = datos
         deps = construir_dependencias()
 
         resultado = ejecutar_estudio(datos, deps)
