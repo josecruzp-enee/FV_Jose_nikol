@@ -73,10 +73,12 @@ def ejecutar_nec(
             s0 = lista[0]
 
             ee["strings"] = {
-                "imp_string_a": float(s0.get("imp_a", 0)),
-                "isc_string_a": float(s0.get("isc_a", 0)),
-                "strings_por_mppt": int(s0.get("n_paralelo", 1)),
-                "n_strings_total": int(rec.get("n_strings_total", 0)),
+                "corrientes_input": {
+                    "imp_string_a": float(s0.get("imp_a", 0)),
+                     "isc_string_a": float(s0.get("isc_a", 0)),
+                     "strings_por_mppt": int(s0.get("n_paralelo", 1)),
+                     "n_strings_total": int(rec.get("n_strings_total", 0)),
+                }
             }
 
             ee["inversor"] = {
