@@ -161,5 +161,6 @@ def calcular_sizing_unificado(
         kwp_dc=round(pdc, 3),
         pdc_kw=round(pdc, 3),
         pac_kw=pac_total_kw,
+        n_inversores=n_inversores,
         energia_12m=energia_12m,
     )
