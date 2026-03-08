@@ -1,8 +1,39 @@
 from __future__ import annotations
 from typing import Dict, Any, Optional
 from math import ceil
+
 from electrical.catalogos import get_inversor, ids_inversores
 
+
+# ======================================================
+# Helper cálculo cantidad de inversores
+# ======================================================
+def calcular_cantidad_inversores(
+    pdc_kw: float,
+    pac_inversor_kw: float,
+    dc_ac_obj: float,
+) -> Dict[str, float]:
+
+    pac_obj = pdc_kw / dc_ac_obj
+
+    n_inversores = ceil(pac_obj / pac_inversor_kw)
+
+    pac_total = n_inversores * pac_inversor_kw
+
+    ratio_real = pdc_kw / pac_total
+
+    return {
+        "n_inversores": n_inversores,
+        "pac_kw": pac_inversor_kw,
+        "pac_total_kw": pac_total,
+        "ratio_real": ratio_real,
+        "pac_obj_kw": pac_obj,
+    }
+
+
+# ======================================================
+# Orquestador inversor
+# ======================================================
 def ejecutar_inversor_desde_sizing(
     *,
     pdc_kw: float,
@@ -16,11 +47,9 @@ def ejecutar_inversor_desde_sizing(
     if dc_ac_obj <= 0:
         raise ValueError("dc_ac_obj inválido")
 
-    pac_obj_kw = pdc_kw / dc_ac_obj
-
-    # -----------------------------
-    # inversor forzado
-    # -----------------------------
+    # --------------------------------------------------
+    # INVERSOR FORZADO (modo manual)
+    # --------------------------------------------------
     if inversor_id_forzado:
 
         inv = get_inversor(inversor_id_forzado)
@@ -30,45 +59,53 @@ def ejecutar_inversor_desde_sizing(
 
         pac = float(inv.kw_ac)
 
-        n_inv = ceil(pac_obj_kw / pac)
+        calc = calcular_cantidad_inversores(
+            pdc_kw=pdc_kw,
+            pac_inversor_kw=pac,
+            dc_ac_obj=dc_ac_obj,
+        )
 
         return {
             "inversor_id": inversor_id_forzado,
-            "pac_kw": pac,
-            "n_inversores": n_inv,
-            "pac_total_kw": pac * n_inv,
-            "pac_obj_kw": pac_obj_kw,
+            **calc,
         }
 
-    # -----------------------------
-    # selección automática
-    # -----------------------------
-    mejor = None
-    mejor_n = None
-    mejor_pac = None
+    # --------------------------------------------------
+    # SELECCIÓN AUTOMÁTICA
+    # --------------------------------------------------
+    mejor_total = None
+    mejor_resultado = None
+    mejor_id = None
 
     for iid in ids_inversores():
 
         inv = get_inversor(iid)
+        if inv is None:
+            continue
 
         pac = float(inv.kw_ac)
 
-        n_inv = ceil(pac_obj_kw / pac)
+        if pac <= 0:
+            continue
 
-        pac_total = n_inv * pac
+        calc = calcular_cantidad_inversores(
+            pdc_kw=pdc_kw,
+            pac_inversor_kw=pac,
+            dc_ac_obj=dc_ac_obj,
+        )
 
-        # buscamos la solución con menor potencia total instalada
-        if mejor is None or pac_total < mejor:
+        pac_total = calc["pac_total_kw"]
 
-            mejor = pac_total
-            mejor_n = n_inv
-            mejor_pac = pac
+        if mejor_total is None or pac_total < mejor_total:
+
+            mejor_total = pac_total
+            mejor_resultado = calc
             mejor_id = iid
+
+    if mejor_resultado is None:
+        raise RuntimeError("No se pudo seleccionar un inversor válido")
 
     return {
         "inversor_id": mejor_id,
-        "pac_kw": mejor_pac,
-        "n_inversores": mejor_n,
-        "pac_total_kw": mejor,
-        "pac_obj_kw": pac_obj_kw,
+        **mejor_resultado,
     }
