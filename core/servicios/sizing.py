@@ -138,6 +138,12 @@ def calcular_sizing_unificado(
     )
 
     pac_kw = float(resultado_inv["pac_kw"])
+    n_inversores = int(resultado_inv.get("n_inversores", 1))
+
+    # potencia AC total instalada
+    pac_total_kw = pac_kw * n_inversores
+
+    
 
     # =========================
     # Energía inicial vacía (la calcula el motor energía)
@@ -151,6 +157,6 @@ def calcular_sizing_unificado(
         n_paneles=n_pan,
         kwp_dc=round(pdc, 3),
         pdc_kw=round(pdc, 3),
-        pac_kw=pac_kw,
+        pac_kw=pac_total_kw,
         energia_12m=energia_12m,
     )
