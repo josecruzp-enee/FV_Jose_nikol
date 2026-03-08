@@ -17,10 +17,6 @@ _MESES = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic
 # ---------------------------------------------------------
 
 def render_analisis_cobertura(ctx):
-    """
-    Ejecuta el análisis de cobertura usando el servicio del core
-    y muestra los escenarios de sistema FV.
-    """
 
     st.markdown("### Análisis de tamaño del sistema FV")
 
@@ -28,40 +24,46 @@ def render_analisis_cobertura(ctx):
 
         try:
 
+            consumo_anual = sum(ctx.consumo.get("kwh_12m", [0]*12))
+
+            # producción anual de 1 kWp usando el motor energético
+            energia_base = ctx.deps.energia.calcular_energia(pdc_instalada_kw=1)
+            energia_1kwp_anual = energia_base.energia_anual_kwh
+
             escenarios = analizar_cobertura(
-                datos=ctx,
-                deps=ctx.deps,
-                ejecutar_estudio=ejecutar_estudio,
+                consumo_anual_kwh=consumo_anual,
+                potencia_panel_kw=0.55,
+                energia_1kwp_anual=energia_1kwp_anual,
+                ejecutar_pipeline=ejecutar_estudio,
             )
 
             if not escenarios:
                 st.warning("No se generaron escenarios.")
                 return
 
-            df = pd.DataFrame(escenarios)
+            df = pd.DataFrame([e.__dict__ for e in escenarios])
 
             df = df.rename(columns={
                 "cobertura": "Cobertura %",
-                "kw_fv": "Sistema FV (kW)",
+                "potencia_fv_kw": "Sistema FV (kW)",
                 "paneles": "Paneles",
-                "roi": "ROI %",
+                "roi": "ROI",
                 "payback": "Payback (años)",
             })
 
             st.dataframe(df, use_container_width=True)
 
-            if "ROI %" in df.columns:
+            if "ROI" in df.columns:
 
                 st.markdown("#### ROI vs Cobertura")
 
-                chart = df.set_index("Cobertura %")["ROI %"]
+                chart = df.set_index("Cobertura %")["ROI"]
 
                 st.line_chart(chart)
 
         except Exception as e:
 
             st.error(f"Error ejecutando análisis de cobertura: {e}")
-
 
 # ---------------------------------------------------------
 # UI Consumo energético
