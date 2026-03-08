@@ -6,7 +6,7 @@ import streamlit as st
 import pandas as pd
 
 from core.servicios.analisis_cobertura import analizar_cobertura
-from core.aplicacion.orquestador import ejecutar_estudio
+from core.aplicacion.orquestador_estudio import ejecutar_estudio
 
 
 _MESES = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"]
