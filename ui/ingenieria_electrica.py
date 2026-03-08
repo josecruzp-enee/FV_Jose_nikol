@@ -201,9 +201,10 @@ def _mostrar_sizing(sizing):
         with s2:
             st.metric("Número de strings", n_strings)
 
+
 def _mostrar_nec(nec):
 
-    st.subheader("Ingeniería NEC 2023")
+    st.subheader("Ingeniería eléctrica (NEC 2023)")
 
     if not nec:
         st.info("Sin resultados NEC.")
@@ -215,12 +216,87 @@ def _mostrar_nec(nec):
     ocpd = paq.get("ocpd", {})
     conductores = paq.get("conductores", {}).get("circuitos", [])
     warnings = paq.get("warnings", [])
+    corr = paq.get("corrientes", {})
+
+    # =====================================
+    # RESUMEN NEC
+    # =====================================
+
+    i_dc_diseno = None
+    i_ac_diseno = None
+
+    for c in conductores:
+        if c.get("nombre") == "DC":
+            i_dc_diseno = c.get("i_diseno_a")
+        if c.get("nombre") == "AC":
+            i_ac_diseno = c.get("i_diseno_a")
+
+    breaker = ocpd.get("breaker_ac", {}).get("tamano_a")
+
+    st.markdown("### Resumen de diseño")
+
+    c1, c2, c3 = st.columns(3)
+
+    with c1:
+        st.metric("I DC diseño", _fmt(i_dc_diseno, "A"))
+
+    with c2:
+        st.metric("I AC diseño", _fmt(i_ac_diseno, "A"))
+
+    with c3:
+        st.metric("Breaker AC", _fmt(breaker, "A"))
+
+    st.divider()
+
+    # =====================================
+    # CORRIENTES DEL SISTEMA FV
+    # =====================================
+
+    st.markdown("### Corrientes del sistema FV")
+
+    p = corr.get("panel", {})
+    s = corr.get("string", {})
+    m = corr.get("mppt", {})
+    dct = corr.get("dc_total", {})
+    acs = corr.get("ac", {})
+
+    c1, c2, c3 = st.columns(3)
+
+    with c1:
+        st.metric("Panel", _fmt(p.get("i_operacion_a"), "A"))
+
+    with c2:
+        st.metric("String", _fmt(s.get("i_operacion_a"), "A"))
+
+    with c3:
+        st.metric("MPPT", _fmt(m.get("i_operacion_a"), "A"))
+
+    c4, c5 = st.columns(2)
+
+    with c4:
+        st.metric(
+            "Entrada inversor DC",
+            _fmt(dct.get("i_operacion_a"), "A"),
+        )
+
+    with c5:
+        st.metric(
+            "Salida inversor AC",
+            _fmt(acs.get("i_operacion_a"), "A"),
+        )
+
+    st.divider()
+
+    # =====================================
+    # TABS TÉCNICAS
+    # =====================================
 
     tabs = st.tabs(["⚡ DC", "🔌 AC", "🧵 Conductores", "⚠ Warnings"])
 
     # =========================
     # DC
     # =========================
+
     with tabs[0]:
 
         c1, c2 = st.columns(2)
@@ -229,13 +305,14 @@ def _mostrar_nec(nec):
             st.metric("Voltaje DC", _fmt(dc.get("vdc_nom"), "V"))
 
         with c2:
-            st.metric("Corriente DC", _fmt(dc.get("idc_nom"), "A"))
+            st.metric("Corriente DC nominal", _fmt(dc.get("idc_nom"), "A"))
 
         st.metric("Potencia DC", _fmt(dc.get("potencia_dc_w"), "W"))
 
     # =========================
     # AC
     # =========================
+
     with tabs[1]:
 
         c1, c2 = st.columns(2)
@@ -244,7 +321,7 @@ def _mostrar_nec(nec):
             st.metric("Voltaje AC", _fmt(ac.get("vac_ll"), "V"))
 
         with c2:
-            st.metric("Corriente AC", _fmt(ac.get("iac_nom"), "A"))
+            st.metric("Corriente AC nominal", _fmt(ac.get("iac_nom"), "A"))
 
         st.metric("Potencia AC", _fmt(ac.get("potencia_ac_w"), "W"))
 
@@ -260,8 +337,9 @@ def _mostrar_nec(nec):
             )
 
     # =========================
-    # Conductores
+    # CONDUCTORES
     # =========================
+
     with tabs[2]:
 
         if not conductores:
@@ -278,6 +356,7 @@ def _mostrar_nec(nec):
                         "Circuito": c.get("nombre"),
                         "Calibre": c.get("calibre"),
                         "I diseño (A)": _fmt(c.get("i_diseno_a"), "A"),
+                        "Ampacidad (A)": _fmt(c.get("ampacidad_ajustada_a"), "A"),
                         "VD (%)": _fmt(c.get("vd_pct"), "%"),
                         "Cumple": "✅" if c.get("cumple") else "❌",
                     }
@@ -288,8 +367,9 @@ def _mostrar_nec(nec):
             st.dataframe(df, use_container_width=True)
 
     # =========================
-    # Warnings
+    # WARNINGS
     # =========================
+
     with tabs[3]:
 
         if not warnings:
