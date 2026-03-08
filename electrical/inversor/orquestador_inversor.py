@@ -1,12 +1,5 @@
-from __future__ import annotations
-from typing import Dict, Any, Optional
+from math import ceil
 
-from electrical.catalogos import get_inversor, ids_inversores
-
-
-# ==========================================================
-# API pública — Selección por potencia DC
-# ==========================================================
 
 def ejecutar_inversor_desde_sizing(
     *,
@@ -16,62 +9,64 @@ def ejecutar_inversor_desde_sizing(
 ) -> Dict[str, Any]:
 
     if pdc_kw <= 0:
-        raise ValueError("pdc_kw inválido para selección de inversor")
+        raise ValueError("pdc_kw inválido")
 
     if dc_ac_obj <= 0:
         raise ValueError("dc_ac_obj inválido")
 
-    # ------------------------------------------------------
-    # Potencia AC objetivo
-    # ------------------------------------------------------
     pac_obj_kw = pdc_kw / dc_ac_obj
 
-    # ------------------------------------------------------
-    # Si hay inversor forzado
-    # ------------------------------------------------------
+    # -----------------------------
+    # inversor forzado
+    # -----------------------------
     if inversor_id_forzado:
+
         inv = get_inversor(inversor_id_forzado)
+
         if inv is None:
             raise ValueError("Inversor forzado no encontrado")
 
+        pac = float(inv.kw_ac)
+
+        n_inv = ceil(pac_obj_kw / pac)
+
         return {
             "inversor_id": inversor_id_forzado,
-            "pac_kw": float(inv.kw_ac),
+            "pac_kw": pac,
+            "n_inversores": n_inv,
+            "pac_total_kw": pac * n_inv,
             "pac_obj_kw": pac_obj_kw,
         }
 
-    # ------------------------------------------------------
-    # Selección automática
-    # ------------------------------------------------------
-    mejor_id = None
+    # -----------------------------
+    # selección automática
+    # -----------------------------
+    mejor = None
+    mejor_n = None
     mejor_pac = None
 
     for iid in ids_inversores():
+
         inv = get_inversor(iid)
+
         pac = float(inv.kw_ac)
 
-        # buscamos el más cercano >= pac_obj
-        if pac >= pac_obj_kw:
-            if mejor_pac is None or pac < mejor_pac:
-                mejor_id = iid
-                mejor_pac = pac
+        n_inv = ceil(pac_obj_kw / pac)
 
-    # Si ninguno cumple >= objetivo, tomar el mayor disponible
-    if mejor_id is None:
-        max_pac = -1.0
-        for iid in ids_inversores():
-            inv = get_inversor(iid)
-            pac = float(inv.kw_ac)
-            if pac > max_pac:
-                max_pac = pac
-                mejor_id = iid
-                mejor_pac = pac
+        pac_total = n_inv * pac
 
-    if mejor_id is None:
-        raise ValueError("No hay inversores disponibles en catálogo")
+        # buscamos la solución con menor potencia total instalada
+        if mejor is None or pac_total < mejor:
+
+            mejor = pac_total
+            mejor_n = n_inv
+            mejor_pac = pac
+            mejor_id = iid
 
     return {
         "inversor_id": mejor_id,
-        "pac_kw": float(mejor_pac),
+        "pac_kw": mejor_pac,
+        "n_inversores": mejor_n,
+        "pac_total_kw": mejor,
         "pac_obj_kw": pac_obj_kw,
     }
