@@ -1,12 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List, Callable
+from typing import List
 
-
-# ==========================================================
-# DATACLASS RESULTADO DE ESCENARIO
-# ==========================================================
 
 @dataclass
 class EscenarioCobertura:
@@ -21,66 +17,38 @@ class EscenarioCobertura:
     payback: float
 
 
-# ==========================================================
-# SERVICIO PRINCIPAL
-# ==========================================================
-
 def analizar_cobertura(
     consumo_anual_kwh: float,
     potencia_panel_kw: float,
     energia_1kwp_anual: float,
-    ejecutar_pipeline: Callable[[float], dict],
-    coberturas: List[float] | None = None,
 ) -> List[EscenarioCobertura]:
 
-    """
-    Analiza distintos escenarios de cobertura energética FV.
-
-    Parámetros
-    ----------
-    consumo_anual_kwh : float
-        Consumo total anual del cliente.
-
-    potencia_panel_kw : float
-        Potencia nominal del panel (ej. 0.55 kW).
-
-    energia_1kwp_anual : float
-        Energía anual generada por 1 kWp usando el motor energético.
-
-    ejecutar_pipeline : Callable
-        Función que ejecuta el pipeline completo dado un tamaño FV (kW).
-
-    coberturas : list
-        Porcentajes de cobertura a evaluar.
-    """
-
-    if coberturas is None:
-        coberturas = [
-            0.10, 0.20, 0.30, 0.40, 0.50,
-            0.60, 0.70, 0.80, 0.90, 1.00
-        ]
+    coberturas = [
+        0.10,0.20,0.30,0.40,0.50,
+        0.60,0.70,0.80,0.90,1.00
+    ]
 
     resultados: List[EscenarioCobertura] = []
 
     for c in coberturas:
 
-        # Energía que se quiere cubrir
         energia_objetivo = consumo_anual_kwh * c
 
-        # Tamaño del sistema necesario
         potencia_fv_kw = energia_objetivo / energia_1kwp_anual
 
-        # Número de paneles
         paneles = int(round(potencia_fv_kw / potencia_panel_kw))
 
-        # Ejecutar pipeline existente
-        resultado = ejecutar_pipeline(potencia_fv_kw)
+        produccion = potencia_fv_kw * energia_1kwp_anual
 
-        produccion = resultado["energia"]["produccion_anual_kwh"]
-        inversion = resultado["financiero"]["capex_total"]
-        ahorro = resultado["financiero"]["ahorro_anual"]
-        roi = resultado["financiero"]["roi"]
-        payback = resultado["financiero"]["payback"]
+        # estimaciones financieras simples
+        costo_kw = 1200
+        tarifa = 5
+
+        inversion = potencia_fv_kw * costo_kw
+        ahorro = produccion * tarifa
+
+        roi = ahorro / inversion
+        payback = inversion / ahorro
 
         escenario = EscenarioCobertura(
             cobertura=c,
