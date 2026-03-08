@@ -261,7 +261,7 @@ def calcular_strings_fv(
 
     print("Serie mínima:", n_min)
     print("Serie máxima:", n_max)
-
+    
     if n_max < n_min:
         return _resultado_error("No existe número válido de módulos en serie")
 
@@ -291,7 +291,7 @@ def calcular_strings_fv(
     corrientes_input = _generar_corrientes_input(strings, n_strings_total)
 
     print("Corrientes input generado:", corrientes_input)
-
+    print("DEBUG CORRIENTES_INPUT:", corrientes_input)
     recomendacion, meta = _calcular_potencias(
         panel,
         n_series,
