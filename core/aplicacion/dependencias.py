@@ -5,7 +5,7 @@ from electrical.paneles.orquestador_paneles import ejecutar_paneles_desde_sizing
 from electrical.energia.orquestador_energia import ejecutar_motor_energia
 from electrical.energia.contrato import EnergiaInput
 from electrical.nec.orquestador_nec import ejecutar_nec
-
+from electrical.energia.irradiancia import hsp_12m_base
 from .puertos import (
     PuertoSizing,
     PuertoPaneles,
@@ -41,7 +41,7 @@ class EnergiaAdapter(PuertoEnergia):
         pac_nominal_kw = sizing.pac_kw
 
         # Irradiancia mensual obligatoria
-        hsp_12m = getattr(datos, "factores_fv_12m", None)
+        hsp_12m = hsp_12m_base()
         if not hsp_12m:
             raise ValueError(
                 "No se encontraron factores mensuales (HSP) en Datosproyecto."
