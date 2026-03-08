@@ -12,6 +12,27 @@ _MESES = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic
 
 
 # ---------------------------------------------------------
+# Gráfica Demanda vs FV
+# ---------------------------------------------------------
+
+def render_demanda_vs_fv(ctx, energia_mensual_kwh):
+
+    st.markdown("#### Demanda vs Generación FV mensual")
+
+    demanda = ctx.consumo["kwh_12m"]
+
+    df_graf = pd.DataFrame({
+        "Mes": _MESES,
+        "Demanda": demanda,
+        "FV": energia_mensual_kwh
+    })
+
+    df_graf = df_graf.set_index("Mes")
+
+    st.bar_chart(df_graf)
+
+
+# ---------------------------------------------------------
 # Análisis de cobertura FV
 # ---------------------------------------------------------
 
@@ -38,7 +59,6 @@ def render_analisis_cobertura(ctx):
 
             df = pd.DataFrame([e.__dict__ for e in escenarios])
 
-            # convertir cobertura a porcentaje
             df["cobertura"] = (df["cobertura"] * 100).astype(int).astype(str) + " %"
 
             df = df.rename(columns={
@@ -52,33 +72,28 @@ def render_analisis_cobertura(ctx):
                 "payback": "Payback (años)",
             })
 
-            # redondear potencia
             df["Sistema FV (kW)"] = df["Sistema FV (kW)"].round(2)
 
-            # formatear dinero
             df["Inversión"] = df["Inversión"].map(lambda x: f"L. {x:,.0f}")
             df["Ahorro anual"] = df["Ahorro anual"].map(lambda x: f"L. {x:,.0f}")
 
-            # redondear métricas
             df["ROI"] = df["ROI"].round(2)
             df["Payback (años)"] = df["Payback (años)"].round(2)
 
             st.dataframe(df, use_container_width=True)
 
-            if "ROI" in df.columns:
+            # gráfica ROI
+            chart_df = df.copy()
+            chart_df["Cobertura %"] = chart_df["Cobertura %"].str.replace(" %", "").astype(int)
+            chart = chart_df.set_index("Cobertura %")["ROI"]
 
-                st.markdown("#### ROI vs Cobertura")
-
-                chart_df = df.copy()
-                chart_df["Cobertura %"] = chart_df["Cobertura %"].str.replace(" %", "").astype(int)
-
-                chart = chart_df.set_index("Cobertura %")["ROI"]
-
-                st.line_chart(chart)
+            st.markdown("#### ROI vs Cobertura")
+            st.line_chart(chart)
 
         except Exception as e:
 
             st.error(f"Error ejecutando análisis de cobertura: {e}")
+
 
 # ---------------------------------------------------------
 # UI Consumo energético
@@ -113,7 +128,6 @@ def render(ctx) -> None:
             "Fuente de datos",
             options=["manual"],
             index=0,
-            help="Por ahora manual. Luego: recibo/CSV.",
         )
 
     st.markdown("#### kWh por mes")
@@ -156,7 +170,13 @@ def render(ctx) -> None:
 
     ctx.consumo = c
 
+    # análisis cobertura
     render_analisis_cobertura(ctx)
+
+    # generación FV estimada para la gráfica (provisional)
+    energia_mensual_fv = [total * 0.22 / 12] * 12
+
+    render_demanda_vs_fv(ctx, energia_mensual_fv)
 
 
 # ---------------------------------------------------------
@@ -171,36 +191,19 @@ def validar(ctx) -> Tuple[bool, List[str]]:
     kwh = c.get("kwh_12m", [])
 
     if not isinstance(kwh, list) or len(kwh) != 12:
-
         errores.append("Debe ingresar 12 valores de consumo (kWh).")
-
         return False, errores
 
     try:
-
         kwh_vals = [float(x) for x in kwh]
-
     except Exception:
-
-        errores.append("Consumo inválido: revise que todos los meses sean numéricos.")
-
+        errores.append("Consumo inválido.")
         return False, errores
 
     if any(v < 0 for v in kwh_vals):
-
-        errores.append("Consumo inválido: no se permiten valores negativos.")
+        errores.append("No se permiten valores negativos.")
 
     if max(kwh_vals) <= 0:
-
-        errores.append("Consumo inválido: al menos un mes debe ser mayor que 0 kWh.")
-
-    tarifa = float(c.get("tarifa_energia_L_kwh", 0.0))
-    cargos = float(c.get("cargos_fijos_L_mes", 0.0))
-
-    if tarifa <= 0:
-        errores.append("Ingrese una tarifa de energía (L/kWh) mayor que 0.")
-
-    if cargos < 0:
-        errores.append("Cargos fijos inválidos (no negativos).")
+        errores.append("Al menos un mes debe ser mayor que 0 kWh.")
 
     return (len(errores) == 0), errores
