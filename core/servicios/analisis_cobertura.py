@@ -28,7 +28,7 @@ class EscenarioCobertura:
 def analizar_cobertura(
     consumo_anual_kwh: float,
     potencia_panel_kw: float,
-    produccion_especifica: float,
+    energia_1kwp_anual: float,
     ejecutar_pipeline: Callable[[float], dict],
     coberturas: List[float] | None = None,
 ) -> List[EscenarioCobertura]:
@@ -44,15 +44,14 @@ def analizar_cobertura(
     potencia_panel_kw : float
         Potencia nominal del panel (ej. 0.55 kW).
 
-    produccion_especifica : float
-        Producción específica kWh/kW-año (ej. 1450 Honduras).
+    energia_1kwp_anual : float
+        Energía anual generada por 1 kWp usando el motor energético.
 
     ejecutar_pipeline : Callable
-        Función que ejecuta tu pipeline completo dado un tamaño FV (kW).
+        Función que ejecuta el pipeline completo dado un tamaño FV (kW).
 
     coberturas : list
         Porcentajes de cobertura a evaluar.
-
     """
 
     if coberturas is None:
@@ -65,10 +64,13 @@ def analizar_cobertura(
 
     for c in coberturas:
 
+        # Energía que se quiere cubrir
         energia_objetivo = consumo_anual_kwh * c
 
-        potencia_fv_kw = energia_objetivo / produccion_especifica
+        # Tamaño del sistema necesario
+        potencia_fv_kw = energia_objetivo / energia_1kwp_anual
 
+        # Número de paneles
         paneles = int(round(potencia_fv_kw / potencia_panel_kw))
 
         # Ejecutar pipeline existente
