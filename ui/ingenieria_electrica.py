@@ -218,66 +218,78 @@ def _mostrar_nec(nec):
 
     tabs = st.tabs(["⚡ DC", "🔌 AC", "🧵 Conductores", "⚠ Warnings"])
 
-    # ---------------- DC ----------------
+    # =========================
+    # DC
+    # =========================
     with tabs[0]:
 
         c1, c2 = st.columns(2)
 
         with c1:
-            st.metric("Voltaje DC", f"{dc.get('vdc_nom')} V")
+            st.metric("Voltaje DC", _fmt(dc.get("vdc_nom"), "V"))
 
         with c2:
-            st.metric("Corriente DC", f"{dc.get('idc_nom'):.2f} A")
+            st.metric("Corriente DC", _fmt(dc.get("idc_nom"), "A"))
 
-        st.metric("Potencia DC", f"{dc.get('potencia_dc_w')} W")
+        st.metric("Potencia DC", _fmt(dc.get("potencia_dc_w"), "W"))
 
-    # ---------------- AC ----------------
+    # =========================
+    # AC
+    # =========================
     with tabs[1]:
 
         c1, c2 = st.columns(2)
 
         with c1:
-            st.metric("Voltaje AC", f"{ac.get('vac_ll')} V")
+            st.metric("Voltaje AC", _fmt(ac.get("vac_ll"), "V"))
 
         with c2:
-            st.metric("Corriente AC", f"{ac.get('iac_nom'):.2f} A")
+            st.metric("Corriente AC", _fmt(ac.get("iac_nom"), "A"))
 
-        st.metric("Potencia AC", f"{ac.get('potencia_ac_w')} W")
+        st.metric("Potencia AC", _fmt(ac.get("potencia_ac_w"), "W"))
 
         breaker = ocpd.get("breaker_ac", {})
 
         if breaker:
+
             st.markdown("### Protección AC")
 
             st.metric(
                 "Breaker requerido",
-                f"{breaker.get('tamano_a')} A"
+                _fmt(breaker.get("tamano_a"), "A"),
             )
 
-    # ---------------- Conductores ----------------
+    # =========================
+    # Conductores
+    # =========================
     with tabs[2]:
 
         if not conductores:
             st.info("Sin datos de conductores")
+
         else:
 
             filas = []
 
             for c in conductores:
 
-                filas.append({
-                    "Circuito": c.get("nombre"),
-                    "Calibre": c.get("calibre"),
-                    "I diseño (A)": c.get("i_diseno_a"),
-                    "VD (%)": c.get("vd_pct"),
-                    "Cumple": "✅" if c.get("cumple") else "❌"
-                })
+                filas.append(
+                    {
+                        "Circuito": c.get("nombre"),
+                        "Calibre": c.get("calibre"),
+                        "I diseño (A)": _fmt(c.get("i_diseno_a"), "A"),
+                        "VD (%)": _fmt(c.get("vd_pct"), "%"),
+                        "Cumple": "✅" if c.get("cumple") else "❌",
+                    }
+                )
 
             df = pd.DataFrame(filas)
 
             st.dataframe(df, use_container_width=True)
 
-    # ---------------- Warnings ----------------
+    # =========================
+    # Warnings
+    # =========================
     with tabs[3]:
 
         if not warnings:
