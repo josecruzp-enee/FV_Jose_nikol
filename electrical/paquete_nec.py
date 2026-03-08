@@ -253,44 +253,92 @@ def armar_paquete_nec(entrada: Mapping[str, Any]) -> Dict[str, Any]:
 
     warnings = []
 
-    # Corrientes nominales
+    # ======================================================
+    # Corrientes nominales (DC / AC del sistema)
+    # ======================================================
+
     dc, ac, w = _resolver_corrientes_nominales(entrada)
     warnings = _merge(warnings, w)
 
-    # Corrientes del sistema FV (motor real)
+    # ======================================================
+    # Corrientes FV reales (panel → string → MPPT → inversor)
+    # ======================================================
+
     try:
+
+        strings_data = entrada.get("strings", {})
+        inversor_data = entrada.get("inversor", {})
+
         corrientes = calcular_corrientes(
-            strings=entrada,
-            inv=entrada,
+            strings=strings_data,
+            inv=inversor_data,
             cfg_tecnicos={}
         )
+
     except Exception as e:
-        corrientes = {}
+
+        corrientes = {
+            "panel": {"i_operacion_a": 0},
+            "string": {"i_operacion_a": 0},
+            "mppt": {"i_operacion_a": 0},
+            "dc_total": {"i_operacion_a": 0},
+            "ac": {"i_operacion_a": 0},
+        }
+
         warnings.append(f"Corrientes error: {e}")
 
-    # Protecciones
+    # ======================================================
+    # PROTECCIONES
+    # ======================================================
+
     ocpd, w = _resolver_protecciones(entrada, ac)
     warnings = _merge(warnings, w)
 
-    # Conductores
+    # ======================================================
+    # CONDUCTORES
+    # ======================================================
+
     conductores, w = _resolver_conductores(entrada, dc, ac)
     warnings = _merge(warnings, w)
 
-    # Canalización
-    canalizacion, w = _resolver_canalizacion(entrada, dc, ac, ocpd, conductores)
+    # ======================================================
+    # CANALIZACIÓN
+    # ======================================================
+
+    canalizacion, w = _resolver_canalizacion(
+        entrada,
+        dc,
+        ac,
+        ocpd,
+        conductores
+    )
+
     warnings = _merge(warnings, w)
 
-    # Resumen
+    # ======================================================
+    # RESUMEN PDF
+    # ======================================================
+
     resumen = _armar_resumen(dc, ac, ocpd, conductores, warnings)
 
-    # Paquete final
+    # ======================================================
+    # PAQUETE FINAL
+    # ======================================================
+
     return {
+
         "corrientes": corrientes,
+
         "dc": dc,
         "ac": ac,
+
         "ocpd": ocpd,
+
         "conductores": conductores,
+
         "canalizacion": canalizacion,
+
         "warnings": warnings,
+
         "resumen_pdf": resumen,
     }
