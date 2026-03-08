@@ -27,12 +27,21 @@ def _validar_ctx(ctx) -> bool:
     return True
 
 
-def _get_resultado_proyecto(ctx) -> dict:
+def _get_resultado_proyecto(ctx) -> Dict[str, Any]:
     rp = getattr(ctx, "resultado_proyecto", None)
-    if not isinstance(rp, dict):
-        raise ValueError("resultado_proyecto inválido.")
-    return rp
 
+    if rp is None:
+        raise ValueError("resultado_proyecto inexistente.")
+
+    # caso normal (dict)
+    if isinstance(rp, dict):
+        return rp
+
+    # soporte para dataclass u objeto
+    if hasattr(rp, "__dict__"):
+        return rp.__dict__
+
+    raise ValueError("resultado_proyecto inválido.")
 
 # ==========================================================
 # KPIs
