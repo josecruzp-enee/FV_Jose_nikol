@@ -1,5 +1,29 @@
 paneles:
 
+  jinko_jkm330pp_72:
+    marca: Jinko Solar
+    nombre: JKM330PP-72
+    codigo: JKM330PP72
+
+    stc:
+      pmax_w: 330
+      vmp_v: 37.8
+      voc_v: 46.9
+      imp_a: 8.74
+      isc_a: 9.14
+
+    coeficientes_pct_c:
+      voc: -0.30
+      pmax: -0.40
+
+    termico:
+      noct_c: 45
+
+
+
+
+
+
   ja_550:
     marca: JA Solar
     nombre: JAM72S30-550
