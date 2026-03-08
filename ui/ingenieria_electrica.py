@@ -201,6 +201,90 @@ def _mostrar_sizing(sizing):
         with s2:
             st.metric("Número de strings", n_strings)
 
+def _mostrar_nec(nec):
+
+    st.subheader("Ingeniería NEC 2023")
+
+    if not nec:
+        st.info("Sin resultados NEC.")
+        return
+
+    paq = nec.get("paq", {})
+    dc = paq.get("dc", {})
+    ac = paq.get("ac", {})
+    ocpd = paq.get("ocpd", {})
+    conductores = paq.get("conductores", {}).get("circuitos", [])
+    warnings = paq.get("warnings", [])
+
+    tabs = st.tabs(["⚡ DC", "🔌 AC", "🧵 Conductores", "⚠ Warnings"])
+
+    # ---------------- DC ----------------
+    with tabs[0]:
+
+        c1, c2 = st.columns(2)
+
+        with c1:
+            st.metric("Voltaje DC", f"{dc.get('vdc_nom')} V")
+
+        with c2:
+            st.metric("Corriente DC", f"{dc.get('idc_nom'):.2f} A")
+
+        st.metric("Potencia DC", f"{dc.get('potencia_dc_w')} W")
+
+    # ---------------- AC ----------------
+    with tabs[1]:
+
+        c1, c2 = st.columns(2)
+
+        with c1:
+            st.metric("Voltaje AC", f"{ac.get('vac_ll')} V")
+
+        with c2:
+            st.metric("Corriente AC", f"{ac.get('iac_nom'):.2f} A")
+
+        st.metric("Potencia AC", f"{ac.get('potencia_ac_w')} W")
+
+        breaker = ocpd.get("breaker_ac", {})
+
+        if breaker:
+            st.markdown("### Protección AC")
+
+            st.metric(
+                "Breaker requerido",
+                f"{breaker.get('tamano_a')} A"
+            )
+
+    # ---------------- Conductores ----------------
+    with tabs[2]:
+
+        if not conductores:
+            st.info("Sin datos de conductores")
+        else:
+
+            filas = []
+
+            for c in conductores:
+
+                filas.append({
+                    "Circuito": c.get("nombre"),
+                    "Calibre": c.get("calibre"),
+                    "I diseño (A)": c.get("i_diseno_a"),
+                    "VD (%)": c.get("vd_pct"),
+                    "Cumple": "✅" if c.get("cumple") else "❌"
+                })
+
+            df = pd.DataFrame(filas)
+
+            st.dataframe(df, use_container_width=True)
+
+    # ---------------- Warnings ----------------
+    with tabs[3]:
+
+        if not warnings:
+            st.success("Sin advertencias")
+        else:
+            for w in warnings:
+                st.warning(w)
 
 # ==========================================================
 # RENDER
@@ -240,8 +324,7 @@ def render(ctx):
 
         _mostrar_sizing(sizing)
 
-        st.subheader("NEC")
-        st.json(nec)
+        _mostrar_nec(nec)
 
         st.subheader("Finanzas")
         st.json(financiero)
