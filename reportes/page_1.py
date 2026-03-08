@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Any, Dict
 
 from reportlab.platypus import Paragraph, Spacer, PageBreak
+from reportlab.platypus import TableStyle
 
 from .helpers_pdf import (
     section_bar,
@@ -27,7 +28,9 @@ def p1_tabla_cliente(datos, sizing, fecha, pal, content_w):
     story.append(section_bar("Datos del cliente y situación energética", pal, content_w))
     story.append(Spacer(1, 6))
 
-    consumo_anual = float(sizing.get("consumo_anual", 0.0))
+    consumo_12m = get_field(datos, "consumo_12m", [])
+    consumo_anual = sum(consumo_12m) if isinstance(consumo_12m, list) else 0.0
+
     tarifa_energia = float(get_field(datos, "tarifa_energia", 0.0))
     cargos_fijos = float(get_field(datos, "cargos_fijos", 0.0))
 
@@ -51,16 +54,19 @@ def p1_tabla_cliente(datos, sizing, fecha, pal, content_w):
     return story
 
 
-def p1_tabla_solucion_unica(datos, sizing, financiero, pal, content_w):
-    from reportlab.platypus import TableStyle
+def p1_tabla_solucion_unica(datos, sizing, energia, financiero, pal, content_w):
 
     kwp = float(sizing.get("kwp_dc", sizing.get("pdc_kw", 0.0)))
     capex = float(financiero.get("capex_L", 0.0))
 
-    prod_anual = float(sizing.get("produccion_anual_kwh", 0.0))
+    energia_12m = energia.get("energia_util_12m", [])
+    prod_anual = sum(energia_12m) if isinstance(energia_12m, list) else 0.0
 
     n_paneles = int(sizing.get("n_paneles", 0))
-    panel_wp = int(sizing.get("panel_w", sizing.get("panel_wp", 0)))
+
+    panel_wp = 0
+    if n_paneles > 0 and kwp > 0:
+        panel_wp = int((kwp * 1000) / n_paneles)
 
     tasa_anual = float(get_field(datos, "tasa_anual", 0.0))
     plazo_anios = int(get_field(datos, "plazo_anios", 0))
@@ -79,7 +85,7 @@ def p1_tabla_solucion_unica(datos, sizing, financiero, pal, content_w):
             "Cobertura objetivo",
             f"{cobertura_objetivo*100:.0f}%",
             "Financiamiento",
-            f"{tasa_anual*100:.2f}% | {plazo_anios} años | {porcentaje_financiado*100:.0f}%",
+            f"{tasa_anual*100:.2f}% | {plazo_anios} años | {porcentaje_financiado*100:.0f}%"
         ],
         ["Sistema", f"{num(kwp,2)} kWp", "CAPEX", money_L(capex)],
         ["Producción anual est.", f"{prod_anual:,.0f} kWh/año", "DSCR", num(ds,2)],
@@ -95,6 +101,7 @@ def p1_tabla_solucion_unica(datos, sizing, financiero, pal, content_w):
     )
 
     t.setStyle(table_style_uniform(pal, font_header=9, font_body=9))
+
     t.setStyle(
         TableStyle(
             [
@@ -114,6 +121,7 @@ def p1_tabla_solucion_unica(datos, sizing, financiero, pal, content_w):
 
 
 def p1_tabla_decision(financiero, pal, content_w):
+
     story = []
     story.append(section_bar("Decisión del cliente (mensual)", pal, content_w))
     story.append(Spacer(1, 6))
@@ -152,10 +160,13 @@ def p1_tabla_decision(financiero, pal, content_w):
 
 
 def p1_conclusion(financiero, sizing, datos, pal, content_w):
+
+    evaluacion = financiero.get("evaluacion", {})
+
     impacto = float(financiero.get("ahorro_mensual", 0.0))
-    ds = float(financiero.get("dscr", 0.0))
-    peor = float(financiero.get("peor_mes", 0.0))
-    estado = str(financiero.get("estado", "")).upper()
+    ds = float(evaluacion.get("dscr", 0.0))
+    peor = float(evaluacion.get("peor_mes", 0.0))
+    estado = str(evaluacion.get("estado", "")).upper()
 
     kwp = float(sizing.get("kwp_dc", sizing.get("pdc_kw", 0.0)))
     cobertura_objetivo = float(get_field(datos, "cobertura_objetivo", 0.0))
@@ -178,9 +189,11 @@ def p1_conclusion(financiero, sizing, datos, pal, content_w):
 
 
 def build_page_1(resultado: Dict[str, Any], datos, paths, pal, styles, content_w):
+
     story = []
 
     sizing = resultado.get("sizing", {})
+    energia = resultado.get("energia", {})
     financiero = resultado.get("financiero", {})
 
     fecha = datetime.now().strftime("%Y-%m-%d")
@@ -189,9 +202,10 @@ def build_page_1(resultado: Dict[str, Any], datos, paths, pal, styles, content_w
     story.append(Spacer(1, 10))
 
     story += p1_tabla_cliente(datos, sizing, fecha, pal, content_w)
-    story += p1_tabla_solucion_unica(datos, sizing, financiero, pal, content_w)
+    story += p1_tabla_solucion_unica(datos, sizing, energia, financiero, pal, content_w)
     story += p1_tabla_decision(financiero, pal, content_w)
     story += p1_conclusion(financiero, sizing, datos, pal, content_w)
 
     story.append(PageBreak())
+
     return story
