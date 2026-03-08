@@ -1,19 +1,17 @@
-# reportes/page_4.py
 from __future__ import annotations
 
 from typing import Any, Dict, List
 
 from reportlab.platypus import Paragraph, Spacer, TableStyle, PageBreak
-from reportlab.lib.units import inch
 
-from reportes.utils import make_table, table_style_uniform, box_paragraph, money_L
+from .helpers_pdf import make_table, table_style_uniform, box_paragraph, money_L
 
 
 # ==========================================================
 # Tabla impacto mensual año 1
 # ==========================================================
 
-def tabla_impacto_mensual_anio1(resultado: Dict[str, Any], pal: dict, content_w: float) -> List:
+def tabla_impacto_mensual_anio1(resultado: Dict[str, Any], pal: dict, content_w: float):
 
     financiero = resultado.get("financiero", {})
     tabla_12m = financiero.get("tabla_12m", [])
@@ -28,9 +26,9 @@ def tabla_impacto_mensual_anio1(resultado: Dict[str, Any], pal: dict, content_w:
         "Ahorro acumulado (L)",
     ]
 
-    rows: List[List[str]] = []
-    acum = 0.0
+    rows = []
 
+    acum = 0.0
     total_pago_actual = 0.0
     total_con_fv_enee = 0.0
     total_fv_cuota = 0.0
@@ -40,12 +38,12 @@ def tabla_impacto_mensual_anio1(resultado: Dict[str, Any], pal: dict, content_w:
 
         mes = r.get("mes", 0)
 
-        # 🔥 Contrato real actual
         pago_actual = float(r.get("factura_base_L", 0.0))
         con_fv_enee = float(r.get("pago_enee_L", 0.0))
 
         fv_cuota = con_fv_enee + cuota_m
         ahorro_mes = pago_actual - fv_cuota
+
         acum += ahorro_mes
 
         total_pago_actual += pago_actual
@@ -62,7 +60,6 @@ def tabla_impacto_mensual_anio1(resultado: Dict[str, Any], pal: dict, content_w:
             money_L(acum),
         ])
 
-    # ===== Fila TOTAL =====
     rows.append([
         "TOTAL",
         money_L(total_pago_actual),
@@ -72,8 +69,10 @@ def tabla_impacto_mensual_anio1(resultado: Dict[str, Any], pal: dict, content_w:
         money_L(total_ahorro),
     ])
 
+    table_data = [header] + rows
+
     t = make_table(
-        [header] + rows,
+        table_data,
         content_w,
         ratios=[0.8, 1.7, 1.7, 1.7, 1.45, 1.9],
         repeatRows=1,
@@ -81,11 +80,12 @@ def tabla_impacto_mensual_anio1(resultado: Dict[str, Any], pal: dict, content_w:
 
     t.setStyle(table_style_uniform(pal, font_header=9, font_body=9))
 
-    last_row = len(rows)
+    last_row = len(table_data) - 1
 
     t.setStyle(TableStyle([
         ("ALIGN", (0, 1), (0, -1), "CENTER"),
         ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
+
         ("FONTNAME", (5, 1), (5, -1), "Helvetica-Bold"),
 
         ("BACKGROUND", (0, last_row), (-1, last_row), pal.get("SOFT")),
@@ -114,7 +114,7 @@ def build_page_4(
     content_w: float,
 ):
 
-    story: List = []
+    story = []
 
     story.append(Paragraph("Tabla Comparativa de Pagos", styles["Title"]))
     story.append(Spacer(1, 10))
@@ -128,15 +128,18 @@ def build_page_4(
     # Configuración eléctrica DC
     # ======================================================
 
-    strings_block = resultado.get("tecnico", {}).get("strings", {})
+    strings_block = resultado.get("strings", {})
     strings = strings_block.get("strings", [])
 
     if strings:
+
         story.append(Paragraph("Configuración eléctrica (DC)", styles["H2b"]))
         story.append(Spacer(1, 6))
 
         lines = []
+
         for s in strings:
+
             lines.append(
                 f"MPPT {s.get('mppt')}: "
                 f"{s.get('n_series')} módulos en serie × "
@@ -152,11 +155,13 @@ def build_page_4(
     # Resumen NEC
     # ======================================================
 
-    nec_block = resultado.get("tecnico", {}).get("nec", {})
+    nec_block = resultado.get("nec", {})
     nec_paq = nec_block.get("paq", {})
+
     resumen_pdf = nec_paq.get("resumen_pdf")
 
     if resumen_pdf:
+
         story.append(Paragraph("Resumen eléctrico (NEC 2023)", styles["H2b"]))
         story.append(Spacer(1, 6))
 
