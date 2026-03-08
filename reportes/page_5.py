@@ -14,6 +14,7 @@ from reportlab.platypus import Paragraph, Spacer, PageBreak, Table, TableStyle, 
 
 def _append_layout_paneles(story, paths, styles, content_w):
     layout = (paths or {}).get("layout_paneles")
+
     if layout and Path(str(layout)).exists():
         story.append(Spacer(1, 10))
         img = Image(str(layout), width=content_w, height=content_w * 0.45)
@@ -91,7 +92,6 @@ def build_page_5(resultado, datos, paths, pal, styles, content_w):
 
     story: List[Any] = []
 
-    # CONTRATO NUEVO
     sizing = resultado.get("sizing", {})
     strings_block = resultado.get("strings", {})
     financiero = resultado.get("financiero", {})
@@ -99,10 +99,19 @@ def build_page_5(resultado, datos, paths, pal, styles, content_w):
     strings = strings_block.get("strings", [])
     tabla_12m = financiero.get("tabla_12m", [])
 
+    # ======================================================
+    # Datos técnicos
+    # ======================================================
+
     kwp_dc = float(sizing.get("kwp_dc", sizing.get("pdc_kw", 0.0)))
     n_paneles = int(sizing.get("n_paneles", 0))
 
     panel_wp = (kwp_dc * 1000) / n_paneles if n_paneles > 0 else 0
+
+    # inversores
+    pac_kw = float(sizing.get("pac_kw", 0.0))
+    n_inv = int(sizing.get("n_inversores", 1))
+    inv_kw = pac_kw / n_inv if n_inv > 0 else 0
 
     capex_L = float(financiero.get("capex_L", 0.0))
 
@@ -110,20 +119,34 @@ def build_page_5(resultado, datos, paths, pal, styles, content_w):
     fv_anual_kwh = _sum_float(tabla_12m, "fv_kwh")
     ahorro_anual_L = float(financiero.get("ahorro_anual_L", 0.0))
 
+    # ======================================================
+    # Resumen técnico
+    # ======================================================
+
     story.append(Paragraph("Resumen técnico", styles["Title"]))
     story.append(Spacer(1, 10))
 
     story.append(Paragraph(f"Sistema FV estimado: {kwp_dc:.2f} kWp DC", styles["BodyText"]))
     story.append(Paragraph(f"Número de paneles: {n_paneles} × {panel_wp:.0f} Wp", styles["BodyText"]))
+
+    # NUEVO
+    story.append(Paragraph(f"Inversores: {n_inv} × {inv_kw:.1f} kW", styles["BodyText"]))
+    story.append(Paragraph(f"Potencia AC instalada: {pac_kw:.1f} kW", styles["BodyText"]))
+
     story.append(Paragraph(f"CAPEX estimado: L {capex_L:,.2f}", styles["BodyText"]))
+
     story.append(Spacer(1, 8))
 
     story.append(Paragraph(f"Consumo anual (12m): {consumo_anual_kwh:,.0f} kWh", styles["BodyText"]))
     story.append(Paragraph(f"Generación FV útil (12m): {fv_anual_kwh:,.0f} kWh", styles["BodyText"]))
     story.append(Paragraph(f"Ahorro anual estimado (12m): L {ahorro_anual_L:,.2f}", styles["BodyText"]))
+
     story.append(Spacer(1, 12))
 
-    # ===== Strings DC =====
+    # ======================================================
+    # Strings DC
+    # ======================================================
+
     story.append(Paragraph("Configuración eléctrica (Strings DC)", styles["Heading2"]))
     story.append(Spacer(1, 6))
 
@@ -134,7 +157,10 @@ def build_page_5(resultado, datos, paths, pal, styles, content_w):
 
     story.append(Spacer(1, 10))
 
-    # ===== Layout paneles =====
+    # ======================================================
+    # Layout paneles
+    # ======================================================
+
     _append_layout_paneles(story, paths, styles, content_w)
 
     story.append(PageBreak())
