@@ -261,12 +261,12 @@ def armar_paquete_nec(entrada: Mapping[str, Any]) -> Dict[str, Any]:
     warnings = _merge(warnings, w)
 
     # ======================================================
-    # Adaptar resultado de strings → motor corrientes
+    # ADAPTAR STRINGS → MOTOR CORRIENTES
     # ======================================================
 
     try:
 
-        strings_result = entrada.get("strings_resultado", {})
+        strings_result = entrada.get("strings", {})
 
         strings_list = strings_result.get("strings", [])
 
@@ -275,12 +275,14 @@ def armar_paquete_nec(entrada: Mapping[str, Any]) -> Dict[str, Any]:
             s0 = strings_list[0]
 
             strings_data = {
-                "imp_string_a": s0.get("imp_a", 0),
-                "isc_string_a": s0.get("isc_a", 0),
-                "strings_por_mppt": s0.get("n_paralelo", 1),
-                "n_strings_total": strings_result.get(
-                    "recomendacion", {}
-                ).get("n_strings_total", 0),
+                "imp_string_a": float(s0.get("imp_a", 0)),
+                "isc_string_a": float(s0.get("isc_a", 0)),
+                "strings_por_mppt": int(s0.get("n_paralelo", 1)),
+                "n_strings_total": int(
+                    strings_result.get("recomendacion", {}).get(
+                        "n_strings_total", 0
+                    )
+                ),
             }
 
         else:
@@ -342,7 +344,7 @@ def armar_paquete_nec(entrada: Mapping[str, Any]) -> Dict[str, Any]:
     resumen = _armar_resumen(dc, ac, ocpd, conductores, warnings)
 
     # ======================================================
-    # PAQUETE FINAL
+    # RESULTADO FINAL
     # ======================================================
 
     return {
