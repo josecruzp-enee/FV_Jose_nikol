@@ -38,33 +38,38 @@ def _sum_float(tabla: List[Dict[str, Any]], key: str) -> float:
 # Tabla Strings DC
 # ==========================================================
 
-def _tabla_strings(strings: List[Dict[str, Any]], pal, content_w):
+def _tabla_strings(strings: List[Dict[str, Any]], n_inversores: int, pal, content_w):
 
-    header = ["MPPT", "Serie (S)", "Paralelo (P)", "Vmp (V)", "Voc frío (V)", "Imp (A)", "Isc (A)"]
+    header = ["Inv", "MPPT", "Serie (S)", "Paralelo (P)", "Vmp (V)", "Voc frío (V)", "Imp (A)", "Isc (A)"]
     rows = [header]
 
-    for s in strings:
-        rows.append([
-            str(int(s.get("mppt", 0))),
-            str(int(s.get("n_series", 0))),
-            str(int(s.get("n_paralelo", 0))),
-            f"{float(s.get('vmp_string_v', 0.0)):.0f}",
-            f"{float(s.get('voc_frio_string_v', 0.0)):.0f}",
-            f"{float(s.get('imp_a', 0.0)):.1f}",
-            f"{float(s.get('isc_a', 0.0)):.1f}",
-        ])
+    for inv in range(1, n_inversores + 1):
+
+        for s in strings:
+            rows.append([
+                str(inv),
+                str(int(s.get("mppt", 0))),
+                str(int(s.get("n_series", 0))),
+                str(int(s.get("n_paralelo", 0))),
+                f"{float(s.get('vmp_string_v', 0.0)):.0f}",
+                f"{float(s.get('voc_frio_string_v', 0.0)):.0f}",
+                f"{float(s.get('imp_a', 0.0)):.1f}",
+                f"{float(s.get('isc_a', 0.0)):.1f}",
+            ])
 
     colw = [
+        content_w * 0.08,
+        content_w * 0.08,
         content_w * 0.10,
         content_w * 0.12,
-        content_w * 0.12,
-        content_w * 0.16,
-        content_w * 0.16,
+        content_w * 0.15,
         content_w * 0.17,
-        content_w * 0.17,
+        content_w * 0.15,
+        content_w * 0.15,
     ]
 
     tbl = Table(rows, colWidths=colw, hAlign="LEFT")
+
     tbl.setStyle(
         TableStyle(
             [
@@ -82,7 +87,6 @@ def _tabla_strings(strings: List[Dict[str, Any]], pal, content_w):
     )
 
     return tbl
-
 
 # ==========================================================
 # Página 5 — Resumen técnico
@@ -150,13 +154,15 @@ def build_page_5(resultado, datos, paths, pal, styles, content_w):
     story.append(Paragraph("Configuración eléctrica (Strings DC)", styles["Heading2"]))
     story.append(Spacer(1, 6))
 
+    n_inversores = int(sizing.get("n_inversores", 1))
+
     if strings:
-        story.append(_tabla_strings(strings, pal, content_w))
+        story.append(_tabla_strings(strings, n_inversores, pal, content_w))
     else:
         story.append(Paragraph("<i>No hay configuración de strings disponible.</i>", styles["BodyText"]))
 
     story.append(Spacer(1, 10))
-
+    
     # ======================================================
     # Layout paneles
     # ======================================================
