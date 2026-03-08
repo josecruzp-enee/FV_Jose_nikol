@@ -70,7 +70,6 @@ def _split_por_mppt(n_strings_total: int, n_mppt: int):
 
     return salida
 
-
 def calcular_strings_fv(
     *,
     n_paneles_total: int,
@@ -257,6 +256,4 @@ def calcular_strings_fv(
         },
         "meta": meta,
         "corrientes_input": corrientes_input,
-    }
-        "meta": meta,
     }
