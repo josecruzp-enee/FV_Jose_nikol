@@ -1,6 +1,6 @@
 from dataclasses import dataclass, asdict
 from typing import Any
-
+from core.servicios.analisis_cobertura import analizar_cobertura
 from core.dominio.contrato import (
     ResultadoProyecto,
 )
@@ -25,7 +25,6 @@ class DependenciasEstudio:
 
 def ejecutar_estudio(datos: Any, deps: DependenciasEstudio):
 
-    # 🔹 Ejecución directa (ya devuelven contratos fuertes)
     sizing = deps.sizing.ejecutar(datos)
     strings = deps.paneles.ejecutar(datos, sizing)
     energia = deps.energia.ejecutar(datos, sizing, strings)
@@ -38,7 +37,6 @@ def ejecutar_estudio(datos: Any, deps: DependenciasEstudio):
         energia=energia,
         nec=nec,
         financiero=financiero,
-        )
-
-    # 🔹 Frontera hacia UI
+    )
+    #fontera a ui. 
     return asdict(resultado)
