@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from typing import List, Dict, Any
-
+from electrical.energia.contrato import EnergiaResultado
 
 # =============================
 # Energía mensual
@@ -85,9 +85,14 @@ class ResultadoFinanciero:
 # Proyecto final
 # =============================
 
+# =============================
+# Proyecto final
+# =============================
+
 @dataclass(frozen=True)
 class ResultadoProyecto:
     sizing: ResultadoSizing
     strings: ResultadoStrings
+    energia: EnergiaResultado
     nec: ResultadoNEC
     financiero: ResultadoFinanciero
