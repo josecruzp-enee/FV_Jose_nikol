@@ -1,5 +1,29 @@
 inversores:
 
+  huawei_sun2000_115ktl_m2:
+    marca: Huawei
+    nombre: SUN2000-115KTL-M2
+    codigo: SUN2000115KTLM2
+
+    entrada_dc:
+      vdc_max_v: 1100
+      mppt_min_v: 200
+      mppt_max_v: 1000
+      vdc_nominal_v: 600
+      n_mppt: 10
+      strings_por_mppt: 2
+      imppt_max_a: 30
+      i_string_max_a: 20
+      isc_mppt_max_a: 40
+
+    salida_ac:
+      pac_kw: 115
+      potencia_aparente_kva: 125
+      vac_nominal_v: 400
+      corriente_nominal_a: 166
+      corriente_max_a: 182
+
+
   growatt_min_5000tlx:
     marca: Growatt
     nombre: MIN 5000TL-X
