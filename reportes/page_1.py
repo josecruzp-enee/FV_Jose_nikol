@@ -67,8 +67,9 @@ def p1_tabla_solucion_unica(datos, sizing, financiero, pal, content_w):
     porcentaje_financiado = float(get_field(datos, "porcentaje_financiado", 0.0))
     cobertura_objetivo = float(get_field(datos, "cobertura_objetivo", 0.0))
 
-    estado_txt = str(financiero.get("estado", "")).upper().strip()
-    ds = float(financiero.get("dscr", 0.0))
+    evaluacion = financiero.get("evaluacion", {})
+    estado_txt = str(evaluacion.get("estado", "")).upper().strip()
+    ds = float(evaluacion.get("dscr", 0.0))
 
     barra = section_bar("Solución propuesta e indicadores clave", pal, content_w)
 
