@@ -27,7 +27,7 @@ def render_analisis_cobertura(ctx):
 
             escenarios = analizar_cobertura(
                 consumo_anual_kwh=consumo_anual,
-                potencia_panel_kw=0.55,
+                potencia_panel_kw=0.330,
                 energia_1kwp_anual=1450,
                 tarifa_energia=ctx.consumo["tarifa_energia_L_kwh"],
             )
