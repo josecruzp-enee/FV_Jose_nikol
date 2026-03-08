@@ -1,9 +1,10 @@
-# electrical/paquete_nec.py
 from __future__ import annotations
 from typing import Any, Dict, Mapping, Optional, Tuple, Iterable
 
 from electrical.conductores.calculo_conductores import tramo_conductor
 from electrical.protecciones.protecciones import dimensionar_protecciones_fv
+from electrical.corrientes.calcular_corrientes import calcular_corrientes
+
 
 # Opcionales
 try:
@@ -60,10 +61,10 @@ def _sqrt3() -> float:
 
 
 # ==========================================================
-# 1️⃣ CORRIENTES
+# 1️⃣ CORRIENTES NOMINALES (DC / AC)
 # ==========================================================
 
-def _resolver_corrientes(entrada: Mapping[str, Any]) -> Tuple[Dict, Dict, list[str]]:
+def _resolver_corrientes_nominales(entrada: Mapping[str, Any]) -> Tuple[Dict, Dict, list[str]]:
 
     warnings = []
 
@@ -122,17 +123,17 @@ def _resolver_corrientes(entrada: Mapping[str, Any]) -> Tuple[Dict, Dict, list[s
 
 
 # ==========================================================
-# 2️⃣ PROTECCIONES (CORREGIDO)
+# 2️⃣ PROTECCIONES
 # ==========================================================
 
-def _resolver_protecciones(entrada, dc, ac):
+def _resolver_protecciones(entrada, ac):
 
     warnings = []
 
     try:
+
         iac = float(ac.get("iac_nom") or 0.0)
 
-        # Opcionales (no afectan breaker AC si faltan)
         n_strings = int(entrada.get("n_strings", 1))
         isc_mod = float(entrada.get("isc_mod_a", 0.0))
 
@@ -143,6 +144,7 @@ def _resolver_protecciones(entrada, dc, ac):
         )
 
     except Exception as e:
+
         warnings.append(f"OCPD error: {e}")
         ocpd = None
 
@@ -161,6 +163,7 @@ def _resolver_conductores(entrada, dc, ac):
     try:
 
         if dc.get("idc_nom"):
+
             circuitos.append(
                 tramo_conductor(
                     nombre="DC",
@@ -172,6 +175,7 @@ def _resolver_conductores(entrada, dc, ac):
             )
 
         if ac.get("iac_nom"):
+
             circuitos.append(
                 tramo_conductor(
                     nombre="AC",
@@ -183,6 +187,7 @@ def _resolver_conductores(entrada, dc, ac):
             )
 
     except Exception as e:
+
         warnings.append(f"Conductores error: {e}")
 
     return {"circuitos": circuitos}, warnings
@@ -198,6 +203,7 @@ def _resolver_canalizacion(entrada, dc, ac, ocpd, conductores):
         return None, ["Canalización no disponible."]
 
     try:
+
         return canalizacion_fv(
             entrada=entrada,
             dc=dc,
@@ -207,11 +213,12 @@ def _resolver_canalizacion(entrada, dc, ac, ocpd, conductores):
         ), []
 
     except Exception as e:
+
         return None, [f"Canalización error: {e}"]
 
 
 # ==========================================================
-# 5️⃣ RESUMEN
+# 5️⃣ RESUMEN PDF
 # ==========================================================
 
 def _armar_resumen(dc, ac, ocpd, conductores, warnings):
@@ -246,21 +253,39 @@ def armar_paquete_nec(entrada: Mapping[str, Any]) -> Dict[str, Any]:
 
     warnings = []
 
-    dc, ac, w = _resolver_corrientes(entrada)
+    # Corrientes nominales
+    dc, ac, w = _resolver_corrientes_nominales(entrada)
     warnings = _merge(warnings, w)
 
-    ocpd, w = _resolver_protecciones(entrada, dc, ac)
+    # Corrientes del sistema FV (motor real)
+    try:
+        corrientes = calcular_corrientes(
+            strings=entrada,
+            inv=entrada,
+            cfg_tecnicos={}
+        )
+    except Exception as e:
+        corrientes = {}
+        warnings.append(f"Corrientes error: {e}")
+
+    # Protecciones
+    ocpd, w = _resolver_protecciones(entrada, ac)
     warnings = _merge(warnings, w)
 
+    # Conductores
     conductores, w = _resolver_conductores(entrada, dc, ac)
     warnings = _merge(warnings, w)
 
+    # Canalización
     canalizacion, w = _resolver_canalizacion(entrada, dc, ac, ocpd, conductores)
     warnings = _merge(warnings, w)
 
+    # Resumen
     resumen = _armar_resumen(dc, ac, ocpd, conductores, warnings)
 
+    # Paquete final
     return {
+        "corrientes": corrientes,
         "dc": dc,
         "ac": ac,
         "ocpd": ocpd,
