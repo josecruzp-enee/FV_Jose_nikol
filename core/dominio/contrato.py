@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import List, Dict, Any
 from electrical.energia.contrato import EnergiaResultado
 
+
 # =============================
 # Energía mensual
 # =============================
@@ -24,7 +25,10 @@ class ResultadoSizing:
     kwp_dc: float
     pdc_kw: float
     pac_kw: float
+
     n_inversores: int
+    paneles_por_inversor: int
+
     energia_12m: List[MesEnergia]
 
 
@@ -34,6 +38,7 @@ class ResultadoSizing:
 
 @dataclass(frozen=True)
 class StringInfo:
+    inversor: int
     mppt: int
     n_series: int
     n_paralelo: int
@@ -54,9 +59,15 @@ class ResultadoStrings:
 # =============================
 
 @dataclass(frozen=True)
-class NECResumen:
+class NECInversor:
+    inversor: int
     idc_nom: float
     iac_nom: float
+
+
+@dataclass(frozen=True)
+class NECResumen:
+    inversores: List[NECInversor]
     vdc_nom: float
     vac_nom: float
 
@@ -81,10 +92,6 @@ class ResultadoFinanciero:
     payback_simple: float
     flujo_12m: List[Dict[str, float]]
 
-
-# =============================
-# Proyecto final
-# =============================
 
 # =============================
 # Proyecto final
