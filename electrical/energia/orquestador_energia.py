@@ -8,7 +8,16 @@ from .generacion_bruta import calcular_energia_bruta_dc
 from .perdidas_fisicas import aplicar_perdidas
 from .limitacion_inversor import aplicar_curtailment
 
-
+print("\n===== DEBUG ENERGIA =====")
+print("Pdc instalada:", inp.pdc_instalada_kw)
+print("Pac nominal:", inp.pac_nominal_kw)
+print("HSP 12 meses:", inp.hsp_12m)
+print("Dias mes:", inp.dias_mes)
+print("Factor orientacion:", inp.factor_orientacion)
+print("Perdidas DC %:", inp.perdidas_dc_pct)
+print("Perdidas AC %:", inp.perdidas_ac_pct)
+print("Sombras %:", inp.sombras_pct)
+print("=========================\n")
 def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
 
     errores = []
