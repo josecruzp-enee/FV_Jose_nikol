@@ -130,30 +130,6 @@ def _ui_inputs_electricos(e: dict):
 
 
 # ==========================================================
-# Defaults eléctricos
-# ==========================================================
-
-def _defaults_electrico(ctx) -> dict:
-    e = _asegurar_dict(ctx, "electrico")
-    merge_defaults(
-        e,
-        {
-            "vac": 240.0,
-            "fases": 1,
-            "fp": 1.0,
-            "dist_dc_m": 15.0,
-            "dist_ac_m": 25.0,
-            "vdrop_obj_dc_pct": 2.0,
-            "vdrop_obj_ac_pct": 2.0,
-            "t_min_c": 10.0,
-            "incluye_neutro_ac": False,
-            "otros_ccc": 0,
-        },
-    )
-    return e
-
-
-# ==========================================================
 # ctx → Datosproyecto
 # ==========================================================
 
@@ -190,56 +166,40 @@ def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
 
 
 # ==========================================================
-# NEC Display
+# Mostrar sizing claro
 # ==========================================================
 
-def _mostrar_nec(pkg: dict):
-    st.divider()
-    st.subheader("Ingeniería NEC 2023")
+def _mostrar_sizing(sizing):
 
-    if not pkg:
-        st.info("Sin resultados NEC.")
-        return
+    st.subheader("Sizing del sistema FV")
 
-    dc = pkg.get("dc") or {}
-    ac = pkg.get("ac") or {}
-    conductores = (pkg.get("conductores") or {}).get("circuitos") or []
-    warnings = pkg.get("warnings") or []
+    c1, c2, c3 = st.columns(3)
 
-    tabs = st.tabs(["⚡ DC", "🔌 AC", "🧵 Conductores", "⚠ Warnings"])
+    with c1:
+        st.metric("Paneles", sizing.get("n_paneles"))
 
-    with tabs[0]:
-        st.metric("Vdc nominal", _fmt(dc.get("vdc_nom"), "V"))
-        st.metric("Idc nominal", _fmt(dc.get("idc_nom"), "A"))
+    with c2:
+        st.metric("Potencia DC", f"{sizing.get('kwp_dc')} kWp")
 
-    with tabs[1]:
-        st.metric("Potencia AC", _fmt(ac.get("potencia_ac_w"), "W"))
-        st.metric("Voltaje", _fmt(ac.get("vac_ll") or ac.get("vac_ln"), "V"))
-        st.metric("I nominal", _fmt(ac.get("iac_nom"), "A"))
+    with c3:
+        st.metric("Potencia AC", f"{sizing.get('pac_kw')} kW")
 
-    with tabs[2]:
-        if not conductores:
-            st.info("Sin datos de conductores.")
-        else:
-            rows = []
-            for c in conductores:
-                rows.append(
-                    {
-                        "Circuito": c.get("nombre"),
-                        "Calibre": c.get("calibre"),
-                        "I diseño (A)": c.get("i_diseno_a"),
-                        "VD (%)": c.get("vd_pct"),
-                        "Cumple": "✅" if c.get("cumple") else "❌",
-                    }
-                )
-            st.dataframe(pd.DataFrame(rows), use_container_width=True)
+    paneles = sizing.get("n_paneles")
+    paneles_por_string = sizing.get("paneles_por_string")
 
-    with tabs[3]:
-        if not warnings:
-            st.success("Sin advertencias.")
-        else:
-            for w in warnings:
-                st.warning(w)
+    if paneles and paneles_por_string:
+
+        n_strings = paneles // paneles_por_string
+
+        st.markdown("### Configuración de strings")
+
+        s1, s2 = st.columns(2)
+
+        with s1:
+            st.metric("Paneles por string", paneles_por_string)
+
+        with s2:
+            st.metric("Número de strings", n_strings)
 
 
 # ==========================================================
@@ -248,7 +208,7 @@ def _mostrar_nec(pkg: dict):
 
 def render(ctx):
 
-    e = _defaults_electrico(ctx)
+    e = _asegurar_dict(ctx, "electrico")
     _ui_inputs_electricos(e)
 
     st.markdown("### Ingeniería eléctrica automática")
@@ -261,34 +221,27 @@ def render(ctx):
         return
 
     try:
-        datos = _datosproyecto_desde_ctx(ctx)
-        ctx.datos_proyecto = datos
-        st.session_state["datos_proyecto"] = datos
 
+        datos = _datosproyecto_desde_ctx(ctx)
         deps = construir_dependencias()
+
         resultado = ejecutar_estudio(datos, deps)
 
-        # soporta dict o dataclass
         if hasattr(resultado, "__dict__"):
             resultado = resultado.__dict__
 
         ctx.resultado_proyecto = resultado
-        st.session_state["resultado_proyecto"] = resultado
-
-        save_result_fingerprint(ctx)
 
         st.success("Ingeniería generada correctamente.")
 
-        # 🔥 CORREGIDO: resultado es dict plano
-        sizing = resultado["sizing"]
-        nec = resultado["nec"]
-        financiero = resultado["financiero"]
+        sizing = resultado.get("sizing", {})
+        nec = resultado.get("nec", {})
+        financiero = resultado.get("financiero", {})
 
-        st.subheader("Sizing")
-        st.json(sizing)
+        _mostrar_sizing(sizing)
 
         st.subheader("NEC")
-        _mostrar_nec(nec.get("paq"))
+        st.json(nec)
 
         st.subheader("Finanzas")
         st.json(financiero)
@@ -302,6 +255,7 @@ def render(ctx):
 # ==========================================================
 
 def validar(ctx) -> Tuple[bool, List[str]]:
+
     errores = []
 
     if not getattr(ctx, "resultado_proyecto", None):
