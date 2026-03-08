@@ -364,6 +364,10 @@ def filas_dc(norm: Dict[str, Any]) -> List[List[str]]:
 def filas_ac(norm: Dict[str, Any]) -> List[List[str]]:
     return [[it["label"] + (f" ({it['unit']})" if it.get("unit") else ""), it.get("value_fmt", "—")] for it in items_ac(norm)]
 
+# ----------------------------
+# PROTECCIONES (UI)
+# ----------------------------
+
 def items_protecciones(norm: Dict[str, Any]) -> List[Dict[str, Any]]:
 
     p = norm.get("protecciones") or {}
@@ -373,69 +377,106 @@ def items_protecciones(norm: Dict[str, Any]) -> List[Dict[str, Any]]:
     br = p.get("breaker_ac") or {}
     fs = p.get("fusible_string") or {}
 
-    items: List[Dict[str, Any]] = []
+    breaker_txt = "—"
+    if br:
+        breaker_txt = f"{br.get('tamano_a', '—')} A (I diseño { _fmt_num(br.get('i_diseno_a')) } A)"
 
-    # =====================
-    # PROTECCIONES DC
-    # =====================
-    items.append({
-        "label": "— Protecciones DC —",
-        "value": ""
-    })
+    fusible_txt = "Requerido" if bool(fs.get("requerido")) else "No requerido"
+    nota = fs.get("nota", "—")
 
-    items.append({
-        "label": "Fusible por string",
-        "value": "Requerido" if bool(fs.get("requerido")) else "No requerido"
-    })
+    items: List[Dict[str, Any]] = [
+        {
+            "key": "prot.breaker_ac",
+            "label": CATALOGO["prot.breaker_ac"]["label"],
+            "value": breaker_txt,
+            "unit": None,
+            "help": CATALOGO["prot.breaker_ac"]["help"],
+        },
+        {
+            "key": "prot.fusible_string",
+            "label": CATALOGO["prot.fusible_string"]["label"],
+            "value": fusible_txt,
+            "unit": None,
+            "help": CATALOGO["prot.fusible_string"]["help"],
+        },
+        {
+            "key": "prot.fusible_nota",
+            "label": "Nota/criterio",
+            "value": nota,
+            "unit": None,
+            "help": "Observación del criterio usado para el fusible.",
+        },
+    ]
+
+    return items
+
+
+# ----------------------------
+# PROTECCIONES (tabla simple PDF)
+# ----------------------------
+
+def filas_protecciones(norm: Dict[str, Any]) -> List[List[str]]:
+
+    p = norm.get("protecciones") or {}
+    spd = norm.get("spd") or {}
+    sec = norm.get("seccionamiento") or {}
+
+    br = p.get("breaker_ac") or {}
+    fs = p.get("fusible_string") or {}
+
+    rows: List[List[str]] = []
+
+    rows.append(["— Protecciones DC —", ""])
+
+    rows.append([
+        "Fusible por string",
+        "Requerido" if bool(fs.get("requerido")) else "No requerido"
+    ])
 
     if fs.get("nota"):
-        items.append({
-            "label": "Nota fusible",
-            "value": fs.get("nota")
-        })
+        rows.append([
+            "Nota fusible",
+            str(fs.get("nota"))
+        ])
 
     if spd.get("dc"):
-        items.append({
-            "label": "SPD DC",
-            "value": spd.get("dc")
-        })
+        rows.append([
+            "SPD DC",
+            str(spd.get("dc"))
+        ])
 
     if sec.get("dc"):
-        items.append({
-            "label": "Seccionamiento DC",
-            "value": sec.get("dc")
-        })
+        rows.append([
+            "Seccionamiento DC",
+            str(sec.get("dc"))
+        ])
 
-    # =====================
-    # PROTECCIONES AC
-    # =====================
-    items.append({
-        "label": "— Protecciones AC —",
-        "value": ""
-    })
+    rows.append(["— Protecciones AC —", ""])
 
     breaker_txt = "—"
     if br:
-        breaker_txt = f"{br.get('tamano_a','—')} A (I diseño { _to_num(br.get('i_diseno_a')) } A)"
+        breaker_txt = f"{br.get('tamano_a','—')} A (I diseño { _fmt_num(br.get('i_diseno_a')) } A)"
 
-    items.append({
-        "label": "Breaker AC",
-        "value": breaker_txt
-    })
+    rows.append([
+        "Breaker AC",
+        breaker_txt
+    ])
 
     if spd.get("ac"):
-        items.append({
-            "label": "SPD AC",
-            "value": spd.get("ac")
-        })
+        rows.append([
+            "SPD AC",
+            str(spd.get("ac"))
+        ])
 
     if sec.get("ac"):
-        items.append({
-            "label": "Seccionamiento AC",
-            "value": sec.get("ac")
-        })
+        rows.append([
+            "Seccionamiento AC",
+            str(sec.get("ac"))
+        ])
 
-    return items
+    return rows
+
+
 def filas_conductores(norm: Dict[str, Any]) -> List[List[str]]:
     # mantiene tu tabla ancha
     rows: List[List[str]] = []
