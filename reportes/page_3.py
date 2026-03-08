@@ -1,4 +1,3 @@
-# reportes/page_3.py
 from __future__ import annotations
 
 from typing import Any, Dict, List
@@ -7,6 +6,10 @@ from reportlab.platypus import Paragraph, Spacer, PageBreak, TableStyle
 
 from .helpers_pdf import make_table, table_style_uniform, box_paragraph, get_field, money_L
 
+
+# ==========================================================
+# Fallback — cálculo amortización
+# ==========================================================
 
 def amortizacion_anual(
     principal: float,
@@ -21,11 +24,13 @@ def amortizacion_anual(
     out: List[Dict[str, float]] = []
 
     for anio in range(1, int(plazo_anios) + 1):
+
         interes_y = 0.0
         principal_y = 0.0
         pago_y = 0.0
 
         for _ in range(12):
+
             if saldo <= 0:
                 break
 
@@ -54,6 +59,10 @@ def amortizacion_anual(
     return out
 
 
+# ==========================================================
+# Página 3
+# ==========================================================
+
 def build_page_3(
     resultado: Dict[str, Any],
     datos: Any,
@@ -62,16 +71,17 @@ def build_page_3(
     styles,
     content_w: float,
 ):
+
     story: List[Any] = []
 
     story.append(Paragraph("Financiamiento — Evolución del Préstamo", styles["Title"]))
     story.append(Spacer(1, 10))
 
-    # ===== CONTRATO FUERTE =====
-    financiero = resultado["financiero"]
+    # ===== CONTRATO ROBUSTO =====
+    financiero = resultado.get("financiero", {})
 
-    capex = float(financiero["capex_L"])
-    cuota = float(financiero["cuota_mensual"])
+    capex = float(financiero.get("capex_L", 0.0))
+    cuota = float(financiero.get("cuota_mensual", 0.0))
 
     pct_fin = float(get_field(datos, "porcentaje_financiado", 1.0))
     pct_fin = max(0.0, min(1.0, pct_fin))
@@ -81,9 +91,14 @@ def build_page_3(
     tasa_anual = float(get_field(datos, "tasa_anual", 0.0))
     plazo_anios = int(get_field(datos, "plazo_anios", 10))
 
-    anual = amortizacion_anual(principal, tasa_anual, cuota, plazo_anios)
+    # ===== usar tabla del motor si existe =====
+    anual = financiero.get("tabla_amortizacion")
+
+    if not anual:
+        anual = amortizacion_anual(principal, tasa_anual, cuota, plazo_anios)
 
     # ===== Tabla =====
+
     header = [
         "Año",
         "Cuota (L/mes)",
@@ -96,14 +111,15 @@ def build_page_3(
     rows: List[List[str]] = []
 
     for a in anual:
+
         rows.append(
             [
-                str(int(a["anio"])),
-                money_L(cuota).replace("L ", ""),
-                f"{a['pago_anual']:,.0f}",
-                f"{a['interes_anual']:,.0f}",
-                f"{a['principal_anual']:,.0f}",
-                f"{a['saldo_fin']:,.0f}",
+                str(int(a.get("anio", 0))),
+                f"{cuota:,.2f}",
+                f"{float(a.get('pago_anual',0)):,.0f}",
+                f"{float(a.get('interes_anual',0)):,.0f}",
+                f"{float(a.get('principal_anual',0)):,.0f}",
+                f"{float(a.get('saldo_fin',0)):,.0f}",
             ]
         )
 
@@ -118,6 +134,7 @@ def build_page_3(
     )
 
     t.setStyle(table_style_uniform(pal, font_header=9, font_body=9))
+
     t.setStyle(
         TableStyle(
             [
@@ -135,6 +152,7 @@ def build_page_3(
     story.append(Spacer(1, 10))
 
     # ===== Lectura ejecutiva =====
+
     saldo_ultimo = float(anual[-1]["saldo_fin"]) if anual else float(principal)
 
     nota = (
@@ -147,4 +165,5 @@ def build_page_3(
     story.append(box_paragraph(nota, pal, content_w, font_size=10))
 
     story.append(PageBreak())
+
     return story
