@@ -114,7 +114,10 @@ def calcular_strings_fv(
             "meta": {},
         }
 
-    # elegir Ns cercano al centro MPPT
+    # ==========================================================
+    # Elegir número de módulos en serie
+    # ==========================================================
+
     mid = (inversor.mppt_min_v + inversor.mppt_max_v) / 2
 
     best_ns = None
@@ -132,7 +135,7 @@ def calcular_strings_fv(
     n_series = best_ns
 
     # ==========================================================
-    # CALCULO REAL DE STRINGS SEGUN PANELES DISPONIBLES
+    # Número de strings
     # ==========================================================
 
     n_strings_total = n_paneles_total // n_series
@@ -194,6 +197,10 @@ def calcular_strings_fv(
             }
         )
 
+    # ==========================================================
+    # Potencias
+    # ==========================================================
+
     p_string_kw = (panel.pmax_w * n_series) / 1000
     pdc_total_kw = p_string_kw * n_strings_total
 
@@ -212,6 +219,32 @@ def calcular_strings_fv(
         "paneles_sobrantes": paneles_sobrantes,
     }
 
+    # ==========================================================
+    # 👇 DATOS PARA MOTOR DE CORRIENTES
+    # ==========================================================
+
+    strings_por_mppt = 0
+    imp_string = 0
+    isc_string = 0
+
+    if strings:
+
+        imp_string = strings[0]["imp_a"]
+        isc_string = strings[0]["isc_a"]
+
+        strings_por_mppt = strings[0]["n_paralelo"]
+
+    corrientes_input = {
+
+        "imp_string_a": imp_string,
+        "isc_string_a": isc_string,
+        "strings_por_mppt": strings_por_mppt,
+        "n_strings_total": n_strings_total
+
+    }
+
+    # ==========================================================
+
     return {
         "ok": len(errores) == 0,
         "errores": errores,
@@ -222,5 +255,8 @@ def calcular_strings_fv(
             "n_min": n_min,
             "n_max": n_max,
         },
+        "meta": meta,
+        "corrientes_input": corrientes_input,
+    }
         "meta": meta,
     }
