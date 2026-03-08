@@ -1,5 +1,7 @@
+from __future__ import annotations
+from typing import Dict, Any, Optional
 from math import ceil
-
+from electrical.catalogos import get_inversor, ids_inversores
 
 def ejecutar_inversor_desde_sizing(
     *,
