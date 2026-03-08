@@ -243,7 +243,7 @@ def calcular_strings_fv(
     }
 
     # ==========================================================
-
+    print("DEBUG STRINGS RESULT:", strings_result)
     return {
         "ok": len(errores) == 0,
         "errores": errores,
