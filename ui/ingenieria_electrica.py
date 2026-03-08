@@ -268,6 +268,10 @@ def render(ctx):
         deps = construir_dependencias()
         resultado = ejecutar_estudio(datos, deps)
 
+        # soporta dict o dataclass
+        if hasattr(resultado, "__dict__"):
+            resultado = resultado.__dict__
+
         ctx.resultado_proyecto = resultado
         st.session_state["resultado_proyecto"] = resultado
 
