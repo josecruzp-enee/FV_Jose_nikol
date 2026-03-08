@@ -6,7 +6,6 @@ import streamlit as st
 import pandas as pd
 
 from core.servicios.analisis_cobertura import analizar_cobertura
-from core.aplicacion.orquestador_estudio import ejecutar_estudio
 
 
 _MESES = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"]
@@ -26,15 +25,10 @@ def render_analisis_cobertura(ctx):
 
             consumo_anual = sum(ctx.consumo.get("kwh_12m", [0]*12))
 
-            # wrapper para adaptar ejecutar_estudio al servicio
-            def ejecutar_pipeline(potencia_kw):
-                return ejecutar_estudio(ctx, potencia_kw)
-
             escenarios = analizar_cobertura(
                 consumo_anual_kwh=consumo_anual,
                 potencia_panel_kw=0.55,
                 energia_1kwp_anual=1500,
-                ejecutar_pipeline=ejecutar_pipeline,
             )
 
             if not escenarios:
@@ -112,7 +106,6 @@ def render(ctx) -> None:
     if len(kwh) != 12:
         kwh = [0.0] * 12
 
-    # grid 4x3 para inputs
     for fila in range(3):
 
         cols = st.columns(4)
@@ -144,10 +137,8 @@ def render(ctx) -> None:
     with b:
         st.metric("Promedio mensual (kWh)", f"{prom:,.0f}")
 
-    # guardar datos
     ctx.consumo = c
 
-    # ejecutar análisis de cobertura
     render_analisis_cobertura(ctx)
 
 
@@ -160,7 +151,6 @@ def validar(ctx) -> Tuple[bool, List[str]]:
     errores: List[str] = []
 
     c = ctx.consumo
-
     kwh = c.get("kwh_12m", [])
 
     if not isinstance(kwh, list) or len(kwh) != 12:
