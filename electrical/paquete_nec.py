@@ -224,9 +224,12 @@ def _armar_resumen(dc, ac, ocpd, conductores, warnings):
     dc_tramo = next((c for c in circuitos if c.get("nombre") == "DC"), None)
     ac_tramo = next((c for c in circuitos if c.get("nombre") == "AC"), None)
 
+    idc = dc.get("idc_nom")
+    iac = ac.get("iac_nom")
+
     return {
-        "idc_nom": dc.get("idc_nom"),
-        "iac_nom": ac.get("iac_nom"),
+        "idc_nom": float(idc) if idc else None,
+        "iac_nom": float(iac) if iac else None,
         "breaker_ac": (
             ocpd.get("breaker_ac", {}).get("tamano_a")
             if isinstance(ocpd, dict)
