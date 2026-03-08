@@ -46,7 +46,7 @@ def ejecutar_nec(
     # Datos desde strings
     # -------------------------
 
-    if strings.get("ok"):
+    if strings and strings.get("ok"):
 
         rec = strings.get("recomendacion", {})
 
@@ -63,6 +63,13 @@ def ejecutar_nec(
 
         if idesign > 0:
             ee["idc_nom"] = idesign
+
+    # -------------------------
+    # Garantizar voltaje DC mínimo
+    # -------------------------
+
+    if "vdc_nom" not in ee:
+        ee["vdc_nom"] = 600
 
     # -------------------------
     # Construcción paquete NEC
