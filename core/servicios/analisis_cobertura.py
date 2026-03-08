@@ -21,6 +21,7 @@ def analizar_cobertura(
     consumo_anual_kwh: float,
     potencia_panel_kw: float,
     energia_1kwp_anual: float,
+    tarifa_energia: float,
 ) -> List[EscenarioCobertura]:
 
     coberturas = [
@@ -42,7 +43,7 @@ def analizar_cobertura(
 
         # estimaciones financieras simples
         costo_kw = 1200
-        tarifa = 5
+        tarifa = tarifa_energia
 
         inversion = potencia_fv_kw * costo_kw
         ahorro = produccion * tarifa
