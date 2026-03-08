@@ -6,17 +6,6 @@ from electrical.protecciones.protecciones import dimensionar_protecciones_fv
 from electrical.conductores.corrientes import calcular_corrientes
 
 
-# Opcionales
-try:
-    from electrical.protecciones.spd import recomendar_spd
-except Exception:
-    recomendar_spd = None
-
-try:
-    from electrical.protecciones.seccionamiento import recomendar_seccionamiento
-except Exception:
-    recomendar_seccionamiento = None
-
 try:
     from electrical.canalizacion.canalizacion import canalizacion_fv
 except Exception:
@@ -61,24 +50,15 @@ def _sqrt3() -> float:
 
 
 # ==========================================================
-# 1️⃣ CORRIENTES NOMINALES (DC / AC)
+# CORRIENTES NOMINALES DEL SISTEMA
 # ==========================================================
 
-def _resolver_corrientes_nominales(entrada: Mapping[str, Any]) -> Tuple[Dict, Dict, list[str]]:
+def _resolver_corrientes_nominales(entrada: Mapping[str, Any]):
 
     warnings = []
 
     pdc_w = _num(entrada, "potencia_dc_w")
-    if pdc_w is None:
-        pdc_kw = _num(entrada, "potencia_dc_kw")
-        if pdc_kw is not None:
-            pdc_w = pdc_kw * 1000
-
     pac_w = _num(entrada, "potencia_ac_w")
-    if pac_w is None:
-        pac_kw = _num(entrada, "potencia_ac_kw")
-        if pac_kw is not None:
-            pac_w = pac_kw * 1000
 
     vdc = _num(entrada, "vdc_nom")
     vac_ll = _num(entrada, "vac_ll")
@@ -88,10 +68,8 @@ def _resolver_corrientes_nominales(entrada: Mapping[str, Any]) -> Tuple[Dict, Di
     fp = _num(entrada, "fp") or 1.0
 
     idc = None
-    if pdc_w and vdc and vdc > 0:
+    if pdc_w and vdc:
         idc = pdc_w / vdc
-    else:
-        warnings.append("No se pudo calcular idc_nom.")
 
     iac = None
     if pac_w:
@@ -100,9 +78,6 @@ def _resolver_corrientes_nominales(entrada: Mapping[str, Any]) -> Tuple[Dict, Di
         elif vac_ln or vac_ll:
             v = vac_ln or vac_ll
             iac = pac_w / (v * fp)
-
-    if iac is None:
-        warnings.append("No se pudo calcular iac_nom.")
 
     dc = {
         "potencia_dc_w": pdc_w,
@@ -123,7 +98,28 @@ def _resolver_corrientes_nominales(entrada: Mapping[str, Any]) -> Tuple[Dict, Di
 
 
 # ==========================================================
-# 2️⃣ PROTECCIONES
+# CORRIENTES FV (CORRIGE BUG DE CEROS)
+# ==========================================================
+
+def _resolver_corrientes_fv(entrada: Mapping[str, Any]):
+
+    strings_result = entrada.get("strings") or {}
+    inversor_data = entrada.get("inversor") or {}
+
+    strings_data = strings_result.get("corrientes_input")
+
+    if not strings_data:
+        raise ValueError("No llegaron datos corrientes_input desde strings")
+
+    return calcular_corrientes(
+        strings=strings_data,
+        inv=inversor_data,
+        cfg_tecnicos={}
+    )
+
+
+# ==========================================================
+# PROTECCIONES
 # ==========================================================
 
 def _resolver_protecciones(entrada, ac):
@@ -152,7 +148,7 @@ def _resolver_protecciones(entrada, ac):
 
 
 # ==========================================================
-# 3️⃣ CONDUCTORES
+# CONDUCTORES
 # ==========================================================
 
 def _resolver_conductores(entrada, dc, ac):
@@ -194,13 +190,13 @@ def _resolver_conductores(entrada, dc, ac):
 
 
 # ==========================================================
-# 4️⃣ CANALIZACIÓN
+# CANALIZACION
 # ==========================================================
 
 def _resolver_canalizacion(entrada, dc, ac, ocpd, conductores):
 
     if not callable(canalizacion_fv):
-        return None, ["Canalización no disponible."]
+        return None, ["Canalización no disponible"]
 
     try:
 
@@ -218,7 +214,7 @@ def _resolver_canalizacion(entrada, dc, ac, ocpd, conductores):
 
 
 # ==========================================================
-# 5️⃣ RESUMEN PDF
+# RESUMEN PDF
 # ==========================================================
 
 def _armar_resumen(dc, ac, ocpd, conductores, warnings):
@@ -243,60 +239,19 @@ def _armar_resumen(dc, ac, ocpd, conductores, warnings):
 
 
 # ==========================================================
-# ORQUESTADOR PRINCIPAL
+# ORQUESTADOR NEC
 # ==========================================================
 
 def armar_paquete_nec(entrada: Mapping[str, Any]) -> Dict[str, Any]:
 
-    if not isinstance(entrada, Mapping):
-        raise TypeError("entrada debe ser Mapping.")
-
     warnings = []
-
-    # ======================================================
-    # Corrientes nominales (DC / AC del sistema)
-    # ======================================================
 
     dc, ac, w = _resolver_corrientes_nominales(entrada)
     warnings = _merge(warnings, w)
 
-    # ======================================================
-    # ADAPTAR STRINGS → MOTOR CORRIENTES
-    # ======================================================
-
+    # CORRIENTES FV
     try:
-
-        strings_result = entrada.get("strings", {})
-
-        strings_list = strings_result.get("strings", [])
-
-        if strings_list:
-
-            s0 = strings_list[0]
-
-            strings_data = {
-                "imp_string_a": float(s0.get("imp_a", 0)),
-                "isc_string_a": float(s0.get("isc_a", 0)),
-                "strings_por_mppt": int(s0.get("n_paralelo", 1)),
-                "n_strings_total": int(
-                    strings_result.get("recomendacion", {}).get(
-                        "n_strings_total", 0
-                    )
-                ),
-            }
-
-        else:
-
-            strings_data = strings_result.get("corrientes_input", {})
-
-        inversor_data = entrada.get("inversor", {})
-
-        corrientes = calcular_corrientes(
-            strings=strings_data,
-            inv=inversor_data,
-            cfg_tecnicos={}
-        )
-
+        corrientes = _resolver_corrientes_fv(entrada)
     except Exception as e:
 
         corrientes = {
@@ -309,23 +264,11 @@ def armar_paquete_nec(entrada: Mapping[str, Any]) -> Dict[str, Any]:
 
         warnings.append(f"Corrientes error: {e}")
 
-    # ======================================================
-    # PROTECCIONES
-    # ======================================================
-
     ocpd, w = _resolver_protecciones(entrada, ac)
     warnings = _merge(warnings, w)
 
-    # ======================================================
-    # CONDUCTORES
-    # ======================================================
-
     conductores, w = _resolver_conductores(entrada, dc, ac)
     warnings = _merge(warnings, w)
-
-    # ======================================================
-    # CANALIZACIÓN
-    # ======================================================
 
     canalizacion, w = _resolver_canalizacion(
         entrada,
@@ -337,30 +280,16 @@ def armar_paquete_nec(entrada: Mapping[str, Any]) -> Dict[str, Any]:
 
     warnings = _merge(warnings, w)
 
-    # ======================================================
-    # RESUMEN PDF
-    # ======================================================
-
     resumen = _armar_resumen(dc, ac, ocpd, conductores, warnings)
-
-    # ======================================================
-    # RESULTADO FINAL
-    # ======================================================
 
     return {
 
         "corrientes": corrientes,
-
         "dc": dc,
         "ac": ac,
-
         "ocpd": ocpd,
-
         "conductores": conductores,
-
         "canalizacion": canalizacion,
-
         "warnings": warnings,
-
         "resumen_pdf": resumen,
     }
