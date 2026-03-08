@@ -2,8 +2,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from math import ceil, floor
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
+
+# ==========================================================
+# MODELOS
+# ==========================================================
 
 @dataclass(frozen=True)
 class PanelSpec:
@@ -26,15 +30,23 @@ class InversorSpec:
     imppt_max_a: float
 
 
-def _voc_frio(voc_stc: float, coef_voc_pct_c: float, t_min_c: float, t_stc_c: float = 25.0) -> float:
+# ==========================================================
+# TEMPERATURAS
+# ==========================================================
+
+def _voc_frio(voc_stc: float, coef_voc_pct_c: float, t_min_c: float, t_stc_c: float = 25.0):
     return voc_stc * (1 + (coef_voc_pct_c / 100) * (t_min_c - t_stc_c))
 
 
-def _vmp_temp(vmp_stc: float, coef_vmp_pct_c: float, t_oper_c: float, t_stc_c: float = 25.0) -> float:
+def _vmp_temp(vmp_stc: float, coef_vmp_pct_c: float, t_oper_c: float, t_stc_c: float = 25.0):
     return vmp_stc * (1 + (coef_vmp_pct_c / 100) * (t_oper_c - t_stc_c))
 
 
-def _bounds_por_voltaje(panel: PanelSpec, inv: InversorSpec, t_min_c: float, t_oper_c: float):
+# ==========================================================
+# LIMITES DE VOLTAJE
+# ==========================================================
+
+def _bounds_por_voltaje(panel, inv, t_min_c, t_oper_c):
 
     voc_frio_panel = _voc_frio(panel.voc_v, panel.coef_voc_pct_c, t_min_c)
     vmp_hot_panel = _vmp_temp(panel.vmp_v, panel.coef_vmp_pct_c, t_oper_c)
@@ -49,6 +61,10 @@ def _bounds_por_voltaje(panel: PanelSpec, inv: InversorSpec, t_min_c: float, t_o
     return n_min, n_max, voc_frio_panel, vmp_hot_panel
 
 
+# ==========================================================
+# DISTRIBUCION MPPT
+# ==========================================================
+
 def _split_por_mppt(n_strings_total: int, n_mppt: int):
 
     base = n_strings_total // n_mppt
@@ -61,6 +77,7 @@ def _split_por_mppt(n_strings_total: int, n_mppt: int):
         n = base + (1 if i < resto else 0)
 
         if n > 0:
+
             salida.append(
                 {
                     "mppt": i + 1,
@@ -70,52 +87,12 @@ def _split_por_mppt(n_strings_total: int, n_mppt: int):
 
     return salida
 
-def calcular_strings_fv(
-    *,
-    n_paneles_total: int,
-    panel: PanelSpec,
-    inversor: InversorSpec,
-    t_min_c: float,
-    dos_aguas: bool = False,
-    objetivo_dc_ac: float | None = None,
-    pdc_kw_objetivo: float | None = None,
-    t_oper_c: float | None = None,
-) -> Dict[str, Any]:
 
-    errores: List[str] = []
-    warnings: List[str] = []
+# ==========================================================
+# SELECCION MODULOS SERIE
+# ==========================================================
 
-    if n_paneles_total <= 0:
-        return {
-            "ok": False,
-            "errores": ["n_paneles_total inválido"],
-            "warnings": [],
-            "strings": [],
-            "recomendacion": {},
-            "bounds": {},
-            "meta": {},
-        }
-
-    t_oper = t_oper_c if t_oper_c else 55.0
-
-    n_min, n_max, voc_frio_panel, vmp_hot_panel = _bounds_por_voltaje(
-        panel, inversor, t_min_c, t_oper
-    )
-
-    if n_max < n_min:
-        return {
-            "ok": False,
-            "errores": ["No existe número válido de módulos en serie"],
-            "warnings": [],
-            "strings": [],
-            "recomendacion": {},
-            "bounds": {},
-            "meta": {},
-        }
-
-    # ==========================================================
-    # Elegir número de módulos en serie
-    # ==========================================================
+def _seleccionar_n_series(n_min, n_max, vmp_hot_panel, inversor):
 
     mid = (inversor.mppt_min_v + inversor.mppt_max_v) / 2
 
@@ -128,41 +105,18 @@ def calcular_strings_fv(
         err = abs(vmp_string - mid)
 
         if err < best_error:
+
             best_error = err
             best_ns = n
 
-    n_series = best_ns
+    return best_ns
 
-    # ==========================================================
-    # Número de strings
-    # ==========================================================
 
-    n_strings_total = n_paneles_total // n_series
+# ==========================================================
+# GENERACION STRINGS
+# ==========================================================
 
-    if n_strings_total <= 0:
-
-        return {
-            "ok": False,
-            "errores": [
-                f"No es posible formar strings con {n_paneles_total} paneles y {n_series} por string"
-            ],
-            "warnings": [],
-            "strings": [],
-            "recomendacion": {},
-            "bounds": {},
-            "meta": {},
-        }
-
-    paneles_usados = n_strings_total * n_series
-    paneles_sobrantes = n_paneles_total - paneles_usados
-
-    if paneles_sobrantes > 0:
-
-        warnings.append(
-            f"{paneles_sobrantes} panel(es) no utilizados por configuración de strings"
-        )
-
-    ramas = _split_por_mppt(n_strings_total, inversor.n_mppt)
+def _generar_strings(ramas, n_series, panel, inversor, voc_frio_panel, vmp_hot_panel, errores):
 
     strings = []
 
@@ -196,12 +150,20 @@ def calcular_strings_fv(
             }
         )
 
-    # ==========================================================
-    # Potencias
-    # ==========================================================
+    return strings, errores
+
+
+# ==========================================================
+# POTENCIAS
+# ==========================================================
+
+def _calcular_potencias(panel, n_series, n_strings_total, vmp_hot_panel, voc_frio_panel, n_paneles_total):
 
     p_string_kw = (panel.pmax_w * n_series) / 1000
     pdc_total_kw = p_string_kw * n_strings_total
+
+    paneles_usados = n_strings_total * n_series
+    paneles_sobrantes = n_paneles_total - paneles_usados
 
     recomendacion = {
         "n_series": n_series,
@@ -218,32 +180,127 @@ def calcular_strings_fv(
         "paneles_sobrantes": paneles_sobrantes,
     }
 
-    # ==========================================================
-    # 👇 DATOS PARA MOTOR DE CORRIENTES
-    # ==========================================================
+    return recomendacion, meta
 
-    strings_por_mppt = 0
-    imp_string = 0
-    isc_string = 0
 
-    if strings:
+# ==========================================================
+# CORRIENTES INPUT
+# ==========================================================
 
-        imp_string = strings[0]["imp_a"]
-        isc_string = strings[0]["isc_a"]
+def _generar_corrientes_input(strings, n_strings_total):
 
-        strings_por_mppt = strings[0]["n_paralelo"]
+    if not strings:
 
-    corrientes_input = {
+        return {
+            "imp_string_a": 0,
+            "isc_string_a": 0,
+            "strings_por_mppt": 0,
+            "n_strings_total": n_strings_total
+        }
 
-        "imp_string_a": imp_string,
-        "isc_string_a": isc_string,
-        "strings_por_mppt": strings_por_mppt,
+    s0 = strings[0]
+
+    return {
+
+        "imp_string_a": s0["imp_a"],
+        "isc_string_a": s0["isc_a"],
+        "strings_por_mppt": s0["n_paralelo"],
         "n_strings_total": n_strings_total
 
     }
 
-    # ==========================================================
-    print("DEBUG STRINGS RESULT:", strings_result)
+
+# ==========================================================
+# RESULTADO ERROR
+# ==========================================================
+
+def _resultado_error(msg):
+
+    return {
+        "ok": False,
+        "errores": [msg],
+        "warnings": [],
+        "strings": [],
+        "recomendacion": {},
+        "bounds": {},
+        "meta": {},
+        "corrientes_input": {}
+    }
+
+
+# ==========================================================
+# MOTOR PRINCIPAL
+# ==========================================================
+
+def calcular_strings_fv(
+    *,
+    n_paneles_total: int,
+    panel: PanelSpec,
+    inversor: InversorSpec,
+    t_min_c: float,
+    dos_aguas: bool = False,
+    objetivo_dc_ac: float | None = None,
+    pdc_kw_objetivo: float | None = None,
+    t_oper_c: float | None = None,
+) -> Dict[str, Any]:
+
+    print("\n====== DEBUG STRINGS ENGINE ======")
+    print("Paneles totales:", n_paneles_total)
+
+    errores: List[str] = []
+    warnings: List[str] = []
+
+    if n_paneles_total <= 0:
+        return _resultado_error("n_paneles_total inválido")
+
+    t_oper = t_oper_c if t_oper_c else 55.0
+
+    n_min, n_max, voc_frio_panel, vmp_hot_panel = _bounds_por_voltaje(
+        panel, inversor, t_min_c, t_oper
+    )
+
+    print("Serie mínima:", n_min)
+    print("Serie máxima:", n_max)
+
+    if n_max < n_min:
+        return _resultado_error("No existe número válido de módulos en serie")
+
+    n_series = _seleccionar_n_series(n_min, n_max, vmp_hot_panel, inversor)
+
+    print("Serie seleccionada:", n_series)
+
+    n_strings_total = n_paneles_total // n_series
+
+    print("Strings totales:", n_strings_total)
+
+    if n_strings_total <= 0:
+        return _resultado_error("No es posible formar strings")
+
+    ramas = _split_por_mppt(n_strings_total, inversor.n_mppt)
+
+    strings, errores = _generar_strings(
+        ramas,
+        n_series,
+        panel,
+        inversor,
+        voc_frio_panel,
+        vmp_hot_panel,
+        errores
+    )
+
+    corrientes_input = _generar_corrientes_input(strings, n_strings_total)
+
+    print("Corrientes input generado:", corrientes_input)
+
+    recomendacion, meta = _calcular_potencias(
+        panel,
+        n_series,
+        n_strings_total,
+        vmp_hot_panel,
+        voc_frio_panel,
+        n_paneles_total
+    )
+
     return {
         "ok": len(errores) == 0,
         "errores": errores,
