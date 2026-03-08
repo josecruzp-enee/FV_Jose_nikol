@@ -35,9 +35,10 @@ def ejecutar_estudio(datos: Any, deps: DependenciasEstudio):
     resultado = ResultadoProyecto(
         sizing=sizing,
         strings=strings,
+        energia=energia,
         nec=nec,
         financiero=financiero,
-    )
+        )
 
     # 🔹 Frontera hacia UI
     return asdict(resultado)
