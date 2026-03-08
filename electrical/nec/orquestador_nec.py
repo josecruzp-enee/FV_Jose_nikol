@@ -24,7 +24,6 @@ def ejecutar_nec(
         if vac:
             ee["vac_ll"] = vac
 
-            # calcular LN si es trifásico
             fases = base.get("fases", 1)
 
             if fases == 3:
@@ -49,6 +48,7 @@ def ejecutar_nec(
     if strings and strings.get("ok"):
 
         rec = strings.get("recomendacion", {})
+        lista = strings.get("strings", [])
 
         vmp_string = float(rec.get("vmp_string_v", 0))
 
@@ -57,12 +57,34 @@ def ejecutar_nec(
 
         # corriente de diseño máxima
         idesign = max(
-            (float(st.get("idesign_cont_a", 0)) for st in strings.get("strings", [])),
+            (float(st.get("idesign_cont_a", 0)) for st in lista),
             default=0,
         )
 
         if idesign > 0:
             ee["idc_nom"] = idesign
+
+        # =====================================
+        # DATOS NECESARIOS PARA MOTOR CORRIENTES
+        # =====================================
+
+        if lista:
+
+            s0 = lista[0]
+
+            ee["strings"] = {
+                "imp_string_a": float(s0.get("imp_a", 0)),
+                "isc_string_a": float(s0.get("isc_a", 0)),
+                "strings_por_mppt": int(s0.get("n_paralelo", 1)),
+                "n_strings_total": int(rec.get("n_strings_total", 0)),
+            }
+
+            ee["inversor"] = {
+                "kw_ac": float(sizing.pac_kw),
+                "v_ac_nom_v": ee.get("vac_ll", 480),
+                "fases": ee.get("fases", 3),
+                "fp": ee.get("fp", 1.0),
+            }
 
     # -------------------------
     # Garantizar voltaje DC mínimo
