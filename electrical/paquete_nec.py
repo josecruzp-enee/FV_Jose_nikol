@@ -3,7 +3,7 @@ from typing import Any, Dict, Mapping, Optional, Tuple, Iterable
 
 from electrical.conductores.calculo_conductores import tramo_conductor
 from electrical.protecciones.protecciones import dimensionar_protecciones_fv
-from electrical.corrientes.calcular_corrientes import calcular_corrientes
+from electrical.conductores.corrientes import calcular_corrientes
 
 
 # Opcionales
