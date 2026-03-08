@@ -18,12 +18,13 @@ class MesEnergia:
 # Sizing
 # =============================
 
-@dataclass(frozen=True)
+@dataclass
 class ResultadoSizing:
     n_paneles: int
     kwp_dc: float
     pdc_kw: float
     pac_kw: float
+    n_inversores: int
     energia_12m: List[MesEnergia]
 
 
