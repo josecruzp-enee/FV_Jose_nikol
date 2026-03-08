@@ -26,14 +26,10 @@ def render_analisis_cobertura(ctx):
 
             consumo_anual = sum(ctx.consumo.get("kwh_12m", [0]*12))
 
-            # producción anual de 1 kWp usando el motor energético
-            energia_base = ctx.deps.energia.calcular_energia(pdc_instalada_kw=1)
-            energia_1kwp_anual = energia_base.energia_anual_kwh
-
             escenarios = analizar_cobertura(
                 consumo_anual_kwh=consumo_anual,
                 potencia_panel_kw=0.55,
-                energia_1kwp_anual=energia_1kwp_anual,
+                energia_1kwp_anual=1500,   # temporal hasta conectar el motor energético
                 ejecutar_pipeline=ejecutar_estudio,
             )
 
