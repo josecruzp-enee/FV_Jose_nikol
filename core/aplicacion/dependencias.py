@@ -70,9 +70,81 @@ class EnergiaAdapter(PuertoEnergia):
 
 
 class NECAdapter(PuertoNEC):
+
     def ejecutar(self, datos, sizing, strings):
-        # Devuelve ResultadoNEC (dataclass fuerte)
-        return ejecutar_nec(datos, sizing, strings)
+
+        # ===============================
+        # Extraer datos del sistema FV
+        # ===============================
+
+        sf = getattr(datos, "sistema_fv", {}) or {}
+
+        vdc_nom = sf.get("vdc_nom", 600)
+        vac_ll = sf.get("vac_ll", 480)
+        vac_ln = sf.get("vac_ln", None)
+        fases = sf.get("fases", 3)
+        fp = sf.get("fp", 1.0)
+
+        # ===============================
+        # Adaptar resultado de strings
+        # ===============================
+
+        strings_list = strings.get("strings", [])
+
+        if strings_list:
+
+            s0 = strings_list[0]
+
+            imp_string = s0.get("imp_a", 0)
+            isc_string = s0.get("isc_a", 0)
+            strings_por_mppt = s0.get("n_paralelo", 1)
+
+        else:
+
+            imp_string = 0
+            isc_string = 0
+            strings_por_mppt = 1
+
+        n_strings_total = strings.get("recomendacion", {}).get(
+            "n_strings_total", 0
+        )
+
+        # ===============================
+        # Construir entrada NEC
+        # ===============================
+
+        entrada_nec = {
+
+            "potencia_dc_kw": sizing.pdc_kw,
+            "potencia_ac_kw": sizing.pac_kw,
+
+            "vdc_nom": vdc_nom,
+            "vac_ll": vac_ll,
+            "vac_ln": vac_ln,
+
+            "fases": fases,
+            "fp": fp,
+
+            "strings": {
+                "imp_string_a": imp_string,
+                "isc_string_a": isc_string,
+                "strings_por_mppt": strings_por_mppt,
+                "n_strings_total": n_strings_total,
+            },
+
+            "inversor": {
+                "kw_ac": sizing.pac_kw,
+                "v_ac_nom_v": vac_ll,
+                "fases": fases,
+                "fp": fp,
+            },
+        }
+
+        # ===============================
+        # Ejecutar NEC
+        # ===============================
+
+        return ejecutar_nec(entrada_nec)
 
 
 class FinanzasAdapter(PuertoFinanzas):
