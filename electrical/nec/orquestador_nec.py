@@ -45,7 +45,7 @@ def ejecutar_nec(
     # Datos desde strings
     # -------------------------
 
-    if strings and strings.get("ok"):
+    if strings:
 
         rec = strings.get("recomendacion", {})
         lista = strings.get("strings", [])
