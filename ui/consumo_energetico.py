@@ -26,9 +26,9 @@ def render_analisis_cobertura(ctx):
 
             consumo_anual = sum(ctx.consumo.get("kwh_12m", [0]*12))
 
-            # wrapper que adapta ejecutar_estudio al servicio
+            # wrapper para adaptar ejecutar_estudio al servicio
             def ejecutar_pipeline(potencia_kw):
-                return ejecutar_estudio(ctx, None, potencia_kw)
+                return ejecutar_estudio(ctx, potencia_kw)
 
             escenarios = analizar_cobertura(
                 consumo_anual_kwh=consumo_anual,
@@ -47,6 +47,9 @@ def render_analisis_cobertura(ctx):
                 "cobertura": "Cobertura %",
                 "potencia_fv_kw": "Sistema FV (kW)",
                 "paneles": "Paneles",
+                "produccion_anual_kwh": "Producción anual (kWh)",
+                "inversion": "Inversión",
+                "ahorro_anual": "Ahorro anual",
                 "roi": "ROI",
                 "payback": "Payback (años)",
             })
@@ -54,12 +57,17 @@ def render_analisis_cobertura(ctx):
             st.dataframe(df, use_container_width=True)
 
             if "ROI" in df.columns:
+
                 st.markdown("#### ROI vs Cobertura")
+
                 chart = df.set_index("Cobertura %")["ROI"]
+
                 st.line_chart(chart)
 
         except Exception as e:
+
             st.error(f"Error ejecutando análisis de cobertura: {e}")
+
 
 # ---------------------------------------------------------
 # UI Consumo energético
