@@ -126,12 +126,19 @@ def p1_tabla_decision(financiero, pal, content_w):
     story.append(section_bar("Decisión del cliente (mensual)", pal, content_w))
     story.append(Spacer(1, 6))
 
-    pago_actual = float(financiero.get("pago_actual", 0.0))
-    pago_residual = float(financiero.get("pago_residual", 0.0))
+    tabla = financiero.get("tabla_12m", [])
+
+    if tabla:
+        pago_actual = sum(x["factura_base_L"] for x in tabla) / 12
+        pago_residual = sum(x["pago_enee_L"] for x in tabla) / 12
+    else:
+        pago_actual = 0.0
+        pago_residual = 0.0
+
     cuota = float(financiero.get("cuota_mensual", 0.0))
 
-    pago_total = float(financiero.get("pago_total_fv", pago_residual + cuota))
-    ahorro = float(financiero.get("ahorro_mensual", pago_actual - pago_total))
+    pago_total = pago_residual + cuota
+    ahorro = pago_actual - pago_total
 
     plazo_anios = int(financiero.get("plazo_anios", 0))
 
@@ -157,7 +164,6 @@ def p1_tabla_decision(financiero, pal, content_w):
     story.append(t)
     story.append(Spacer(1, 12))
     return story
-
 
 def p1_conclusion(financiero, sizing, datos, pal, content_w):
 
