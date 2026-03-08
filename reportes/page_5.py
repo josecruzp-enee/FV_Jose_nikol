@@ -101,7 +101,8 @@ def build_page_5(resultado, datos, paths, pal, styles, content_w):
 
     kwp_dc = float(sizing.get("kwp_dc", sizing.get("pdc_kw", 0.0)))
     n_paneles = int(sizing.get("n_paneles", 0))
-    panel_wp = float(sizing.get("panel_w", sizing.get("panel_wp", 0)))
+
+    panel_wp = (kwp_dc * 1000) / n_paneles if n_paneles > 0 else 0
 
     capex_L = float(financiero.get("capex_L", 0.0))
 
