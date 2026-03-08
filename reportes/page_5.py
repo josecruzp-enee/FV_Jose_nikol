@@ -91,17 +91,18 @@ def build_page_5(resultado, datos, paths, pal, styles, content_w):
 
     story: List[Any] = []
 
-    tecnico = resultado.get("tecnico", {})
+    # CONTRATO NUEVO
+    sizing = resultado.get("sizing", {})
+    strings_block = resultado.get("strings", {})
     financiero = resultado.get("financiero", {})
 
-    sizing = tecnico.get("sizing", {})
-    strings_block = tecnico.get("strings", {})
     strings = strings_block.get("strings", [])
-
     tabla_12m = financiero.get("tabla_12m", [])
 
-    kwp_dc = float(sizing.get("kwp_dc", 0.0))
+    kwp_dc = float(sizing.get("kwp_dc", sizing.get("pdc_kw", 0.0)))
     n_paneles = int(sizing.get("n_paneles", 0))
+    panel_wp = float(sizing.get("panel_w", sizing.get("panel_wp", 0)))
+
     capex_L = float(financiero.get("capex_L", 0.0))
 
     consumo_anual_kwh = _sum_float(tabla_12m, "consumo_kwh")
@@ -112,7 +113,7 @@ def build_page_5(resultado, datos, paths, pal, styles, content_w):
     story.append(Spacer(1, 10))
 
     story.append(Paragraph(f"Sistema FV estimado: {kwp_dc:.2f} kWp DC", styles["BodyText"]))
-    story.append(Paragraph(f"Número de paneles: {n_paneles}", styles["BodyText"]))
+    story.append(Paragraph(f"Número de paneles: {n_paneles} × {panel_wp:.0f} Wp", styles["BodyText"]))
     story.append(Paragraph(f"CAPEX estimado: L {capex_L:,.2f}", styles["BodyText"]))
     story.append(Spacer(1, 8))
 
