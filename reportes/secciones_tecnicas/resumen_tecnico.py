@@ -1,3 +1,11 @@
+from __future__ import annotations
+from typing import Any, Dict
+from reportlab.platypus import Paragraph, Spacer, Table, TableStyle
+from reportlab.lib import colors
+
+
+
+
 # ==========================================================
 # Extraer datos del sistema
 # ==========================================================
