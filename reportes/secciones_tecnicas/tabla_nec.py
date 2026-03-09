@@ -1,7 +1,7 @@
 from reportlab.platypus import Table, TableStyle
 
 
-def crear_tabla_nec_profesional(paq, pal, content_w):
+def crear_tabla_diseno_nec(paq, pal, content_w):
 
     corr = paq.get("corrientes", {})
     ocpd = paq.get("ocpd", {})
