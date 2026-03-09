@@ -1,9 +1,39 @@
 from __future__ import annotations
 from typing import Any, Dict
+
 from reportlab.platypus import Paragraph, Spacer, Table, TableStyle
 from reportlab.lib import colors
 
 
+# ==========================================================
+# Tabla resumen técnico
+# ==========================================================
+
+def crear_tabla_resumen_tecnico(data, pal, content_w):
+
+    colw = [content_w * 0.55, content_w * 0.45]
+
+    tbl = Table(data, colWidths=colw)
+
+    tbl.setStyle(
+        TableStyle([
+            ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
+
+            ("BACKGROUND", (0,0), (-1,0), pal["SOFT"]),
+            ("TEXTCOLOR", (0,0), (-1,0), pal["PRIMARY"]),
+
+            ("ALIGN", (1,1), (-1,-1), "RIGHT"),
+
+            ("GRID", (0,0), (-1,-1), 0.3, pal["BORDER"]),
+
+            ("FONTSIZE", (0,0), (-1,-1), 10),
+
+            ("TOPPADDING", (0,0), (-1,-1), 6),
+            ("BOTTOMPADDING", (0,0), (-1,-1), 6),
+        ])
+    )
+
+    return tbl
 
 
 # ==========================================================
@@ -14,8 +44,7 @@ def extraer_datos_sistema(resultado):
 
     sizing = resultado.get("sizing", {})
 
-    kwp_dc = float(sizing.get("kwp_dc", sizing.get("pdc_kw", 0))
-    )
+    kwp_dc = float(sizing.get("kwp_dc", sizing.get("pdc_kw", 0)))
     pac_kw = float(sizing.get("pac_kw", 0))
 
     n_paneles = int(sizing.get("n_paneles", 0))
@@ -170,7 +199,7 @@ def build_resumen_tecnico(resultado, pal, styles, content_w):
     story.append(Paragraph("Resumen técnico del sistema FV", styles["Heading1"]))
     story.append(Spacer(1, 10))
 
-    story.append(_tabla_resumen_tecnico(data, pal, content_w))
+    story.append(crear_tabla_resumen_tecnico(data, pal, content_w))
 
     story.append(Spacer(1, 14))
 
