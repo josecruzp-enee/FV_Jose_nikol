@@ -1,4 +1,6 @@
 from typing import Dict, Any
+import math
+
 from core.dominio.contrato import ResultadoSizing
 from electrical.paquete_nec import armar_paquete_nec
 
@@ -11,39 +13,59 @@ def ejecutar_nec(
 
     ee: Dict[str, Any] = {}
 
-    # -------------------------
-    # Base eléctrica del proyecto
-    # -------------------------
+    # ------------------------------------------------------
+    # 1. Base eléctrica del proyecto (definida por proyectista)
+    # ------------------------------------------------------
 
     base = getattr(p, "electrico", None)
 
+    vac_ll = None
+    fases = 1
+    fp = 1.0
+
     if isinstance(base, dict):
 
-        vac = base.get("vac")
+        vac_ll = base.get("vac")
+        fases = base.get("fases", 1)
+        fp = base.get("fp", 1.0)
 
-        if vac:
-            ee["vac_ll"] = vac
-
-            fases = base.get("fases", 1)
+        if vac_ll:
+            ee["vac_ll"] = vac_ll
 
             if fases == 3:
-                ee["vac_ln"] = vac / 1.732
+                ee["vac_ln"] = vac_ll / math.sqrt(3)
             else:
-                ee["vac_ln"] = vac
+                ee["vac_ln"] = vac_ll
 
-        ee["fases"] = base.get("fases")
-        ee["fp"] = base.get("fp")
+    ee["fases"] = fases
+    ee["fp"] = fp
 
-    # -------------------------
-    # Potencias desde sizing
-    # -------------------------
+    # ------------------------------------------------------
+    # 2. Potencias desde sizing
+    # ------------------------------------------------------
 
-    ee["potencia_dc_w"] = float(sizing.pdc_kw) * 1000
-    ee["potencia_ac_w"] = float(sizing.pac_kw) * 1000
+    pdc_w = float(sizing.pdc_kw) * 1000
+    pac_w = float(sizing.pac_kw) * 1000
 
-    # -------------------------
-    # Datos desde strings
-    # -------------------------
+    ee["potencia_dc_w"] = pdc_w
+    ee["potencia_ac_w"] = pac_w
+
+    # ------------------------------------------------------
+    # 3. Corriente AC nominal del inversor
+    # ------------------------------------------------------
+
+    if vac_ll and vac_ll > 0:
+
+        if fases == 3:
+            iac_nom = pac_w / (math.sqrt(3) * vac_ll * fp)
+        else:
+            iac_nom = pac_w / (vac_ll * fp)
+
+        ee["iac_nom_a"] = iac_nom
+
+    # ------------------------------------------------------
+    # 4. Datos desde strings
+    # ------------------------------------------------------
 
     if strings:
 
@@ -55,7 +77,7 @@ def ejecutar_nec(
         if vmp_string > 0:
             ee["vdc_nom"] = vmp_string
 
-        # corriente de diseño máxima
+        # corriente DC nominal
         idesign = max(
             (float(st.get("idesign_cont_a", 0)) for st in lista),
             default=0,
@@ -64,9 +86,9 @@ def ejecutar_nec(
         if idesign > 0:
             ee["idc_nom"] = idesign
 
-        # =====================================
-        # DATOS NECESARIOS PARA MOTOR CORRIENTES
-        # =====================================
+        # ----------------------------------------------
+        # Datos necesarios para cálculo de corrientes
+        # ----------------------------------------------
 
         if lista:
 
@@ -75,29 +97,30 @@ def ejecutar_nec(
             ee["strings"] = {
                 "corrientes_input": {
                     "imp_string_a": float(s0.get("imp_a", 0)),
-                     "isc_string_a": float(s0.get("isc_a", 0)),
-                     "strings_por_mppt": int(s0.get("n_paralelo", 1)),
-                     "n_strings_total": int(rec.get("n_strings_total", 0)),
+                    "isc_string_a": float(s0.get("isc_a", 0)),
+                    "strings_por_mppt": int(s0.get("n_paralelo", 1)),
+                    "n_strings_total": int(rec.get("n_strings_total", 0)),
                 }
             }
 
             ee["inversor"] = {
                 "kw_ac": float(sizing.pac_kw),
-                "v_ac_nom_v": ee.get("vac_ll", 480),
-                "fases": ee.get("fases", 3),
-                "fp": ee.get("fp", 1.0),
+                "v_ac_nom_v": vac_ll,
+                "fases": fases,
+                "fp": fp,
+                "iac_nom_a": ee.get("iac_nom_a"),
             }
 
-    # -------------------------
-    # Garantizar voltaje DC mínimo
-    # -------------------------
+    # ------------------------------------------------------
+    # 5. Garantizar voltaje DC mínimo
+    # ------------------------------------------------------
 
     if "vdc_nom" not in ee:
         ee["vdc_nom"] = 600
 
-    # -------------------------
-    # Construcción paquete NEC
-    # -------------------------
+    # ------------------------------------------------------
+    # 6. Construcción paquete NEC
+    # ------------------------------------------------------
 
     paquete = armar_paquete_nec(ee)
 
