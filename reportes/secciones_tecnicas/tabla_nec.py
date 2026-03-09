@@ -1,40 +1,67 @@
 from reportlab.platypus import Table, TableStyle
 
 
-def crear_tabla_diseno_nec(paq, pal, content_w):
+def crear_tabla_nec_profesional(paq, pal, content_w):
 
+    corr = paq.get("corrientes", {})
     ocpd = paq.get("ocpd", {})
-    conductores = paq.get("conductores", {}).get("circuitos", [])
+    cond = paq.get("conductores", {})
 
-    i_dc = None
-    i_ac = None
-
-    for c in conductores:
-
-        if c.get("nombre") == "DC":
-            i_dc = c.get("i_diseno_a")
-
-        if c.get("nombre") == "AC":
-            i_ac = c.get("i_diseno_a")
-
-    breaker = ocpd.get("breaker_ac", {}).get("tamano_a")
+    def fmt_corriente(v):
+        try:
+            return f"{float(v):.2f} A"
+        except:
+            return "-"
 
     data = [
 
-        ["Parámetro", "Valor"],
+        ["Circuito", "I nominal", "I diseño", "Protección", "Conductor"],
 
-        ["Corriente DC diseño", f"{(i_dc or 0):.2f} A"],
+        [
+            "String",
+            fmt_corriente(corr.get("string", {}).get("i_nominal")),
+            fmt_corriente(corr.get("string", {}).get("i_diseno")),
+            ocpd.get("string", {}).get("proteccion", "-"),
+            cond.get("string", {}).get("calibre", "-"),
+        ],
 
-        ["Corriente AC diseño", f"{(i_ac or 0):.2f} A"],
+        [
+            "MPPT",
+            fmt_corriente(corr.get("mppt", {}).get("i_nominal")),
+            fmt_corriente(corr.get("mppt", {}).get("i_diseno")),
+            ocpd.get("mppt", {}).get("proteccion", "-"),
+            cond.get("mppt", {}).get("calibre", "-"),
+        ],
 
-        ["Breaker AC requerido", f"{breaker or 0} A"],
+        [
+            "DC Inversor",
+            fmt_corriente(corr.get("dc_inversor", {}).get("i_nominal")),
+            fmt_corriente(corr.get("dc_inversor", {}).get("i_diseno")),
+            ocpd.get("dc_inversor", {}).get("proteccion", "-"),
+            cond.get("dc_inversor", {}).get("calibre", "-"),
+        ],
+
+        [
+            "AC salida",
+            fmt_corriente(corr.get("ac_salida", {}).get("i_nominal")),
+            fmt_corriente(corr.get("ac_salida", {}).get("i_diseno")),
+            ocpd.get("ac_salida", {}).get("proteccion", "-"),
+            cond.get("ac_salida", {}).get("calibre", "-"),
+        ],
     ]
 
-    colw = [content_w * 0.6, content_w * 0.4]
+    colw = [
+        content_w * 0.20,
+        content_w * 0.20,
+        content_w * 0.20,
+        content_w * 0.20,
+        content_w * 0.20,
+    ]
 
     tabla = Table(data, colWidths=colw)
 
     tabla.setStyle(TableStyle([
+
         ("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),
         ("BACKGROUND",(0,0),(-1,0),pal["SOFT"]),
         ("TEXTCOLOR",(0,0),(-1,0),pal["PRIMARY"]),
@@ -42,7 +69,10 @@ def crear_tabla_diseno_nec(paq, pal, content_w):
         ("ALIGN",(1,1),(-1,-1),"RIGHT"),
 
         ("GRID",(0,0),(-1,-1),0.3,pal["BORDER"]),
-        ("FONTSIZE",(0,0),(-1,-1),10),
+        ("FONTSIZE",(0,0),(-1,-1),9),
+
+        ("VALIGN",(0,0),(-1,-1),"MIDDLE")
+
     ]))
 
     return tabla
