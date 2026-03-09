@@ -1,10 +1,13 @@
 # reportes/page_5_tecnico.py
 
+from reportlab.platypus import Paragraph, Spacer, PageBreak
+
 from .secciones_tecnicas.resumen_tecnico import build_resumen_tecnico
 from .secciones_tecnicas.tabla_strings import crear_tabla_strings
 from .secciones_tecnicas.tabla_corrientes import crear_tabla_corrientes
 from .secciones_tecnicas.tabla_nec import crear_tabla_diseno_nec
-from .secciones_tecnicas.layout_paneles import insertar_layout_paneles build_resumen_tecnico
+from .secciones_tecnicas.layout_paneles import insertar_layout_paneles
+
 
 
 def build_page_5(resultado, datos, paths, pal, styles, content_w):
