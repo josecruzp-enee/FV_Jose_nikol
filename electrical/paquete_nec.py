@@ -50,6 +50,37 @@ def _sqrt3() -> float:
 
 
 # ==========================================================
+# NORMALIZACION DE CORRIENTES PARA TABLA NEC
+# ==========================================================
+
+def _normalizar_corrientes(corrientes):
+
+    def calc(v):
+        try:
+            v = float(v)
+            return {
+                "i_nominal": v,
+                "i_diseno": v * 1.25
+            }
+        except:
+            return {
+                "i_nominal": None,
+                "i_diseno": None
+            }
+
+    return {
+
+        "string": calc(corrientes.get("string", {}).get("i_operacion_a")),
+
+        "mppt": calc(corrientes.get("mppt", {}).get("i_operacion_a")),
+
+        "dc_inversor": calc(corrientes.get("dc_total", {}).get("i_operacion_a")),
+
+        "ac_salida": calc(corrientes.get("ac", {}).get("i_operacion_a")),
+    }
+
+
+# ==========================================================
 # CORRIENTES NOMINALES DEL SISTEMA
 # ==========================================================
 
@@ -98,7 +129,7 @@ def _resolver_corrientes_nominales(entrada: Mapping[str, Any]):
 
 
 # ==========================================================
-# CORRIENTES FV (CORRIGE BUG DE CEROS)
+# CORRIENTES FV
 # ==========================================================
 
 def _resolver_corrientes_fv(entrada: Mapping[str, Any]):
@@ -252,7 +283,6 @@ def armar_paquete_nec(entrada: Mapping[str, Any]) -> Dict[str, Any]:
     dc, ac, w = _resolver_corrientes_nominales(entrada)
     warnings = _merge(warnings, w)
 
-    # CORRIENTES FV
     try:
         corrientes = _resolver_corrientes_fv(entrada)
     except Exception as e:
@@ -266,6 +296,9 @@ def armar_paquete_nec(entrada: Mapping[str, Any]) -> Dict[str, Any]:
         }
 
         warnings.append(f"Corrientes error: {e}")
+
+    # NORMALIZACION PARA TABLA NEC
+    corrientes_nec = _normalizar_corrientes(corrientes)
 
     ocpd, w = _resolver_protecciones(entrada, ac)
     warnings = _merge(warnings, w)
@@ -282,18 +315,25 @@ def armar_paquete_nec(entrada: Mapping[str, Any]) -> Dict[str, Any]:
     )
 
     warnings = _merge(warnings, w)
+
     if corrientes and "ac" in corrientes:
         ac["iac_nom"] = corrientes["ac"].get("i_operacion_a")
+
     resumen = _armar_resumen(dc, ac, ocpd, conductores, warnings)
-    print("DEBUG NEC ENTRADA:", entrada.keys())
+
     return {
 
-        "corrientes": corrientes,
+        "corrientes": corrientes_nec,
+        "corrientes_raw": corrientes,
+
         "dc": dc,
         "ac": ac,
+
         "ocpd": ocpd,
         "conductores": conductores,
+
         "canalizacion": canalizacion,
+
         "warnings": warnings,
         "resumen_pdf": resumen,
     }
