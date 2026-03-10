@@ -2,17 +2,17 @@
 from __future__ import annotations
 from dataclasses import dataclass
 
+from dataclasses import dataclass
+
 @dataclass(frozen=True)
 class PanelSpec:
-    nombre: str
-    w: float
-    vmp: float
-    voc: float
-    imp: float
-    isc: float
-    tc_voc_frac_c: float = -0.0029  # -0.29%/°C típico
-
-
+    pmax_w: float
+    vmp_v: float
+    voc_v: float
+    imp_a: float
+    isc_a: float
+    coef_voc_pct_c: float = -0.28
+    coef_vmp_pct_c: float = -0.34
 
 @dataclass(frozen=True)
 class ParametrosCableado:
