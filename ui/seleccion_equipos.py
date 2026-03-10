@@ -148,7 +148,7 @@ def _ui_resumen(eq: dict, panel_map: Dict[str, dict], inv_map: Dict[str, dict]) 
     p = panel_map[eq["panel_id"]]
     inv = inv_map[eq["inversor_id"]]
     st.write(f"**Panel:** {p['marca']} {p['modelo']} — Pmax {p['pmax_w']:.0f} W | Voc {p['voc_v']:.1f} V | Vmp {p['vmp_v']:.1f} V | Imp {p['imp_a']:.2f} A")
-    st.write(f"**Inversor:** {inv['marca']} {inv['modelo']} — AC {inv['pac_kw']:.1f} kW | MPPT {inv['mppt_min_v']:.0f}-{inv['mppt_max_v']:.0f} V | Vdc max {inv['vmax_dc_v']:.0f} V | MPPTs {inv['n_mppt']}")
+    st.write(f"**Inversor:** {inv['marca']} {inv['modelo']} — AC {inv['kw_ac']:.1f} kW | MPPT {inv['mppt_min_v']:.0f}-{inv['mppt_max_v']:.0f} V | Vdc max {inv['vmax_dc_v']:.0f} V | MPPTs {inv['n_mppt']}")
 
 
 def render(ctx) -> None:
