@@ -12,16 +12,13 @@ from .catalogos_yaml import cargar_paneles_yaml, cargar_inversores_yaml
 # Catálogo base (hardcoded) — opcional
 # ==========================================================
 
-_PANELES: Dict[str, Panel] = {
-    "panel_550w": Panel(
-        nombre="Panel 550 W (genérico)",
-        w=550.0,
-        vmp=41.5,
-        voc=49.5,
-        imp=13.25,
-        isc=14.10,
-    ),
-}
+"panel_550w": Panel(
+    pmax_w=550.0,
+    vmp_v=41.5,
+    voc_v=49.5,
+    imp_a=13.25,
+    isc_a=14.10,
+)
 
 _INVERSORES: Dict[str, Inversor] = {
     "inv_5kw_2mppt": Inversor(
