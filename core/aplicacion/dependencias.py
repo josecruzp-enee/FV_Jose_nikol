@@ -38,7 +38,7 @@ class EnergiaAdapter(PuertoEnergia):
 
         # sizing es ResultadoSizing
         pdc_instalada_kw = sizing.pdc_kw
-        pac_nominal_kw = sizing.pac_kw
+        pac_nominal_kw = sizing.kw_ac
 
         # Irradiancia mensual obligatoria
         hsp_12m = hsp_12m_base()
@@ -55,7 +55,7 @@ class EnergiaAdapter(PuertoEnergia):
 
         inp = EnergiaInput(
             pdc_instalada_kw=pdc_instalada_kw,
-            pac_nominal_kw=pac_nominal_kw,
+            pac_nominal_kw = sizing.kw_ac,
             hsp_12m=hsp_12m,
             dias_mes=dias_mes,
             factor_orientacion=sf.get("factor_orientacion", 1.0),
@@ -104,7 +104,7 @@ class NECAdapter(PuertoNEC):
         entrada_nec = {
 
             "potencia_dc_kw": sizing.pdc_kw,
-            "potencia_ac_kw": sizing.pac_kw,
+            "potencia_ac_kw": sizing.kw_ac,
 
             "vdc_nom": vdc_nom,
             "vac_ll": vac_ll,
@@ -121,7 +121,7 @@ class NECAdapter(PuertoNEC):
             },
 
             "inversor": {
-                "kw_ac": sizing.pac_kw,
+                "kw_ac": sizing.kw_ac,
                 "v_ac_nom_v": vac_ll,
                 "fases": fases,
                 "fp": fp,
