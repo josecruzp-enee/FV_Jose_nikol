@@ -27,7 +27,7 @@ _PANELES: Dict[str, Panel] = {
 
 _INVERSORES: Dict[str, Inversor] = {
     "inv_5kw_2mppt": Inversor(
-        pac_kw=5.0,
+        kw_ac=5.0,
         n_mppt=2,
         mppt_min_v=120.0,
         mppt_max_v=480.0,
@@ -138,7 +138,7 @@ def catalogo_inversores() -> list[dict]:
             "id": iid,
             "marca": "YAML/Base",
             "modelo": iid,
-            "pac_kw": float(inv.pac_kw),
+            "kw_ac": float(inv.kw_ac),
             "n_mppt": int(inv.n_mppt),
             "mppt_min_v": float(inv.mppt_min_v),
             "mppt_max_v": float(inv.mppt_max_v),
