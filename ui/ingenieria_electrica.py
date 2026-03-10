@@ -182,7 +182,7 @@ def _mostrar_sizing(sizing):
         st.metric("Potencia DC", f"{sizing.get('kwp_dc')} kWp")
 
     with c3:
-        st.metric("Potencia AC", f"{sizing.get('pac_kw')} kW")
+        st.metric("Potencia AC", f"{sizing.get('kw_ac')} kW")
 
     paneles = sizing.get("n_paneles")
     paneles_por_string = sizing.get("paneles_por_string")
