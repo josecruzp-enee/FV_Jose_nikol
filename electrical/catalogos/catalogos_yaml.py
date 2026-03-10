@@ -5,7 +5,8 @@ from pathlib import Path
 from typing import Any, Dict
 import yaml
 
-from .modelos import Panel, Inversor
+from electrical.modelos.paneles import PanelSpec as Panel
+from electrical.modelos.inversor import InversorSpec as Inversor
 from functools import lru_cache
 
 @lru_cache(maxsize=32)
