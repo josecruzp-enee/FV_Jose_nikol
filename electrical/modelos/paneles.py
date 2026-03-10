@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 @dataclass(frozen=True)
-class Panel:
+class PanelSpec:
     nombre: str
     w: float
     vmp: float
