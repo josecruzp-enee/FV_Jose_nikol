@@ -7,7 +7,6 @@ from typing import Any, Dict, List, Optional
 
 from .calculo_de_strings import InversorSpec, PanelSpec, calcular_strings_fv
 from .dimensionado_paneles import calcular_panel_sizing
-from .resumen_strings import resumen_strings
 from .validacion_strings import (
     validar_inversor,
     validar_panel,
