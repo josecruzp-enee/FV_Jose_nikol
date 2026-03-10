@@ -1,9 +1,8 @@
 # Validación del dominio paneles: verifica coherencia de PanelSpec/InversorSpec y parámetros previos al motor FV.
 from __future__ import annotations
-
 from typing import List, Optional, Tuple
-
-from .calculo_de_strings import InversorSpec, PanelSpec
+from electrical.modelos.paneles import PanelSpec
+from electrical.modelos.inversor import InversorSpec
 
 
 # Valida coherencia básica de parámetros del panel FV usando el contrato interno PanelSpec.
