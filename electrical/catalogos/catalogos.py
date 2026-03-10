@@ -90,12 +90,12 @@ def catalogo_paneles() -> list[dict]:
         out.append({
             "id": pid,
             "marca": "YAML/Base",
-            "modelo": p.nombre,
-            "pmax_w": float(p.w),
-            "vmp_v": float(p.vmp),
-            "voc_v": float(p.voc),
-            "imp_a": float(p.imp),
-            "isc_a": float(p.isc),
+            "modelo": pid,
+            "pmax_w": float(p.pmax_w),
+            "vmp_v": float(p.vmp_v),
+            "voc_v": float(p.voc_v),
+            "imp_a": float(p.imp_a),
+            "isc_a": float(p.isc_a),
         })
     return out
 
