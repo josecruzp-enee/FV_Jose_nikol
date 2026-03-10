@@ -6,6 +6,7 @@ from electrical.energia.orquestador_energia import ejecutar_motor_energia
 from electrical.energia.contrato import EnergiaInput
 from electrical.nec.orquestador_nec import ejecutar_nec
 from electrical.energia.irradiancia import hsp_12m_base
+
 from .puertos import (
     PuertoSizing,
     PuertoPaneles,
@@ -21,41 +22,40 @@ from .orquestador_estudio import DependenciasEstudio
 # ADAPTADORES
 # ==========================================================
 
+
 class SizingAdapter(PuertoSizing):
+
     def ejecutar(self, datos):
-        # Devuelve ResultadoSizing (dataclass fuerte)
         return calcular_sizing_unificado(datos)
 
 
 class PanelesAdapter(PuertoPaneles):
+
     def ejecutar(self, datos, sizing):
-        # sizing es ResultadoSizing (dataclass)
         return ejecutar_paneles_desde_sizing(datos, sizing)
 
 
 class EnergiaAdapter(PuertoEnergia):
+
     def ejecutar(self, datos, sizing, strings):
 
-        # sizing es ResultadoSizing
         pdc_instalada_kw = sizing.pdc_kw
         pac_nominal_kw = sizing.kw_ac
 
-        # Irradiancia mensual obligatoria
         hsp_12m = hsp_12m_base()
+
         if not hsp_12m:
             raise ValueError(
                 "No se encontraron factores mensuales (HSP) en Datosproyecto."
             )
 
-        # Días estándar por mes
         dias_mes = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 
-        # Parámetros físicos desde sistema_fv
         sf = getattr(datos, "sistema_fv", {}) or {}
 
         inp = EnergiaInput(
             pdc_instalada_kw=pdc_instalada_kw,
-            pac_nominal_kw = sizing.kw_ac,
+            pac_nominal_kw=pac_nominal_kw,
             hsp_12m=hsp_12m,
             dias_mes=dias_mes,
             factor_orientacion=sf.get("factor_orientacion", 1.0),
@@ -65,7 +65,6 @@ class EnergiaAdapter(PuertoEnergia):
             permitir_curtailment=sf.get("permitir_curtailment", True),
         )
 
-        # Devuelve EnergiaResultado (dataclass fuerte)
         return ejecutar_motor_energia(inp)
 
 
@@ -101,17 +100,23 @@ class NECAdapter(PuertoNEC):
             "n_strings_total", 0
         )
 
+        # ======================================================
+        # ENTRADA CORRECTA PARA ORQUESTADOR NEC
+        # ======================================================
+
         entrada_nec = {
+
+            "electrico": {
+                "vac_ll": vac_ll,
+                "vac_ln": vac_ln,
+                "fases": fases,
+                "fp": fp,
+            },
 
             "potencia_dc_kw": sizing.pdc_kw,
             "potencia_ac_kw": sizing.kw_ac,
 
             "vdc_nom": vdc_nom,
-            "vac_ll": vac_ll,
-            "vac_ln": vac_ln,
-
-            "fases": fases,
-            "fp": fp,
 
             "strings": {
                 "imp_string_a": imp_string,
@@ -132,8 +137,9 @@ class NECAdapter(PuertoNEC):
 
 
 class FinanzasAdapter(PuertoFinanzas):
+
     def ejecutar(self, datos, sizing, energia):
-        # Devuelve ResultadoFinanciero (dataclass fuerte)
+
         return ejecutar_finanzas(
             datos=datos,
             sizing=sizing,
@@ -145,7 +151,9 @@ class FinanzasAdapter(PuertoFinanzas):
 # FACTORY
 # ==========================================================
 
+
 def construir_dependencias() -> DependenciasEstudio:
+
     return DependenciasEstudio(
         sizing=SizingAdapter(),
         paneles=PanelesAdapter(),
