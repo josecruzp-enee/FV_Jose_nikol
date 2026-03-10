@@ -77,7 +77,7 @@ inversores:
       imppt_max_a: 30
 
     salida_ac:
-      kw_ac:w: 8.0
+      kw_ac: 8.0
 
 
   solis_10k_4g:
