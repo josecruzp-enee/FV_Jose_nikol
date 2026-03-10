@@ -34,7 +34,7 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
             ok=False,
             errores=errores,
             pdc_instalada_kw=inp.pdc_instalada_kw,
-            pac_nominal_kw=inp.pac_nominal_kw,
+            kw_ac=inp.pac_nominal_kw,
             dc_ac_ratio=0.0,
             energia_bruta_12m=[],
             energia_despues_perdidas_12m=[],
