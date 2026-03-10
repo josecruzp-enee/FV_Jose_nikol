@@ -182,7 +182,7 @@ def render(ctx) -> None:
     kwp_estimado = total * cobertura / 1450
     
 
-    PR = 0.80
+    PR = 1
 
     energia_mensual_fv = [
         kwp_estimado * h * d * PR
