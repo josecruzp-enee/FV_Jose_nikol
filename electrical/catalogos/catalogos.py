@@ -4,7 +4,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Dict, List
 
-from .modelos import Panel, Inversor
+from electrical.modelos.paneles import PanelSpec as Panel
+from electrical.modelos.inversor import InversorSpec as Inversor
 from .catalogos_yaml import cargar_paneles_yaml, cargar_inversores_yaml
 
 # ==========================================================
