@@ -12,15 +12,7 @@ class Panel:
     isc: float
     tc_voc_frac_c: float = -0.0029  # -0.29%/°C típico
 
-@dataclass(frozen=True)
-class Inversor:
-    nombre: str
-    kw_ac: float
-    n_mppt: int
-    vmppt_min: float
-    vmppt_max: float
-    vdc_max_v: float
-    imppt_max: float = 25.0  # A por MPPT (referencial)
+
 
 @dataclass(frozen=True)
 class ParametrosCableado:
