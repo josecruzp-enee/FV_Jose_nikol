@@ -37,32 +37,42 @@ def _i(x: Any, default: int = 0) -> int:
 # ================================
 
 def _as_panel_spec(panel: Any) -> PanelSpec:
+
     if isinstance(panel, PanelSpec):
         return panel
 
     coef_voc = _f(
-        getattr(panel, "coef_voc_pct_c",
-            getattr(panel, "coef_voc",
-                getattr(panel, "tc_voc_pct_c", -0.28))),
+        getattr(
+            panel,
+            "coef_voc_pct_c",
+            getattr(
+                panel,
+                "coef_voc",
+                getattr(panel, "tc_voc_pct_c", -0.28)
+            )
+        ),
         -0.28,
     )
 
     coef_vmp = getattr(panel, "coef_vmp_pct_c", None)
+
     if coef_vmp is None:
         coef_vmp = getattr(panel, "coef_vmp", None)
+
     if coef_vmp is None:
         coef_vmp = getattr(panel, "tc_vmp_pct_c", None)
+
     if coef_vmp is None:
         coef_vmp = getattr(panel, "coef_pmax_pct_c", -0.34)
 
     return PanelSpec(
-        nombre=getattr(panel, "nombre", "panel"),
-        w=_f(getattr(panel, "w", getattr(panel, "pmax_w", 0.0))),
-        vmp=_f(getattr(panel, "vmp", getattr(panel, "vmp_v", 0.0))),
-        voc=_f(getattr(panel, "voc", getattr(panel, "voc_v", 0.0))),
-        imp=_f(getattr(panel, "imp", getattr(panel, "imp_a", 0.0))),
-        isc=_f(getattr(panel, "isc", getattr(panel, "isc_a", 0.0))),
-        tc_voc_frac_c=_f(getattr(panel, "tc_voc_frac_c", -0.0029)),
+        pmax_w=_f(getattr(panel, "w", getattr(panel, "pmax_w", 0.0))),
+        vmp_v=_f(getattr(panel, "vmp", getattr(panel, "vmp_v", 0.0))),
+        voc_v=_f(getattr(panel, "voc", getattr(panel, "voc_v", 0.0))),
+        imp_a=_f(getattr(panel, "imp", getattr(panel, "imp_a", 0.0))),
+        isc_a=_f(getattr(panel, "isc", getattr(panel, "isc_a", 0.0))),
+        coef_voc_pct_c=_f(coef_voc, -0.28),
+        coef_vmp_pct_c=_f(coef_vmp, -0.34),
     )
 
 
