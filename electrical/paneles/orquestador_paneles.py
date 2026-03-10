@@ -1,11 +1,11 @@
 # electrical/paneles/orquestador_paneles.py
 # Orquestador del dominio paneles: normaliza entradas, valida coherencia mínima
 # y ejecuta el motor único de strings FV.
-
 from __future__ import annotations
 from typing import Any, Dict, List, Optional
-
-from .calculo_de_strings import InversorSpec, PanelSpec, calcular_strings_fv
+from electrical.modelos.paneles import PanelSpec
+from electrical.modelos.inversor import InversorSpec
+from .calculo_de_strings import calcular_strings_fv
 from .dimensionado_paneles import calcular_panel_sizing
 from .validacion_strings import (
     validar_inversor,
