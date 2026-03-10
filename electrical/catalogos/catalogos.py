@@ -138,7 +138,7 @@ def catalogo_inversores() -> list[dict]:
             "id": iid,
             "marca": "YAML/Base",
             "modelo": iid,
-            "pac_kw": float(inv.kw_ac),
+            "pac_kw": float(inv.pac_kw),
             "n_mppt": int(inv.n_mppt),
             "mppt_min_v": float(inv.mppt_min_v),
             "mppt_max_v": float(inv.mppt_max_v),
