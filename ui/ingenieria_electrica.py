@@ -201,7 +201,9 @@ def _mostrar_sizing(sizing):
         with s2:
             st.metric("Número de strings", n_strings)
 
-
+# ==========================================================
+# Mostrar Nec
+# ==========================================================
 def _mostrar_nec(nec):
 
     st.subheader("Ingeniería eléctrica (NEC 2023)")
@@ -211,6 +213,7 @@ def _mostrar_nec(nec):
         return
 
     paq = nec.get("paq", {})
+
     dc = paq.get("dc", {})
     ac = paq.get("ac", {})
     ocpd = paq.get("ocpd", {})
@@ -218,9 +221,18 @@ def _mostrar_nec(nec):
     warnings = paq.get("warnings", [])
     corr = paq.get("corrientes", {})
 
-    # =====================================
-    # RESUMEN NEC
-    # =====================================
+    _mostrar_resumen_nec(ocpd, conductores)
+
+    st.divider()
+
+    _mostrar_corrientes_fv(corr)
+
+    st.divider()
+
+    _mostrar_tabs_nec(dc, ac, ocpd, conductores, warnings)
+
+
+def _mostrar_resumen_nec(ocpd, conductores):
 
     i_dc_diseno = None
     i_ac_diseno = None
@@ -246,137 +258,126 @@ def _mostrar_nec(nec):
     with c3:
         st.metric("Breaker AC", _fmt(breaker, "A"))
 
-    st.divider()
 
-    # =====================================
-    # CORRIENTES DEL SISTEMA FV
-    # =====================================
+def _mostrar_corrientes_fv(corr):
 
     st.markdown("### Corrientes del sistema FV")
 
     p = corr.get("panel", {})
     s = corr.get("string", {})
     m = corr.get("mppt", {})
-    dct = corr.get("dc_total", {})
-    acs = corr.get("ac", {})
+    dct = corr.get("dc_inversor", {})
+    acs = corr.get("ac_salida", {})
 
     c1, c2, c3 = st.columns(3)
 
     with c1:
-        st.metric("Panel", _fmt(p.get("i_operacion_a"), "A"))
+        st.metric("Panel", _fmt(p.get("i_nominal"), "A"))
 
     with c2:
-        st.metric("String", _fmt(s.get("i_operacion_a"), "A"))
+        st.metric("String", _fmt(s.get("i_nominal"), "A"))
 
     with c3:
-        st.metric("MPPT", _fmt(m.get("i_operacion_a"), "A"))
+        st.metric("MPPT", _fmt(m.get("i_nominal"), "A"))
 
     c4, c5 = st.columns(2)
 
     with c4:
-        st.metric(
-            "Entrada inversor DC",
-            _fmt(dct.get("i_operacion_a"), "A"),
-        )
+        st.metric("Entrada inversor DC", _fmt(dct.get("i_nominal"), "A"))
 
     with c5:
-        st.metric(
-            "Salida inversor AC",
-            _fmt(acs.get("i_operacion_a"), "A"),
-        )
+        st.metric("Salida inversor AC", _fmt(acs.get("i_nominal"), "A"))
 
-    st.divider()
 
-    # =====================================
-    # TABS TÉCNICAS
-    # =====================================
+def _mostrar_tabs_nec(dc, ac, ocpd, conductores, warnings):
 
     tabs = st.tabs(["⚡ DC", "🔌 AC", "🧵 Conductores", "⚠ Warnings"])
 
-    # =========================
-    # DC
-    # =========================
-
     with tabs[0]:
-
-        c1, c2 = st.columns(2)
-
-        with c1:
-            st.metric("Voltaje DC", _fmt(dc.get("vdc_nom"), "V"))
-
-        with c2:
-            st.metric("Corriente DC nominal", _fmt(dc.get("idc_nom"), "A"))
-
-        st.metric("Potencia DC", _fmt(dc.get("potencia_dc_w"), "W"))
-
-    # =========================
-    # AC
-    # =========================
+        _mostrar_tab_dc(dc)
 
     with tabs[1]:
-
-        c1, c2 = st.columns(2)
-
-        with c1:
-            st.metric("Voltaje AC", _fmt(ac.get("vac_ll"), "V"))
-
-        with c2:
-            st.metric("Corriente AC nominal", _fmt(ac.get("iac_nom"), "A"))
-
-        st.metric("Potencia AC", _fmt(ac.get("potencia_ac_w"), "W"))
-
-        breaker = ocpd.get("breaker_ac", {})
-
-        if breaker:
-
-            st.markdown("### Protección AC")
-
-            st.metric(
-                "Breaker requerido",
-                _fmt(breaker.get("tamano_a"), "A"),
-            )
-
-    # =========================
-    # CONDUCTORES
-    # =========================
+        _mostrar_tab_ac(ac, ocpd)
 
     with tabs[2]:
-
-        if not conductores:
-            st.info("Sin datos de conductores")
-
-        else:
-
-            filas = []
-
-            for c in conductores:
-
-                filas.append(
-                    {
-                        "Circuito": c.get("nombre"),
-                        "Calibre": c.get("calibre"),
-                        "I diseño (A)": _fmt(c.get("i_diseno_a"), "A"),
-                        "Ampacidad (A)": _fmt(c.get("ampacidad_ajustada_a"), "A"),
-                        "VD (%)": _fmt(c.get("vd_pct"), "%"),
-                        "Cumple": "✅" if c.get("cumple") else "❌",
-                    }
-                )
-
-            df = pd.DataFrame(filas)
-
-            st.dataframe(df, use_container_width=True)
-
-    # =========================
-    # WARNINGS
-    # =========================
+        _mostrar_tab_conductores(conductores)
 
     with tabs[3]:
+        _mostrar_tab_warnings(warnings)
 
-        if not warnings:
-            st.success("Sin advertencias")
-        else:
-            for w in warnings:
-                st.warning(w)
+
+def _mostrar_tab_dc(dc):
+
+    c1, c2 = st.columns(2)
+
+    with c1:
+        st.metric("Voltaje DC", _fmt(dc.get("vdc_nom"), "V"))
+
+    with c2:
+        st.metric("Corriente DC nominal", _fmt(dc.get("idc_nom"), "A"))
+
+    st.metric("Potencia DC", _fmt(dc.get("potencia_dc_w"), "W"))
+
+
+def _mostrar_tab_ac(ac, ocpd):
+
+    c1, c2 = st.columns(2)
+
+    with c1:
+        st.metric("Voltaje AC", _fmt(ac.get("vac_ll"), "V"))
+
+    with c2:
+        st.metric("Corriente AC nominal", _fmt(ac.get("iac_nom"), "A"))
+
+    st.metric("Potencia AC", _fmt(ac.get("potencia_ac_w"), "W"))
+
+    breaker = ocpd.get("breaker_ac", {})
+
+    if breaker:
+
+        st.markdown("### Protección AC")
+
+        st.metric(
+            "Breaker requerido",
+            _fmt(breaker.get("tamano_a"), "A"),
+        )
+
+def _mostrar_tab_conductores(conductores):
+
+    if not conductores:
+        st.info("Sin datos de conductores")
+        return
+
+    filas = []
+
+    for c in conductores:
+
+        filas.append(
+            {
+                "Circuito": c.get("nombre"),
+                "Calibre": c.get("calibre"),
+                "I diseño (A)": _fmt(c.get("i_diseno_a"), "A"),
+                "Ampacidad (A)": _fmt(c.get("ampacidad_ajustada_a"), "A"),
+                "VD (%)": _fmt(c.get("vd_pct"), "%"),
+                "Cumple": "✅" if c.get("cumple") else "❌",
+            }
+        )
+
+    df = pd.DataFrame(filas)
+
+    st.dataframe(df, use_container_width=True)
+
+def _mostrar_tab_warnings(warnings):
+
+    if not warnings:
+        st.success("Sin advertencias")
+        return
+
+    for w in warnings:
+        st.warning(w)
+
+
+
 
 # ==========================================================
 # RENDER
