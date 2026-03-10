@@ -45,23 +45,23 @@ def extraer_datos_sistema(resultado):
     sizing = resultado.get("sizing", {})
 
     kwp_dc = float(sizing.get("kwp_dc", sizing.get("pdc_kw", 0)))
-    pac_kw = float(sizing.get("pac_kw", 0))
+    kw_ac = float(sizing.get("kw_ac", 0))
 
     n_paneles = int(sizing.get("n_paneles", 0))
     n_inversores = int(sizing.get("n_inversores", 1))
 
-    return kwp_dc, pac_kw, n_paneles, n_inversores
+    return kwp_dc, kw_ac, n_paneles, n_inversores
 
 
 # ==========================================================
 # Calcular parámetros del sistema
 # ==========================================================
 
-def calcular_parametros_generales(kwp_dc, pac_kw, n_paneles, n_inversores):
+def calcular_parametros_generales(kwp_dc, kw_ac, n_paneles, n_inversores):
 
     panel_wp = (kwp_dc * 1000) / n_paneles if n_paneles else 0
-    potencia_inversor = pac_kw / n_inversores if n_inversores else 0
-    relacion_dc_ac = kwp_dc / pac_kw if pac_kw else 0
+    potencia_inversor = kw_ac / n_inversores if n_inversores else 0
+    relacion_dc_ac = kwp_dc / kw_ac if kw_ac else 0
 
     return panel_wp, potencia_inversor, relacion_dc_ac
 
@@ -115,7 +115,7 @@ def obtener_corrientes(resultado):
 
 def construir_datos_resumen(
     kwp_dc,
-    pac_kw,
+    kw_ac,
     n_paneles,
     panel_wp,
     n_inversores,
@@ -137,7 +137,7 @@ def construir_datos_resumen(
         ["Parámetro", "Valor"],
 
         ["Potencia DC instalada", f"{kwp_dc:.2f} kWp"],
-        ["Potencia AC instalada", f"{pac_kw:.2f} kW"],
+        ["Potencia AC instalada", f"{kw_ac:.2f} kW"],
         ["Relación DC/AC", f"{relacion_dc_ac:.2f}"],
 
         ["Número de módulos", f"{n_paneles} × {panel_wp:.0f} Wp"],
@@ -164,11 +164,11 @@ def build_resumen_tecnico(resultado, pal, styles, content_w):
 
     story = []
 
-    kwp_dc, pac_kw, n_paneles, n_inversores = extraer_datos_sistema(resultado)
+    kwp_dc, kw_ac, n_paneles, n_inversores = extraer_datos_sistema(resultado)
 
     panel_wp, potencia_inversor, relacion_dc_ac = calcular_parametros_generales(
         kwp_dc,
-        pac_kw,
+        kw_ac,
         n_paneles,
         n_inversores
     )
@@ -179,7 +179,7 @@ def build_resumen_tecnico(resultado, pal, styles, content_w):
 
     data = construir_datos_resumen(
         kwp_dc,
-        pac_kw,
+        kw_ac,
         n_paneles,
         panel_wp,
         n_inversores,

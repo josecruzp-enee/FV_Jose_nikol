@@ -34,7 +34,7 @@ def _inv_yaml_to_ui(iid: str, inv: Dict[str, Any]) -> Dict[str, Any]:
     dc = inv.get("entrada_dc", inv)
     ac = inv.get("salida_ac", inv)
     return {"id": iid, "marca": inv.get("marca", "N/D"), "modelo": inv.get("nombre", inv.get("modelo", inv.get("codigo", "Inversor"))),
-            "pac_kw": float(ac.get("pac_kw", ac.get("pac_w", 0.0)) or 0.0), "n_mppt": int(dc.get("n_mppt", 1) or 1),
+            "kw_ac": float(ac.get("kw_ac", ac.get("pac_w", 0.0)) or 0.0), "n_mppt": int(dc.get("n_mppt", 1) or 1),
             "mppt_min_v": float(dc.get("mppt_min_v", 0.0)), "mppt_max_v": float(dc.get("mppt_max_v", 0.0)),
             "vmax_dc_v": float(dc.get("vdc_max_v", 0.0))}
 

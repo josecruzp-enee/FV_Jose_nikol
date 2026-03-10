@@ -63,7 +63,7 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
     energia_util, energia_recortada = aplicar_curtailment(
         energia_12m=energia_perdidas,
         pdc_kw=inp.pdc_instalada_kw,
-        pac_kw=inp.pac_nominal_kw,
+        kw_ac=inp.pac_nominal_kw,
         permitir=inp.permitir_curtailment,
     )
 

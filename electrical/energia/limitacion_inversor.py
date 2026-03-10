@@ -6,7 +6,7 @@ def aplicar_curtailment(
     *,
     energia_12m: List[float],
     pdc_kw: float,
-    pac_kw: float,
+    kw_ac: float,
     permitir: bool,
 ) -> (List[float], List[float]):
 
