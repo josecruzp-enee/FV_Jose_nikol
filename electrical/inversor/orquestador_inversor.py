@@ -24,10 +24,10 @@ def calcular_cantidad_inversores(
 
     return {
         "n_inversores": n_inversores,
-        "pac_kw": pac_inversor_kw,
-        "pac_total_kw": pac_total,
+        "kw_ac": pac_inversor_kw,
+        "kw_ac_total": pac_total,
         "ratio_real": ratio_real,
-        "pac_obj_kw": pac_obj,
+        "kw_ac_obj": pac_obj,
     }
 
 
@@ -94,7 +94,8 @@ def ejecutar_inversor_desde_sizing(
             dc_ac_obj=dc_ac_obj,
         )
 
-        pac_total = calc["pac_total_kw"]
+        # CORRECCIÓN AQUÍ
+        pac_total = calc["kw_ac_total"]
 
         if mejor_total is None or pac_total < mejor_total:
 
