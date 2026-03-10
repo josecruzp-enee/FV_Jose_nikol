@@ -32,7 +32,7 @@ _INVERSORES: Dict[str, Inversor] = {
         mppt_min_v=120.0,
         mppt_max_v=480.0,
         vdc_max_v=550.0,
-        imppt_max_a=None,
+        imppt_max_a=15.0,
     ),
 }
 
