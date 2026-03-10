@@ -27,7 +27,7 @@ _PANELES: Dict[str, Panel] = {
 
 _INVERSORES: Dict[str, Inversor] = {
     "inv_5kw_2mppt": Inversor(
-        kpac_kw=5.0,
+        pac_kw=5.0,
         n_mppt=2,
         mppt_min_v=120.0,
         mppt_max_v=480.0,
