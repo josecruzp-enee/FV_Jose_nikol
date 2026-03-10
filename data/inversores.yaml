@@ -18,7 +18,7 @@ inversores:
       isc_mppt_max_a: 40
 
     salida_ac:
-      pac_kw: 20
+      kw_ac:: 20
       potencia_aparente_kva: 22
       vac_nominal_v: 400
       corriente_nominal_a: 29
@@ -41,7 +41,7 @@ inversores:
       isc_mppt_max_a: 40
 
     salida_ac:
-      pac_kw: 115
+      kw_ac:: 115
       potencia_aparente_kva: 125
       vac_nominal_v: 400
       corriente_nominal_a: 166
@@ -61,7 +61,7 @@ inversores:
       imppt_max_a: 13.5
 
     salida_ac:
-      pac_kw: 5.0
+      kw_ac:: 5.0
 
 
   sungrow_sg8rt:
@@ -77,7 +77,7 @@ inversores:
       imppt_max_a: 30
 
     salida_ac:
-      pac_kw: 8.0
+      kw_ac:w: 8.0
 
 
   solis_10k_4g:
@@ -93,4 +93,4 @@ inversores:
       imppt_max_a: 26
 
     salida_ac:
-      pac_kw: 10.0
+      kw_ac:: 10.0
