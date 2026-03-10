@@ -137,11 +137,11 @@ def calcular_sizing_unificado(
         inversor_id_forzado=_inv_id(eq),
     )
 
-    pac_kw = float(resultado_inv["pac_kw"])
+    kw_ac = float(resultado_inv["kw_ac"])
     n_inversores = int(resultado_inv.get("n_inversores", 1))
 
     # potencia AC total instalada
-    pac_total_kw = pac_kw * n_inversores
+    pac_total_kw = kw_ac * n_inversores
 
     # =========================
     # DIVISIÓN DEL ARREGLO
@@ -160,7 +160,7 @@ def calcular_sizing_unificado(
         n_paneles=n_pan,
         kwp_dc=round(pdc, 3),
         pdc_kw=round(pdc, 3),
-        pac_kw=pac_total_kw,
+        kw_ac=pac_total_kw,
         n_inversores=n_inversores,
         paneles_por_inversor=paneles_por_inversor,
         energia_12m=energia_12m,
