@@ -161,11 +161,9 @@ def calcular_strings_fv(
 ) -> Dict:
 
     errores: List[str] = []
-
     warnings: List[str] = []
 
     if n_paneles_total <= 0:
-
         return _resultado_error("n_paneles_total inválido")
 
     t_oper = t_oper_c if t_oper_c else 55.0
@@ -178,7 +176,6 @@ def calcular_strings_fv(
     )
 
     if n_max < n_min:
-
         return _resultado_error("No existe número válido de módulos en serie")
 
     n_series = _seleccionar_n_series(
@@ -189,13 +186,11 @@ def calcular_strings_fv(
     )
 
     if not n_series or n_series <= 0:
-
         return _resultado_error("Serie inválida calculada")
 
     n_strings_total = n_paneles_total // n_series
 
     if n_strings_total <= 0:
-
         return _resultado_error("No es posible formar strings")
 
     ramas = _split_por_mppt(
@@ -211,6 +206,21 @@ def calcular_strings_fv(
         vmp_hot_panel
     )
 
+    # ------------------------------------------------------
+    # Enriquecer strings con datos eléctricos
+    # ------------------------------------------------------
+
+    vmp_string = vmp_hot_panel * n_series
+    voc_string = voc_frio_panel * n_series
+
+    for s in strings:
+
+        s["imp_a"] = float(panel.imp)
+        s["isc_a"] = float(panel.isc)
+
+        s["vmp_string_v"] = float(vmp_string)
+        s["voc_string_v"] = float(voc_string)
+
     return {
         "ok": True,
         "errores": errores,
@@ -218,7 +228,9 @@ def calcular_strings_fv(
         "strings": strings,
         "recomendacion": {
             "n_series": n_series,
-            "n_strings_total": n_strings_total
+            "n_strings_total": n_strings_total,
+            "vmp_string_v": vmp_string,
+            "voc_string_v": voc_string
         },
         "bounds": {
             "n_min": n_min,
