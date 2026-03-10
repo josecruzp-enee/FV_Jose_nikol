@@ -2,8 +2,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
 
-from dataclasses import dataclass
-
 @dataclass(frozen=True)
 class PanelSpec:
     pmax_w: float
