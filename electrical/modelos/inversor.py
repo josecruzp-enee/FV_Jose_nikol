@@ -9,7 +9,7 @@ from dataclasses import dataclass
 @dataclass(frozen=True)
 class InversorSpec:
 
-    pac_kw: float
+    kw_ac: float
 
     n_mppt: int
 
