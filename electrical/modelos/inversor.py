@@ -5,13 +5,13 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class InversorSpec:
-    pac_kw: float
+    nombre: str
+    kw_ac: float
     n_mppt: int
-    mppt_min_v: float
-    mppt_max_v: float
+    vmppt_min: float
+    vmppt_max: float
     vdc_max_v: float
-    imppt_max_a: float = 25.0
-    nombre: str = "Inversor"
+    imppt_max: float = 25.0
 
     # ================================
     # Compatibilidad con el motor FV
