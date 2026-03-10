@@ -27,11 +27,16 @@ def render_demanda_vs_fv(ctx, energia_mensual_kwh):
         "FV": energia_mensual_kwh
     })
 
-    df_graf = df_graf.set_index("Mes")
+    # forzar orden correcto de meses
+    df_graf["Mes"] = pd.Categorical(
+        df_graf["Mes"],
+        categories=_MESES,
+        ordered=True
+    )
+
+    df_graf = df_graf.sort_values("Mes").set_index("Mes")
 
     st.bar_chart(df_graf)
-
-
 # ---------------------------------------------------------
 # Análisis de cobertura FV
 # ---------------------------------------------------------
