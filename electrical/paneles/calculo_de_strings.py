@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from math import ceil, floor
 from typing import Dict, List
-
-from electrical.catalogos.modelos import Panel, Inversor
+from electrical.modelos.paneles import PanelSpec
+from electrical.modelos.inversor import InversorSpec
 
 
 # ==========================================================
