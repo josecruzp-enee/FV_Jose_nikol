@@ -2,15 +2,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
 
-@dataclass(frozen=True)
-class Panel:
-    nombre: str
-    w: float
-    vmp: float
-    voc: float
-    imp: float
-    isc: float
-    tc_voc_frac_c: float = -0.0029  # -0.29%/°C típico
 
 @dataclass(frozen=True)
 class Inversor:
