@@ -168,7 +168,19 @@ def render(ctx) -> None:
     render_analisis_cobertura(ctx)
 
     # generación FV estimada para la gráfica (provisional)
-    energia_mensual_fv = [total * 0.75 / 12] * 12
+    from electrical.energia.irradiancia import hsp_12m_base, DIAS_MES
+
+    hsp = hsp_12m_base()
+
+    # estimación simple de tamaño FV basada en consumo
+    kwp_estimado = total / 1450
+
+    PR = 0.80
+
+    energia_mensual_fv = [
+        kwp_estimado * h * d * PR
+        for h, d in zip(hsp, DIAS_MES)
+    ]
 
     render_demanda_vs_fv(ctx, energia_mensual_fv)
 
