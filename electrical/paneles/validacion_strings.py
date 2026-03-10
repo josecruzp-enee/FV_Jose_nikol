@@ -57,8 +57,8 @@ def validar_inversor(inversor: InversorSpec) -> Tuple[List[str], List[str]]:
     if inversor.vdc_max_v > 0 and inversor.mppt_max_v > 0 and inversor.vdc_max_v < inversor.mppt_max_v:
         warnings.append("Inversor: vdc_max_v < mppt_max_v (revisar datasheet).")
 
-    if inversor.pac_kw <= 0:
-        warnings.append("Inversor: pac_kw <= 0 (DC/AC objetivo puede quedar sin referencia).")
+    if inversor.kw_ac <= 0:
+        warnings.append("Inversor: kw_ac <= 0 (DC/AC objetivo puede quedar sin referencia).")
 
     return errores, warnings
 
