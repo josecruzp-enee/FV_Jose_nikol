@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from math import ceil, floor
 from typing import Dict, List
+
 from electrical.modelos.paneles import PanelSpec
 from electrical.modelos.inversor import InversorSpec
 
@@ -11,7 +12,6 @@ from electrical.modelos.inversor import InversorSpec
 # ==========================================================
 
 def _voc_frio(voc_stc: float, coef_voc_frac_c: float, t_min_c: float, t_stc_c: float = 25.0):
-
     return voc_stc * (1 + coef_voc_frac_c * (t_min_c - t_stc_c))
 
 
@@ -19,17 +19,21 @@ def _voc_frio(voc_stc: float, coef_voc_frac_c: float, t_min_c: float, t_stc_c: f
 # LIMITES DE VOLTAJE
 # ==========================================================
 
-def _bounds_por_voltaje(panel: Panel, inv: Inversor, t_min_c: float, t_oper_c: float):
+def _bounds_por_voltaje(panel: PanelSpec, inv: InversorSpec, t_min_c: float, t_oper_c: float):
 
-    voc_frio_panel = _voc_frio(panel.voc, panel.tc_voc_frac_c, t_min_c)
+    voc_frio_panel = _voc_frio(
+        panel.voc_v,
+        panel.coef_voc_pct_c / 100.0,
+        t_min_c
+    )
 
-    vmp_hot_panel = panel.vmp
+    vmp_hot_panel = panel.vmp_v
 
     max_por_vdc = floor(inv.vdc_max_v / voc_frio_panel)
 
-    min_por_mppt = ceil(inv.vmppt_min / vmp_hot_panel)
+    min_por_mppt = ceil(inv.mppt_min_v / vmp_hot_panel)
 
-    max_por_mppt = floor(inv.vmppt_max / vmp_hot_panel)
+    max_por_mppt = floor(inv.mppt_max_v / vmp_hot_panel)
 
     n_min = max(1, min_por_mppt)
 
@@ -42,24 +46,20 @@ def _bounds_por_voltaje(panel: Panel, inv: Inversor, t_min_c: float, t_oper_c: f
 # SELECCION SERIES
 # ==========================================================
 
-def _seleccionar_n_series(n_min: int, n_max: int, vmp_hot_panel: float, inversor: Inversor):
+def _seleccionar_n_series(n_min: int, n_max: int, vmp_hot_panel: float, inversor: InversorSpec):
 
-    mid = (inversor.vmppt_min + inversor.vmppt_max) / 2
+    mid = (inversor.mppt_min_v + inversor.mppt_max_v) / 2
 
     best_ns = None
-
     best_error = 1e12
 
     for n in range(n_min, n_max + 1):
 
         vmp_string = n * vmp_hot_panel
-
         err = abs(vmp_string - mid)
 
         if err < best_error:
-
             best_error = err
-
             best_ns = n
 
     return best_ns
@@ -69,12 +69,11 @@ def _seleccionar_n_series(n_min: int, n_max: int, vmp_hot_panel: float, inversor
 # DISTRIBUCION STRINGS
 # ==========================================================
 
-def _split_por_mppt(n_strings_total: int, inversor: Inversor):
+def _split_por_mppt(n_strings_total: int, inversor: InversorSpec):
 
     n_mppt = inversor.n_mppt
 
     base = n_strings_total // n_mppt
-
     resto = n_strings_total % n_mppt
 
     salida = []
@@ -84,7 +83,6 @@ def _split_por_mppt(n_strings_total: int, inversor: Inversor):
         n = base + (1 if i < resto else 0)
 
         if n > 0:
-
             salida.append(
                 {
                     "mppt": i + 1,
@@ -99,7 +97,7 @@ def _split_por_mppt(n_strings_total: int, inversor: Inversor):
 # GENERACION STRINGS
 # ==========================================================
 
-def _generar_strings(ramas, n_series, panel: Panel, voc_frio_panel, vmp_hot_panel):
+def _generar_strings(ramas, n_series, panel: PanelSpec, voc_frio_panel, vmp_hot_panel):
 
     strings = []
 
@@ -116,11 +114,11 @@ def _generar_strings(ramas, n_series, panel: Panel, voc_frio_panel, vmp_hot_pane
                 "vmp_string_v": n_series * vmp_hot_panel,
                 "voc_frio_string_v": n_series * voc_frio_panel,
 
-                "imp_string_a": panel.imp,
-                "isc_string_a": panel.isc,
+                "imp_string_a": panel.imp_a,
+                "isc_string_a": panel.isc_a,
 
-                "imp_mppt_a": panel.imp * n_paralelo,
-                "isc_array_a": panel.isc * n_paralelo,
+                "imp_mppt_a": panel.imp_a * n_paralelo,
+                "isc_array_a": panel.isc_a * n_paralelo,
             }
         )
 
@@ -151,8 +149,8 @@ def _resultado_error(msg: str):
 def calcular_strings_fv(
     *,
     n_paneles_total: int,
-    panel: Panel,
-    inversor: Inversor,
+    panel: PanelSpec,
+    inversor: InversorSpec,
     t_min_c: float,
     dos_aguas: bool = False,
     objetivo_dc_ac: float | None = None,
@@ -206,17 +204,13 @@ def calcular_strings_fv(
         vmp_hot_panel
     )
 
-    # ------------------------------------------------------
-    # Enriquecer strings con datos eléctricos
-    # ------------------------------------------------------
-
     vmp_string = vmp_hot_panel * n_series
     voc_string = voc_frio_panel * n_series
 
     for s in strings:
 
-        s["imp_a"] = float(panel.imp)
-        s["isc_a"] = float(panel.isc)
+        s["imp_a"] = float(panel.imp_a)
+        s["isc_a"] = float(panel.isc_a)
 
         s["vmp_string_v"] = float(vmp_string)
         s["voc_string_v"] = float(voc_string)
