@@ -114,14 +114,12 @@ def cargar_paneles_yaml(path: str = "paneles.yaml") -> Dict[str, Panel]:
 
         # Construcción compatible (sin asumir nuevos campos en __init__)
         panel_obj = Panel(
-            nombre=str(p["nombre"]).strip(),
-            w=float(stc["pmax_w"]),
-            vmp=float(stc["vmp_v"]),
-            voc=float(stc["voc_v"]),
-            imp=float(stc["imp_a"]),
-            isc=float(stc["isc_a"]),
+            pmax_w=float(stc["pmax_w"]),
+            vmp_v=float(stc["vmp_v"]),
+            voc_v=float(stc["voc_v"]),
+            imp_a=float(stc["imp_a"]),
+            isc_a=float(stc["isc_a"]),
         )
-
         # Inyectar coeficientes para que el orquestador los pueda leer
         _set_attr_safe(panel_obj, "coef_voc_pct_c", float(coef_voc))
         _set_attr_safe(panel_obj, "coef_vmp_pct_c", float(coef_vmp))
