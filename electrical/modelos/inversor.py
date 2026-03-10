@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
-class Inversor:
+class InversorSpec:
     nombre: str
     kw_ac: float
     n_mppt: int
