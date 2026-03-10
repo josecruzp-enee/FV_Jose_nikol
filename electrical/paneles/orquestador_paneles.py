@@ -77,6 +77,7 @@ def _as_panel_spec(panel: Any) -> PanelSpec:
 
 
 def _as_inversor_spec(inversor: Any) -> InversorSpec:
+
     if isinstance(inversor, InversorSpec):
         return inversor
 
@@ -84,18 +85,18 @@ def _as_inversor_spec(inversor: Any) -> InversorSpec:
     if imppt is None:
         imppt = getattr(inversor, "imppt_max", None)
 
-    imppt_f = _f(imppt, 0.0) if imppt is not None else 0.0
+    imppt_f = _f(imppt, 25.0) if imppt is not None else 25.0
     n_mppt = _i(getattr(inversor, "n_mppt", 1), 1) or 1
 
     return InversorSpec(
-        pac_kw=_f(getattr(inversor, "kw_ac", getattr(inversor, "pac_kw", 0.0))),
-        vdc_max_v=_f(getattr(inversor, "vdc_max", getattr(inversor, "vdc_max_v", 0.0))),
-        mppt_min_v=_f(getattr(inversor, "vmppt_min", getattr(inversor, "mppt_min_v", 0.0))),
-        mppt_max_v=_f(getattr(inversor, "vmppt_max", getattr(inversor, "mppt_max_v", 0.0))),
+        nombre=getattr(inversor, "nombre", getattr(inversor, "name", "Inversor")),
+        kw_ac=_f(getattr(inversor, "kw_ac", getattr(inversor, "pac_kw", 0.0))),
         n_mppt=n_mppt,
-        imppt_max_a=imppt_f,
+        vmppt_min=_f(getattr(inversor, "vmppt_min", getattr(inversor, "mppt_min_v", 0.0))),
+        vmppt_max=_f(getattr(inversor, "vmppt_max", getattr(inversor, "mppt_max_v", 0.0))),
+        vdc_max_v=_f(getattr(inversor, "vdc_max_v", getattr(inversor, "vdc_max", 0.0))),
+        imppt_max=imppt_f,
     )
-
 
 # ================================
 # Motor principal de strings
