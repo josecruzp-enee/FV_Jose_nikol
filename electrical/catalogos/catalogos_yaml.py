@@ -163,7 +163,7 @@ def cargar_inversores_yaml(path: str = "inversores.yaml") -> Dict[str, Inversor]
         imppt = _opt_num(dc, "imppt_max_a", f"inversores.{iid}.entrada_dc")
 
         inv_obj = Inversor(
-            kw_ac=pac_kw,
+            pac_kw=pac_kw,
             n_mppt=int(dc["n_mppt"]),
             mppt_min_v=float(dc["mppt_min_v"]),
             mppt_max_v=float(dc["mppt_max_v"]),
