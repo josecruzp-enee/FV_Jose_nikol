@@ -10,10 +10,10 @@ def aplicar_curtailment(
     permitir: bool,
 ) -> (List[float], List[float]):
 
-    if not permitir or pac_kw <= 0:
+    if not permitir or kw_ac <= 0:
         return energia_12m, [0.0] * 12
 
-    ratio = pdc_kw / pac_kw
+    ratio = pdc_kw / kw_ac
 
     if ratio <= 1.0:
         return energia_12m, [0.0] * 12
