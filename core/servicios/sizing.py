@@ -66,7 +66,7 @@ def calcular_sizing_unificado(
     if panel is None:
         raise ValueError("Panel no encontrado en catálogo")
 
-    panel_w = float(getattr(panel, "w", 0.0))
+    panel_w = float(getattr(panel, "pmax_w", 0.0))
     if panel_w <= 0:
         raise ValueError("Potencia de panel inválida")
 
