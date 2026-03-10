@@ -178,7 +178,9 @@ def render(ctx) -> None:
     hsp = hsp_12m_base()
 
     # estimación simple de tamaño FV basada en consumo
-    kwp_estimado = total / 1450
+    cobertura = 0.80
+    kwp_estimado = total * cobertura / 1450
+    
 
     PR = 0.80
 
