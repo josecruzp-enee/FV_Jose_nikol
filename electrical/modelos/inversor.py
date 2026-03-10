@@ -20,25 +20,6 @@ class InversorSpec:
 
     imppt_max_a: float | None = None
 
-    # ================================
-    # Compatibilidad con el motor FV
-    # ================================
-
-    @property
-    def pac_kw(self):
-        return self.kw_ac
-
-    @property
-    def mppt_min_v(self):
-        return self.vmppt_min
-
-    @property
-    def mppt_max_v(self):
-        return self.vmppt_max
-
-    @property
-    def imppt_max_a(self):
-        return self.imppt_max
 
 @dataclass(frozen=True)
 class ParametrosCableado:
