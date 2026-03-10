@@ -5,13 +5,6 @@ from core.dominio.contrato import ResultadoSizing
 from electrical.paquete_nec import armar_paquete_nec
 
 
-from typing import Dict, Any
-import math
-
-from core.dominio.contrato import ResultadoSizing
-from electrical.paquete_nec import armar_paquete_nec
-
-
 def ejecutar_nec(
     p,
     sizing: ResultadoSizing,
@@ -21,9 +14,10 @@ def ejecutar_nec(
     ee: Dict[str, Any] = {}
 
     # ------------------------------------------------------
-    # 1. Base eléctrica del proyecto (definida por proyectista)
+    # 1. Base eléctrica del proyecto
     # ------------------------------------------------------
 
+    # aceptar dict u objeto
     if isinstance(p, dict):
         base = p.get("electrico", {})
     else:
@@ -35,7 +29,9 @@ def ejecutar_nec(
 
     if isinstance(base, dict):
 
-        vac_ll = base.get("vac")
+        # aceptar vac o vac_ll
+        vac_ll = base.get("vac") or base.get("vac_ll")
+
         fases = base.get("fases", 1)
         fp = base.get("fp", 1.0)
 
@@ -47,6 +43,10 @@ def ejecutar_nec(
                 ee["vac_ln"] = vac_ll / math.sqrt(3)
             else:
                 ee["vac_ln"] = vac_ll
+
+    # protección contra errores silenciosos
+    if not vac_ll:
+        raise ValueError("Voltaje AC del sistema no definido en proyecto")
 
     ee["fases"] = fases
     ee["fp"] = fp
