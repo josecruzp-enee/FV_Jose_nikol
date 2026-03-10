@@ -24,7 +24,10 @@ def ejecutar_nec(
     # 1. Base eléctrica del proyecto (definida por proyectista)
     # ------------------------------------------------------
 
-    base = getattr(p, "electrico", None)
+    if isinstance(p, dict):
+        base = p.get("electrico", {})
+    else:
+        base = getattr(p, "electrico", {})
 
     vac_ll = None
     fases = 1
