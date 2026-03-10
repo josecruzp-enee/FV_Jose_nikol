@@ -85,7 +85,7 @@ def _ui_select_inversor(eq: dict, inv_ids: List[str], inv_map: Dict[str, dict]) 
         "Inversor",
         options=inv_ids,
         index=_safe_index(inv_ids, eq.get("inversor_id")),
-        format_func=lambda iid: f'{inv_map[iid]["marca"]} {inv_map[iid]["modelo"]} ({inv_map[iid]["pac_kw"]:.1f} kW)',
+        format_func=lambda iid: f'{inv_map[iid]["marca"]} {inv_map[iid]["modelo"]} ({inv_map[iid]["kw_ac"]:.1f} kW)'
     )
 
 
