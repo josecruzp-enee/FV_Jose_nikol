@@ -82,13 +82,7 @@ def render_analisis_cobertura(ctx):
 
             st.dataframe(df, use_container_width=True)
 
-            # gráfica ROI
-            chart_df = df.copy()
-            chart_df["Cobertura %"] = chart_df["Cobertura %"].str.replace(" %", "").astype(int)
-            chart = chart_df.set_index("Cobertura %")["ROI"]
-
-            st.markdown("#### ROI vs Cobertura")
-            st.line_chart(chart)
+            
 
         except Exception as e:
 
