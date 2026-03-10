@@ -6,33 +6,6 @@ from typing import Any, Dict, List
 
 
 # ==========================================================
-# MODELOS
-# ==========================================================
-
-@dataclass(frozen=True)
-class PanelSpec:
-
-    pmax_w: float
-    vmp_v: float
-    voc_v: float
-    imp_a: float
-    isc_a: float
-    coef_voc_pct_c: float
-    coef_vmp_pct_c: float = -0.34
-
-
-@dataclass(frozen=True)
-class InversorSpec:
-
-    pac_kw: float
-    vdc_max_v: float
-    mppt_min_v: float
-    mppt_max_v: float
-    n_mppt: int
-    imppt_max_a: float
-
-
-# ==========================================================
 # TEMPERATURA
 # ==========================================================
 
