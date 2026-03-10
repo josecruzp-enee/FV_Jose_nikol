@@ -2,15 +2,20 @@
 from __future__ import annotations
 from dataclasses import dataclass
 
+
 @dataclass(frozen=True)
 class PanelSpec:
+
     pmax_w: float
+
     vmp_v: float
     voc_v: float
+
     imp_a: float
     isc_a: float
-    coef_voc_pct_c: float = -0.28
-    coef_vmp_pct_c: float = -0.34
+
+    coef_voc_pct_c: float
+    coef_vmp_pct_c: float
 
 @dataclass(frozen=True)
 class ParametrosCableado:
