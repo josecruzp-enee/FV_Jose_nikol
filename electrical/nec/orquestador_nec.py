@@ -5,6 +5,13 @@ from core.dominio.contrato import ResultadoSizing
 from electrical.paquete_nec import armar_paquete_nec
 
 
+from typing import Dict, Any
+import math
+
+from core.dominio.contrato import ResultadoSizing
+from electrical.paquete_nec import armar_paquete_nec
+
+
 def ejecutar_nec(
     p,
     sizing: ResultadoSizing,
@@ -49,7 +56,7 @@ def ejecutar_nec(
     kw_ac = float(sizing.kw_ac)
 
     ee["potencia_dc_w"] = pdc_w
-    ee["potencia_kw_ac"] = kw_ac * 1000
+    ee["potencia_ac_w"] = kw_ac * 1000
 
     # ------------------------------------------------------
     # 3. Datos desde strings
@@ -95,8 +102,8 @@ def ejecutar_nec(
         ee["strings"] = {
             "corrientes_input": {
 
-                "imp_string_a": float(s0.get("imp_a", 0)),
-                "isc_string_a": float(s0.get("isc_a", 0)),
+                "imp_string_a": float(s0.get("imp_string_a", 0)),
+                "isc_string_a": float(s0.get("isc_string_a", 0)),
 
                 "strings_por_mppt": int(s0.get("n_paralelo", 1)),
                 "n_strings_total": int(rec.get("n_strings_total", 0)),
@@ -106,7 +113,7 @@ def ejecutar_nec(
         ee["inversor"] = {
 
             # potencia AC
-            "kw_ac": pac_kw,
+            "kw_ac": kw_ac,
 
             # datos eléctricos
             "v_ac_nom_v": vac_ll,
