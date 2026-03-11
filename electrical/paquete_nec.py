@@ -5,7 +5,6 @@ from electrical.conductores.calculo_conductores import tramo_conductor
 from electrical.protecciones.protecciones import dimensionar_protecciones_fv
 from electrical.conductores.corrientes import calcular_corrientes
 
-
 try:
     from electrical.canalizacion.canalizacion import canalizacion_fv
 except Exception:
@@ -81,7 +80,7 @@ def _normalizar_corrientes(corrientes):
 
 
 # ==========================================================
-# CORRIENTES NOMINALES DEL SISTEMA
+# CORRIENTES NOMINALES (solo referencia)
 # ==========================================================
 
 def _resolver_corrientes_nominales(entrada: Mapping[str, Any]):
@@ -179,22 +178,24 @@ def _resolver_protecciones(entrada, ac):
 
 
 # ==========================================================
-# CONDUCTORES
+# CONDUCTORES (CORREGIDO)
 # ==========================================================
 
-def _resolver_conductores(entrada, dc, ac):
+def _resolver_conductores(entrada, dc, ac, corrientes):
 
     warnings = []
     circuitos = []
 
     try:
 
-        if dc.get("idc_nom"):
+        i_dc_diseno = corrientes.get("dc_total", {}).get("i_diseno_nec_a")
+
+        if i_dc_diseno:
 
             circuitos.append(
                 tramo_conductor(
                     nombre="DC",
-                    i_diseno_a=dc["idc_nom"],
+                    i_diseno_a=i_dc_diseno,
                     v_base_v=dc.get("vdc_nom") or 1,
                     l_m=entrada.get("dist_dc_m", 1),
                     vd_obj_pct=entrada.get("vdrop_obj_dc_pct", 2),
@@ -297,13 +298,18 @@ def armar_paquete_nec(entrada: Mapping[str, Any]) -> Dict[str, Any]:
 
         warnings.append(f"Corrientes error: {e}")
 
-    # NORMALIZACION PARA TABLA NEC
     corrientes_nec = _normalizar_corrientes(corrientes)
 
     ocpd, w = _resolver_protecciones(entrada, ac)
     warnings = _merge(warnings, w)
 
-    conductores, w = _resolver_conductores(entrada, dc, ac)
+    conductores, w = _resolver_conductores(
+        entrada,
+        dc,
+        ac,
+        corrientes
+    )
+
     warnings = _merge(warnings, w)
 
     canalizacion, w = _resolver_canalizacion(
