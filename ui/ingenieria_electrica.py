@@ -225,7 +225,7 @@ def _mostrar_nec(nec):
 
     st.divider()
 
-    _mostrar_corrientes_fv(corr)
+    _mostrar_corrientes_fv(paq)
 
     st.divider()
 
