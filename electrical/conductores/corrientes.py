@@ -60,6 +60,11 @@ def calcular_corrientes(
 
     cfg_tecnicos = cfg_tecnicos or {}
 
+    # Adaptador: si llega el resultado completo de paneles
+    if isinstance(strings, dict) and "strings" in strings:
+        if strings["strings"]:
+            strings = strings["strings"][0]
+
     f_dc = float(cfg_tecnicos.get("factor_seguridad_dc", 1.25))
     f_ac = float(cfg_tecnicos.get("factor_seguridad_ac", 1.25))
 
