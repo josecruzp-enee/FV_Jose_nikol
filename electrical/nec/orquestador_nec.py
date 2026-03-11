@@ -138,4 +138,4 @@ def ejecutar_nec(
         "ok": True,
         "input": ee,
         "paq": paquete,
-    }   esto es lo que yo tenia cuando solo no aparecia la corriente del panel 
+    }
