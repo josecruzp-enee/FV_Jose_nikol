@@ -266,28 +266,27 @@ def _mostrar_corrientes_fv(corr):
     p = corr.get("panel", {})
     s = corr.get("string", {})
     m = corr.get("mppt", {})
-    dct = corr.get("dc_inversor", {})
-    acs = corr.get("ac_salida", {})
+    dct = corr.get("dc_total", {})
+    acs = corr.get("ac", {})
 
     c1, c2, c3 = st.columns(3)
 
     with c1:
-        st.metric("Panel", _fmt(p.get("i_nominal"), "A"))
+        st.metric("Panel", _fmt(p.get("i_operacion_a"), "A"))
 
     with c2:
-        st.metric("String", _fmt(s.get("i_nominal"), "A"))
+        st.metric("String", _fmt(s.get("i_operacion_a"), "A"))
 
     with c3:
-        st.metric("MPPT", _fmt(m.get("i_nominal"), "A"))
+        st.metric("MPPT", _fmt(m.get("i_operacion_a"), "A"))
 
     c4, c5 = st.columns(2)
 
     with c4:
-        st.metric("Entrada inversor DC", _fmt(dct.get("i_nominal"), "A"))
+        st.metric("Entrada inversor DC", _fmt(dct.get("i_operacion_a"), "A"))
 
     with c5:
-        st.metric("Salida inversor AC", _fmt(acs.get("i_nominal"), "A"))
-
+        st.metric("Salida inversor AC", _fmt(acs.get("i_operacion_a"), "A"))
 
 def _mostrar_tabs_nec(dc, ac, ocpd, conductores, warnings):
 
