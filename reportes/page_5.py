@@ -20,9 +20,8 @@ def build_page_5(resultado, datos, paths, pal, styles, content_w):
 
     sizing = resultado.get("sizing", {})
     strings_block = resultado.get("strings", {})
-    nec = resultado.get("nec", {})
 
-    paq = nec.get("paq", {})
+    paq = resultado.get("nec", {})
     corr = paq.get("corrientes", {})
 
     strings = strings_block.get("strings", [])
