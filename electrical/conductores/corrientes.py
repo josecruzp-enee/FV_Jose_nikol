@@ -60,63 +60,78 @@ def calcular_corrientes(
 
     cfg_tecnicos = cfg_tecnicos or {}
 
-    # Adaptador: si llega el resultado completo de paneles
-    if isinstance(strings, dict) and "strings" in strings:
-        if strings["strings"]:
-            strings = strings["strings"][0]
-
     f_dc = float(cfg_tecnicos.get("factor_seguridad_dc", 1.25))
     f_ac = float(cfg_tecnicos.get("factor_seguridad_ac", 1.25))
 
-    # ================================
-    # Datos strings
-    # ================================
+    # ======================================================
+    # Adaptador de entrada (resultado completo de paneles)
+    # ======================================================
 
-    imp_string = _f(strings, "imp_string_a", 0.0)
-    isc_string = _f(strings, "isc_string_a", 0.0)
+    if isinstance(strings, dict) and "strings" in strings:
 
-    strings_por_mppt = _i(strings, "strings_por_mppt", 1)
-    n_strings_total = _i(strings, "n_strings_total", 0)
+        lista = strings.get("strings", [])
+        rec = strings.get("recomendacion", {})
 
-    mppt_por_inv = _i(inv, "mppt", 1)
+        if not lista:
+            raise ValueError("Resultado strings vacío")
 
-    # ================================
-    # Panel
-    # ================================
+        s0 = lista[0]
 
-    i_panel = strings.get("panel_i", isc_string)
+        strings_por_mppt = _i(s0, "n_paralelo", 1)
+        n_strings_total = _i(rec, "n_strings_total", 0)
 
-    # ================================
-    # String
-    # ================================
+        imp_string = _f(s0, "imp_string_a", 0.0)
+        isc_string = _f(s0, "isc_string_a", 0.0)
+
+        i_panel = isc_string
+
+    else:
+
+        imp_string = _f(strings, "imp_string_a", 0.0)
+        isc_string = _f(strings, "isc_string_a", 0.0)
+
+        strings_por_mppt = _i(strings, "strings_por_mppt", 1)
+        n_strings_total = _i(strings, "n_strings_total", 0)
+
+        i_panel = strings.get("panel_i", isc_string)
+
+    if n_strings_total <= 0:
+        raise ValueError("n_strings_total inválido para cálculo de corrientes")
+
+    # ======================================================
+    # STRING
+    # ======================================================
 
     i_string_operacion = imp_string
     isc_string_val = isc_string
 
-    # ================================
+    # ======================================================
     # MPPT
-    # ================================
+    # ======================================================
 
     i_mppt_operacion = imp_string * strings_por_mppt
     isc_mppt = isc_string * strings_por_mppt
 
-    # NEC 690.8
     i_mppt_diseno = isc_mppt * f_dc
 
-    # ================================
-    # Sistema DC total
-    # ================================
+    # ======================================================
+    # SISTEMA DC TOTAL
+    # ======================================================
 
     i_dc_total_operacion = imp_string * n_strings_total
     isc_total = isc_string * n_strings_total
 
-    # ================================
+    # NEC 690.8
+    i_dc_diseno = isc_total * f_dc
+
+    # ======================================================
     # AC
-    # ================================
+    # ======================================================
 
     i_ac_max_ds = _f(inv, "i_ac_max_a", 0.0)
 
     if i_ac_max_ds > 0:
+
         i_ac = i_ac_max_ds
 
     else:
@@ -150,9 +165,9 @@ def calcular_corrientes(
 
     i_ac_diseno = i_ac * f_ac
 
-    # ================================
+    # ======================================================
     # Shape estable
-    # ================================
+    # ======================================================
 
     return {
 
@@ -176,6 +191,7 @@ def calcular_corrientes(
             "strings_total": int(n_strings_total),
             "i_operacion_a": float(i_dc_total_operacion),
             "isc_total_a": float(isc_total),
+            "i_diseno_nec_a": float(i_dc_diseno),
         },
 
         "ac": {
