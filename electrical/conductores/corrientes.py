@@ -84,7 +84,7 @@ def calcular_corrientes(
     # Panel
     # ================================
 
-    i_panel = imp_string
+    i_panel = strings.get("panel_i", isc_string)
 
     # ================================
     # String
