@@ -126,7 +126,12 @@ def _generar_strings(ramas, n_series, panel: PanelSpec, voc_frio_panel, vmp_hot_
                 "isc_string_a": float(panel.isc_a),
 
                 "imp_mppt_a": float(panel.imp_a * n_paralelo),
+
+                # nombre legacy (no romper app)
                 "isc_array_a": float(panel.isc_a * n_paralelo),
+
+                # nombre correcto futuro
+                "isc_mppt_a": float(panel.isc_a * n_paralelo),
             }
         )
 
@@ -191,13 +196,28 @@ def calcular_strings_fv(
         inversor
     )
 
-    if not n_series or n_series <= 0:
+    if n_series <= 0:
         return _resultado_error("Serie inválida calculada")
+
+    # ----------------------------------------------------------
+    # CALCULO DE STRINGS
+    # ----------------------------------------------------------
 
     n_strings_total = n_paneles_total // n_series
 
     if n_strings_total <= 0:
         return _resultado_error("No es posible formar strings")
+
+    # ----------------------------------------------------------
+    # WARNING POR PANELES SOBRANTES
+    # ----------------------------------------------------------
+
+    resto = n_paneles_total % n_series
+
+    if resto > 0:
+        warnings.append(
+            f"{resto} panel(es) no utilizados por configuración de strings"
+        )
 
     ramas = _split_por_mppt(
         n_strings_total,
@@ -215,6 +235,13 @@ def calcular_strings_fv(
     vmp_string = vmp_hot_panel * n_series
     voc_string = voc_frio_panel * n_series
 
+    # ----------------------------------------------------------
+    # CORRIENTES DEL ARRAY COMPLETO (MUY IMPORTANTE)
+    # ----------------------------------------------------------
+
+    imp_array = panel.imp_a * n_strings_total
+    isc_array_total = panel.isc_a * n_strings_total
+
     return {
         "ok": True,
         "errores": errores,
@@ -224,7 +251,11 @@ def calcular_strings_fv(
             "n_series": n_series,
             "n_strings_total": n_strings_total,
             "vmp_string_v": float(vmp_string),
-            "voc_string_v": float(voc_string)
+            "voc_string_v": float(voc_string),
+
+            # NUEVAS VARIABLES (no rompen compatibilidad)
+            "imp_array_a": float(imp_array),
+            "isc_array_total_a": float(isc_array_total),
         },
         "bounds": {
             "n_min": n_min,
