@@ -86,12 +86,15 @@ def ejecutar_nec(
     # Corriente DC nominal (desde strings)
     # ------------------------------------------------------
 
-    imp = float(s0.get("imp_string_a", 0))
-    n_strings = int(rec.get("n_strings_total", 0))
+    if lista:
 
-    if imp > 0 and n_strings > 0:
-        ee["idc_nom"] = imp * n_strings
+        s0 = lista[0]
 
+        imp = float(s0.get("imp_string_a", 0))
+        n_strings = int(rec.get("n_strings_total", 0))
+
+        if imp > 0 and n_strings > 0:
+            ee["idc_nom"] = imp * n_strings
     # ------------------------------------------------------
     # Datos para motor de corrientes
     # ------------------------------------------------------
