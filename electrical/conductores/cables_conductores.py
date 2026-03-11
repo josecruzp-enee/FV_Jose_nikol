@@ -30,8 +30,17 @@ TABLA_BASE_CU: List[Dict[str, float]] = [
     {"awg": "2/0", "amp_a": 175, "r_ohm_km": 0.256},
     {"awg": "3/0", "amp_a": 200, "r_ohm_km": 0.203},
     {"awg": "4/0", "amp_a": 230, "r_ohm_km": 0.161},
-]
 
+    # ---- kcmil ----
+    {"awg": "250", "amp_a": 255, "r_ohm_km": 0.128},
+    {"awg": "300", "amp_a": 285, "r_ohm_km": 0.107},
+    {"awg": "350", "amp_a": 310, "r_ohm_km": 0.094},
+    {"awg": "400", "amp_a": 335, "r_ohm_km": 0.083},
+    {"awg": "500", "amp_a": 380, "r_ohm_km": 0.066},
+    {"awg": "600", "amp_a": 420, "r_ohm_km": 0.055},
+    {"awg": "750", "amp_a": 475, "r_ohm_km": 0.044},
+    {"awg": "1000", "amp_a": 545, "r_ohm_km": 0.033},
+]
 # Aluminio (columna base referencial tipo 75°C)
 TABLA_BASE_AL: List[Dict[str, float]] = [
     {"awg": "12",  "amp_a": 20,  "r_ohm_km": 8.487},
@@ -44,6 +53,14 @@ TABLA_BASE_AL: List[Dict[str, float]] = [
     {"awg": "2/0", "amp_a": 135, "r_ohm_km": 0.418},
     {"awg": "3/0", "amp_a": 155, "r_ohm_km": 0.331},
     {"awg": "4/0", "amp_a": 180, "r_ohm_km": 0.263},
+
+    # kcmil
+    {"awg": "250", "amp_a": 205, "r_ohm_km": 0.214},
+    {"awg": "300", "amp_a": 230, "r_ohm_km": 0.179},
+    {"awg": "350", "amp_a": 250, "r_ohm_km": 0.158},
+    {"awg": "400", "amp_a": 270, "r_ohm_km": 0.140},
+    {"awg": "500", "amp_a": 310, "r_ohm_km": 0.112},
+    {"awg": "600", "amp_a": 340, "r_ohm_km": 0.094},
 ]
 
 # PV Wire (columna base referencial tipo 90°C)
