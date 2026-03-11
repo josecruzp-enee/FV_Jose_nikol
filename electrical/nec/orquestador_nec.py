@@ -17,6 +17,7 @@ def ejecutar_nec(
     # 1. Base eléctrica del proyecto
     # ------------------------------------------------------
 
+    # aceptar dict u objeto
     if isinstance(p, dict):
         base = p.get("electrico", {})
     else:
@@ -28,6 +29,7 @@ def ejecutar_nec(
 
     if isinstance(base, dict):
 
+        # aceptar vac o vac_ll
         vac_ll = base.get("vac") or base.get("vac_ll")
 
         fases = base.get("fases", 1)
@@ -42,6 +44,7 @@ def ejecutar_nec(
             else:
                 ee["vac_ln"] = vac_ll
 
+    # protección contra errores silenciosos
     if not vac_ll:
         raise ValueError("Voltaje AC del sistema no definido en proyecto")
 
@@ -80,7 +83,7 @@ def ejecutar_nec(
     ee["vdc_nom"] = vmp_string
 
     # ------------------------------------------------------
-    # Corriente DC nominal
+    # Corriente DC nominal (desde strings)
     # ------------------------------------------------------
 
     idesign = max(
@@ -92,26 +95,36 @@ def ejecutar_nec(
         ee["idc_nom"] = idesign
 
     # ------------------------------------------------------
-    # Pasar estructura original de strings
-    # ------------------------------------------------------
-
-    ee["strings"] = strings
-
-    # ------------------------------------------------------
-    # Datos de inversor para cálculo AC
+    # Datos para motor de corrientes
     # ------------------------------------------------------
 
     if lista:
 
         s0 = lista[0]
 
+        ee["strings"] = {
+            "corrientes_input": {
+
+                "imp_string_a": float(s0.get("imp_string_a", 0)),
+                "isc_string_a": float(s0.get("isc_string_a", 0)),
+
+                "strings_por_mppt": int(s0.get("n_paralelo", 1)),
+                "n_strings_total": int(rec.get("n_strings_total", 0)),
+            }
+            "panel_i": float(s0.get("isc_string_a", 0))
+        }
+
         ee["inversor"] = {
 
+            # potencia AC
             "kw_ac": kw_ac,
+
+            # datos eléctricos
             "v_ac_nom_v": vac_ll,
             "fases": fases,
             "fp": fp,
 
+            # topología inversor
             "mppt": int(s0.get("mppt", 2)),
         }
 
@@ -125,4 +138,4 @@ def ejecutar_nec(
         "ok": True,
         "input": ee,
         "paq": paquete,
-    }
+    }   esto es lo que yo tenia cuando solo no aparecia la corriente del panel 
