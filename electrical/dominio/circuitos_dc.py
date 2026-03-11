@@ -12,3 +12,5 @@ class MPPTCircuit:
 
     corriente_operacion: float
     corriente_diseno: float
+
+    longitud_m: float = 0
