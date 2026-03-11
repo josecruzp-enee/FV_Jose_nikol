@@ -110,7 +110,7 @@ def ejecutar_nec(
 
                 "strings_por_mppt": int(s0.get("n_paralelo", 1)),
                 "n_strings_total": int(rec.get("n_strings_total", 0)),
-            }
+            },
             "panel_i": float(s0.get("isc_string_a", 0))
         }
 
