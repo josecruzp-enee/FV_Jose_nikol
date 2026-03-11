@@ -113,17 +113,7 @@ def tramo_conductor(
     n_hilos: int = 2,
     nec: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """
-    Dimensiona un tramo:
-      1) Selecciona calibre por ampacidad ajustada NEC (310.15).
-      2) Mejora por caída de tensión (informational notes) subiendo calibre.
-      3) Entrega resultado estable para UI/PDF.
 
-    Convención VD:
-      - Modelo resistivo simplificado (DC) del tramo.
-      - n_hilos representa la cantidad de conductores en el camino resistivo.
-      - Si luego implementas VD 3Φ con √3, hacerlo en modelo_tramo (fuente única).
-    """
     if float(i_diseno_a) <= 0 or float(l_m) <= 0 or float(v_base_v) <= 0:
         return {
             "nombre": str(nombre),
@@ -141,6 +131,7 @@ def tramo_conductor(
     ccc = max(1, ccc)
 
     tab = tabla_conductores(material)
+
     if not tab:
         return {
             "nombre": str(nombre),
@@ -149,7 +140,10 @@ def tramo_conductor(
             "nota": f"Tabla de conductores vacía para material={material!r}.",
         }
 
-    # 1) Selección por ampacidad NEC
+    # ------------------------------------------------------
+    # 1 Selección inicial por ampacidad
+    # ------------------------------------------------------
+
     cand = seleccionar_por_ampacidad_nec(
         float(i_diseno_a),
         tab,
@@ -157,9 +151,13 @@ def tramo_conductor(
         ccc=ccc,
         aplicar_derating=aplicar,
     )
+
     awg_cand = str(cand.get("awg", tab[0].get("awg")))
 
-    # 2) Mejora por VD
+    # ------------------------------------------------------
+    # 2 Mejora por caída de tensión
+    # ------------------------------------------------------
+
     awg_final = mejorar_por_vd(
         tab,
         awg=awg_cand,
@@ -171,9 +169,51 @@ def tramo_conductor(
     )
 
     fila_final = _fila_por_awg(tab, awg_final) or dict(tab[-1])
+
+    # ------------------------------------------------------
+    # 3 Recalculo automático por ampacidad
+    # ------------------------------------------------------
+
+    idx = tab.index(fila_final)
+
+    while True:
+
+        amp_base = float(fila_final.get("amp_a", 0.0))
+        r_ohm_km = float(fila_final.get("r_ohm_km", 0.0))
+
+        amp_adj, f_t, f_c = ampacidad_ajustada_nec(
+            amp_base,
+            t_amb_c,
+            ccc,
+            aplicar=aplicar,
+        )
+
+        vd_pct = caida_tension_pct(
+            v=float(v_base_v),
+            i=float(i_diseno_a),
+            l_m=float(l_m),
+            r_ohm_km=float(r_ohm_km),
+            n_hilos=int(n_hilos),
+        )
+
+        cumple_amp = float(amp_adj) >= float(i_diseno_a)
+        cumple_vd = float(vd_pct) <= float(vd_obj_pct)
+
+        if cumple_amp and cumple_vd:
+            break
+
+        if idx >= len(tab) - 1:
+            break
+
+        idx += 1
+        fila_final = tab[idx]
+
     awg_final = str(fila_final.get("awg"))
 
-    # 3) Cálculos finales
+    # ------------------------------------------------------
+    # Cálculos finales
+    # ------------------------------------------------------
+
     amp_base = float(fila_final.get("amp_a", 0.0))
     r_ohm_km = float(fila_final.get("r_ohm_km", 0.0))
 
@@ -194,17 +234,22 @@ def tramo_conductor(
 
     cumple_amp = float(amp_adj) >= float(i_diseno_a)
     cumple_vd = float(vd_pct) <= float(vd_obj_pct)
+
     cumple = bool(cumple_amp and cumple_vd)
 
-    agotado_vd = (awg_final == str(tab[-1].get("awg"))) and (float(vd_pct) > float(vd_obj_pct))
+    agotado_vd = (awg_final == str(tab[-1].get("awg"))) and (
+        float(vd_pct) > float(vd_obj_pct)
+    )
 
     out: Dict[str, Any] = {
+
         "nombre": str(nombre),
         "ok": True,
 
         "i_diseno_a": round(float(i_diseno_a), 3),
         "l_m": round(float(l_m), 3),
         "v_base_v": round(float(v_base_v), 3),
+
         "material": str(material),
         "n_hilos": int(n_hilos),
 
@@ -218,6 +263,7 @@ def tramo_conductor(
         "fac_ccc": round(float(f_c), 4),
 
         "r_ohm_km": round(float(r_ohm_km), 6),
+
         "vd_pct": round(float(vd_pct), 4),
         "vd_obj_pct": float(vd_obj_pct),
 
@@ -225,8 +271,14 @@ def tramo_conductor(
         "cumple_vd": bool(cumple_vd),
         "cumple": bool(cumple),
 
-        "nec": {"t_amb_c": t_amb_c, "ccc": int(ccc), "aplicar_derating": bool(aplicar)},
+        "nec": {
+            "t_amb_c": t_amb_c,
+            "ccc": int(ccc),
+            "aplicar_derating": bool(aplicar)
+        },
+
         "agotado_vd": bool(agotado_vd),
+
         "referencias": list(NEC_REFERENCIAS),
     }
 
@@ -234,18 +286,25 @@ def tramo_conductor(
         out["nota_ccc"] = "CCC no provisto; se usó n_hilos como aproximación."
 
     if not cumple:
+
         notas: List[str] = []
+
         if not cumple_amp:
             notas.append("No cumple ampacidad ajustada NEC (310.15).")
+
         if not cumple_vd:
             if agotado_vd:
-                notas.append("No cumple caída de tensión objetivo ni con el calibre máximo de la tabla.")
+                notas.append(
+                    "No cumple caída de tensión objetivo ni con el calibre máximo."
+                )
             else:
-                notas.append("No cumple caída de tensión objetivo; se requiere aumentar calibre.")
+                notas.append(
+                    "No cumple caída de tensión objetivo; aumentar calibre."
+                )
+
         out["nota"] = " ".join(notas)
 
     return out
-
 
 # ==========================================================
 # Orquestador FV: panel/string → inversor → tablero principal
