@@ -92,26 +92,22 @@ def ejecutar_nec(
         ee["idc_nom"] = idesign
 
     # ------------------------------------------------------
-    # Datos para motor de corrientes
+    # Pasar estructura original de strings
+    # ------------------------------------------------------
+
+    ee["strings"] = strings
+
+    # ------------------------------------------------------
+    # Datos de inversor para cálculo AC
     # ------------------------------------------------------
 
     if lista:
 
         s0 = lista[0]
 
-        ee["strings"] = {
-
-            "imp_string_a": float(s0.get("imp_string_a", 0)),
-            "isc_string_a": float(s0.get("isc_string_a", 0)),
-
-            "strings_por_mppt": int(s0.get("n_paralelo", 1)),
-            "n_strings_total": int(rec.get("n_strings_total", 0)),
-        }
-
         ee["inversor"] = {
 
             "kw_ac": kw_ac,
-
             "v_ac_nom_v": vac_ll,
             "fases": fases,
             "fp": fp,
