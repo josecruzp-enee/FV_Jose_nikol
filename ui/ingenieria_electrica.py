@@ -213,7 +213,7 @@ def _mostrar_nec(nec):
         return
 
     paq = nec.get("paq", {})
-
+    st.write("DEBUG PAQ:", paq)
     dc = paq.get("dc", {})
     ac = paq.get("ac", {})
     ocpd = paq.get("ocpd", {})
