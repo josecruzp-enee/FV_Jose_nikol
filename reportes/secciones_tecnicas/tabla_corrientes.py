@@ -6,8 +6,8 @@ def crear_tabla_corrientes(corr, pal, content_w):
     panel = corr.get("panel", {})
     string = corr.get("string", {})
     mppt = corr.get("mppt", {})
-    dc_total = corr.get("dc_inversor", {})   # ← nombre correcto
-    ac = corr.get("ac_salida", {})           # ← nombre correcto
+    dc_total = corr.get("dc_inversor", {})
+    ac = corr.get("ac_salida", {})
 
     data = [
 
