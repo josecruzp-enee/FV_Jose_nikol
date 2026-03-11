@@ -271,65 +271,73 @@ def dimensionar_tramos_fv(
     nec_ac: Optional[Dict[str, Any]] = None,
     distancias_m: Optional[Dict[str, float]] = None,
 ) -> Dict[str, Any]:
-    """
-    Construye tramos FV típicos y los dimensiona con el motor.
 
-    Tramos que modela (por defecto):
-      - DC_STRING_A_INV: string/array DC → inversor (usa dist_dc_m)
-      - AC_INV_A_TABLERO: inversor → tablero principal (usa dist_ac_m)
-
-    Si quieres separar "panel→string" y "string→inversor", pasa distancias_m:
-      distancias_m = {
-        "dc_panel_a_string": 5.0,
-        "dc_string_a_inversor": 18.0,
-        "ac_inversor_a_tabl_principal": 25.0,
-      }
-
-    params_cableado esperado (keys típicas):
-      - dist_dc_m, dist_ac_m
-      - vdrop_obj_dc_pct, vdrop_obj_ac_pct
-      - vac (opcional)
-
-    strings esperado (keys típicas):
-      - vmp_string_v (o vmp_array_v / vmp_string_v)
-      - (corrientes salen de calcular_corrientes)
-
-    inversor esperado (keys típicas):
-      - v_ac_nom_v / vac, fases
-      - i_ac_max_a (opcional) o kw_ac/potencia_ac_kw
-    """
     distancias_m = distancias_m or {}
 
-    # 1) Corrientes de diseño (DC/AC)
+    # ======================================================
+    # 1. Corrientes del sistema
+    # ======================================================
+
     corr = calcular_corrientes(strings, inversor, cfg_tecnicos)
 
-    # 2) Voltajes base
+    # Corrientes correctas desde motor
+    i_dc_diseno = float(corr.get("dc_total", {}).get("i_diseno_nec_a", 0.0))
+    i_ac_diseno = float(corr.get("ac", {}).get("i_diseno_a", 0.0))
+
+    # ======================================================
+    # 2. Voltajes base
+    # ======================================================
+
     vmp_dc = _f(strings, "vmp_string_v", 0.0)
     if vmp_dc <= 0.0:
         vmp_dc = _f(strings, "vmp_array_v", 0.0)
 
     vac = _f(params_cableado, "vac", 0.0)
+
     if vac <= 0.0:
         vac = _f(inversor, "v_ac_nom_v", 0.0)
+
     if vac <= 0.0:
         vac = _f(inversor, "vac", 0.0)
 
-    # 3) Distancias / objetivos VD
-    dist_dc = float(distancias_m.get("dc_string_a_inversor", _f(params_cableado, "dist_dc_m", 0.0)))
-    dist_ac = float(distancias_m.get("ac_inversor_a_tabl_principal", _f(params_cableado, "dist_ac_m", 0.0)))
+    # ======================================================
+    # 3. Distancias y objetivos VD
+    # ======================================================
+
+    dist_dc = float(
+        distancias_m.get(
+            "dc_string_a_inversor",
+            _f(params_cableado, "dist_dc_m", 0.0),
+        )
+    )
+
+    dist_ac = float(
+        distancias_m.get(
+            "ac_inversor_a_tabl_principal",
+            _f(params_cableado, "dist_ac_m", 0.0),
+        )
+    )
 
     vd_obj_dc = _f(params_cableado, "vdrop_obj_dc_pct", 2.0)
     vd_obj_ac = _f(params_cableado, "vdrop_obj_ac_pct", 2.0)
 
-    # 4) Dimensionamiento tramos
+    # ======================================================
+    # 4. Dimensionamiento
+    # ======================================================
+
     out_tramos: Dict[str, Any] = {}
 
-    # (Opcional) panel → string (si te pasan distancia)
+    # ------------------------------------------------------
+    # Panel → String (opcional)
+    # ------------------------------------------------------
+
     dist_panel_string = distancias_m.get("dc_panel_a_string", 0.0)
+
     if dist_panel_string and dist_panel_string > 0.0 and vmp_dc > 0.0:
+
         out_tramos["DC_PANEL_A_STRING"] = tramo_conductor(
             nombre="DC_PANEL_A_STRING",
-            i_diseno_a=float(corr.get("i_dc_diseno_a", 0.0)),
+            i_diseno_a=i_dc_diseno,
             v_base_v=float(vmp_dc),
             l_m=float(dist_panel_string),
             vd_obj_pct=float(vd_obj_dc),
@@ -338,10 +346,13 @@ def dimensionar_tramos_fv(
             nec=nec_dc,
         )
 
-    # string/array → inversor (principal DC)
+    # ------------------------------------------------------
+    # String / Array → Inversor
+    # ------------------------------------------------------
+
     out_tramos["DC_STRING_A_INV"] = tramo_conductor(
         nombre="DC_STRING_A_INV",
-        i_diseno_a=float(corr.get("i_dc_diseno_a", 0.0)),
+        i_diseno_a=i_dc_diseno,
         v_base_v=float(vmp_dc) if vmp_dc > 0.0 else 1.0,
         l_m=float(dist_dc),
         vd_obj_pct=float(vd_obj_dc),
@@ -350,14 +361,17 @@ def dimensionar_tramos_fv(
         nec=nec_dc,
     )
 
-    # inversor → tablero principal (AC principal)
-    # Nota: el VD aquí sigue el modelo resistivo simplificado del dominio.
+    # ------------------------------------------------------
+    # Inversor → Tablero principal
+    # ------------------------------------------------------
+
     fases = int(inversor.get("fases", 1) or 1)
+
     n_hilos_ac = 3 if fases == 3 else 2
 
     out_tramos["AC_INV_A_TABLERO"] = tramo_conductor(
         nombre="AC_INV_A_TABLERO",
-        i_diseno_a=float(corr.get("i_ac_diseno_a", 0.0)),
+        i_diseno_a=i_ac_diseno,
         v_base_v=float(vac) if vac > 0.0 else 1.0,
         l_m=float(dist_ac),
         vd_obj_pct=float(vd_obj_ac),
@@ -365,6 +379,10 @@ def dimensionar_tramos_fv(
         n_hilos=int(n_hilos_ac),
         nec=nec_ac,
     )
+
+    # ======================================================
+    # Resultado
+    # ======================================================
 
     return {
         "corrientes": dict(corr),
@@ -378,7 +396,6 @@ def dimensionar_tramos_fv(
             "dist_ac_m": float(dist_ac),
         },
     }
-
 
 # ==========================================================
 # Wrappers legacy (presets) — delegan al motor único
