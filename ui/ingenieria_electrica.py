@@ -229,18 +229,18 @@ def _mostrar_nec(nec):
 
     st.divider()
 
-    _mostrar_tabs_nec(dc, ac, ocpd, conductores, warnings)
+    _mostrar_tabs_nec(dc, ac, ocpd, conductores, warnings, paq)
 
 # ==========================================================
 # Tabs NEC
 # ==========================================================
 
-def _mostrar_tabs_nec(dc, ac, ocpd, conductores, warnings):
+def _mostrar_tabs_nec(dc, ac, ocpd, conductores, warnings, paq):
 
     tabs = st.tabs(["⚡ DC", "🔌 AC", "🧵 Conductores", "⚠ Warnings"])
 
     with tabs[0]:
-        _mostrar_tab_dc(dc)
+        _mostrar_tab_dc(dc, paq)
 
     with tabs[1]:
         _mostrar_tab_ac(ac, ocpd)
@@ -256,7 +256,13 @@ def _mostrar_tabs_nec(dc, ac, ocpd, conductores, warnings):
 # TAB DC
 # ==========================================================
 
-def _mostrar_tab_dc(dc):
+def _mostrar_tab_dc(dc, paq):
+
+    corr_raw = paq.get("corrientes_raw", {})
+    dc_total = corr_raw.get("dc_total", {})
+
+    i_oper = dc_total.get("i_operacion_a")
+    i_dis = dc_total.get("i_diseno_nec_a")
 
     c1, c2 = st.columns(2)
 
@@ -264,10 +270,11 @@ def _mostrar_tab_dc(dc):
         st.metric("Voltaje DC", _fmt(dc.get("vdc_nom"), "V"))
 
     with c2:
-        st.metric("Corriente DC nominal", _fmt(dc.get("idc_nom"), "A"))
+        st.metric("Corriente DC (operación)", _fmt(i_oper, "A"))
+
+    st.metric("Corriente DC diseño NEC", _fmt(i_dis, "A"))
 
     st.metric("Potencia DC", _fmt(dc.get("potencia_dc_w"), "W"))
-
 
 # ==========================================================
 # TAB AC
