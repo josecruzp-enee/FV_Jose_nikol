@@ -6,6 +6,107 @@ from electrical.paquete_nec import armar_paquete_nec
 from electrical.circuitos.generador_circuitos_dc import generar_circuitos_dc
 
 
+# ==========================================================
+# Lectura base eléctrica
+# ==========================================================
+
+def _leer_base_electrica(p):
+
+    if isinstance(p, dict):
+        base = p.get("electrico", {})
+    else:
+        base = getattr(p, "electrico", {})
+
+    vac_ll = base.get("vac") or base.get("vac_ll")
+    fases = base.get("fases", 1)
+    fp = base.get("fp", 1.0)
+
+    return vac_ll, fases, fp
+
+
+# ==========================================================
+# Corrientes DC
+# ==========================================================
+
+def _calcular_corrientes_dc(strings: Dict[str, Any]):
+
+    imp = strings.get("i_operacion_a", 0)
+    isc = strings.get("isc_a", 0)
+
+    i_nom = imp
+    i_dis = isc * 1.25
+
+    return {
+        "i_nominal": i_nom,
+        "i_diseno": i_dis
+    }
+
+
+# ==========================================================
+# Corrientes AC
+# ==========================================================
+
+def _calcular_corrientes_ac(potencia_ac_w, vac_ll, fases, fp):
+
+    if fases == 3:
+        i_nom = potencia_ac_w / (math.sqrt(3) * vac_ll * fp)
+    else:
+        i_nom = potencia_ac_w / (vac_ll * fp)
+
+    i_dis = i_nom * 1.25
+
+    return {
+        "i_nominal": i_nom,
+        "i_diseno": i_dis
+    }
+
+
+# ==========================================================
+# Circuitos MPPT
+# ==========================================================
+
+def _generar_circuitos_mppt(strings, sizing):
+
+    strings_totales = strings.get("strings_total", 1)
+    imp = strings.get("i_operacion_a", 0)
+
+    mppts = getattr(sizing, "mppts", 1)
+
+    circuitos = generar_circuitos_dc(
+        strings_totales,
+        mppts,
+        imp
+    )
+
+    return circuitos
+
+
+# ==========================================================
+# Resumen DC total
+# ==========================================================
+
+def _armar_resumen_dc(strings, sizing):
+
+    potencia_dc = sizing.potencia_dc_w
+
+    vdc_nom = strings.get("vmp_string_v", 0)
+
+    if vdc_nom > 0:
+        idc_nom = potencia_dc / vdc_nom
+    else:
+        idc_nom = 0
+
+    return {
+        "potencia_dc_w": potencia_dc,
+        "vdc_nom": vdc_nom,
+        "idc_nom": idc_nom
+    }
+
+
+# ==========================================================
+# Orquestador principal
+# ==========================================================
+
 def ejecutar_nec(
     p,
     sizing: ResultadoSizing,
@@ -15,153 +116,84 @@ def ejecutar_nec(
     ee: Dict[str, Any] = {}
 
     # ------------------------------------------------------
-    # 1. Base eléctrica del proyecto
+    # Base eléctrica
     # ------------------------------------------------------
 
-    if isinstance(p, dict):
-        base = p.get("electrico", {})
-    else:
-        base = getattr(p, "electrico", {})
-
-    vac_ll = None
-    fases = 1
-    fp = 1.0
-
-    if isinstance(base, dict):
-
-        vac_ll = base.get("vac") or base.get("vac_ll")
-
-        fases = base.get("fases", 1)
-        fp = base.get("fp", 1.0)
-
-        if vac_ll:
-
-            ee["vac_ll"] = vac_ll
-
-            if fases == 3:
-                ee["vac_ln"] = vac_ll / math.sqrt(3)
-            else:
-                ee["vac_ln"] = vac_ll
-
-    if not vac_ll:
-        raise ValueError("Voltaje AC del sistema no definido en proyecto")
-
-    ee["fases"] = fases
-    ee["fp"] = fp
+    vac_ll, fases, fp = _leer_base_electrica(p)
 
     # ------------------------------------------------------
-    # 2. Potencias desde sizing
+    # Corrientes DC
     # ------------------------------------------------------
 
-    pdc_w = float(sizing.pdc_kw) * 1000
-    kw_ac = float(sizing.kw_ac)
-
-    ee["potencia_dc_w"] = pdc_w
-    ee["potencia_ac_w"] = kw_ac * 1000
+    corr_string = _calcular_corrientes_dc(strings)
 
     # ------------------------------------------------------
-    # 3. Datos desde strings
+    # Circuitos MPPT
     # ------------------------------------------------------
 
-    if not strings:
-        raise ValueError("NEC requiere datos del módulo strings")
+    circuitos_mppt = _generar_circuitos_mppt(strings, sizing)
 
-    rec = strings.get("recomendacion", {})
-    lista = strings.get("strings", [])
-
-    # ------------------------------------------------------
-    # Voltaje DC desde strings
-    # ------------------------------------------------------
-
-    vmp_string = float(rec.get("vmp_string_v", 0))
-
-    if vmp_string <= 0:
-        raise ValueError("vmp_string_v no definido en resultado strings")
-
-    ee["vdc_nom"] = vmp_string
+    i_mppt_nom = max(c["i_operacion"] for c in circuitos_mppt)
+    i_mppt_dis = max(c["i_diseno"] for c in circuitos_mppt)
 
     # ------------------------------------------------------
-    # Corrientes DC nominales
+    # Corrientes AC
     # ------------------------------------------------------
 
-    if lista:
+    potencia_ac = sizing.potencia_ac_w
 
-        s0 = lista[0]
-
-        imp = float(s0.get("imp_string_a", 0))
-        isc = float(s0.get("isc_string_a", 0))
-
-        n_strings = int(rec.get("n_strings_total", 0))
-
-        if imp > 0 and n_strings > 0:
-            ee["idc_nom"] = imp * n_strings
-
-        if isc > 0 and n_strings > 0:
-            ee["isc_total_a"] = isc * n_strings
+    corr_ac = _calcular_corrientes_ac(
+        potencia_ac,
+        vac_ll,
+        fases,
+        fp
+    )
 
     # ------------------------------------------------------
-    # 4. Generación de circuitos MPPT
+    # Resumen DC
     # ------------------------------------------------------
 
-    if lista:
-
-        s0 = lista[0]
-
-        imp = float(s0.get("imp_string_a", 0))
-        isc = float(s0.get("isc_string_a", 0))
-
-        n_strings = int(rec.get("n_strings_total", 0))
-
-        mppts = int(s0.get("mppt", 2))
-
-        circuitos_mppt = generar_circuitos_dc(
-            strings_totales=n_strings,
-            mppts=mppts,
-            imp=imp,
-        )
-
-        ee["dc_circuitos"] = circuitos_mppt
+    dc = _armar_resumen_dc(strings, sizing)
 
     # ------------------------------------------------------
-    # Datos para motor de corrientes
+    # Consolidación
     # ------------------------------------------------------
 
-    if lista:
+    ee["corrientes"] = {
 
-        s0 = lista[0]
+        "string": corr_string,
 
-        ee["strings"] = {
-            "corrientes_input": {
+        "mppt": {
+            "i_nominal": i_mppt_nom,
+            "i_diseno": i_mppt_dis
+        },
 
-                "imp_string_a": float(s0.get("imp_string_a", 0)),
-                "isc_string_a": float(s0.get("isc_string_a", 0)),
+        "dc_inversor": {
+            "i_nominal": dc["idc_nom"],
+            "i_diseno": dc["idc_nom"] * 1.25
+        },
 
-                # se mantiene para compatibilidad con motor actual
-                "strings_por_mppt": int(s0.get("n_paralelo", 1)),
-                "n_strings_total": int(rec.get("n_strings_total", 0)),
-            },
-            "panel_i": float(s0.get("isc_string_a", 0))
-        }
-
-        ee["inversor"] = {
-
-            "kw_ac": kw_ac,
-
-            "v_ac_nom_v": vac_ll,
-            "fases": fases,
-            "fp": fp,
-
-            "mppt": int(s0.get("mppt", 2)),
-        }
-
-    # ------------------------------------------------------
-    # 5. Construcción paquete NEC
-    # ------------------------------------------------------
-
-    paquete = armar_paquete_nec(ee)
-
-    return {
-        "ok": True,
-        "input": ee,
-        "paq": paquete,
+        "ac_salida": corr_ac
     }
+
+    ee["dc"] = dc
+
+    ee["ac"] = {
+        "potencia_ac_w": potencia_ac,
+        "vac_ll": vac_ll,
+        "fases": fases,
+        "fp": fp,
+        "iac_nom": corr_ac["i_nominal"]
+    }
+
+    ee["circuitos_mppt"] = circuitos_mppt
+
+    # ------------------------------------------------------
+    # NEC package
+    # ------------------------------------------------------
+
+    paquete = armar_paquete_nec(p, ee)
+
+    ee.update(paquete)
+
+    return ee
