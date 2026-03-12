@@ -16,10 +16,11 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Mapping, Optional
 
-from .cables_conductores import tabla_base_conductores
+from .tablas_conductores import tabla_base_conductores
 from .factores_nec import ampacidad_ajustada_nec
-from .modelo_tramo import caida_tension_pct, mejorar_por_vd
+from .caida_voltaje import caida_tension_pct, ajustar_calibre_por_vd
 from .corrientes import calcular_corrientes
+from .resultado_corriente import ResultadoCorrientes
 
 # Referencias normativas utilizadas en este módulo
 NEC_REFERENCIAS = [
@@ -158,7 +159,7 @@ def tramo_conductor(
     # 2 Mejora por caída de tensión
     # ------------------------------------------------------
 
-    awg_final = mejorar_por_vd(
+    awg_final = ajustar_calibre_por_vd(
         tab,
         awg=awg_cand,
         i_a=float(i_diseno_a),
@@ -285,29 +286,11 @@ def tramo_conductor(
     if not ccc_provisto:
         out["nota_ccc"] = "CCC no provisto; se usó n_hilos como aproximación."
 
-    if not cumple:
-
-        notas: List[str] = []
-
-        if not cumple_amp:
-            notas.append("No cumple ampacidad ajustada NEC (310.15).")
-
-        if not cumple_vd:
-            if agotado_vd:
-                notas.append(
-                    "No cumple caída de tensión objetivo ni con el calibre máximo."
-                )
-            else:
-                notas.append(
-                    "No cumple caída de tensión objetivo; aumentar calibre."
-                )
-
-        out["nota"] = " ".join(notas)
-
     return out
 
+
 # ==========================================================
-# Orquestador FV: panel/string → inversor → tablero principal
+# Orquestador FV
 # ==========================================================
 
 def _f(m: Mapping[str, Any], k: str, default: float = 0.0) -> float:
@@ -334,220 +317,76 @@ def dimensionar_tramos_fv(
     distancias_m = distancias_m or {}
 
     # ======================================================
-    # 1. Corrientes del sistema
+    # 1 Corrientes
     # ======================================================
 
-    corr = calcular_corrientes(strings, inversor, cfg_tecnicos)
+    corr: ResultadoCorrientes = calcular_corrientes(strings, inversor, cfg_tecnicos)
 
-    # Corrientes correctas desde motor
-    i_dc_diseno = float(corr.get("dc_total", {}).get("i_diseno_nec_a", 0.0))
-    i_ac_diseno = float(corr.get("ac", {}).get("i_diseno_a", 0.0))
+    i_dc_diseno = corr.dc_total.i_diseno_a
+    i_ac_diseno = corr.ac.i_diseno_a
 
     # ======================================================
-    # 2. Voltajes base
+    # 2 Voltajes base
     # ======================================================
 
     vmp_dc = _f(strings, "vmp_string_v", 0.0)
-    if vmp_dc <= 0.0:
+    if vmp_dc <= 0:
         vmp_dc = _f(strings, "vmp_array_v", 0.0)
 
     vac = _f(params_cableado, "vac", 0.0)
-
-    if vac <= 0.0:
+    if vac <= 0:
         vac = _f(inversor, "v_ac_nom_v", 0.0)
 
-    if vac <= 0.0:
-        vac = _f(inversor, "vac", 0.0)
-
     # ======================================================
-    # 3. Distancias y objetivos VD
+    # 3 Distancias
     # ======================================================
 
-    dist_dc = float(
-        distancias_m.get(
-            "dc_string_a_inversor",
-            _f(params_cableado, "dist_dc_m", 0.0),
-        )
-    )
-
-    dist_ac = float(
-        distancias_m.get(
-            "ac_inversor_a_tabl_principal",
-            _f(params_cableado, "dist_ac_m", 0.0),
-        )
-    )
+    dist_dc = float(distancias_m.get("dc_string_a_inversor", _f(params_cableado, "dist_dc_m", 0.0)))
+    dist_ac = float(distancias_m.get("ac_inversor_a_tabl_principal", _f(params_cableado, "dist_ac_m", 0.0)))
 
     vd_obj_dc = _f(params_cableado, "vdrop_obj_dc_pct", 2.0)
     vd_obj_ac = _f(params_cableado, "vdrop_obj_ac_pct", 2.0)
 
     # ======================================================
-    # 4. Dimensionamiento
+    # 4 Dimensionamiento
     # ======================================================
 
     out_tramos: Dict[str, Any] = {}
 
-    # ------------------------------------------------------
-    # Panel → String (opcional)
-    # ------------------------------------------------------
-
-    dist_panel_string = distancias_m.get("dc_panel_a_string", 0.0)
-
-    if dist_panel_string and dist_panel_string > 0.0 and vmp_dc > 0.0:
-
-        out_tramos["DC_PANEL_A_STRING"] = tramo_conductor(
-            nombre="DC_PANEL_A_STRING",
-            i_diseno_a=i_dc_diseno,
-            v_base_v=float(vmp_dc),
-            l_m=float(dist_panel_string),
-            vd_obj_pct=float(vd_obj_dc),
-            material=str(material_dc),
-            n_hilos=2,
-            nec=nec_dc,
-        )
-
-    # ------------------------------------------------------
-    # String / Array → Inversor
-    # ------------------------------------------------------
-
     out_tramos["DC_STRING_A_INV"] = tramo_conductor(
         nombre="DC_STRING_A_INV",
         i_diseno_a=i_dc_diseno,
-        v_base_v=float(vmp_dc) if vmp_dc > 0.0 else 1.0,
-        l_m=float(dist_dc),
-        vd_obj_pct=float(vd_obj_dc),
-        material=str(material_dc),
+        v_base_v=vmp_dc if vmp_dc > 0 else 1.0,
+        l_m=dist_dc,
+        vd_obj_pct=vd_obj_dc,
+        material=material_dc,
         n_hilos=2,
         nec=nec_dc,
     )
 
-    # ------------------------------------------------------
-    # Inversor → Tablero principal
-    # ------------------------------------------------------
-
     fases = int(inversor.get("fases", 1) or 1)
-
     n_hilos_ac = 3 if fases == 3 else 2
 
     out_tramos["AC_INV_A_TABLERO"] = tramo_conductor(
         nombre="AC_INV_A_TABLERO",
         i_diseno_a=i_ac_diseno,
-        v_base_v=float(vac) if vac > 0.0 else 1.0,
-        l_m=float(dist_ac),
-        vd_obj_pct=float(vd_obj_ac),
-        material=str(material_ac),
-        n_hilos=int(n_hilos_ac),
+        v_base_v=vac if vac > 0 else 1.0,
+        l_m=dist_ac,
+        vd_obj_pct=vd_obj_ac,
+        material=material_ac,
+        n_hilos=n_hilos_ac,
         nec=nec_ac,
     )
 
-    # ======================================================
-    # Resultado
-    # ======================================================
-
     return {
-        "corrientes": dict(corr),
+        "corrientes": corr,
         "tramos": out_tramos,
         "meta": {
-            "material_dc": str(material_dc),
-            "material_ac": str(material_ac),
-            "vd_obj_dc_pct": float(vd_obj_dc),
-            "vd_obj_ac_pct": float(vd_obj_ac),
-            "dist_dc_m": float(dist_dc),
-            "dist_ac_m": float(dist_ac),
+            "material_dc": material_dc,
+            "material_ac": material_ac,
+            "vd_obj_dc_pct": vd_obj_dc,
+            "vd_obj_ac_pct": vd_obj_ac,
+            "dist_dc_m": dist_dc,
+            "dist_ac_m": dist_ac,
         },
     }
-
-# ==========================================================
-# Wrappers legacy (presets) — delegan al motor único
-# ==========================================================
-
-def tramo_dc_ref(
-    *,
-    vmp_v: float,
-    imp_a: float,
-    isc_a: Optional[float],
-    dist_m: float,
-    factor_seguridad: float = 1.25,
-    vd_obj_pct: float = 2.0,
-    material: str = "Cu",
-    nec: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
-    base_i = float(isc_a) if isc_a is not None else float(imp_a)
-    i_diseno = float(base_i) * float(factor_seguridad)
-
-    res = tramo_conductor(
-        nombre="TRAMO_DC",
-        i_diseno_a=float(i_diseno),
-        v_base_v=float(vmp_v),
-        l_m=float(dist_m),
-        vd_obj_pct=float(vd_obj_pct),
-        material=str(material),
-        n_hilos=2,
-        nec=nec,
-    )
-    res.setdefault("i_diseno_a", round(float(i_diseno), 3))
-    return res
-
-
-def tramo_ac_1f_ref(
-    *,
-    vac_v: float,
-    iac_a: float,
-    dist_m: float,
-    factor_seguridad: float = 1.25,
-    vd_obj_pct: float = 2.0,
-    material: str = "Cu",
-    nec: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
-    i_diseno = float(iac_a) * float(factor_seguridad)
-
-    res = tramo_conductor(
-        nombre="TRAMO_AC_1F",
-        i_diseno_a=float(i_diseno),
-        v_base_v=float(vac_v),
-        l_m=float(dist_m),
-        vd_obj_pct=float(vd_obj_pct),
-        material=str(material),
-        n_hilos=2,
-        nec=nec,
-    )
-    res.setdefault("i_diseno_a", round(float(i_diseno), 3))
-    return res
-
-
-def tramo_ac_3f_ref(
-    *,
-    vll_v: float,
-    iac_a: float,
-    dist_m: float,
-    factor_seguridad: float = 1.25,
-    vd_obj_pct: float = 2.0,
-    material: str = "Cu",
-    nec: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
-    i_diseno = float(iac_a) * float(factor_seguridad)
-
-    res = tramo_conductor(
-        nombre="TRAMO_AC_3F",
-        i_diseno_a=float(i_diseno),
-        v_base_v=float(vll_v),
-        l_m=float(dist_m),
-        vd_obj_pct=float(vd_obj_pct),
-        material=str(material),
-        n_hilos=3,
-        nec=nec,
-    )
-    res.setdefault("i_diseno_a", round(float(i_diseno), 3))
-    return res
-
-
-__all__ = [
-    "NEC_REFERENCIAS",
-    "tabla_conductores",
-    "vdrop_pct",
-    "seleccionar_por_ampacidad_nec",
-    "tramo_conductor",
-    "dimensionar_tramos_fv",
-    "tramo_dc_ref",
-    "tramo_ac_1f_ref",
-    "tramo_ac_3f_ref",
-]
