@@ -2,7 +2,15 @@
 Dimensionado de paneles FV.
 
 Convierte potencia DC objetivo en número de paneles y potencia DC instalada.
-Este módulo NO calcula HSP, PR ni consumo energético.
+
+Este módulo NO calcula:
+    - HSP
+    - PR
+    - consumo energético
+    - strings
+
+Solo determina:
+    cantidad de paneles necesaria para alcanzar una potencia DC objetivo.
 """
 
 from __future__ import annotations
@@ -46,7 +54,7 @@ def _n_paneles(kwp_req: float, panel_w: float) -> int:
         raise ValueError("panel_w inválido (<=0).")
 
     if kwp_req <= 0:
-        raise ValueError("kwp_req inválido (<=0).")
+        raise ValueError("pdc_kw_objetivo inválido (<=0).")
 
     return max(1, int(ceil((kwp_req * 1000.0) / panel_w)))
 
@@ -76,6 +84,16 @@ def dimensionar_paneles(
 
     kwp_req = _safe_float(entrada.pdc_kw_objetivo, 0.0)
 
+    # ------------------------------------------------------
+    # VALIDAR CONFLICTO DE ENTRADAS
+    # ------------------------------------------------------
+
+    if entrada.n_paneles_total is not None and kwp_req > 0:
+
+        errores.append(
+            "Definir solo uno: n_paneles_total o pdc_kw_objetivo"
+        )
+
     n_pan = 0
     pdc = 0.0
 
@@ -83,16 +101,33 @@ def dimensionar_paneles(
 
         try:
 
+            # --------------------------------------------------
+            # CASO 1: usuario define número de paneles
+            # --------------------------------------------------
+
             if entrada.n_paneles_total is not None:
 
                 n_pan = int(entrada.n_paneles_total)
 
+                if n_pan <= 0:
+                    raise ValueError("n_paneles_total inválido")
+
+            # --------------------------------------------------
+            # CASO 2: usuario define potencia objetivo
+            # --------------------------------------------------
+
             else:
 
                 if kwp_req <= 0:
-                    raise ValueError("pdc_kw_objetivo inválido o no definido.")
+                    raise ValueError(
+                        "pdc_kw_objetivo inválido o no definido."
+                    )
 
                 n_pan = _n_paneles(kwp_req, panel_w)
+
+            # --------------------------------------------------
+            # POTENCIA INSTALADA
+            # --------------------------------------------------
 
             pdc = _pdc_kw(n_pan, panel_w)
 
@@ -126,6 +161,6 @@ def dimensionar_paneles(
 # pdc_kw : float
 #
 # Consumido por:
-# electrical.paneles.calculo_de_strings
+# electrical.paneles.orquestador_paneles
 #
 # ==========================================================
