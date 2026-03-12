@@ -1,5 +1,35 @@
-# ui/resultados.py
 from __future__ import annotations
+
+"""
+PASO 6 — RESULTADOS Y PROPUESTA
+FV Engine
+
+CAPA
+----
+UI / Presentación
+
+FRONTERA
+--------
+Entrada:
+    ctx : WizardCtx
+
+Variables internas:
+    resultado_proyecto
+    sizing
+    financiero
+    nec
+
+Salida:
+    PDF profesional
+    descarga PDF
+    visualización KPIs
+    visualización ingeniería NEC
+
+Este módulo NO realiza cálculos técnicos.
+Solo muestra resultados ya calculados por:
+
+    core.aplicacion.orquestador_estudio
+"""
 
 import copy
 from typing import Any, Dict, List, Tuple
@@ -13,53 +43,74 @@ from reportes.imagenes import generar_artefactos
 
 
 # ==========================================================
-# Validaciones básicas
+# VALIDACIÓN CONTEXTO
 # ==========================================================
+
 def _validar_ctx(ctx) -> bool:
+
     if getattr(ctx, "resultado_proyecto", None) is None:
-        st.error("No hay resultados del estudio. Genere primero la ingeniería eléctrica (Paso 5).")
+
+        st.error(
+            "No hay resultados del estudio. "
+            "Genere primero la ingeniería eléctrica (Paso 5)."
+        )
+
         return False
 
     if not hasattr(ctx, "datos_proyecto") or ctx.datos_proyecto is None:
-        st.error("Falta ctx.datos_proyecto. En Paso 5 debes guardar Datosproyecto en ctx.datos_proyecto.")
+
+        st.error(
+            "Falta ctx.datos_proyecto. "
+            "En Paso 5 debes guardar Datosproyecto."
+        )
+
         return False
 
     return True
 
 
+# ==========================================================
+# OBTENER RESULTADO
+# ==========================================================
+
 def _get_resultado_proyecto(ctx) -> Dict[str, Any]:
+
     rp = getattr(ctx, "resultado_proyecto", None)
 
     if rp is None:
-        raise ValueError("resultado_proyecto inexistente.")
+        raise ValueError("resultado_proyecto inexistente")
 
-    # caso normal (dict)
     if isinstance(rp, dict):
         return rp
 
-    # soporte para dataclass u objeto
     if hasattr(rp, "__dict__"):
         return rp.__dict__
 
-    raise ValueError("resultado_proyecto inválido.")
+    raise ValueError("resultado_proyecto inválido")
+
 
 # ==========================================================
-# KPIs
+# KPIs PRINCIPALES
 # ==========================================================
+
 def _render_kpis(resultado_proyecto: dict) -> None:
 
     sizing = resultado_proyecto.get("sizing") or {}
     financiero = resultado_proyecto.get("financiero") or {}
 
     if not sizing or not financiero:
-        st.error("Estructura de resultado_proyecto incompleta.")
+
+        st.error("Estructura de resultado_proyecto incompleta")
+
         st.json(resultado_proyecto)
+
         return
 
     pdc_kw = float(sizing.get("pdc_kw") or 0.0)
     cuota = float(financiero.get("cuota_mensual") or 0.0)
 
     evaluacion = financiero.get("evaluacion") or {}
+
     estado = str(
         evaluacion.get("estado")
         or evaluacion.get("dictamen")
@@ -67,18 +118,21 @@ def _render_kpis(resultado_proyecto: dict) -> None:
     )
 
     c1, c2, c3 = st.columns(3)
+
     c1.metric("Sistema (kWp DC)", num(pdc_kw, 2))
     c2.metric("Cuota mensual", money_L(cuota))
     c3.metric("Estado", estado)
 
     if pdc_kw <= 0:
-        st.warning("Sizing inválido.")
+        st.warning("Sizing inválido")
 
 
 # ==========================================================
-# NEC resumen
+# RESUMEN NEC
 # ==========================================================
+
 def _render_nec_resumen(resultado_proyecto: dict) -> None:
+
     st.subheader("Ingeniería eléctrica (NEC 2023)")
 
     nec = resultado_proyecto.get("nec") or {}
@@ -87,7 +141,9 @@ def _render_nec_resumen(resultado_proyecto: dict) -> None:
     paq = nec.get("paq")
 
     if not paq:
-        st.info("Sin paquete NEC disponible.")
+
+        st.info("Sin paquete NEC disponible")
+
         return
 
     resumen = paq.get("resumen_pdf") or {}
@@ -101,7 +157,7 @@ def _render_nec_resumen(resultado_proyecto: dict) -> None:
         len(strings.get("strings", []))
     )
 
-    # Corrientes con 2 decimales
+    # Corrientes
     idc = resumen.get("idc_nom")
     iac = resumen.get("iac_nom")
 
@@ -115,7 +171,7 @@ def _render_nec_resumen(resultado_proyecto: dict) -> None:
         f"{float(iac):.2f} A" if isinstance(iac, (int, float)) else "—"
     )
 
-    # Breaker AC robusto
+    # Breaker
     breaker = ocpd.get("breaker_ac") if isinstance(ocpd, dict) else None
     tam = breaker.get("tamano_a") if isinstance(breaker, dict) else None
 
@@ -124,48 +180,88 @@ def _render_nec_resumen(resultado_proyecto: dict) -> None:
         f"{int(tam)} A" if isinstance(tam, (int, float)) else "—"
     )
 
-    with st.expander("Ver paquete NEC (crudo)", expanded=False):
+    with st.expander("Ver paquete NEC (crudo)"):
         st.json(paq)
 
 
 # ==========================================================
-# PDF Pipeline
+# UI BOTÓN PDF
 # ==========================================================
+
 def _ui_boton_pdf(disabled: bool = False) -> bool:
+
     st.markdown("#### Generar propuesta (PDF)")
+
     col_a, col_b = st.columns([1, 2])
 
     with col_a:
-        run = st.button("Generar PDF", type="primary", disabled=disabled)
+
+        run = st.button(
+            "Generar PDF",
+            type="primary",
+            disabled=disabled,
+        )
 
     with col_b:
-        st.caption("Genera charts, layout y PDF profesional usando los datos ya calculados.")
+
+        st.caption(
+            "Genera charts, layout y PDF profesional "
+            "usando los datos ya calculados."
+        )
 
     return bool(run)
 
 
-def _ejecutar_pipeline_pdf(ctx, resultado_proyecto: dict) -> None:
-    paths = preparar_salida("salidas")
-    out_dir = paths.get("out_dir") or paths.get("base_dir") or "salidas"
+# ==========================================================
+# PIPELINE PDF
+# ==========================================================
 
+def _ejecutar_pipeline_pdf(ctx, resultado_proyecto: dict) -> None:
+
+    paths = preparar_salida("salidas")
+
+    out_dir = (
+        paths.get("out_dir")
+        or paths.get("base_dir")
+        or "salidas"
+    )
+
+    # Generar artefactos gráficos
     try:
+
         arte = generar_artefactos(
             res=resultado_proyecto,
             out_dir=out_dir,
             vista_resultados={},
             dos_aguas=True,
         )
+
         paths.update(arte)
 
     except Exception as e:
-        st.exception(e)
-        st.warning("No se pudieron generar artefactos (charts/layout). Se intentará generar el PDF igual.")
 
+        st.exception(e)
+
+        st.warning(
+            "No se pudieron generar artefactos "
+            "(charts/layout)."
+        )
+
+    # Generar PDF
     try:
-        datos_pdf = dict(getattr(ctx.datos_proyecto, "__dict__", {}))
-        pdf_path = generar_pdf_profesional(resultado_proyecto, datos_pdf, paths)
+
+        datos_pdf = dict(
+            getattr(ctx.datos_proyecto, "__dict__", {})
+        )
+
+        pdf_path = generar_pdf_profesional(
+            resultado_proyecto,
+            datos_pdf,
+            paths,
+        )
 
         with open(pdf_path, "rb") as f:
+
             st.download_button(
                 "Descargar PDF",
                 data=f,
@@ -173,17 +269,21 @@ def _ejecutar_pipeline_pdf(ctx, resultado_proyecto: dict) -> None:
                 mime="application/pdf",
             )
 
-        st.success("PDF generado.")
+        st.success("PDF generado")
 
     except Exception as e:
+
         st.exception(e)
-        st.warning("No se pudo generar PDF.")
+
+        st.warning("No se pudo generar PDF")
 
 
 # ==========================================================
-# Paso 6
+# RENDER PRINCIPAL
 # ==========================================================
+
 def render(ctx) -> None:
+
     st.markdown("### Resultados y propuesta")
 
     if not _validar_ctx(ctx):
@@ -192,31 +292,51 @@ def render(ctx) -> None:
     resultado_proyecto = _get_resultado_proyecto(ctx)
 
     _render_kpis(resultado_proyecto)
+
     st.divider()
 
     _render_nec_resumen(resultado_proyecto)
+
     st.divider()
 
     stale_inputs = is_result_stale(ctx)
+
     if stale_inputs:
+
         st.warning(
-            "Los datos de entrada cambiaron después del cálculo del Paso 5. "
+            "Los datos cambiaron después del cálculo. "
             "Regenera la ingeniería antes del PDF."
         )
 
     if not _ui_boton_pdf(disabled=stale_inputs):
         return
 
-    _ejecutar_pipeline_pdf(ctx, copy.deepcopy(resultado_proyecto))
+    _ejecutar_pipeline_pdf(
+        ctx,
+        copy.deepcopy(resultado_proyecto),
+    )
 
+
+# ==========================================================
+# VALIDACIÓN DEL PASO
+# ==========================================================
 
 def validar(ctx) -> Tuple[bool, List[str]]:
+
     errores: List[str] = []
 
     if getattr(ctx, "resultado_proyecto", None) is None:
-        errores.append("No hay resultados del estudio (genere en Paso 5).")
+
+        errores.append(
+            "No hay resultados del estudio "
+            "(genere en Paso 5)."
+        )
 
     if is_result_stale(ctx):
-        errores.append("Los resultados están desactualizados. Regenera la ingeniería del Paso 5.")
+
+        errores.append(
+            "Resultados desactualizados. "
+            "Regenera la ingeniería."
+        )
 
     return (len(errores) == 0), errores
