@@ -105,6 +105,10 @@ def _split_por_mppt(n_strings_total: int, inversor: InversorSpec):
 # GENERACION STRINGS
 # ==========================================================
 
+# ==========================================================
+# GENERACION STRINGS
+# ==========================================================
+
 def _generar_strings(ramas, n_series, panel: PanelSpec, voc_frio_panel, vmp_hot_panel):
 
     strings = []
@@ -113,25 +117,55 @@ def _generar_strings(ramas, n_series, panel: PanelSpec, voc_frio_panel, vmp_hot_
 
         n_paralelo = r["n_strings"]
 
+        # voltajes del string
+        vmp_string = float(n_series * vmp_hot_panel)
+
+        voc_frio_string = float(n_series * voc_frio_panel)
+
+        # corrientes
+        imp_string = float(panel.imp_a)
+
+        isc_string = float(panel.isc_a)
+
         strings.append(
             {
                 "mppt": r["mppt"],
+
                 "n_series": n_series,
+
                 "n_paralelo": n_paralelo,
 
-                "vmp_string_v": float(n_series * vmp_hot_panel),
-                "voc_string_v": float(n_series * voc_frio_panel),
+                # --------------------------------------------------
+                # VOLTAJES
+                # --------------------------------------------------
 
-                "imp_string_a": float(panel.imp_a),
-                "isc_string_a": float(panel.isc_a),
+                "vmp_string_v": vmp_string,
 
-                "imp_mppt_a": float(panel.imp_a * n_paralelo),
+                # compatibilidad legacy
+                "voc_string_v": voc_frio_string,
+
+                # nombre correcto para ingeniería
+                "voc_frio_string_v": voc_frio_string,
+
+                # --------------------------------------------------
+                # CORRIENTES STRING
+                # --------------------------------------------------
+
+                "imp_string_a": imp_string,
+
+                "isc_string_a": isc_string,
+
+                # --------------------------------------------------
+                # CORRIENTES MPPT
+                # --------------------------------------------------
+
+                "imp_mppt_a": float(imp_string * n_paralelo),
 
                 # nombre legacy (no romper app)
-                "isc_array_a": float(panel.isc_a * n_paralelo),
+                "isc_array_a": float(isc_string * n_paralelo),
 
                 # nombre correcto futuro
-                "isc_mppt_a": float(panel.isc_a * n_paralelo),
+                "isc_mppt_a": float(isc_string * n_paralelo),
             }
         )
 
