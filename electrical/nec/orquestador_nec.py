@@ -175,7 +175,7 @@ def ejecutar_nec(
     dc = _armar_resumen_dc(strings, sizing)
 
     # ------------------------------------------------------
-    # Consolidación
+    # Consolidación interna
     # ------------------------------------------------------
 
     ee["corrientes"] = {
@@ -208,10 +208,33 @@ def ejecutar_nec(
     ee["circuitos_mppt"] = circuitos_mppt
 
     # ------------------------------------------------------
+    # ADAPTADOR PARA PAQUETE NEC
+    # ------------------------------------------------------
+
+    entrada_nec = {
+
+        "strings": {
+            "corrientes_input": {
+                "i_operacion_a": corr_string["i_nominal"],
+                "isc_a": corr_string["i_nominal"] * 1.05
+            }
+        },
+
+        "potencia_dc_w": dc["potencia_dc_w"],
+        "potencia_ac_w": potencia_ac,
+
+        "vdc_nom": dc["vdc_nom"],
+        "vac_ll": vac_ll,
+
+        "fases": fases,
+        "fp": fp,
+    }
+
+    # ------------------------------------------------------
     # Generar paquete NEC
     # ------------------------------------------------------
 
-    paquete = armar_paquete_nec(ee)
+    paquete = armar_paquete_nec(entrada_nec)
 
     ee.update(paquete)
 
