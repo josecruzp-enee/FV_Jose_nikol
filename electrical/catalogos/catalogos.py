@@ -47,9 +47,10 @@ from typing import Dict, List
 from electrical.modelos.paneles import PanelSpec as Panel
 from electrical.modelos.inversor import InversorSpec as Inversor
 
+# loader real
 from .catalogos_yaml import (
-    cargar_paneles_yaml,
-    cargar_inversores_yaml,
+    _paneles,
+    _inversores,
 )
 
 
@@ -101,7 +102,7 @@ def _merge_paneles() -> Dict[str, Panel]:
     out = dict(_PANELES)
 
     if _YAML_PANELES.exists():
-        out.update(cargar_paneles_yaml("paneles.yaml"))
+        out.update(_paneles())
 
     return out
 
@@ -111,7 +112,7 @@ def _merge_inversores() -> Dict[str, Inversor]:
     out = dict(_INVERSORES)
 
     if _YAML_INVERSORES.exists():
-        out.update(cargar_inversores_yaml("inversores.yaml"))
+        out.update(_inversores())
 
     return out
 
