@@ -3,7 +3,7 @@ import math
 
 from core.dominio.contrato import ResultadoSizing
 from electrical.paquete_nec import armar_paquete_nec
-from electrical.circuitos.generador_circuitos_dc import crear_circuitos_mppt
+from electrical.circuitos.generador_circuitos_dc import generar_circuitos_dc
 
 
 def ejecutar_nec(
