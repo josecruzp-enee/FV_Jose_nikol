@@ -87,7 +87,7 @@ def _generar_circuitos_mppt(strings: Dict[str, Any], sizing: ResultadoSizing):
 
 def _armar_resumen_dc(strings: Dict[str, Any], sizing: ResultadoSizing):
 
-    potencia_dc = sizing.kw_dc * 1000
+    potencia_dc = sizing.pdc_kw * 1000
 
     vdc_nom = strings.get("vmp_string_v", 0)
 
@@ -101,7 +101,6 @@ def _armar_resumen_dc(strings: Dict[str, Any], sizing: ResultadoSizing):
         "vdc_nom": vdc_nom,
         "idc_nom": idc_nom
     }
-
 
 # ==========================================================
 # Orquestador NEC principal
