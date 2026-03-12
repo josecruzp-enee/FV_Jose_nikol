@@ -191,7 +191,7 @@ def ejecutar_nec(
     # Generar paquete NEC
     # ------------------------------------------------------
 
-    paquete = armar_paquete_nec(p, ee)
+    paquete = armar_paquete_nec(ee)
 
     ee.update(paquete)
 
