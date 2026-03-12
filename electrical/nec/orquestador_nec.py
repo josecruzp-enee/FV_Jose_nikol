@@ -177,6 +177,15 @@ def ejecutar_nec(
     ee: Dict[str, Any] = {}
 
     # ------------------------------------------------------
+    # FRONTERA 1: STRINGS → NEC
+    # ------------------------------------------------------
+
+    print("\n==============================")
+    print("FRONTERA 1: STRINGS → NEC")
+    print("==============================")
+    print("strings recibidos:", strings)
+
+    # ------------------------------------------------------
     # Base eléctrica
     # ------------------------------------------------------
 
@@ -188,11 +197,15 @@ def ejecutar_nec(
 
     corr_string = _calcular_corrientes_string(strings)
 
+    print("\nCorrientes calculadas del string:", corr_string)
+
     # ------------------------------------------------------
     # Circuitos MPPT
     # ------------------------------------------------------
 
     circuitos_mppt = _generar_circuitos_mppt(strings, sizing)
+
+    print("\nCircuitos MPPT generados:", circuitos_mppt)
 
     i_mppt_nom = max((c.get("i_operacion", 0) for c in circuitos_mppt), default=0)
     i_mppt_dis = max((c.get("i_diseno", 0) for c in circuitos_mppt), default=0)
@@ -276,10 +289,24 @@ def ejecutar_nec(
     }
 
     # ------------------------------------------------------
+    # FRONTERA 2: NEC → PAQUETE NEC
+    # ------------------------------------------------------
+
+    print("\n==============================")
+    print("FRONTERA 2: NEC → PAQUETE NEC")
+    print("==============================")
+    print("entrada_nec:", entrada_nec)
+
+    # ------------------------------------------------------
     # Ejecutar NEC
     # ------------------------------------------------------
 
     paquete = armar_paquete_nec(entrada_nec)
+
+    print("\n==============================")
+    print("FRONTERA 3: SALIDA PAQUETE NEC")
+    print("==============================")
+    print(paquete)
 
     ee.update(paquete)
 
