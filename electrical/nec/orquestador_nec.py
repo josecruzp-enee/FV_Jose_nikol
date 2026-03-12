@@ -48,6 +48,9 @@ def _calcular_corrientes_string(strings: Dict[str, Any]):
 
 def _calcular_corrientes_ac(potencia_ac_w, vac_ll, fases, fp):
 
+    if not vac_ll or vac_ll == 0:
+        return {"i_nominal": 0, "i_diseno": 0}
+
     if fases == 3:
         i_nom = potencia_ac_w / (math.sqrt(3) * vac_ll * fp)
     else:
@@ -70,6 +73,7 @@ def _generar_circuitos_mppt(strings: Dict[str, Any], sizing: ResultadoSizing):
     strings_totales = strings.get("strings_total", 1)
     imp = strings.get("i_operacion_a", 0)
 
+    # sizing no tiene mppts todavía → usar 1 por seguridad
     mppts = getattr(sizing, "mppts", 1)
 
     circuitos = generar_circuitos_dc(
@@ -89,7 +93,12 @@ def _armar_resumen_dc(strings: Dict[str, Any], sizing: ResultadoSizing):
 
     potencia_dc = sizing.pdc_kw * 1000
 
-    vdc_nom = strings.get("vmp_string_v", 0)
+    lista_strings = strings.get("strings", [])
+
+    if lista_strings:
+        vdc_nom = lista_strings[0].vmp_string_v
+    else:
+        vdc_nom = 0
 
     if vdc_nom > 0:
         idc_nom = potencia_dc / vdc_nom
@@ -101,6 +110,7 @@ def _armar_resumen_dc(strings: Dict[str, Any], sizing: ResultadoSizing):
         "vdc_nom": vdc_nom,
         "idc_nom": idc_nom
     }
+
 
 # ==========================================================
 # Orquestador NEC principal
@@ -132,8 +142,12 @@ def ejecutar_nec(
 
     circuitos_mppt = _generar_circuitos_mppt(strings, sizing)
 
-    i_mppt_nom = max(c["i_operacion"] for c in circuitos_mppt)
-    i_mppt_dis = max(c["i_diseno"] for c in circuitos_mppt)
+    if circuitos_mppt:
+        i_mppt_nom = max(c["i_operacion"] for c in circuitos_mppt)
+        i_mppt_dis = max(c["i_diseno"] for c in circuitos_mppt)
+    else:
+        i_mppt_nom = 0
+        i_mppt_dis = 0
 
     # ------------------------------------------------------
     # Corrientes AC
@@ -192,7 +206,9 @@ def ejecutar_nec(
     # ------------------------------------------------------
 
     paquete = armar_paquete_nec(ee)
-    
+
     ee.update(paquete)
+
     print("DEBUG NEC RESULT:", ee)
+
     return ee
