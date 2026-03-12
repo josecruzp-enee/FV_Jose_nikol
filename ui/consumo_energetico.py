@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Tuple, List
 import streamlit as st
-from core.servicios.analisis_cobertura import analizar_escenarios_fv
+from core.servicios.analisis_cobertura import analizar_cobertura as analizar_escenarios_fv
 import pandas as pd
 
 # ==========================================================
