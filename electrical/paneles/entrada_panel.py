@@ -20,11 +20,11 @@ from electrical.modelos.inversor import InversorSpec
 # CONTRATO DE ENTRADA
 # ==========================================================
 
-@dataclass
+@dataclass(frozen=True)
 class EntradaPaneles:
 
-    panel: Panel
-    inversor: Inversor
+    panel: PanelSpec
+    inversor: InversorSpec
 
     n_paneles_total: Optional[int]
 
@@ -45,7 +45,7 @@ def _f(x, default: float = 0.0) -> float:
     """Convierte cualquier valor a float seguro."""
     try:
         return float(x)
-    except Exception:
+    except (TypeError, ValueError):
         return float(default)
 
 
@@ -53,7 +53,7 @@ def _i(x, default: int = 0) -> int:
     """Convierte cualquier valor a entero seguro."""
     try:
         return int(x)
-    except Exception:
+    except (TypeError, ValueError):
         return int(default)
 
 
@@ -68,8 +68,8 @@ def _clamp(x: float, lo: float, hi: float) -> float:
 
 def build_entrada_paneles(
     *,
-    panel: Panel,
-    inversor: Inversor,
+    panel: PanelSpec,
+    inversor: InversorSpec,
     n_paneles_total: Optional[int] = None,
     t_min_c: float,
     dos_aguas: bool,
@@ -82,7 +82,9 @@ def build_entrada_paneles(
     """
 
     # Número de paneles
-    n_total = _i(n_paneles_total, 0) if n_paneles_total is not None else None
+    n_total = _i(n_paneles_total) if n_paneles_total is not None else None
+    if n_total is not None and n_total <= 0:
+        n_total = None
 
     # Temperatura mínima ambiente
     tmin = _clamp(_f(t_min_c, 0.0), -40.0, 40.0)
@@ -118,12 +120,16 @@ def build_entrada_paneles(
 # SALIDAS DEL ARCHIVO
 # ==========================================================
 #
+# build_entrada_paneles(...)
+#
+# devuelve:
+#
 # EntradaPaneles
 #
 # Campos:
 #
-# panel : Panel
-# inversor : Inversor
+# panel : PanelSpec
+# inversor : InversorSpec
 # n_paneles_total : Optional[int]
 # t_min_c : float
 # t_oper_c : Optional[float]
@@ -132,6 +138,7 @@ def build_entrada_paneles(
 # pdc_kw_objetivo : Optional[float]
 #
 # Este objeto es consumido por:
+#
 # electrical.paneles.orquestador_paneles
 #
 # ==========================================================
