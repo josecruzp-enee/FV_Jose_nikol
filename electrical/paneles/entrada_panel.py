@@ -1,118 +1,97 @@
 from __future__ import annotations
-from typing import Dict, List
+
+"""
+CONTRATO DE ENTRADA — DOMINIO PANELES
+
+Este archivo define la estructura de datos que recibe el
+dominio de paneles para calcular la configuración del
+generador fotovoltaico.
+
+Este módulo NO contiene lógica de cálculo.
+
+Responsabilidad:
+    Definir la estructura tipada de entrada para el
+    orquestador del dominio paneles.
+
+Consumido por:
+    electrical.paneles.orquestador_paneles
+"""
+
+from dataclasses import dataclass
+from typing import Optional
 
 from electrical.modelos.paneles import PanelSpec
 from electrical.modelos.inversor import InversorSpec
 
-from .calculo_de_strings import calcular_strings_fv
-from .entrada_panel import EntradaPaneles
-from .validacion_strings import validar_inversor, validar_panel, validar_parametros_generales
 
 # ==========================================================
-# ORQUESTADOR DEL DOMINIO PANELES
+# ENTRADA DEL DOMINIO PANELES
 # ==========================================================
 
-def ejecutar_paneles(
-    entrada: EntradaPaneles
-) -> Dict:
+@dataclass
+class EntradaPaneles:
+    """
+    Parámetros de entrada requeridos para calcular
+    la configuración de strings del generador FV.
+    """
 
-    errores: List[str] = []
-    warnings: List[str] = []
+    # ----------------------------------------------
+    # Equipos
+    # ----------------------------------------------
 
-    panel: PanelSpec = entrada.panel
-    inversor: InversorSpec = entrada.inversor
+    panel: PanelSpec
+    inversor: InversorSpec
 
-    n_paneles_total = entrada.n_paneles_total
+    # ----------------------------------------------
+    # Sistema FV
+    # ----------------------------------------------
 
-    if n_paneles_total is None or n_paneles_total <= 0:
-        return {
-            "ok": False,
-            "errores": ["n_paneles_total inválido"],
-            "warnings": []
-        }
+    n_paneles_total: int
 
-    # ------------------------------------------------------
-    # VALIDACIONES
-    # ------------------------------------------------------
+    # ----------------------------------------------
+    # Condiciones térmicas
+    # ----------------------------------------------
 
-    e, w = validar_panel(panel)
-    errores += e
-    warnings += w
+    t_min_c: float
+    t_oper_c: float
 
-    e, w = validar_inversor(inversor)
-    errores += e
-    warnings += w
+    # ----------------------------------------------
+    # Configuración de instalación
+    # ----------------------------------------------
 
-    e, w = validar_parametros_generales(
-        n_paneles_total,
-        entrada.t_min_c,
-        entrada.t_oper_c
-    )
+    dos_aguas: bool = False
 
-    errores += e
-    warnings += w
+    # ----------------------------------------------
+    # Objetivo de diseño
+    # ----------------------------------------------
 
-    if errores:
+    objetivo_dc_ac: Optional[float] = None
 
-        return {
-            "ok": False,
-            "errores": errores,
-            "warnings": warnings
-        }
-
-    # ------------------------------------------------------
-    # CALCULO STRINGS
-    # ------------------------------------------------------
-
-    resultado = calcular_strings_fv(
-
-        n_paneles_total=n_paneles_total,
-        panel=panel,
-        inversor=inversor,
-        t_min_c=float(entrada.t_min_c),
-        dos_aguas=bool(entrada.dos_aguas),
-        objetivo_dc_ac=entrada.objetivo_dc_ac,
-        pdc_kw_objetivo=entrada.pdc_kw_objetivo,
-        t_oper_c=entrada.t_oper_c,
-    )
-
-    resultado.setdefault("ok", False)
-    resultado.setdefault("errores", [])
-    resultado.setdefault("warnings", [])
-
-    return resultado
+    pdc_kw_objetivo: Optional[float] = None
 
 
 # ==========================================================
 # SALIDAS DEL ARCHIVO
 # ==========================================================
 #
-# ejecutar_paneles(entrada: EntradaPaneles)
+# EntradaPaneles
 #
-# devuelve:
+# Campos:
 #
-# ok : bool
-# errores : list[str]
-# warnings : list[str]
+# panel : PanelSpec
+# inversor : InversorSpec
 #
-# strings : list
+# n_paneles_total : int
 #
-# recomendacion:
-#   n_series
-#   n_strings_total
-#   vmp_string_v
-#   voc_string_v
-#   imp_array_a
-#   isc_array_total_a
+# t_min_c : float
+# t_oper_c : float
 #
-# bounds:
-#   n_min
-#   n_max
+# dos_aguas : bool
 #
-# meta:
-#   n_paneles_total
+# objetivo_dc_ac : Optional[float]
+# pdc_kw_objetivo : Optional[float]
 #
 # Consumido por:
-# core
+# electrical.paneles.orquestador_paneles
 #
 # ==========================================================
