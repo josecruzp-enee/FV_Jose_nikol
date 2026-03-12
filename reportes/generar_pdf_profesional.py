@@ -46,6 +46,10 @@ def generar_pdf_profesional(resultado_proyecto: dict, datos: Any, paths: Dict[st
     pal = pdf_palette()
     styles = pdf_styles()
 
+    print("\n========== DEBUG PDF ==========")
+    print(resultado_proyecto.get("nec"))
+    print("================================\n")
+    
     pdf_path = _ensure_pdf_path(paths)
 
     doc = SimpleDocTemplate(str(pdf_path), pagesize=letter)
