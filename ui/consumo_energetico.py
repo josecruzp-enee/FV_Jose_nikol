@@ -63,13 +63,20 @@ def render_analisis_cobertura(ctx):
     Ejecuta análisis exploratorio de diferentes tamaños de FV
     """
     consumo = ctx.consumo
-    escenarios = analizar_escenarios_fv(
-        consumo_anual=sum(consumo["kwh_12m"]),
+
+    # Valores de ejemplo (debes reemplazar por los reales de tu proyecto)
+    potencia_panel_kw = 0.55      # 550 W por panel
+    energia_1kwp_anual = 1500.0   # kWh anual por kWp instalado
+
+    escenarios = analizar_cobertura(
+        consumo_anual_kwh=sum(consumo["kwh_12m"]),
+        potencia_panel_kw=potencia_panel_kw,
+        energia_1kwp_anual=energia_1kwp_anual,
         tarifa_energia=consumo["tarifa_energia_L_kwh"]
     )
-    st.write("### Escenarios FV")
-    st.dataframe(escenarios)
 
+    st.write("### Escenarios FV")
+    st.dataframe([e.__dict__ for e in escenarios])
 # ==========================================================
 # VALIDACIÓN
 # ==========================================================
