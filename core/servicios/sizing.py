@@ -168,7 +168,7 @@ def calcular_sizing_unificado(
     # PANEL SIZING
     # ======================================================
 
-    panel_sizing = calcular_panel_sizing(
+    panel_sizing = dimensionar_paneles(
 
         consumo_12m_kwh=consumo_12m_kwh,
         cobertura_obj=cobertura_obj,
