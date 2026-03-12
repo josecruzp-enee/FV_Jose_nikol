@@ -4,23 +4,28 @@ Subdominio corrientes — FV Engine
 Responsabilidad:
 - Calcular corrientes eléctricas del sistema FV.
 - Separar niveles eléctricos reales:
+
     panel → string → MPPT → inversor → sistema AC
-- Entregar un shape estable para protecciones/conductores.
+
+Salida estable para:
+- protecciones
+- conductores
 """
 
 from __future__ import annotations
 
 import math
-from typing import Any, Mapping, Dict
+from typing import Any, Mapping
+
+from .resultado_corriente import ResultadoCorrientes, NivelCorriente
 
 
 ResultadoStrings = Mapping[str, Any]
 EntradaInversor = Mapping[str, Any]
-ResultadoCorrientes = Dict[str, float]
 
 
 # ==========================================================
-# Utilidades seguras
+# UTILIDADES SEGURAS
 # ==========================================================
 
 def _get(m: Mapping[str, Any] | None, k: str, default: Any = None) -> Any:
@@ -49,14 +54,14 @@ def _i(m: Mapping[str, Any] | None, k: str, default: int = 0) -> int:
 
 
 # ==========================================================
-# Motor principal
+# MOTOR PRINCIPAL
 # ==========================================================
 
 def calcular_corrientes(
     strings: ResultadoStrings,
     inv: EntradaInversor,
     cfg_tecnicos: Mapping[str, Any] | None = None,
-) -> Dict[str, Any]:
+) -> ResultadoCorrientes:
 
     cfg_tecnicos = cfg_tecnicos or {}
 
@@ -64,7 +69,7 @@ def calcular_corrientes(
     f_ac = float(cfg_tecnicos.get("factor_seguridad_ac", 1.25))
 
     # ======================================================
-    # Adaptador de entrada (resultado completo de paneles)
+    # Adaptador entrada resultado strings
     # ======================================================
 
     if isinstance(strings, dict) and "strings" in strings:
@@ -93,7 +98,7 @@ def calcular_corrientes(
         strings_por_mppt = _i(strings, "strings_por_mppt", 1)
         n_strings_total = _i(strings, "n_strings_total", 0)
 
-        i_panel = strings.get("panel_i", isc_string)
+        i_panel = _f(strings, "panel_i", isc_string)
 
     if n_strings_total <= 0:
         raise ValueError("n_strings_total inválido para cálculo de corrientes")
@@ -103,7 +108,7 @@ def calcular_corrientes(
     # ======================================================
 
     i_string_operacion = imp_string
-    isc_string_val = isc_string
+    i_string_diseno = isc_string * f_dc
 
     # ======================================================
     # MPPT
@@ -115,7 +120,7 @@ def calcular_corrientes(
     i_mppt_diseno = isc_mppt * f_dc
 
     # ======================================================
-    # SISTEMA DC TOTAL
+    # DC TOTAL
     # ======================================================
 
     i_dc_total_operacion = imp_string * n_strings_total
@@ -166,41 +171,33 @@ def calcular_corrientes(
     i_ac_diseno = i_ac * f_ac
 
     # ======================================================
-    # Shape estable
+    # RESULTADO TIPADO
     # ======================================================
 
-    return {
+    return ResultadoCorrientes(
 
-        "panel": {
-            "i_operacion_a": float(i_panel),
-        },
+        panel=NivelCorriente(
+            i_operacion_a=float(i_panel),
+            i_diseno_a=float(i_panel * f_dc),
+        ),
 
-        "string": {
-            "i_operacion_a": float(i_string_operacion),
-            "isc_a": float(isc_string_val),
-        },
+        string=NivelCorriente(
+            i_operacion_a=float(i_string_operacion),
+            i_diseno_a=float(i_string_diseno),
+        ),
 
-        "mppt": {
-            "strings_paralelo": int(strings_por_mppt),
-            "i_operacion_a": float(i_mppt_operacion),
-            "isc_a": float(isc_mppt),
-            "i_diseno_nec_a": float(i_mppt_diseno),
-        },
+        mppt=NivelCorriente(
+            i_operacion_a=float(i_mppt_operacion),
+            i_diseno_a=float(i_mppt_diseno),
+        ),
 
-        "dc_total": {
-            "strings_total": int(n_strings_total),
-            "i_operacion_a": float(i_dc_total_operacion),
-            "isc_total_a": float(isc_total),
-            "i_diseno_nec_a": float(i_dc_diseno),
-        },
+        dc_total=NivelCorriente(
+            i_operacion_a=float(i_dc_total_operacion),
+            i_diseno_a=float(i_dc_diseno),
+        ),
 
-        "ac": {
-            "i_operacion_a": float(i_ac),
-            "i_diseno_a": float(i_ac_diseno),
-        },
-
-        "factores": {
-            "factor_dc": float(f_dc),
-            "factor_ac": float(f_ac),
-        }
-    }
+        ac=NivelCorriente(
+            i_operacion_a=float(i_ac),
+            i_diseno_a=float(i_ac_diseno),
+        ),
+    )
