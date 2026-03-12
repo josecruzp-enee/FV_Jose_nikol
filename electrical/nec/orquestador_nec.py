@@ -1,7 +1,7 @@
 from typing import Dict, Any
 import math
 
-from core.dominio.contrato import ResultadoSizing
+from core.dominio.contrato import ResultadoSizing, ResultadoStrings
 from electrical.paquete_nec import armar_paquete_nec
 from electrical.circuitos.generador_circuitos_dc import generar_circuitos_dc
 
@@ -28,10 +28,15 @@ def _leer_base_electrica(p):
 # Corrientes DC por string
 # ==========================================================
 
-def _calcular_corrientes_string(strings: Dict[str, Any]):
+def _calcular_corrientes_string(strings: ResultadoStrings):
 
-    imp = strings.get("i_operacion_a", 0)
-    isc = strings.get("isc_a", 0)
+    if not strings.strings:
+        return {"i_nominal": 0, "i_diseno": 0}
+
+    s0 = strings.strings[0]
+
+    imp = s0.imp_a
+    isc = s0.isc_a
 
     i_nom = imp
     i_dis = isc * 1.25
@@ -40,6 +45,30 @@ def _calcular_corrientes_string(strings: Dict[str, Any]):
         "i_nominal": i_nom,
         "i_diseno": i_dis
     }
+
+
+# ==========================================================
+# Circuitos MPPT
+# ==========================================================
+
+def _generar_circuitos_mppt(strings: ResultadoStrings, sizing: ResultadoSizing):
+
+    strings_totales = len(strings.strings)
+
+    if strings.strings:
+        imp = strings.strings[0].imp_a
+    else:
+        imp = 0
+
+    mppts = getattr(sizing, "mppts", 1)
+
+    circuitos = generar_circuitos_dc(
+        strings_totales,
+        mppts,
+        imp
+    )
+
+    return circuitos
 
 
 # ==========================================================
@@ -65,38 +94,15 @@ def _calcular_corrientes_ac(potencia_ac_w, vac_ll, fases, fp):
 
 
 # ==========================================================
-# Circuitos MPPT
-# ==========================================================
-
-def _generar_circuitos_mppt(strings: Dict[str, Any], sizing: ResultadoSizing):
-
-    strings_totales = strings.get("strings_total", 1)
-    imp = strings.get("i_operacion_a", 0)
-
-    # sizing no tiene mppts todavía → usar 1 por seguridad
-    mppts = getattr(sizing, "mppts", 1)
-
-    circuitos = generar_circuitos_dc(
-        strings_totales,
-        mppts,
-        imp
-    )
-
-    return circuitos
-
-
-# ==========================================================
 # Resumen DC del sistema
 # ==========================================================
 
-def _armar_resumen_dc(strings: Dict[str, Any], sizing: ResultadoSizing):
+def _armar_resumen_dc(strings: ResultadoStrings, sizing: ResultadoSizing):
 
     potencia_dc = sizing.pdc_kw * 1000
 
-    lista_strings = strings.get("strings", [])
-
-    if lista_strings:
-        vdc_nom = lista_strings[0].vmp_string_v
+    if strings.strings:
+        vdc_nom = strings.strings[0].vmp_string_v
     else:
         vdc_nom = 0
 
@@ -119,25 +125,11 @@ def _armar_resumen_dc(strings: Dict[str, Any], sizing: ResultadoSizing):
 def ejecutar_nec(
     p,
     sizing: ResultadoSizing,
-    strings: Dict[str, Any],
+    strings: ResultadoStrings,
 ) -> Dict[str, Any]:
 
     ee: Dict[str, Any] = {}
-    print("\n===== DEBUG STRINGS =====")
-    print(type(strings))
-    print(strings)
 
-    if isinstance(strings, dict):
-        print("keys:", strings.keys())
-
-        if "strings" in strings:
-            print("tipo lista strings:", type(strings["strings"]))
-
-            if strings["strings"]:
-                print("tipo primer elemento:", type(strings["strings"][0]))
-                print("contenido primer string:", strings["strings"][0])
-
-    print("=========================\n")
     # ------------------------------------------------------
     # Base eléctrica
     # ------------------------------------------------------
@@ -222,7 +214,5 @@ def ejecutar_nec(
     paquete = armar_paquete_nec(ee)
 
     ee.update(paquete)
-
-    print("DEBUG NEC RESULT:", ee)
 
     return ee
