@@ -33,7 +33,7 @@ def caida_tension_pct(
     i: float,
     l_m: float,
     r_ohm_km: float,
-    n_hilos: int = 2,
+    n_hilos: float = 2.0,
 ) -> float:
     """
     Calcula caída de tensión porcentual usando modelo resistivo.
@@ -50,8 +50,12 @@ def caida_tension_pct(
     i : corriente del circuito (A)
     l_m : longitud del tramo (m)
     r_ohm_km : resistencia del conductor (ohm/km)
-    n_hilos : número de conductores en el camino de corriente
-              (2 para ida-vuelta en DC)
+    n_hilos : número equivalente de conductores en el camino
+              de corriente.
+
+              Ejemplos típicos:
+                DC / monofásico ida-vuelta = 2
+                trifásico ≈ √3 ≈ 1.732
 
     Retorna
     -------
@@ -63,16 +67,17 @@ def caida_tension_pct(
         i = float(i)
         l_m = float(l_m)
         r_ohm_km = float(r_ohm_km)
-        n_hilos = int(n_hilos)
+        n_hilos = float(n_hilos)
     except Exception:
         return 0.0
 
-    if n_hilos < 1:
-        n_hilos = 1
+    if n_hilos <= 0:
+        n_hilos = 1.0
 
     if v <= 0 or i <= 0 or l_m <= 0 or r_ohm_km <= 0:
         return 0.0
 
+    # resistencia total del circuito
     r_total = r_ohm_km * (l_m / 1000.0) * n_hilos
 
     vd_pct = 100.0 * (i * r_total) / v
@@ -97,8 +102,13 @@ def resistencia_de_tabla(
     a = str(awg)
 
     for t in tabla:
+
         if str(t.get("awg")) == a:
-            return float(t.get("r_ohm_km", 0.0))
+
+            try:
+                return float(t.get("r_ohm_km", 0.0))
+            except Exception:
+                return 0.0
 
     return 0.0
 
@@ -115,7 +125,7 @@ def ajustar_calibre_por_vd(
     v_v: float,
     l_m: float,
     vd_obj_pct: float,
-    n_hilos: int = 2,
+    n_hilos: float = 2.0,
 ) -> str:
     """
     Incrementa el calibre del conductor hasta cumplir
@@ -136,13 +146,13 @@ def ajustar_calibre_por_vd(
         v_v = float(v_v)
         l_m = float(l_m)
         vd_obj_pct = float(vd_obj_pct)
-        n_hilos = int(n_hilos)
+        n_hilos = float(n_hilos)
     except Exception:
         return str(awg)
 
     awg = str(awg)
 
-    # buscar posición inicial
+    # buscar posición inicial del calibre
     idx0 = next(
         (k for k, t in enumerate(tabla) if str(t.get("awg")) == awg),
         None,
@@ -155,7 +165,10 @@ def ajustar_calibre_por_vd(
 
     while idx < len(tabla):
 
-        r = float(tabla[idx].get("r_ohm_km", 0.0))
+        try:
+            r = float(tabla[idx].get("r_ohm_km", 0.0))
+        except Exception:
+            r = 0.0
 
         vd = caida_tension_pct(
             v=v_v,
