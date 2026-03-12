@@ -7,6 +7,18 @@ from electrical.circuitos.generador_circuitos_dc import generar_circuitos_dc
 
 
 # ==========================================================
+# UTILIDAD: obtener lista de strings sin romper si llega dict
+# ==========================================================
+
+def _lista_strings(strings):
+
+    if isinstance(strings, dict):
+        return strings.get("strings", [])
+
+    return getattr(strings, "strings", [])
+
+
+# ==========================================================
 # Leer base eléctrica del proyecto
 # ==========================================================
 
@@ -28,15 +40,17 @@ def _leer_base_electrica(p):
 # Corrientes DC por string
 # ==========================================================
 
-def _calcular_corrientes_string(strings: ResultadoStrings):
+def _calcular_corrientes_string(strings):
 
-    if not strings.strings:
+    lista = _lista_strings(strings)
+
+    if not lista:
         return {"i_nominal": 0, "i_diseno": 0}
 
-    s0 = strings.strings[0]
+    s0 = lista[0]
 
-    imp = s0.imp_a
-    isc = s0.isc_a
+    imp = getattr(s0, "imp_a", s0.get("imp_a", 0))
+    isc = getattr(s0, "isc_a", s0.get("isc_a", 0))
 
     i_nom = imp
     i_dis = isc * 1.25
@@ -51,12 +65,15 @@ def _calcular_corrientes_string(strings: ResultadoStrings):
 # Circuitos MPPT
 # ==========================================================
 
-def _generar_circuitos_mppt(strings: ResultadoStrings, sizing: ResultadoSizing):
+def _generar_circuitos_mppt(strings, sizing: ResultadoSizing):
 
-    strings_totales = len(strings.strings)
+    lista = _lista_strings(strings)
 
-    if strings.strings:
-        imp = strings.strings[0].imp_a
+    strings_totales = len(lista)
+
+    if lista:
+        s0 = lista[0]
+        imp = getattr(s0, "imp_a", s0.get("imp_a", 0))
     else:
         imp = 0
 
@@ -97,12 +114,15 @@ def _calcular_corrientes_ac(potencia_ac_w, vac_ll, fases, fp):
 # Resumen DC del sistema
 # ==========================================================
 
-def _armar_resumen_dc(strings: ResultadoStrings, sizing: ResultadoSizing):
+def _armar_resumen_dc(strings, sizing: ResultadoSizing):
+
+    lista = _lista_strings(strings)
 
     potencia_dc = sizing.pdc_kw * 1000
 
-    if strings.strings:
-        vdc_nom = strings.strings[0].vmp_string_v
+    if lista:
+        s0 = lista[0]
+        vdc_nom = getattr(s0, "vmp_string_v", s0.get("vmp_string_v", 0))
     else:
         vdc_nom = 0
 
@@ -125,7 +145,7 @@ def _armar_resumen_dc(strings: ResultadoStrings, sizing: ResultadoSizing):
 def ejecutar_nec(
     p,
     sizing: ResultadoSizing,
-    strings: ResultadoStrings,
+    strings,
 ) -> Dict[str, Any]:
 
     ee: Dict[str, Any] = {}
