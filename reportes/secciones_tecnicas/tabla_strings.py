@@ -1,6 +1,5 @@
 from typing import List, Dict, Any
 from reportlab.platypus import Table, TableStyle
-from reportlab.lib import colors
 
 
 def crear_tabla_strings(strings: List[Dict[str, Any]], n_inversores: int, pal, content_w):
@@ -24,13 +23,25 @@ def crear_tabla_strings(strings: List[Dict[str, Any]], n_inversores: int, pal, c
 
             rows.append([
                 str(inv),
+
                 str(int(s.get("mppt", 0))),
+
                 str(int(s.get("n_series", 0))),
-                str(int(s.get("n_paralelo", 0))),
+
+                # ahora cada fila es un string
+                "1",
+
                 f"{float(s.get('vmp_string_v', 0)):.0f}",
-                f"{float(s.get('voc_frio_string_v', 0)):.0f}",
-                f"{float(s.get('imp_a', 0)):.1f}",
-                f"{float(s.get('isc_a', 0)):.1f}",
+
+                f"{float(
+                    s.get('voc_frio_string_v')
+                    or s.get('voc_string_v')
+                    or 0
+                ):.0f}",
+
+                f"{float(s.get('imp_string_a', 0)):.2f}",
+
+                f"{float(s.get('isc_string_a', 0)):.2f}",
             ])
 
     colw = [
@@ -50,11 +61,8 @@ def crear_tabla_strings(strings: List[Dict[str, Any]], n_inversores: int, pal, c
         ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
         ("BACKGROUND", (0,0), (-1,0), pal["SOFT"]),
         ("TEXTCOLOR", (0,0), (-1,0), pal["PRIMARY"]),
-
         ("ALIGN", (0,0), (-1,-1), "CENTER"),
-
         ("GRID", (0,0), (-1,-1), 0.3, pal["BORDER"]),
-
         ("FONTSIZE", (0,0), (-1,-1), 9),
     ]))
 
