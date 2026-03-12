@@ -7,7 +7,7 @@ from electrical.circuitos.generador_circuitos_dc import generar_circuitos_dc
 
 
 # ==========================================================
-# Lectura base eléctrica
+# Leer base eléctrica del proyecto
 # ==========================================================
 
 def _leer_base_electrica(p):
@@ -25,10 +25,10 @@ def _leer_base_electrica(p):
 
 
 # ==========================================================
-# Corrientes DC
+# Corrientes DC por string
 # ==========================================================
 
-def _calcular_corrientes_dc(strings: Dict[str, Any]):
+def _calcular_corrientes_string(strings: Dict[str, Any]):
 
     imp = strings.get("i_operacion_a", 0)
     isc = strings.get("isc_a", 0)
@@ -65,7 +65,7 @@ def _calcular_corrientes_ac(potencia_ac_w, vac_ll, fases, fp):
 # Circuitos MPPT
 # ==========================================================
 
-def _generar_circuitos_mppt(strings, sizing):
+def _generar_circuitos_mppt(strings: Dict[str, Any], sizing: ResultadoSizing):
 
     strings_totales = strings.get("strings_total", 1)
     imp = strings.get("i_operacion_a", 0)
@@ -82,12 +82,12 @@ def _generar_circuitos_mppt(strings, sizing):
 
 
 # ==========================================================
-# Resumen DC total
+# Resumen DC del sistema
 # ==========================================================
 
-def _armar_resumen_dc(strings, sizing):
+def _armar_resumen_dc(strings: Dict[str, Any], sizing: ResultadoSizing):
 
-    potencia_dc = sizing.potencia_dc_w
+    potencia_dc = sizing.kw_dc * 1000
 
     vdc_nom = strings.get("vmp_string_v", 0)
 
@@ -104,7 +104,7 @@ def _armar_resumen_dc(strings, sizing):
 
 
 # ==========================================================
-# Orquestador principal
+# Orquestador NEC principal
 # ==========================================================
 
 def ejecutar_nec(
@@ -122,10 +122,10 @@ def ejecutar_nec(
     vac_ll, fases, fp = _leer_base_electrica(p)
 
     # ------------------------------------------------------
-    # Corrientes DC
+    # Corriente por string
     # ------------------------------------------------------
 
-    corr_string = _calcular_corrientes_dc(strings)
+    corr_string = _calcular_corrientes_string(strings)
 
     # ------------------------------------------------------
     # Circuitos MPPT
@@ -140,7 +140,7 @@ def ejecutar_nec(
     # Corrientes AC
     # ------------------------------------------------------
 
-    potencia_ac = sizing.potencia_ac_w
+    potencia_ac = sizing.kw_ac * 1000
 
     corr_ac = _calcular_corrientes_ac(
         potencia_ac,
@@ -189,7 +189,7 @@ def ejecutar_nec(
     ee["circuitos_mppt"] = circuitos_mppt
 
     # ------------------------------------------------------
-    # NEC package
+    # Generar paquete NEC
     # ------------------------------------------------------
 
     paquete = armar_paquete_nec(p, ee)
