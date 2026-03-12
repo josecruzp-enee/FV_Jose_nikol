@@ -1,3 +1,105 @@
+"""
+MÓDULO: ADAPTADORES DEL ESTUDIO FV
+
+Este módulo implementa los adaptadores concretos de los puertos
+definidos por el orquestador del estudio FV.
+
+Forma parte de la capa de infraestructura dentro del patrón
+Ports & Adapters utilizado por FV Engine.
+
+---------------------------------------------------------------------
+
+ARQUITECTURA
+
+UI
+↓
+core.orquestador_estudio
+↓
+PUERTOS (interfaces)
+↓
+ADAPTADORES (este módulo)
+↓
+DOMINIOS
+
+    sizing
+    paneles
+    energia
+    nec
+    finanzas
+
+---------------------------------------------------------------------
+
+RESPONSABILIDAD
+
+Implementar los puertos definidos por el orquestador del estudio
+y conectar cada dominio con su motor correspondiente.
+
+Cada adaptador traduce la entrada del sistema hacia el formato
+esperado por el dominio.
+
+Este módulo NO contiene lógica de cálculo de ingeniería.
+
+---------------------------------------------------------------------
+
+ADAPTADORES IMPLEMENTADOS
+
+SizingAdapter
+    Ejecuta el motor de dimensionamiento del sistema FV.
+
+PanelesAdapter
+    Ejecuta el cálculo de configuración de strings.
+
+EnergiaAdapter
+    Ejecuta el motor de simulación energética anual.
+
+NECAdapter
+    Ejecuta el cálculo de ingeniería eléctrica NEC.
+
+FinanzasAdapter
+    Ejecuta el análisis financiero del proyecto.
+
+---------------------------------------------------------------------
+
+FUNCIÓN PRINCIPAL DEL MÓDULO
+
+construir_dependencias() -> DependenciasEstudio
+
+Construye la estructura de dependencias que será utilizada por
+el orquestador del estudio.
+
+---------------------------------------------------------------------
+
+ENTRADAS
+
+Cada adaptador recibe según el dominio:
+
+    datos   : DatosProyecto
+    sizing  : ResultadoSizing
+    strings : ResultadoPaneles
+    energia : ResultadoEnergia
+
+---------------------------------------------------------------------
+
+SALIDAS
+
+Cada adaptador devuelve el resultado del dominio correspondiente:
+
+    sizing   → ResultadoSizing
+    paneles  → ResultadoPaneles
+    energia  → ResultadoEnergia
+    nec      → ResultadoNEC
+    finanzas → ResultadoFinanzas
+
+---------------------------------------------------------------------
+
+REGLA ARQUITECTÓNICA
+
+Este módulo NO realiza cálculos físicos ni eléctricos.
+
+Su único propósito es conectar los puertos definidos por el core
+con las implementaciones concretas de los dominios.
+"""
+
 from core.servicios.sizing import calcular_sizing_unificado
 from core.servicios.finanzas import ejecutar_finanzas
 
@@ -19,25 +121,42 @@ from .orquestador_estudio import DependenciasEstudio
 
 
 # ==========================================================
-# ADAPTADORES
+# ADAPTADOR: SIZING
 # ==========================================================
-
 
 class SizingAdapter(PuertoSizing):
 
     def ejecutar(self, datos):
+        """
+        Ejecuta el motor de dimensionamiento FV.
+        """
         return calcular_sizing_unificado(datos)
 
+
+# ==========================================================
+# ADAPTADOR: PANELES
+# ==========================================================
 
 class PanelesAdapter(PuertoPaneles):
 
     def ejecutar(self, datos, sizing):
+        """
+        Ejecuta el cálculo de strings y configuración
+        del generador FV.
+        """
         return ejecutar_paneles_desde_sizing(datos, sizing)
 
+
+# ==========================================================
+# ADAPTADOR: ENERGÍA
+# ==========================================================
 
 class EnergiaAdapter(PuertoEnergia):
 
     def ejecutar(self, datos, sizing, strings):
+        """
+        Ejecuta el motor de simulación energética anual.
+        """
 
         pdc_instalada_kw = sizing.pdc_kw
         pac_nominal_kw = sizing.kw_ac
@@ -68,9 +187,16 @@ class EnergiaAdapter(PuertoEnergia):
         return ejecutar_motor_energia(inp)
 
 
+# ==========================================================
+# ADAPTADOR: NEC
+# ==========================================================
+
 class NECAdapter(PuertoNEC):
 
     def ejecutar(self, datos, sizing, strings):
+        """
+        Ejecuta el cálculo de ingeniería eléctrica NEC.
+        """
 
         sf = getattr(datos, "sistema_fv", {}) or {}
 
@@ -101,7 +227,7 @@ class NECAdapter(PuertoNEC):
         )
 
         # ======================================================
-        # ENTRADA CORRECTA PARA ORQUESTADOR NEC
+        # ENTRADA PARA ORQUESTADOR NEC
         # ======================================================
 
         entrada_nec = {
@@ -136,9 +262,16 @@ class NECAdapter(PuertoNEC):
         return ejecutar_nec(entrada_nec, sizing, strings)
 
 
+# ==========================================================
+# ADAPTADOR: FINANZAS
+# ==========================================================
+
 class FinanzasAdapter(PuertoFinanzas):
 
     def ejecutar(self, datos, sizing, energia):
+        """
+        Ejecuta el motor financiero del proyecto.
+        """
 
         return ejecutar_finanzas(
             datos=datos,
@@ -148,11 +281,16 @@ class FinanzasAdapter(PuertoFinanzas):
 
 
 # ==========================================================
-# FACTORY
+# FACTORY DE DEPENDENCIAS
 # ==========================================================
 
-
 def construir_dependencias() -> DependenciasEstudio:
+    """
+    Construye la estructura completa de dependencias del estudio.
+
+    Esta función es utilizada por el orquestador principal
+    del sistema FV para inyectar los motores de cada dominio.
+    """
 
     return DependenciasEstudio(
         sizing=SizingAdapter(),
