@@ -165,7 +165,6 @@ def _armar_resumen_dc(strings, sizing: ResultadoSizing):
 # ==========================================================
 # ORQUESTADOR NEC
 # ==========================================================
-
 def ejecutar_nec(
     p,
     sizing: ResultadoSizing,
@@ -248,14 +247,23 @@ def ejecutar_nec(
     ee["circuitos_mppt"] = circuitos_mppt
 
     # ------------------------------------------------------
-    # ENTRADA PARA PAQUETE NEC (CORREGIDO)
+    # ENTRADA PARA PAQUETE NEC (FORMATO CORRECTO)
     # ------------------------------------------------------
 
     lista = _lista_strings(strings)
 
     entrada_nec = {
 
-        "strings": lista,
+        "strings": {
+            "corrientes_input": {
+                "i_operacion_a": corr_string["i_nominal"],
+                "isc_a": corr_string["i_nominal"] * 1.05
+            }
+        },
+
+        "n_strings": len(lista),
+
+        "isc_mod_a": corr_string["i_nominal"] * 1.05,
 
         "potencia_dc_w": dc["potencia_dc_w"],
         "potencia_ac_w": potencia_ac,
