@@ -1,332 +1,299 @@
+from __future__ import annotations
+
 """
-PASO 3 — SISTEMA FOTOVOLTAICO
+PASO 3 — CONFIGURACIÓN DEL SISTEMA FV
 FV Engine
 
-Este módulo implementa el tercer paso del wizard de la interfaz
-de usuario.
+CAPA
+----
+UI / Presentation Layer
 
-OBJETIVO
+FRONTERA
 --------
-Capturar los parámetros técnicos del sistema FV propuesto
-que serán utilizados posteriormente por el motor del sistema
-para realizar:
+Este módulo interactúa únicamente con:
 
-    dimensionamiento del sistema
-    cálculo energético
-    ingeniería eléctrica
-    análisis financiero
+    WizardCtx (estado del wizard)
 
-Este módulo pertenece a la capa:
+y produce:
 
-    UI / Presentation Layer
+    ctx.sistema_fv
 
+No ejecuta cálculos técnicos.
 
-------------------------------------------------------------
-FRONTERA DEL MÓDULO
-------------------------------------------------------------
-
-Entrada:
-
-    WizardCtx (estado global del wizard)
-
-Salida:
-
-    ctx.sistema_fv actualizado
-
-
-------------------------------------------------------------
-DEPENDENCIAS PERMITIDAS
-------------------------------------------------------------
-
-streamlit
-ui.state_helpers
-
-
-------------------------------------------------------------
-DEPENDENCIAS PROHIBIDAS
-------------------------------------------------------------
-
-Este módulo NO puede importar:
-
-    electrical.*
-    paneles.*
-    energia.*
-    nec.*
-    finanzas.*
-
-La UI no ejecuta cálculos técnicos.
-
-
-------------------------------------------------------------
-RESPONSABILIDADES DEL MÓDULO
-------------------------------------------------------------
-
-Este módulo se encarga de:
-
-    1. Definir modo de dimensionamiento del sistema
-    2. Capturar parámetros geométricos del arreglo FV
-    3. Capturar condiciones de instalación
-    4. Guardar configuración en ctx.sistema_fv
-    5. Validar coherencia básica de los parámetros
-
-
-------------------------------------------------------------
-NO ES RESPONSABLE DE
-------------------------------------------------------------
-
-    cálculo de producción energética
-    cálculo de strings
-    cálculo eléctrico NEC
-    cálculo financiero
-    simulación solar
-
-Estos cálculos pertenecen al motor FV.
-
-
-------------------------------------------------------------
-ENTRADA DEL MÓDULO
-------------------------------------------------------------
-
+ENTRADAS
+--------
 ctx : WizardCtx
 
-El módulo utiliza principalmente:
+Variables utilizadas:
 
     ctx.sistema_fv
 
 
-------------------------------------------------------------
-ESTRUCTURA DE ctx.sistema_fv
-------------------------------------------------------------
+SALIDAS
+-------
+ctx.sistema_fv actualizado con parámetros del sistema FV.
+
+
+ESTRUCTURA DE SALIDA
+--------------------
 
 ctx.sistema_fv = {
 
-    # modo de dimensionamiento
     "modo_dimensionado": str
         auto | manual
 
     "n_paneles_manual": int
 
-    # geometría
-    "inclinacion_deg": float
-    "azimut_deg": float
-
     "tipo_superficie": str
-        "Un plano"
-        "Techo dos aguas"
 
+    "azimut_deg": float
     "azimut_a_deg": float
     "azimut_b_deg": float
 
+    "inclinacion_deg": float
+
     "reparto_pct_a": float
 
-    # condiciones del sistema
     "sombras_pct": float
     "perdidas_sistema_pct": float
+
 }
 
+RESPONSABILIDAD
+---------------
 
-------------------------------------------------------------
-VARIABLES INTERNAS IMPORTANTES
-------------------------------------------------------------
+Capturar parámetros técnicos del arreglo FV:
 
-sf : dict
+    geometría
+    orientación
+    pérdidas
+    modo de dimensionamiento
 
-Diccionario local que referencia:
-
-    ctx.sistema_fv
-
-
-_defaults_sistema_fv()
-
-Define los valores iniciales del sistema FV.
-
-
-------------------------------------------------------------
-FUNCIONES DEL MÓDULO
-------------------------------------------------------------
-
-
-render(ctx)
-
-Función principal del paso del wizard.
-
-Responsabilidades:
-
-    - cargar defaults
-    - mostrar modo de dimensionamiento
-    - capturar geometría del sistema FV
-    - capturar condiciones de instalación
-
-Entrada:
-
-    ctx : WizardCtx
-
-Salida:
-
-    ctx.sistema_fv actualizado
-
-
-------------------------------------------------------------
-
-
-_render_modo_dimensionado(sf)
-
-Captura el modo de dimensionamiento del sistema FV.
-
-Opciones:
-
-    Automático
-    Manual (definir número de paneles)
-
-
-Entrada:
-
-    sf : dict
-
-
-Salida:
-
-    sf actualizado
-
-
-------------------------------------------------------------
-
-
-_render_geometria(sf)
-
-Captura la geometría del sistema fotovoltaico.
-
-Opciones de superficie:
-
-    plano único
-    techo dos aguas
-
-Parámetros capturados:
-
-    inclinación
-    azimut
-    reparto de paneles
-
-
-Entrada:
-
-    sf : dict
-
-
-Salida:
-
-    sf actualizado
-
-
-------------------------------------------------------------
-
-
-_render_condiciones(sf)
-
-Captura condiciones de operación del sistema.
-
-Parámetros:
-
-    sombras
-    pérdidas del sistema
-
-
-Entrada:
-
-    sf : dict
-
-
-Salida:
-
-    sf actualizado
-
-
-------------------------------------------------------------
-
-
-validar(ctx)
-
-Realiza validaciones básicas de coherencia.
-
-Validaciones:
-
-    inclinación válida
-    número de paneles válido (modo manual)
-
-
-Entrada:
-
-    ctx : WizardCtx
-
-
-Salida:
-
-    (bool, list[str])
-
-    bool        → paso válido
-    list[str]   → lista de errores
-
-
-------------------------------------------------------------
-SALIDA DEL MÓDULO
-------------------------------------------------------------
-
-El módulo actualiza:
-
-    ctx.sistema_fv
-
-
-Ejemplo:
-
-ctx.sistema_fv = {
-
-    "modo_dimensionado": "auto",
-
-    "inclinacion_deg": 15,
-    "azimut_deg": 180,
-
-    "tipo_superficie": "Un plano (suelo/losa/estructura)",
-
-    "sombras_pct": 5.0,
-    "perdidas_sistema_pct": 15.0
-}
-
-
-------------------------------------------------------------
-FLUJO DENTRO DEL WIZARD
-------------------------------------------------------------
-
-Paso 1
-
-    datos_cliente
-
-        ↓
-
-Paso 2
-
-    consumo_energetico
-
-        ↓
-
-Paso 3
-
-    sistema_fv
-
-        ↓
-
-Paso 4
-
-    selección equipos
-
-
-Los parámetros capturados en este módulo serán utilizados por:
+Estos datos serán usados por:
 
     core.orquestador_estudio
-
-para ejecutar:
-
-    dimensionamiento del sistema FV
-    cálculo energético
-    ingeniería eléctrica
-    análisis financiero
 """
+
+from typing import Any, Dict, List, Tuple
+import streamlit as st
+
+from ui.state_helpers import ensure_dict, merge_defaults
+
+
+# ==========================================================
+# VARIABLES DEL MÓDULO
+# ==========================================================
+
+# defaults del sistema FV
+def _defaults_sistema_fv() -> Dict[str, Any]:
+
+    return {
+
+        "modo_dimensionado": "auto",
+
+        "n_paneles_manual": 10,
+
+        "inclinacion_deg": 15,
+
+        "azimut_deg": 180,
+
+        "tipo_superficie": "Un plano (suelo/losa/estructura)",
+
+        "azimut_a_deg": 90,
+        "azimut_b_deg": 270,
+
+        "reparto_pct_a": 50.0,
+
+        "sombras_pct": 0.0,
+
+        "perdidas_sistema_pct": 15.0,
+    }
+
+
+# ==========================================================
+# UTILIDADES
+# ==========================================================
+
+def _asegurar_dict(ctx, nombre: str) -> Dict[str, Any]:
+
+    return ensure_dict(ctx, nombre, dict)
+
+
+def _get_sf(ctx) -> Dict[str, Any]:
+
+    sf = _asegurar_dict(ctx, "sistema_fv")
+
+    merge_defaults(sf, _defaults_sistema_fv())
+
+    return sf
+
+
+# ==========================================================
+# SUBSECCIÓN — MODO DE DIMENSIONAMIENTO
+# ==========================================================
+
+def _render_modo_dimensionado(sf: Dict[str, Any]) -> None:
+
+    st.markdown("#### Dimensionamiento del sistema")
+
+    modo = st.radio(
+        "Seleccione modo de dimensionamiento",
+        options=[
+            "Automático (por cobertura)",
+            "Manual (definir cantidad de paneles)"
+        ],
+        index=0 if sf.get("modo_dimensionado") != "manual" else 1,
+    )
+
+    sf["modo_dimensionado"] = "manual" if "Manual" in modo else "auto"
+
+    if sf["modo_dimensionado"] == "manual":
+
+        sf["n_paneles_manual"] = st.number_input(
+            "Cantidad de paneles",
+            min_value=1,
+            max_value=1000,
+            step=1,
+            value=int(sf.get("n_paneles_manual", 10)),
+        )
+
+
+# ==========================================================
+# SUBSECCIÓN — GEOMETRÍA DEL ARREGLO
+# ==========================================================
+
+def _render_geometria(sf: Dict[str, Any]) -> None:
+
+    st.markdown("#### Geometría del arreglo")
+
+    sf["tipo_superficie"] = st.selectbox(
+
+        "Tipo de superficie",
+
+        options=[
+            "Un plano (suelo/losa/estructura)",
+            "Techo dos aguas"
+        ],
+    )
+
+    if sf["tipo_superficie"] == "Techo dos aguas":
+
+        st.caption("Agua A")
+
+        sf["azimut_a_deg"] = st.number_input(
+            "Azimut agua A (°)",
+            min_value=0,
+            max_value=360,
+            value=int(sf.get("azimut_a_deg", 90)),
+        )
+
+        st.caption("Agua B")
+
+        sf["azimut_b_deg"] = st.number_input(
+            "Azimut agua B (°)",
+            min_value=0,
+            max_value=360,
+            value=int(sf.get("azimut_b_deg", 270)),
+        )
+
+        sf["reparto_pct_a"] = st.number_input(
+            "Reparto paneles agua A (%)",
+            min_value=0.0,
+            max_value=100.0,
+            value=float(sf.get("reparto_pct_a", 50.0)),
+        )
+
+    else:
+
+        sf["azimut_deg"] = st.number_input(
+            "Azimut (°)",
+            min_value=0,
+            max_value=360,
+            value=int(sf.get("azimut_deg", 180)),
+        )
+
+    sf["inclinacion_deg"] = st.number_input(
+        "Inclinación (°)",
+        min_value=0,
+        max_value=45,
+        value=int(sf.get("inclinacion_deg", 15)),
+    )
+
+
+# ==========================================================
+# SUBSECCIÓN — CONDICIONES DEL SISTEMA
+# ==========================================================
+
+def _render_condiciones(sf: Dict[str, Any]) -> None:
+
+    st.markdown("#### Condiciones de instalación")
+
+    sf["sombras_pct"] = st.number_input(
+        "Sombras (%)",
+        min_value=0.0,
+        max_value=30.0,
+        value=float(sf.get("sombras_pct", 0.0)),
+    )
+
+    sf["perdidas_sistema_pct"] = st.number_input(
+        "Pérdidas del sistema (%)",
+        min_value=5.0,
+        max_value=30.0,
+        value=float(sf.get("perdidas_sistema_pct", 15.0)),
+    )
+
+
+# ==========================================================
+# API DEL PASO (WIZARD)
+# ==========================================================
+
+def render(ctx) -> None:
+    """
+    Renderiza el paso del wizard.
+
+    Entrada
+    -------
+    ctx : WizardCtx
+
+    Salida
+    ------
+    ctx.sistema_fv actualizado
+    """
+
+    st.markdown("### Sistema Fotovoltaico")
+
+    sf = _get_sf(ctx)
+
+    _render_modo_dimensionado(sf)
+
+    _render_geometria(sf)
+
+    _render_condiciones(sf)
+
+    ctx.sistema_fv = sf
+
+
+# ==========================================================
+# VALIDACIÓN DEL PASO
+# ==========================================================
+
+def validar(ctx) -> Tuple[bool, List[str]]:
+    """
+    Valida coherencia de los parámetros del sistema FV.
+    """
+
+    sf = _get_sf(ctx)
+
+    errores: List[str] = []
+
+    if int(sf.get("inclinacion_deg", 0)) < 0:
+
+        errores.append("Inclinación inválida.")
+
+    if sf.get("modo_dimensionado") == "manual":
+
+        if int(sf.get("n_paneles_manual", 0)) <= 0:
+
+            errores.append("Debe definir una cantidad válida de paneles.")
+
+    return (len(errores) == 0), errores
