@@ -92,12 +92,21 @@ def obtener_configuracion_strings(resultado):
 # Obtener corrientes del sistema FV
 # ==========================================================
 
+# ==========================================================
+# Obtener corrientes del sistema FV
+# ==========================================================
+
 def obtener_corrientes(resultado):
 
-    corr = resultado.get("nec", {}).get("corrientes", {})
+    nec = resultado.get("nec", {})
+    paq = nec.get("paq", {})
+    corr = paq.get("corrientes", {})
+    corr_raw = paq.get("corrientes_raw", {})
 
-    panel = corr.get("panel", {}).get("i_nominal", 0)
+    # panel viene de corrientes_raw
+    panel = corr_raw.get("panel", {}).get("i_operacion_a", 0)
 
+    # los demás vienen de corrientes
     string = corr.get("string", {}).get("i_nominal", 0)
 
     mppt = corr.get("mppt", {}).get("i_nominal", 0)
