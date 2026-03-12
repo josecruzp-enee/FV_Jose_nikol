@@ -238,10 +238,18 @@ def calcular_strings_fv(
     errores: List[str] = []
     warnings: List[str] = []
 
+    # ----------------------------------------------------------
+    # VALIDACIÓN BÁSICA
+    # ----------------------------------------------------------
+
     if n_paneles_total <= 0:
         return _resultado_error("n_paneles_total inválido")
 
     t_oper = t_oper_c if t_oper_c is not None else 55.0
+
+    # ----------------------------------------------------------
+    # CÁLCULO DE LÍMITES ELÉCTRICOS
+    # ----------------------------------------------------------
 
     n_min, n_max, voc_frio_panel, vmp_hot_panel = _bounds_por_voltaje(
         panel,
@@ -253,6 +261,10 @@ def calcular_strings_fv(
     if n_max < n_min:
         return _resultado_error("No existe número válido de módulos en serie")
 
+    # ----------------------------------------------------------
+    # SELECCIÓN DE SERIES
+    # ----------------------------------------------------------
+
     n_series = _seleccionar_n_series(
         n_min,
         n_max,
@@ -263,9 +275,9 @@ def calcular_strings_fv(
     if not n_series or n_series <= 0:
         return _resultado_error("Serie inválida calculada")
 
-    # ------------------------------------------------------
-    # CALCULO DE STRINGS
-    # ------------------------------------------------------
+    # ----------------------------------------------------------
+    # CÁLCULO DE STRINGS
+    # ----------------------------------------------------------
 
     n_strings_total = n_paneles_total // n_series
 
@@ -279,10 +291,18 @@ def calcular_strings_fv(
             f"{resto} panel(es) no utilizados por configuración de strings"
         )
 
+    # ----------------------------------------------------------
+    # DISTRIBUCIÓN ENTRE MPPT
+    # ----------------------------------------------------------
+
     ramas = _split_por_mppt(
         n_strings_total,
         inversor
     )
+
+    # ----------------------------------------------------------
+    # GENERACIÓN DE STRINGS
+    # ----------------------------------------------------------
 
     strings = _generar_strings(
         ramas,
@@ -292,41 +312,59 @@ def calcular_strings_fv(
         vmp_hot_panel
     )
 
-    # ------------------------------------------------------
-    # PARAMETROS ELECTRICOS DEL ARRAY
-    # ------------------------------------------------------
+    # ----------------------------------------------------------
+    # VOLTAJES DEL STRING
+    # ----------------------------------------------------------
 
-    vmp_string = vmp_hot_panel * n_series
-    voc_string = voc_frio_panel * n_series
+    vmp_string = float(vmp_hot_panel * n_series)
+    voc_string = float(voc_frio_panel * n_series)
 
-    imp_array = panel.imp_a * n_strings_total
-    isc_array_total = panel.isc_a * n_strings_total
+    # ----------------------------------------------------------
+    # CORRIENTES DEL ARRAY
+    # ----------------------------------------------------------
 
-    return {
+    imp_array = float(panel.imp_a * n_strings_total)
+    isc_array_total = float(panel.isc_a * n_strings_total)
+
+    # ----------------------------------------------------------
+    # RESULTADO FINAL
+    # ----------------------------------------------------------
+
+    resultado = {
+
         "ok": True,
+
         "errores": errores,
+
         "warnings": warnings,
+
         "strings": strings,
 
         "recomendacion": {
+
             "n_series": n_series,
             "n_strings_total": n_strings_total,
-            "vmp_string_v": float(vmp_string),
-            "voc_string_v": float(voc_string),
-            "imp_array_a": float(imp_array),
-            "isc_array_total_a": float(isc_array_total),
+
+            "vmp_string_v": vmp_string,
+            "voc_string_v": voc_string,
+
+            "imp_array_a": imp_array,
+            "isc_array_total_a": isc_array_total,
         },
 
         "bounds": {
+
             "n_min": n_min,
             "n_max": n_max
         },
 
         "meta": {
+
             "n_paneles_total": n_paneles_total
         }
     }
 
+    return resultado
 
 # ==========================================================
 # SALIDAS DEL MODULO
