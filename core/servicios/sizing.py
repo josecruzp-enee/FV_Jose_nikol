@@ -41,7 +41,7 @@ from electrical.inversor.orquestador_inversor import (
     ejecutar_inversor_desde_sizing,
 )
 
-from electrical.paneles.dimensionado_paneles import calcular_panel_sizing
+from electrical.paneles.dimensionado_paneles import dimensionar_paneles
 
 
 # ==========================================================
