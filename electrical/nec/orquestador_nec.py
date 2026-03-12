@@ -54,7 +54,7 @@ def _calcular_corrientes_string(strings):
     lista = _lista_strings(strings)
 
     if not lista:
-        return {"i_nominal": 0, "i_diseno": 0}
+        return {"i_nominal": 0, "i_diseno": 0, "isc": 0}
 
     s0 = lista[0]
 
@@ -70,7 +70,8 @@ def _calcular_corrientes_string(strings):
 
     return {
         "i_nominal": i_nom,
-        "i_diseno": i_dis
+        "i_diseno": i_dis,
+        "isc": isc
     }
 
 
@@ -85,6 +86,7 @@ def _generar_circuitos_mppt(strings, sizing: ResultadoSizing):
     strings_totales = len(lista)
 
     if lista:
+
         s0 = lista[0]
 
         if isinstance(s0, dict):
@@ -165,6 +167,7 @@ def _armar_resumen_dc(strings, sizing: ResultadoSizing):
 # ==========================================================
 # ORQUESTADOR NEC
 # ==========================================================
+
 def ejecutar_nec(
     p,
     sizing: ResultadoSizing,
@@ -219,7 +222,10 @@ def ejecutar_nec(
 
     ee["corrientes"] = {
 
-        "string": corr_string,
+        "string": {
+            "i_nominal": corr_string["i_nominal"],
+            "i_diseno": corr_string["i_diseno"]
+        },
 
         "mppt": {
             "i_nominal": i_mppt_nom,
@@ -247,23 +253,17 @@ def ejecutar_nec(
     ee["circuitos_mppt"] = circuitos_mppt
 
     # ------------------------------------------------------
-    # ENTRADA PARA PAQUETE NEC (FORMATO CORRECTO)
+    # ENTRADA PARA PAQUETE NEC
     # ------------------------------------------------------
 
     lista = _lista_strings(strings)
 
     entrada_nec = {
 
-        "strings": {
-            "corrientes_input": {
-                "i_operacion_a": corr_string["i_nominal"],
-                "isc_a": corr_string["i_nominal"] * 1.05
-            }
-        },
-
         "n_strings": len(lista),
 
-        "isc_mod_a": corr_string["i_nominal"] * 1.05,
+        "imp_string_a": corr_string["i_nominal"],
+        "isc_string_a": corr_string["isc"],
 
         "potencia_dc_w": dc["potencia_dc_w"],
         "potencia_ac_w": potencia_ac,
