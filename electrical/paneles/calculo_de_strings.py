@@ -118,35 +118,6 @@ def _seleccionar_n_series(
     return best_ns
 
 
-# ==========================================================
-# DISTRIBUCION DE STRINGS ENTRE MPPT
-# ==========================================================
-
-def _split_por_mppt(
-    n_strings_total: int,
-    inversor: InversorSpec
-):
-
-    n_mppt = inversor.n_mppt
-
-    base = n_strings_total // n_mppt
-    resto = n_strings_total % n_mppt
-
-    salida = []
-
-    for i in range(n_mppt):
-
-        n = base + (1 if i < resto else 0)
-
-        if n > 0:
-            salida.append(
-                {
-                    "mppt": i + 1,
-                    "n_strings": n
-                }
-            )
-
-    return salida
 
 
 # ==========================================================
