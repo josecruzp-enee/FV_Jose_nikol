@@ -28,16 +28,14 @@ from typing import Dict, List
 
 from electrical.modelos.paneles import PanelSpec
 from electrical.modelos.inversor import InversorSpec
-
+from .calculo_de_strings import calcular_strings_fv
+from .dimensionado_paneles import dimensionar_paneles
 from .entrada_panel import EntradaPaneles
 from .validacion_strings import (
     validar_panel,
     validar_inversor,
-    validar_parametros_generales,
+    validar_parametros_generales
 )
-
-from .dimensionado_paneles import dimensionar_paneles
-from .calculo_de_strings import calcular_strings_fv
 
 
 # ==========================================================
