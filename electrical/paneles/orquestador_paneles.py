@@ -1,18 +1,12 @@
 from __future__ import annotations
-
 from typing import Dict, List
 
 from electrical.modelos.paneles import PanelSpec
 from electrical.modelos.inversor import InversorSpec
 
-from .entrada_panel import EntradaPaneles
 from .calculo_de_strings import calcular_strings_fv
-from .validacion_strings import (
-    validar_inversor,
-    validar_panel,
-    validar_parametros_generales,
-)
-
+from .entrada_panel import EntradaPaneles
+from .validacion_strings import validar_inversor, validar_panel, validar_parametros_generales
 
 # ==========================================================
 # ORQUESTADOR DEL DOMINIO PANELES
