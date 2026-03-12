@@ -56,12 +56,20 @@ def _normalizar_corrientes(corrientes):
 
     def calc(v):
         try:
+            if v is None:
+                return {
+                    "i_nominal": None,
+                    "i_diseno": None
+                }
+
             v = float(v)
+
             return {
                 "i_nominal": v,
                 "i_diseno": v * 1.25
             }
-        except:
+
+        except Exception:
             return {
                 "i_nominal": None,
                 "i_diseno": None
@@ -138,14 +146,34 @@ def _resolver_corrientes_fv(entrada: Mapping[str, Any]):
 
     strings_data = strings_result.get("corrientes_input")
 
+    # Si no llegaron datos desde strings
     if not strings_data:
-        raise ValueError("No llegaron datos corrientes_input desde strings")
 
-    return calcular_corrientes(
-        strings=strings_data,
-        inv=inversor_data,
-        cfg_tecnicos={}
-    )
+        return {
+            "panel": {"i_operacion_a": None},
+            "string": {"i_operacion_a": None},
+            "mppt": {"i_operacion_a": None},
+            "dc_total": {"i_operacion_a": None},
+            "ac": {"i_operacion_a": None},
+        }
+
+    try:
+
+        return calcular_corrientes(
+            strings=strings_data,
+            inv=inversor_data,
+            cfg_tecnicos={}
+        )
+
+    except Exception:
+
+        return {
+            "panel": {"i_operacion_a": None},
+            "string": {"i_operacion_a": None},
+            "mppt": {"i_operacion_a": None},
+            "dc_total": {"i_operacion_a": None},
+            "ac": {"i_operacion_a": None},
+        }
 
 
 # ==========================================================
@@ -178,7 +206,7 @@ def _resolver_protecciones(entrada, ac):
 
 
 # ==========================================================
-# CONDUCTORES (CORREGIDO)
+# CONDUCTORES
 # ==========================================================
 
 def _resolver_conductores(entrada, dc, ac, corrientes):
@@ -289,11 +317,11 @@ def armar_paquete_nec(entrada: Mapping[str, Any]) -> Dict[str, Any]:
     except Exception as e:
 
         corrientes = {
-            "panel": {"i_operacion_a": 0},
-            "string": {"i_operacion_a": 0},
-            "mppt": {"i_operacion_a": 0},
-            "dc_total": {"i_operacion_a": 0},
-            "ac": {"i_operacion_a": 0},
+            "panel": {"i_operacion_a": None},
+            "string": {"i_operacion_a": None},
+            "mppt": {"i_operacion_a": None},
+            "dc_total": {"i_operacion_a": None},
+            "ac": {"i_operacion_a": None},
         }
 
         warnings.append(f"Corrientes error: {e}")
