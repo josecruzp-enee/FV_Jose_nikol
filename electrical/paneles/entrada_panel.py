@@ -1,144 +1,118 @@
-"""
-Entrada del dominio paneles.
-
-Normaliza payload proveniente de UI/API y construye el objeto
-EntradaPaneles que será consumido por el orquestador del dominio.
-
-Este módulo NO realiza cálculos eléctricos.
-"""
-
 from __future__ import annotations
-
-from dataclasses import dataclass
-from typing import Optional
+from typing import Dict, List
 
 from electrical.modelos.paneles import PanelSpec
 from electrical.modelos.inversor import InversorSpec
 
+from .calculo_de_strings import calcular_strings_fv
+from .entrada_panel import EntradaPaneles
+from .validacion_strings import validar_inversor, validar_panel, validar_parametros_generales
 
 # ==========================================================
-# CONTRATO DE ENTRADA
+# ORQUESTADOR DEL DOMINIO PANELES
 # ==========================================================
 
-@dataclass(frozen=True)
-class EntradaPaneles:
+def ejecutar_paneles(
+    entrada: EntradaPaneles
+) -> Dict:
 
-    panel: PanelSpec
-    inversor: InversorSpec
+    errores: List[str] = []
+    warnings: List[str] = []
 
-    n_paneles_total: Optional[int]
+    panel: PanelSpec = entrada.panel
+    inversor: InversorSpec = entrada.inversor
 
-    t_min_c: float
-    t_oper_c: Optional[float]
+    n_paneles_total = entrada.n_paneles_total
 
-    dos_aguas: bool
+    if n_paneles_total is None or n_paneles_total <= 0:
+        return {
+            "ok": False,
+            "errores": ["n_paneles_total inválido"],
+            "warnings": []
+        }
 
-    objetivo_dc_ac: Optional[float]
-    pdc_kw_objetivo: Optional[float]
+    # ------------------------------------------------------
+    # VALIDACIONES
+    # ------------------------------------------------------
 
+    e, w = validar_panel(panel)
+    errores += e
+    warnings += w
 
-# ==========================================================
-# HELPERS DE NORMALIZACIÓN
-# ==========================================================
+    e, w = validar_inversor(inversor)
+    errores += e
+    warnings += w
 
-def _f(x, default: float = 0.0) -> float:
-    """Convierte cualquier valor a float seguro."""
-    try:
-        return float(x)
-    except (TypeError, ValueError):
-        return float(default)
+    e, w = validar_parametros_generales(
+        n_paneles_total,
+        entrada.t_min_c,
+        entrada.t_oper_c
+    )
 
+    errores += e
+    warnings += w
 
-def _i(x, default: int = 0) -> int:
-    """Convierte cualquier valor a entero seguro."""
-    try:
-        return int(x)
-    except (TypeError, ValueError):
-        return int(default)
+    if errores:
 
+        return {
+            "ok": False,
+            "errores": errores,
+            "warnings": warnings
+        }
 
-def _clamp(x: float, lo: float, hi: float) -> float:
-    """Limita un valor float a un rango."""
-    return max(lo, min(hi, float(x)))
+    # ------------------------------------------------------
+    # CALCULO STRINGS
+    # ------------------------------------------------------
 
+    resultado = calcular_strings_fv(
 
-# ==========================================================
-# CONSTRUCTOR DE ENTRADA
-# ==========================================================
-
-def build_entrada_paneles(
-    *,
-    panel: PanelSpec,
-    inversor: InversorSpec,
-    n_paneles_total: Optional[int] = None,
-    t_min_c: float,
-    dos_aguas: bool,
-    objetivo_dc_ac: Optional[float] = 1.2,
-    pdc_kw_objetivo: Optional[float] = None,
-    t_oper_c: Optional[float] = 55.0,
-) -> EntradaPaneles:
-    """
-    Construye EntradaPaneles normalizando inputs provenientes de UI/API.
-    """
-
-    # Número de paneles
-    n_total = _i(n_paneles_total) if n_paneles_total is not None else None
-    if n_total is not None and n_total <= 0:
-        n_total = None
-
-    # Temperatura mínima ambiente
-    tmin = _clamp(_f(t_min_c, 0.0), -40.0, 40.0)
-
-    # Temperatura operación módulo
-    toper = _f(t_oper_c, 55.0) if t_oper_c is not None else None
-    if toper is not None:
-        toper = _clamp(toper, 25.0, 85.0)
-
-    # Objetivo DC/AC
-    odc = _f(objetivo_dc_ac, 1.2) if objetivo_dc_ac is not None else None
-    if odc is not None:
-        odc = _clamp(odc, 0.8, 1.6)
-
-    # Potencia DC objetivo
-    pdc_obj = _f(pdc_kw_objetivo, 0.0) if pdc_kw_objetivo is not None else None
-    if pdc_obj is not None and pdc_obj <= 0:
-        pdc_obj = None
-
-    return EntradaPaneles(
+        n_paneles_total=n_paneles_total,
         panel=panel,
         inversor=inversor,
-        n_paneles_total=n_total,
-        t_min_c=tmin,
-        t_oper_c=toper,
-        dos_aguas=bool(dos_aguas),
-        objetivo_dc_ac=odc,
-        pdc_kw_objetivo=pdc_obj,
+        t_min_c=float(entrada.t_min_c),
+        dos_aguas=bool(entrada.dos_aguas),
+        objetivo_dc_ac=entrada.objetivo_dc_ac,
+        pdc_kw_objetivo=entrada.pdc_kw_objetivo,
+        t_oper_c=entrada.t_oper_c,
     )
+
+    resultado.setdefault("ok", False)
+    resultado.setdefault("errores", [])
+    resultado.setdefault("warnings", [])
+
+    return resultado
 
 
 # ==========================================================
 # SALIDAS DEL ARCHIVO
 # ==========================================================
 #
-# build_entrada_paneles(...)
+# ejecutar_paneles(entrada: EntradaPaneles)
 #
 # devuelve:
 #
-# EntradaPaneles
+# ok : bool
+# errores : list[str]
+# warnings : list[str]
 #
-# Campos:
+# strings : list
 #
-# panel : PanelSpec
-# inversor : InversorSpec
-# n_paneles_total : Optional[int]
-# t_min_c : float
-# t_oper_c : Optional[float]
-# dos_aguas : bool
-# objetivo_dc_ac : Optional[float]
-# pdc_kw_objetivo : Optional[float]
+# recomendacion:
+#   n_series
+#   n_strings_total
+#   vmp_string_v
+#   voc_string_v
+#   imp_array_a
+#   isc_array_total_a
 #
-# Este objeto es consumido por:
+# bounds:
+#   n_min
+#   n_max
 #
-# electrical.paneles.orquestador_paneles
+# meta:
+#   n_paneles_total
+#
+# Consumido por:
+# core
 #
 # ==========================================================
