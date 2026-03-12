@@ -212,8 +212,10 @@ def _mostrar_nec(nec):
         st.info("Sin resultados NEC.")
         return
 
-    paq = nec.get("paq", {})
+    paq = nec   # ← AQUÍ está la corrección
+
     st.write("DEBUG PAQ:", paq)
+
     dc = paq.get("dc", {})
     ac = paq.get("ac", {})
     ocpd = paq.get("ocpd", {})
