@@ -54,16 +54,23 @@ def _calcular_corrientes_string(strings):
     lista = _lista_strings(strings)
 
     if not lista:
-        return {"i_nominal": 0, "i_diseno": 0, "isc": 0}
+        return {
+            "i_nominal": 0,
+            "i_diseno": 0,
+            "isc": 0
+        }
 
     s0 = lista[0]
 
     if isinstance(s0, dict):
-        imp = s0.get("imp_a", 0)
-        isc = s0.get("isc_a", 0)
+
+        imp = s0.get("imp_string_a", 0)
+        isc = s0.get("isc_string_a", 0)
+
     else:
-        imp = getattr(s0, "imp_a", 0)
-        isc = getattr(s0, "isc_a", 0)
+
+        imp = getattr(s0, "imp_string_a", 0)
+        isc = getattr(s0, "isc_string_a", 0)
 
     i_nom = imp
     i_dis = isc * 1.25
