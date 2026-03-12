@@ -114,7 +114,7 @@ def ejecutar_nec(
 
         mppts = int(s0.get("mppt", 2))
 
-        circuitos_mppt = crear_circuitos_mppt(
+        circuitos_mppt = generar_circuitos_dc(
             strings_totales=n_strings,
             mppts=mppts,
             imp=imp,
