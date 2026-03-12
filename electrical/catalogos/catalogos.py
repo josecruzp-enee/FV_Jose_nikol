@@ -1,18 +1,64 @@
 from __future__ import annotations
 
+"""
+Gateway catálogo → motor eléctrico.
+
+FRONTERA DEL MÓDULO
+===================
+
+Entradas:
+    - data/paneles.yaml
+    - data/inversores.yaml
+    - catálogo base embebido (fallback)
+
+Salidas:
+    - PanelSpec
+    - InversorSpec
+
+API pública del catálogo:
+    get_panel(id)
+    get_inversor(id)
+
+    ids_paneles()
+    ids_inversores()
+
+    catalogo_paneles()      ← para UI
+    catalogo_inversores()   ← para UI
+
+Consumido por:
+    core.servicios.sizing
+    electrical.paneles
+    electrical.inversor
+
+Este módulo:
+    ✔ carga YAML
+    ✔ valida catálogo
+    ✔ construye modelos
+
+Este módulo NO:
+    ✘ hace cálculos eléctricos
+    ✘ calcula strings
+    ✘ calcula corrientes
+"""
+
 from pathlib import Path
 from typing import Dict, List
 
 from electrical.modelos.paneles import PanelSpec as Panel
 from electrical.modelos.inversor import InversorSpec as Inversor
-from .catalogos_yaml import cargar_paneles_yaml, cargar_inversores_yaml
+
+from .catalogos_yaml import (
+    cargar_paneles_yaml,
+    cargar_inversores_yaml,
+)
 
 
 # ==========================================================
-# Catálogo base (hardcoded) — opcional
+# Catálogo base (fallback)
 # ==========================================================
 
 _PANELES: Dict[str, Panel] = {
+
     "panel_550w": Panel(
         pmax_w=550.0,
         vmp_v=41.5,
@@ -21,11 +67,13 @@ _PANELES: Dict[str, Panel] = {
         isc_a=14.10,
         coef_voc_pct_c=-0.28,
         coef_vmp_pct_c=-0.34,
-    ),
+    )
+
 }
 
 
 _INVERSORES: Dict[str, Inversor] = {
+
     "inv_5kw_2mppt": Inversor(
         kw_ac=5.0,
         n_mppt=2,
@@ -33,11 +81,13 @@ _INVERSORES: Dict[str, Inversor] = {
         mppt_max_v=480.0,
         vdc_max_v=550.0,
         imppt_max_a=15.0,
-    ),
+    )
+
 }
 
 
 _DATA_DIR = Path("data")
+
 _YAML_PANELES = _DATA_DIR / "paneles.yaml"
 _YAML_INVERSORES = _DATA_DIR / "inversores.yaml"
 
@@ -67,10 +117,13 @@ def _merge_inversores() -> Dict[str, Inversor]:
 
 
 # ==========================================================
-# API pública (fuente de verdad)
+# API pública (motor eléctrico)
 # ==========================================================
 
 def get_panel(panel_id: str) -> Panel:
+    """
+    Devuelve PanelSpec del catálogo.
+    """
 
     paneles = _merge_paneles()
 
@@ -81,6 +134,9 @@ def get_panel(panel_id: str) -> Panel:
 
 
 def get_inversor(inv_id: str) -> Inversor:
+    """
+    Devuelve InversorSpec del catálogo.
+    """
 
     inversores = _merge_inversores()
 
@@ -91,20 +147,30 @@ def get_inversor(inv_id: str) -> Inversor:
 
 
 def ids_paneles() -> List[str]:
+    """
+    Lista de IDs disponibles de paneles.
+    """
     return sorted(_merge_paneles().keys())
 
 
 def ids_inversores() -> List[str]:
+    """
+    Lista de IDs disponibles de inversores.
+    """
     return sorted(_merge_inversores().keys())
 
 
 # ==========================================================
-# API para UI (listas de dicts)
+# API para UI (listas serializables)
 # ==========================================================
 
 def catalogo_paneles() -> list[dict]:
+    """
+    Catálogo serializable para UI.
+    """
 
     paneles = _merge_paneles()
+
     out: list[dict] = []
 
     for pid in sorted(paneles.keys()):
@@ -112,12 +178,15 @@ def catalogo_paneles() -> list[dict]:
         p = paneles[pid]
 
         out.append({
+
             "id": pid,
             "marca": "YAML/Base",
             "modelo": pid,
+
             "pmax_w": float(p.pmax_w),
             "vmp_v": float(p.vmp_v),
             "voc_v": float(p.voc_v),
+
             "imp_a": float(p.imp_a),
             "isc_a": float(p.isc_a),
         })
@@ -126,8 +195,12 @@ def catalogo_paneles() -> list[dict]:
 
 
 def catalogo_inversores() -> list[dict]:
+    """
+    Catálogo serializable para UI.
+    """
 
     inversores = _merge_inversores()
+
     out: list[dict] = []
 
     for iid in sorted(inversores.keys()):
@@ -135,13 +208,17 @@ def catalogo_inversores() -> list[dict]:
         inv = inversores[iid]
 
         out.append({
+
             "id": iid,
             "marca": "YAML/Base",
             "modelo": iid,
+
             "kw_ac": float(inv.kw_ac),
             "n_mppt": int(inv.n_mppt),
+
             "mppt_min_v": float(inv.mppt_min_v),
             "mppt_max_v": float(inv.mppt_max_v),
+
             "vmax_dc_v": float(inv.vdc_max_v),
         })
 
