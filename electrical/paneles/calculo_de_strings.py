@@ -44,9 +44,7 @@ def _voc_frio(
     t_min_c: float,
     t_stc_c: float = 25.0
 ) -> float:
-    """
-    Calcula Voc del módulo en temperatura mínima.
-    """
+    """Calcula Voc del módulo en temperatura mínima."""
     return voc_stc * (1 + (coef_voc_pct_c / 100.0) * (t_min_c - t_stc_c))
 
 
@@ -56,9 +54,7 @@ def _vmp_temp(
     t_oper_c: float,
     t_stc_c: float = 25.0
 ) -> float:
-    """
-    Calcula Vmp del módulo en temperatura operativa.
-    """
+    """Calcula Vmp del módulo en temperatura operativa."""
     return vmp_stc * (1 + (coef_vmp_pct_c / 100.0) * (t_oper_c - t_stc_c))
 
 
@@ -118,6 +114,39 @@ def _seleccionar_n_series(
     return best_ns
 
 
+# ==========================================================
+# DISTRIBUCION DE STRINGS ENTRE MPPT
+# ==========================================================
+
+def _split_por_mppt(
+    n_strings_total: int,
+    inversor: InversorSpec
+):
+
+    n_mppt = int(inversor.n_mppt)
+
+    if n_mppt <= 0:
+        raise ValueError("Inversor sin MPPT válidos")
+
+    base = n_strings_total // n_mppt
+    resto = n_strings_total % n_mppt
+
+    ramas = []
+
+    for i in range(n_mppt):
+
+        n = base + (1 if i < resto else 0)
+
+        if n > 0:
+
+            ramas.append(
+                {
+                    "mppt": i + 1,
+                    "n_strings": n
+                }
+            )
+
+    return ramas
 
 
 # ==========================================================
@@ -155,11 +184,9 @@ def _generar_strings(
                     "mppt": mppt,
                     "n_series": n_series,
 
-                    # voltajes
                     "vmp_string_v": vmp_string,
                     "voc_frio_string_v": voc_frio_string,
 
-                    # corrientes
                     "imp_string_a": imp_string,
                     "isc_string_a": isc_string,
                 }
@@ -209,17 +236,13 @@ def calcular_strings_fv(
     errores: List[str] = []
     warnings: List[str] = []
 
-    # ----------------------------------------------------------
-    # VALIDACIÓN BÁSICA
-    # ----------------------------------------------------------
-
     if n_paneles_total <= 0:
         return _resultado_error("n_paneles_total inválido")
 
     t_oper = t_oper_c if t_oper_c is not None else 55.0
 
     # ----------------------------------------------------------
-    # CÁLCULO DE LÍMITES ELÉCTRICOS
+    # LIMITES ELECTRICOS
     # ----------------------------------------------------------
 
     n_min, n_max, voc_frio_panel, vmp_hot_panel = _bounds_por_voltaje(
@@ -233,7 +256,7 @@ def calcular_strings_fv(
         return _resultado_error("No existe número válido de módulos en serie")
 
     # ----------------------------------------------------------
-    # SELECCIÓN DE SERIES
+    # SELECCION DE SERIES
     # ----------------------------------------------------------
 
     n_series = _seleccionar_n_series(
@@ -247,7 +270,7 @@ def calcular_strings_fv(
         return _resultado_error("Serie inválida calculada")
 
     # ----------------------------------------------------------
-    # CÁLCULO DE STRINGS
+    # STRINGS
     # ----------------------------------------------------------
 
     n_strings_total = n_paneles_total // n_series
@@ -263,7 +286,7 @@ def calcular_strings_fv(
         )
 
     # ----------------------------------------------------------
-    # DISTRIBUCIÓN ENTRE MPPT
+    # DISTRIBUCION MPPT
     # ----------------------------------------------------------
 
     ramas = _split_por_mppt(
@@ -272,7 +295,7 @@ def calcular_strings_fv(
     )
 
     # ----------------------------------------------------------
-    # GENERACIÓN DE STRINGS
+    # GENERACION DE STRINGS
     # ----------------------------------------------------------
 
     strings = _generar_strings(
@@ -284,24 +307,24 @@ def calcular_strings_fv(
     )
 
     # ----------------------------------------------------------
-    # VOLTAJES DEL STRING
+    # VOLTAJES
     # ----------------------------------------------------------
 
     vmp_string = float(vmp_hot_panel * n_series)
     voc_string = float(voc_frio_panel * n_series)
 
     # ----------------------------------------------------------
-    # CORRIENTES DEL ARRAY
+    # CORRIENTES ARRAY
     # ----------------------------------------------------------
 
     imp_array = float(panel.imp_a * n_strings_total)
     isc_array_total = float(panel.isc_a * n_strings_total)
 
     # ----------------------------------------------------------
-    # RESULTADO FINAL
+    # RESULTADO
     # ----------------------------------------------------------
 
-    resultado = {
+    return {
 
         "ok": True,
 
@@ -334,39 +357,3 @@ def calcular_strings_fv(
             "n_paneles_total": n_paneles_total
         }
     }
-
-    return resultado
-
-# ==========================================================
-# SALIDAS DEL MODULO
-# ==========================================================
-#
-# calcular_strings_fv(...)
-#
-# devuelve:
-#
-# ok : bool
-# errores : list[str]
-# warnings : list[str]
-#
-# strings : list[dict]
-#
-# recomendacion:
-#   n_series
-#   n_strings_total
-#   vmp_string_v
-#   voc_string_v
-#   imp_array_a
-#   isc_array_total_a
-#
-# bounds:
-#   n_min
-#   n_max
-#
-# meta:
-#   n_paneles_total
-#
-# Consumido por:
-# electrical.paneles.orquestador_paneles
-#
-# ==========================================================
