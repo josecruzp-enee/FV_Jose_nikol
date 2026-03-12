@@ -9,9 +9,11 @@ from dataclasses import dataclass
 @dataclass
 class NivelCorriente:
     """
-    Representa la corriente eléctrica en un nivel del sistema FV.
+    Corriente en un nivel eléctrico del sistema FV.
     """
+
     i_operacion_a: float
+    i_diseno_a: float
 
 
 # ==========================================================
