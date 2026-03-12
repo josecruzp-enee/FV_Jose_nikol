@@ -113,64 +113,43 @@ def _generar_strings(ramas, n_series, panel: PanelSpec, voc_frio_panel, vmp_hot_
 
     strings = []
 
+    vmp_string = float(n_series * vmp_hot_panel)
+    voc_frio_string = float(n_series * voc_frio_panel)
+
+    imp_string = float(panel.imp_a)
+    isc_string = float(panel.isc_a)
+
+    string_id = 1
+
     for r in ramas:
 
-        n_paralelo = r["n_strings"]
+        mppt = r["mppt"]
+        n_strings = r["n_strings"]
 
-        # voltajes del string
-        vmp_string = float(n_series * vmp_hot_panel)
+        for _ in range(n_strings):
 
-        voc_frio_string = float(n_series * voc_frio_panel)
+            strings.append(
+                {
+                    "id": string_id,
 
-        # corrientes
-        imp_string = float(panel.imp_a)
+                    "mppt": mppt,
 
-        isc_string = float(panel.isc_a)
+                    "n_series": n_series,
 
-        strings.append(
-            {
-                "mppt": r["mppt"],
+                    # voltajes
+                    "vmp_string_v": vmp_string,
+                    "voc_string_v": voc_frio_string,
+                    "voc_frio_string_v": voc_frio_string,
 
-                "n_series": n_series,
+                    # corrientes
+                    "imp_string_a": imp_string,
+                    "isc_string_a": isc_string,
+                }
+            )
 
-                "n_paralelo": n_paralelo,
-
-                # --------------------------------------------------
-                # VOLTAJES
-                # --------------------------------------------------
-
-                "vmp_string_v": vmp_string,
-
-                # compatibilidad legacy
-                "voc_string_v": voc_frio_string,
-
-                # nombre correcto para ingeniería
-                "voc_frio_string_v": voc_frio_string,
-
-                # --------------------------------------------------
-                # CORRIENTES STRING
-                # --------------------------------------------------
-
-                "imp_string_a": imp_string,
-
-                "isc_string_a": isc_string,
-
-                # --------------------------------------------------
-                # CORRIENTES MPPT
-                # --------------------------------------------------
-
-                "imp_mppt_a": float(imp_string * n_paralelo),
-
-                # nombre legacy (no romper app)
-                "isc_array_a": float(isc_string * n_paralelo),
-
-                # nombre correcto futuro
-                "isc_mppt_a": float(isc_string * n_paralelo),
-            }
-        )
+            string_id += 1
 
     return strings
-
 
 # ==========================================================
 # RESULTADO ERROR
