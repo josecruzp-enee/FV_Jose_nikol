@@ -293,7 +293,13 @@ def _armar_resumen(dc, ac, ocpd, conductores, warnings):
 
 def armar_paquete_nec(entrada: Mapping[str, Any]) -> Dict[str, Any]:
 
+    print("\n==============================")
+    print("ENTRADA NEC")
+    print("==============================")
+    print(entrada)
+
     warnings = []
+   
 
     dc, ac, w = _resolver_corrientes_nominales(entrada)
     warnings = _merge(warnings, w)
