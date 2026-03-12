@@ -72,17 +72,35 @@ def instrument_dependencies(deps):
 
 def construir_datos_demo():
 
-    # ejemplo mínimo de proyecto
-
     return Datosproyecto(
+
         cliente="DEBUG",
         ubicacion="TEST",
+
         consumo_12m=[500]*12,
-        tarifa_energia=5.0,
-        cargos_fijos=100
+
+        # producción base Honduras aprox
+        prod_base_kwh_kwp_mes=[
+            140,145,150,148,140,135,
+            132,134,130,128,135,138
+        ],
+
+        # factores mensuales FV
+        factores_fv_12m=[
+            1,1,1,1,1,1,1,1,1,1,1,1
+        ],
+
+        cobertura_objetivo=1.0,
+
+        # costos
+        costo_usd_kwp=900,
+
+        # financiero
+        tcambio=24.5,
+        tasa_anual=0.12,
+        plazo_anios=10,
+        porcentaje_financiado=0.7
     )
-
-
 def main():
 
     print("\n\n========== DEBUG PIPELINE FV ENGINE ==========\n")
