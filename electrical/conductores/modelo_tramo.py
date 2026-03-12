@@ -1,15 +1,31 @@
 """
-Modelo físico del tramo — FV Engine.
+Motor físico de caída de voltaje — FV Engine
 
-Responsabilidad:
-- Cálculo de caída de tensión (VD) con resistencia DC referencial.
-- Utilidades físicas sobre tablas (sin NEC, sin selección por ampacidad).
+FRONTERA DEL MÓDULO
+-------------------
+Este módulo implementa únicamente el modelo físico resistivo
+del conductor.
+
+Responsabilidades:
+    - cálculo de caída de tensión
+    - lectura de resistencia del conductor
+    - ajuste de calibre por criterio de VD
+
+NO realiza:
+    - cálculo de ampacidad NEC
+    - factores de corrección
+    - selección inicial de conductor
+
+Eso pertenece a otros módulos del dominio conductores.
 """
 
 from __future__ import annotations
+from typing import Dict, List
 
-from typing import Dict, List, Tuple
 
+# ==========================================================
+# MODELO FÍSICO DE CAÍDA DE TENSIÓN
+# ==========================================================
 
 def caida_tension_pct(
     *,
@@ -20,14 +36,28 @@ def caida_tension_pct(
     n_hilos: int = 2,
 ) -> float:
     """
-    Caída de tensión porcentual usando modelo resistivo DC simplificado:
+    Calcula caída de tensión porcentual usando modelo resistivo.
+
+    Fórmula:
 
         VD% = 100 * (I * R_total) / V
+
         R_total = r_ohm_km * (L_km) * n_hilos
 
-    Donde n_hilos representa el número de conductores en el camino de corriente
-    (por ejemplo, 2 para ida-vuelta en DC o 1Φ con retorno).
+    Parámetros
+    ----------
+    v : tensión del circuito (V)
+    i : corriente del circuito (A)
+    l_m : longitud del tramo (m)
+    r_ohm_km : resistencia del conductor (ohm/km)
+    n_hilos : número de conductores en el camino de corriente
+              (2 para ida-vuelta en DC)
+
+    Retorna
+    -------
+    float : caída de tensión en porcentaje
     """
+
     try:
         v = float(v)
         i = float(i)
@@ -40,29 +70,45 @@ def caida_tension_pct(
     if n_hilos < 1:
         n_hilos = 1
 
-    if v <= 0.0 or i <= 0.0 or l_m <= 0.0 or r_ohm_km <= 0.0:
+    if v <= 0 or i <= 0 or l_m <= 0 or r_ohm_km <= 0:
         return 0.0
 
-    r_total = r_ohm_km * (l_m / 1000.0) * float(n_hilos)
-    return 100.0 * (i * r_total) / v
+    r_total = r_ohm_km * (l_m / 1000.0) * n_hilos
+
+    vd_pct = 100.0 * (i * r_total) / v
+
+    return vd_pct
 
 
-def r_de_tabla(tab: List[Dict[str, float]], awg: str) -> float:
+# ==========================================================
+# RESISTENCIA DE CONDUCTOR DESDE TABLA
+# ==========================================================
+
+def resistencia_de_tabla(
+    tabla: List[Dict[str, float]],
+    awg: str,
+) -> float:
     """
-    Obtiene la resistencia (ohm/km) del calibre desde una tabla base.
+    Obtiene la resistencia del conductor desde la tabla base.
 
-    Si no encuentra el calibre:
-      - retorna 0.0 (para que el motor detecte inconsistencia / no se "auto-corrija").
+    Si el calibre no existe retorna 0.0.
     """
+
     a = str(awg)
-    for t in tab:
+
+    for t in tabla:
         if str(t.get("awg")) == a:
             return float(t.get("r_ohm_km", 0.0))
+
     return 0.0
 
 
-def mejorar_por_vd(
-    tab: List[Dict[str, float]],
+# ==========================================================
+# AJUSTE DE CALIBRE POR CAÍDA DE VOLTAJE
+# ==========================================================
+
+def ajustar_calibre_por_vd(
+    tabla: List[Dict[str, float]],
     *,
     awg: str,
     i_a: float,
@@ -72,10 +118,19 @@ def mejorar_por_vd(
     n_hilos: int = 2,
 ) -> str:
     """
-    Incrementa calibre dentro de la tabla hasta cumplir la VD objetivo.
-    Devuelve el AWG final (puede terminar en el máximo si no logra cumplir).
+    Incrementa el calibre del conductor hasta cumplir
+    la caída de tensión objetivo.
+
+    Parámetros
+    ----------
+    tabla : tabla de conductores ordenada por calibre
+    awg : calibre inicial
+    i_a : corriente del circuito
+    v_v : tensión del circuito
+    l_m : longitud del tramo
+    vd_obj_pct : caída de tensión máxima permitida
     """
-    a0 = str(awg)
+
     try:
         i_a = float(i_a)
         v_v = float(v_v)
@@ -83,23 +138,37 @@ def mejorar_por_vd(
         vd_obj_pct = float(vd_obj_pct)
         n_hilos = int(n_hilos)
     except Exception:
-        return a0
+        return str(awg)
 
-    # Localiza índice inicial; si no existe, arranca en el primer calibre.
-    idx0 = next((k for k, t in enumerate(tab) if str(t.get("awg")) == a0), 0)
+    awg = str(awg)
+
+    # buscar posición inicial
+    idx0 = next(
+        (k for k, t in enumerate(tabla) if str(t.get("awg")) == awg),
+        None,
+    )
+
+    if idx0 is None:
+        idx0 = 0
 
     idx = idx0
-    while idx < len(tab):
+
+    while idx < len(tabla):
+
+        r = float(tabla[idx].get("r_ohm_km", 0.0))
+
         vd = caida_tension_pct(
             v=v_v,
             i=i_a,
             l_m=l_m,
-            r_ohm_km=float(tab[idx].get("r_ohm_km", 0.0)),
+            r_ohm_km=r,
             n_hilos=n_hilos,
         )
+
         if vd <= vd_obj_pct:
-            return str(tab[idx].get("awg"))
+            return str(tabla[idx].get("awg"))
+
         idx += 1
 
-    # No cumplió ni con el máximo; devuelve el último calibre disponible.
-    return str(tab[-1].get("awg"))
+    # si no cumple ni con el mayor calibre
+    return str(tabla[-1].get("awg"))
