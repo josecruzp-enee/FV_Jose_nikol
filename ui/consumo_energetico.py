@@ -21,10 +21,13 @@ _MESES = [
 # ==========================================================
 # RENDER PRINCIPAL
 # ==========================================================
+# ==========================================================
+# RENDER PRINCIPAL (con columnas)
+# ==========================================================
 def render(ctx) -> None:
     """
-    Renderiza inputs de consumo, tarifa y cargos fijos,
-    muestra métricas y escenarios FV.
+    Renderiza inputs de consumo energético en 3 columnas,
+    actualiza ctx.consumo, muestra métricas y escenarios FV.
     """
     consumo = getattr(ctx, "consumo", {})
 
@@ -36,24 +39,35 @@ def render(ctx) -> None:
 
     st.markdown("### Consumo energético")
 
-    # Captura consumo mensual
+    # ======================================================
+    # Inputs de consumo mensual en 3 columnas
+    # ======================================================
+    n_cols = 3
+    cols = st.columns(n_cols)
+
     for i, mes in enumerate(_MESES):
-        consumo["kwh_12m"][i] = st.number_input(
-            f"Consumo {mes} (kWh)",
+        col = cols[i % n_cols]
+        consumo["kwh_12m"][i] = col.number_input(
+            f"{mes} (kWh)",
             value=consumo["kwh_12m"][i],
             min_value=0.0,
             format="%.2f",
+            key=f"kwh_{i}"
         )
 
-    # Captura cargos fijos y tarifa
-    consumo["cargos_fijos_L_mes"] = st.number_input(
+    # ======================================================
+    # Inputs de cargos y tarifa
+    # ======================================================
+    c1, c2 = st.columns(2)
+
+    consumo["cargos_fijos_L_mes"] = c1.number_input(
         "Cargos fijos L/Mes",
         value=consumo["cargos_fijos_L_mes"],
         min_value=0.0,
         format="%.2f",
     )
 
-    consumo["tarifa_energia_L_kwh"] = st.number_input(
+    consumo["tarifa_energia_L_kwh"] = c2.number_input(
         "Tarifa energía L/kWh",
         value=consumo["tarifa_energia_L_kwh"],
         min_value=0.0,
