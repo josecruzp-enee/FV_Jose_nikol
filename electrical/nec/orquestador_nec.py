@@ -20,7 +20,7 @@ NO calcula ingeniería eléctrica directamente.
 from typing import Dict, Any
 
 from core.dominio.contrato import ResultadoSizing
-from electrical.paquete_nec import armar_paquete_nec
+from electrical.ingenieria_electrica import ejecutar_ingenieria_electrica
 
 
 # ==========================================================
