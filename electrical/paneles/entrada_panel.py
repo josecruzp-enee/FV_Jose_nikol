@@ -20,8 +20,8 @@ Consumido por:
 from dataclasses import dataclass
 from typing import Optional
 
-from electrical.modelos.paneles import Paneles
-from electrical.modelos.inversor import Inversor
+from electrical.modelos.paneles import PanelSpec
+from electrical.modelos.inversor import InversorSpec
 
 
 # ==========================================================
