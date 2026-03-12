@@ -103,7 +103,7 @@ con las implementaciones concretas de los dominios.
 from core.servicios.sizing import calcular_sizing_unificado
 from core.servicios.finanzas import ejecutar_finanzas
 
-from electrical.paneles.orquestador_paneles import ejecutar_paneles_desde_sizing
+from electrical.paneles.orquestador_paneles import ejecutar_paneles
 from electrical.energia.orquestador_energia import ejecutar_motor_energia
 from electrical.energia.contrato import EnergiaInput
 from electrical.nec.orquestador_nec import ejecutar_nec
