@@ -146,35 +146,21 @@ def _resolver_corrientes_fv(entrada: Mapping[str, Any]):
 
     strings_data = strings_result.get("corrientes_input")
 
-    # Si no llegaron datos desde strings
+    n_strings = entrada.get("n_strings")
+
     if not strings_data:
+        raise ValueError("No llegaron datos corrientes_input desde strings")
 
-        return {
-            "panel": {"i_operacion_a": None},
-            "string": {"i_operacion_a": None},
-            "mppt": {"i_operacion_a": None},
-            "dc_total": {"i_operacion_a": None},
-            "ac": {"i_operacion_a": None},
+    if not n_strings:
+        raise ValueError("n_strings_total inválido para cálculo de corrientes")
+
+    return calcular_corrientes(
+        strings=strings_data,
+        inv=inversor_data,
+        cfg_tecnicos={
+            "n_strings_total": n_strings
         }
-
-    try:
-
-        return calcular_corrientes(
-            strings=strings_data,
-            inv=inversor_data,
-            cfg_tecnicos={}
-        )
-
-    except Exception:
-
-        return {
-            "panel": {"i_operacion_a": None},
-            "string": {"i_operacion_a": None},
-            "mppt": {"i_operacion_a": None},
-            "dc_total": {"i_operacion_a": None},
-            "ac": {"i_operacion_a": None},
-        }
-
+    )
 
 # ==========================================================
 # PROTECCIONES
