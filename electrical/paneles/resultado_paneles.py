@@ -1,5 +1,5 @@
 """
-Contrato del dominio PANELes (generador FV DC).
+Contrato del dominio PANELES (generador FV DC).
 
 Define la salida oficial del módulo paneles.
 Otros módulos (corrientes, protecciones, NEC, UI, PDF)
@@ -18,16 +18,19 @@ from typing import List, Dict, Any
 
 @dataclass
 class StringFV:
+
     mppt: int
     n_series: int
     n_strings: int
 
+    # voltajes
     vmp_string_v: float
     voc_frio_string_v: float
 
+    # corriente MPPT
     i_mppt_a: float
 
-    # valores útiles para NEC
+    # NEC
     isc_array_a: float
     imax_pv_a: float
     idesign_cont_a: float
@@ -50,6 +53,22 @@ class RecomendacionStrings:
 
 
 # =========================================================
+# Información global del array FV
+# =========================================================
+
+@dataclass
+class ArrayFV:
+
+    potencia_dc_w: float
+
+    vdc_nom: float
+    idc_nom: float
+
+    n_strings_total: int
+    n_paneles_total: int
+
+
+# =========================================================
 # SALIDA OFICIAL DEL DOMINIO
 # =========================================================
 
@@ -58,9 +77,13 @@ class ResultadoPaneles:
 
     ok: bool
 
-    # configuración FV
+    # configuración del sistema
     topologia: str
 
+    # resumen del generador
+    array: ArrayFV
+
+    # recomendación del motor
     recomendacion: RecomendacionStrings
 
     # detalle por MPPT / string
@@ -70,5 +93,5 @@ class ResultadoPaneles:
     warnings: List[str]
     errores: List[str]
 
-    # información auxiliar / trazabilidad
+    # trazabilidad
     meta: Dict[str, Any]
