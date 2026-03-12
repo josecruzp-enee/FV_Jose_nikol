@@ -1,3 +1,4 @@
+from electrical.paneles.distribucion_mppt import distribuir_strings
 def distribuir_strings(strings_totales, mppts):
 
     base = strings_totales // mppts
