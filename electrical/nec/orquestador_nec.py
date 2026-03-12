@@ -123,7 +123,21 @@ def ejecutar_nec(
 ) -> Dict[str, Any]:
 
     ee: Dict[str, Any] = {}
+    print("\n===== DEBUG STRINGS =====")
+    print(type(strings))
+    print(strings)
 
+    if isinstance(strings, dict):
+        print("keys:", strings.keys())
+
+        if "strings" in strings:
+            print("tipo lista strings:", type(strings["strings"]))
+
+            if strings["strings"]:
+                print("tipo primer elemento:", type(strings["strings"][0]))
+                print("contenido primer string:", strings["strings"][0])
+
+    print("=========================\n")
     # ------------------------------------------------------
     # Base eléctrica
     # ------------------------------------------------------
