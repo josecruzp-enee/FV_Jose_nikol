@@ -1,12 +1,26 @@
-# Validación del dominio paneles: verifica coherencia de PanelSpec/InversorSpec y parámetros previos al motor FV.
+"""
+Validación del dominio paneles.
+
+Verifica coherencia de PanelSpec / InversorSpec y parámetros
+previos al cálculo de strings FV.
+
+Este módulo NO ejecuta cálculos eléctricos.
+"""
+
 from __future__ import annotations
+
 from typing import List, Optional, Tuple
+
 from electrical.modelos.paneles import PanelSpec
 from electrical.modelos.inversor import InversorSpec
 
 
-# Valida coherencia básica de parámetros del panel FV usando el contrato interno PanelSpec.
+# ==========================================================
+# VALIDACIÓN PANEL
+# ==========================================================
+
 def validar_panel(panel: PanelSpec) -> Tuple[List[str], List[str]]:
+
     errores: List[str] = []
     warnings: List[str] = []
 
@@ -25,15 +39,19 @@ def validar_panel(panel: PanelSpec) -> Tuple[List[str], List[str]]:
     if panel.coef_vmp_pct_c >= 0:
         warnings.append("Panel: coef_vmp_pct_c normalmente es negativo.")
 
-    # Coherencia suave: Vmp no debería exceder Voc (no es norma, pero suele ser error de carga)
+    # Coherencia suave
     if panel.voc_v > 0 and panel.vmp_v > panel.voc_v:
         warnings.append("Panel: Vmp > Voc (posible error de datos).")
 
     return errores, warnings
 
 
-# Valida coherencia básica de parámetros del inversor usando el contrato interno InversorSpec.
+# ==========================================================
+# VALIDACIÓN INVERSOR
+# ==========================================================
+
 def validar_inversor(inversor: InversorSpec) -> Tuple[List[str], List[str]]:
+
     errores: List[str] = []
     warnings: List[str] = []
 
@@ -46,16 +64,15 @@ def validar_inversor(inversor: InversorSpec) -> Tuple[List[str], List[str]]:
     if inversor.mppt_min_v >= inversor.mppt_max_v:
         errores.append("Inversor inválido: mppt_min_v debe ser < mppt_max_v.")
 
-    # A norma: dato obligatorio datasheet
     if inversor.imppt_max_a <= 0:
-        errores.append("Inversor inválido: imppt_max_a debe ser > 0 (dato obligatorio datasheet).")
+        errores.append("Inversor inválido: imppt_max_a debe ser > 0.")
 
     if inversor.n_mppt <= 0:
         errores.append("Inversor inválido: n_mppt <= 0.")
 
-    # Check suave: no necesariamente error, pero requiere revisión
-    if inversor.vdc_max_v > 0 and inversor.mppt_max_v > 0 and inversor.vdc_max_v < inversor.mppt_max_v:
-        warnings.append("Inversor: vdc_max_v < mppt_max_v (revisar datasheet).")
+    if inversor.vdc_max_v > 0 and inversor.mppt_max_v > 0:
+        if inversor.vdc_max_v < inversor.mppt_max_v:
+            warnings.append("Inversor: vdc_max_v < mppt_max_v (revisar datasheet).")
 
     if inversor.kw_ac <= 0:
         warnings.append("Inversor: kw_ac <= 0 (DC/AC objetivo puede quedar sin referencia).")
@@ -63,12 +80,16 @@ def validar_inversor(inversor: InversorSpec) -> Tuple[List[str], List[str]]:
     return errores, warnings
 
 
-# Valida parámetros generales previos al cálculo de strings (no ejecuta cálculos eléctricos).
+# ==========================================================
+# VALIDACIÓN PARÁMETROS GENERALES
+# ==========================================================
+
 def validar_parametros_generales(
     n_paneles_total: int,
     t_min_c: float,
     t_oper_c: Optional[float] = None,
 ) -> Tuple[List[str], List[str]]:
+
     errores: List[str] = []
     warnings: List[str] = []
 
@@ -87,3 +108,22 @@ def validar_parametros_generales(
             errores.append("t_oper_c no convertible a número.")
 
     return errores, warnings
+
+
+# ==========================================================
+# SALIDAS DEL ARCHIVO
+# ==========================================================
+#
+# validar_panel(panel)
+#   → (errores: list[str], warnings: list[str])
+#
+# validar_inversor(inversor)
+#   → (errores: list[str], warnings: list[str])
+#
+# validar_parametros_generales(...)
+#   → (errores: list[str], warnings: list[str])
+#
+# Consumido por:
+# electrical.paneles.orquestador_paneles
+#
+# ==========================================================
