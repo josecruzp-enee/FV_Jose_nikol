@@ -25,17 +25,9 @@ def _vmp_temp(vmp_stc: float, coef_vmp_pct_c: float, t_oper_c: float, t_stc_c: f
 
 def _bounds_por_voltaje(panel: PanelSpec, inv: InversorSpec, t_min_c: float, t_oper_c: float):
 
-    voc_frio_panel = _voc_frio(
-        panel.voc_v,
-        panel.coef_voc_pct_c,
-        t_min_c
-    )
+    voc_frio_panel = _voc_frio(panel.voc_v, panel.coef_voc_pct_c, t_min_c)
 
-    vmp_hot_panel = _vmp_temp(
-        panel.vmp_v,
-        panel.coef_vmp_pct_c,
-        t_oper_c
-    )
+    vmp_hot_panel = _vmp_temp(panel.vmp_v, panel.coef_vmp_pct_c, t_oper_c)
 
     max_por_vdc = floor(inv.vdc_max_v / voc_frio_panel)
 
@@ -105,10 +97,6 @@ def _split_por_mppt(n_strings_total: int, inversor: InversorSpec):
 # GENERACION STRINGS
 # ==========================================================
 
-# ==========================================================
-# GENERACION STRINGS
-# ==========================================================
-
 def _generar_strings(ramas, n_series, panel: PanelSpec, voc_frio_panel, vmp_hot_panel):
 
     strings = []
@@ -131,9 +119,7 @@ def _generar_strings(ramas, n_series, panel: PanelSpec, voc_frio_panel, vmp_hot_
             strings.append(
                 {
                     "id": string_id,
-
                     "mppt": mppt,
-
                     "n_series": n_series,
 
                     # voltajes
@@ -150,6 +136,7 @@ def _generar_strings(ramas, n_series, panel: PanelSpec, voc_frio_panel, vmp_hot_
             string_id += 1
 
     return strings
+
 
 # ==========================================================
 # RESULTADO ERROR
@@ -190,7 +177,7 @@ def calcular_strings_fv(
     if n_paneles_total <= 0:
         return _resultado_error("n_paneles_total inválido")
 
-    t_oper = t_oper_c if t_oper_c else 55.0
+    t_oper = t_oper_c if t_oper_c is not None else 55.0
 
     n_min, n_max, voc_frio_panel, vmp_hot_panel = _bounds_por_voltaje(
         panel,
@@ -209,7 +196,7 @@ def calcular_strings_fv(
         inversor
     )
 
-    if n_series <= 0:
+    if not n_series or n_series <= 0:
         return _resultado_error("Serie inválida calculada")
 
     # ----------------------------------------------------------
@@ -220,10 +207,6 @@ def calcular_strings_fv(
 
     if n_strings_total <= 0:
         return _resultado_error("No es posible formar strings")
-
-    # ----------------------------------------------------------
-    # WARNING POR PANELES SOBRANTES
-    # ----------------------------------------------------------
 
     resto = n_paneles_total % n_series
 
@@ -249,7 +232,7 @@ def calcular_strings_fv(
     voc_string = voc_frio_panel * n_series
 
     # ----------------------------------------------------------
-    # CORRIENTES DEL ARRAY COMPLETO (MUY IMPORTANTE)
+    # CORRIENTES DEL ARRAY
     # ----------------------------------------------------------
 
     imp_array = panel.imp_a * n_strings_total
@@ -266,7 +249,6 @@ def calcular_strings_fv(
             "vmp_string_v": float(vmp_string),
             "voc_string_v": float(voc_string),
 
-            # NUEVAS VARIABLES (no rompen compatibilidad)
             "imp_array_a": float(imp_array),
             "isc_array_total_a": float(isc_array_total),
         },
@@ -278,3 +260,38 @@ def calcular_strings_fv(
             "n_paneles_total": n_paneles_total
         }
     }
+
+
+# ==========================================================
+# SALIDAS DEL ARCHIVO
+# ==========================================================
+#
+# calcular_strings_fv(...)
+#
+# devuelve:
+#
+# ok : bool
+# errores : list[str]
+# warnings : list[str]
+#
+# strings : list[dict]
+#
+# recomendacion:
+#   n_series
+#   n_strings_total
+#   vmp_string_v
+#   voc_string_v
+#   imp_array_a
+#   isc_array_total_a
+#
+# bounds:
+#   n_min
+#   n_max
+#
+# meta:
+#   n_paneles_total
+#
+# Consumido por:
+# electrical.paneles.orquestador_paneles
+#
+# ==========================================================
