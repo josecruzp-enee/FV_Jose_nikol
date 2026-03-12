@@ -192,7 +192,7 @@ def ejecutar_nec(
     # ------------------------------------------------------
 
     paquete = armar_paquete_nec(ee)
-
+    
     ee.update(paquete)
-
+    print("DEBUG NEC RESULT:", ee)
     return ee
