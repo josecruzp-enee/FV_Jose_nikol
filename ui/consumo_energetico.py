@@ -1,8 +1,14 @@
 from __future__ import annotations
-from typing import Tuple, List
+from typing import Tuple, List, Dict
 import streamlit as st
-from core.servicios.analisis_cobertura import analizar_cobertura as analizar_escenarios_fv
-import pandas as pd
+from core.servicios.analisis_cobertura import analizar_cobertura
+
+"""
+PASO 2 — CONSUMO ENERGÉTICO
+FV Engine
+
+UI Layer — captura y valida consumo mensual + tarifa
+"""
 
 # ==========================================================
 # CONSTANTES
@@ -17,42 +23,53 @@ _MESES = [
 # ==========================================================
 def render(ctx) -> None:
     """
-    Renderiza inputs de consumo energético, actualiza ctx.consumo,
-    muestra métricas y gráficas comparativas.
+    Renderiza inputs de consumo, tarifa y cargos fijos,
+    muestra métricas y escenarios FV.
     """
     consumo = getattr(ctx, "consumo", {})
-    
-    # Inicializar si no existen
+
+    # Inicializar campos si no existen
     consumo.setdefault("kwh_12m", [0.0]*12)
     consumo.setdefault("cargos_fijos_L_mes", 0.0)
     consumo.setdefault("tarifa_energia_L_kwh", 0.0)
     consumo.setdefault("fuente", "manual")
-    
+
     st.markdown("### Consumo energético")
-    
+
     # Captura consumo mensual
     for i, mes in enumerate(_MESES):
         consumo["kwh_12m"][i] = st.number_input(
-            f"Consumo {mes} (kWh)", value=consumo["kwh_12m"][i], min_value=0.0
+            f"Consumo {mes} (kWh)",
+            value=consumo["kwh_12m"][i],
+            min_value=0.0,
+            format="%.2f",
         )
-    
+
+    # Captura cargos fijos y tarifa
     consumo["cargos_fijos_L_mes"] = st.number_input(
-        "Cargos fijos L/Mes", value=consumo["cargos_fijos_L_mes"], min_value=0.0
+        "Cargos fijos L/Mes",
+        value=consumo["cargos_fijos_L_mes"],
+        min_value=0.0,
+        format="%.2f",
     )
-    
+
     consumo["tarifa_energia_L_kwh"] = st.number_input(
-        "Tarifa energía L/kWh", value=consumo["tarifa_energia_L_kwh"], min_value=0.0
+        "Tarifa energía L/kWh",
+        value=consumo["tarifa_energia_L_kwh"],
+        min_value=0.0,
+        format="%.2f",
     )
-    
+
+    # Actualizar ctx
     ctx.consumo = consumo
-    
-    # Mostrar métricas simples
+
+    # Mostrar métricas
     total = sum(consumo["kwh_12m"])
     promedio = total / 12
     st.write(f"Consumo anual total: {total:.2f} kWh")
     st.write(f"Consumo promedio mensual: {promedio:.2f} kWh")
-    
-    # Análisis de cobertura
+
+    # Llamar análisis exploratorio
     render_analisis_cobertura(ctx)
 
 # ==========================================================
@@ -60,23 +77,28 @@ def render(ctx) -> None:
 # ==========================================================
 def render_analisis_cobertura(ctx):
     """
-    Ejecuta análisis exploratorio de diferentes tamaños de FV
+    Ejecuta análisis de diferentes tamaños de FV
     """
     consumo = ctx.consumo
 
-    # Valores de ejemplo (debes reemplazar por los reales de tu proyecto)
-    potencia_panel_kw = 0.55      # 550 W por panel
-    energia_1kwp_anual = 1500.0   # kWh anual por kWp instalado
+    # Valores de ejemplo para cálculo preliminar
+    potencia_panel_kw = 0.55       # 550 W por panel
+    energia_1kwp_anual = 1500.0    # kWh anual por kWp instalado
 
-    escenarios = analizar_cobertura(
-        consumo_anual_kwh=sum(consumo["kwh_12m"]),
-        potencia_panel_kw=potencia_panel_kw,
-        energia_1kwp_anual=energia_1kwp_anual,
-        tarifa_energia=consumo["tarifa_energia_L_kwh"]
-    )
+    try:
+        escenarios = analizar_cobertura(
+            consumo_anual_kwh=sum(consumo["kwh_12m"]),
+            potencia_panel_kw=potencia_panel_kw,
+            energia_1kwp_anual=energia_1kwp_anual,
+            tarifa_energia=consumo["tarifa_energia_L_kwh"],
+        )
+    except Exception as e:
+        st.error(f"No se pudo calcular escenarios FV: {e}")
+        return
 
     st.write("### Escenarios FV")
     st.dataframe([e.__dict__ for e in escenarios])
+
 # ==========================================================
 # VALIDACIÓN
 # ==========================================================
@@ -86,7 +108,7 @@ def validar(ctx) -> Tuple[bool, List[str]]:
     """
     errores: List[str] = []
     consumo = getattr(ctx, "consumo", {})
-    
+
     kwh = consumo.get("kwh_12m", [])
     if len(kwh) != 12:
         errores.append("Se deben ingresar 12 meses de consumo.")
@@ -94,16 +116,19 @@ def validar(ctx) -> Tuple[bool, List[str]]:
         errores.append("No se permiten consumos negativos.")
     if sum(kwh) <= 0:
         errores.append("Al menos un mes debe tener consumo > 0.")
-    
+
     return len(errores) == 0, errores
 
 # ==========================================================
-# RENDER DEMANDA vs FV
+# RENDER DEMANDA vs FV (opcional)
 # ==========================================================
-def render_demanda_vs_fv(ctx, energia_mensual_kwh: list[float]):
+def render_demanda_vs_fv(ctx, energia_mensual_kwh):
     """
     Grafica demanda mensual vs generación FV estimada
     """
+    import matplotlib.pyplot as plt
+    import pandas as pd
+
     df = pd.DataFrame({
         "Demanda": ctx.consumo["kwh_12m"],
         "Generación FV": energia_mensual_kwh
