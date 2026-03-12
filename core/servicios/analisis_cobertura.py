@@ -1,21 +1,80 @@
 from __future__ import annotations
 
+"""
+SERVICIO: ANALISIS DE COBERTURA FV
+
+FRONTERA
+--------
+Capa:
+    core.servicios
+
+Consumido por:
+    core.orquestador_estudio
+    UI
+
+Responsabilidad:
+    Generar escenarios preliminares de dimensionamiento FV
+    según distintos niveles de cobertura del consumo.
+
+No debe:
+    - calcular strings
+    - ejecutar NEC
+    - simular energía mensual
+    - ejecutar finanzas completas
+
+ENTRADA
+-------
+analizar_cobertura(
+
+    consumo_anual_kwh: float
+    potencia_panel_kw: float
+    energia_1kwp_anual: float
+    tarifa_energia: float
+
+)
+
+SALIDA
+------
+List[EscenarioCobertura]
+
+EscenarioCobertura:
+    cobertura
+    energia_objetivo_kwh
+    potencia_fv_kw
+    paneles
+    produccion_anual_kwh
+    inversion
+    ahorro_anual
+    roi
+    payback
+"""
+
 from dataclasses import dataclass
 from typing import List
 
 
+# =========================================================
+# MODELO DE SALIDA
+# =========================================================
+
 @dataclass
 class EscenarioCobertura:
+
     cobertura: float
     energia_objetivo_kwh: float
     potencia_fv_kw: float
     paneles: int
     produccion_anual_kwh: float
+
     inversion: float
     ahorro_anual: float
     roi: float
     payback: float
 
+
+# =========================================================
+# SERVICIO
+# =========================================================
 
 def analizar_cobertura(
     consumo_anual_kwh: float,
@@ -25,8 +84,8 @@ def analizar_cobertura(
 ) -> List[EscenarioCobertura]:
 
     coberturas = [
-        0.10,0.20,0.30,0.40,0.50,
-        0.60,0.70,0.80,0.90,1.00
+        0.10, 0.20, 0.30, 0.40, 0.50,
+        0.60, 0.70, 0.80, 0.90, 1.00
     ]
 
     resultados: List[EscenarioCobertura] = []
@@ -41,15 +100,14 @@ def analizar_cobertura(
 
         produccion = potencia_fv_kw * energia_1kwp_anual
 
-        # estimaciones financieras simples
         costo_kw = 1200
         tarifa = tarifa_energia
 
         inversion = potencia_fv_kw * costo_kw
         ahorro = produccion * tarifa
 
-        roi = ahorro / inversion
-        payback = inversion / ahorro
+        roi = ahorro / inversion if inversion else 0
+        payback = inversion / ahorro if ahorro else 0
 
         escenario = EscenarioCobertura(
             cobertura=c,
