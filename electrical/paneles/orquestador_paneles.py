@@ -1,20 +1,27 @@
 from __future__ import annotations
-from typing import Dict, List
+
+from typing import List
 
 from electrical.modelos.paneles import PanelSpec
 from electrical.modelos.inversor import InversorSpec
 
 from .calculo_de_strings import calcular_strings_fv
 from .entrada_panel import EntradaPaneles
-from .validacion_strings import validar_inversor, validar_panel, validar_parametros_generales
+from .resultado_paneles import ResultadoPaneles
+from .validacion_strings import (
+    validar_inversor,
+    validar_panel,
+    validar_parametros_generales,
+)
 
 # ==========================================================
 # ORQUESTADOR DEL DOMINIO PANELES
 # ==========================================================
 
+
 def ejecutar_paneles(
     entrada: EntradaPaneles
-) -> Dict:
+) -> ResultadoPaneles:
 
     errores: List[str] = []
     warnings: List[str] = []
@@ -25,11 +32,17 @@ def ejecutar_paneles(
     n_paneles_total = entrada.n_paneles_total
 
     if n_paneles_total is None or n_paneles_total <= 0:
-        return {
-            "ok": False,
-            "errores": ["n_paneles_total inválido"],
-            "warnings": []
-        }
+
+        return ResultadoPaneles(
+            ok=False,
+            topologia="desconocida",
+            array=None,
+            recomendacion=None,
+            strings=[],
+            warnings=[],
+            errores=["n_paneles_total inválido"],
+            meta={},
+        )
 
     # ------------------------------------------------------
     # VALIDACIONES
@@ -54,14 +67,19 @@ def ejecutar_paneles(
 
     if errores:
 
-        return {
-            "ok": False,
-            "errores": errores,
-            "warnings": warnings
-        }
+        return ResultadoPaneles(
+            ok=False,
+            topologia="desconocida",
+            array=None,
+            recomendacion=None,
+            strings=[],
+            warnings=warnings,
+            errores=errores,
+            meta={},
+        )
 
     # ------------------------------------------------------
-    # CALCULO STRINGS
+    # CALCULO DE STRINGS
     # ------------------------------------------------------
 
     resultado = calcular_strings_fv(
@@ -76,10 +94,6 @@ def ejecutar_paneles(
         t_oper_c=entrada.t_oper_c,
     )
 
-    resultado.setdefault("ok", False)
-    resultado.setdefault("errores", [])
-    resultado.setdefault("warnings", [])
-
     return resultado
 
 
@@ -91,26 +105,19 @@ def ejecutar_paneles(
 #
 # devuelve:
 #
+# ResultadoPaneles
+#
+# Campos principales:
+#
 # ok : bool
-# errores : list[str]
+# array : ArrayFV
+# recomendacion : RecomendacionStrings
+# strings : list[StringFV]
+#
 # warnings : list[str]
+# errores : list[str]
 #
-# strings : list
-#
-# recomendacion:
-#   n_series
-#   n_strings_total
-#   vmp_string_v
-#   voc_string_v
-#   imp_array_a
-#   isc_array_total_a
-#
-# bounds:
-#   n_min
-#   n_max
-#
-# meta:
-#   n_paneles_total
+# meta : dict
 #
 # Consumido por:
 # core
