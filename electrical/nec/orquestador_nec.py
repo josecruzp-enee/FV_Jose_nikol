@@ -1,25 +1,34 @@
 from typing import Dict, Any
 import math
 
-from core.dominio.contrato import ResultadoSizing, ResultadoStrings
+from core.dominio.contrato import ResultadoSizing
 from electrical.paquete_nec import armar_paquete_nec
 from electrical.circuitos.generador_circuitos_dc import generar_circuitos_dc
 
 
 # ==========================================================
-# UTILIDAD: obtener lista de strings sin romper si llega dict
+# UTILIDAD: obtener lista de strings
 # ==========================================================
 
 def _lista_strings(strings):
 
+    if not strings:
+        return []
+
     if isinstance(strings, dict):
         return strings.get("strings", [])
 
-    return getattr(strings, "strings", [])
+    if hasattr(strings, "strings"):
+        return strings.strings
+
+    if isinstance(strings, list):
+        return strings
+
+    return []
 
 
 # ==========================================================
-# Leer base eléctrica del proyecto
+# Leer base eléctrica
 # ==========================================================
 
 def _leer_base_electrica(p):
@@ -49,8 +58,12 @@ def _calcular_corrientes_string(strings):
 
     s0 = lista[0]
 
-    imp = getattr(s0, "imp_a", s0.get("imp_a", 0))
-    isc = getattr(s0, "isc_a", s0.get("isc_a", 0))
+    if isinstance(s0, dict):
+        imp = s0.get("imp_a", 0)
+        isc = s0.get("isc_a", 0)
+    else:
+        imp = getattr(s0, "imp_a", 0)
+        isc = getattr(s0, "isc_a", 0)
 
     i_nom = imp
     i_dis = isc * 1.25
@@ -73,7 +86,12 @@ def _generar_circuitos_mppt(strings, sizing: ResultadoSizing):
 
     if lista:
         s0 = lista[0]
-        imp = getattr(s0, "imp_a", s0.get("imp_a", 0))
+
+        if isinstance(s0, dict):
+            imp = s0.get("imp_a", 0)
+        else:
+            imp = getattr(s0, "imp_a", 0)
+
     else:
         imp = 0
 
@@ -94,7 +112,7 @@ def _generar_circuitos_mppt(strings, sizing: ResultadoSizing):
 
 def _calcular_corrientes_ac(potencia_ac_w, vac_ll, fases, fp):
 
-    if not vac_ll or vac_ll == 0:
+    if not vac_ll:
         return {"i_nominal": 0, "i_diseno": 0}
 
     if fases == 3:
@@ -111,18 +129,24 @@ def _calcular_corrientes_ac(potencia_ac_w, vac_ll, fases, fp):
 
 
 # ==========================================================
-# Resumen DC del sistema
+# Resumen DC
 # ==========================================================
 
 def _armar_resumen_dc(strings, sizing: ResultadoSizing):
 
     lista = _lista_strings(strings)
 
-    potencia_dc = sizing.pdc_kw * 1000
+    potencia_dc = getattr(sizing, "pdc_kw", 0) * 1000
 
     if lista:
+
         s0 = lista[0]
-        vdc_nom = getattr(s0, "vmp_string_v", s0.get("vmp_string_v", 0))
+
+        if isinstance(s0, dict):
+            vdc_nom = s0.get("vmp_string_v", 0)
+        else:
+            vdc_nom = getattr(s0, "vmp_string_v", 0)
+
     else:
         vdc_nom = 0
 
@@ -139,7 +163,7 @@ def _armar_resumen_dc(strings, sizing: ResultadoSizing):
 
 
 # ==========================================================
-# Orquestador NEC principal
+# ORQUESTADOR NEC
 # ==========================================================
 
 def ejecutar_nec(
@@ -157,7 +181,7 @@ def ejecutar_nec(
     vac_ll, fases, fp = _leer_base_electrica(p)
 
     # ------------------------------------------------------
-    # Corriente por string
+    # Corrientes string
     # ------------------------------------------------------
 
     corr_string = _calcular_corrientes_string(strings)
@@ -168,18 +192,14 @@ def ejecutar_nec(
 
     circuitos_mppt = _generar_circuitos_mppt(strings, sizing)
 
-    if circuitos_mppt:
-        i_mppt_nom = max(c["i_operacion"] for c in circuitos_mppt)
-        i_mppt_dis = max(c["i_diseno"] for c in circuitos_mppt)
-    else:
-        i_mppt_nom = 0
-        i_mppt_dis = 0
+    i_mppt_nom = max((c.get("i_operacion", 0) for c in circuitos_mppt), default=0)
+    i_mppt_dis = max((c.get("i_diseno", 0) for c in circuitos_mppt), default=0)
 
     # ------------------------------------------------------
     # Corrientes AC
     # ------------------------------------------------------
 
-    potencia_ac = sizing.kw_ac * 1000
+    potencia_ac = getattr(sizing, "kw_ac", 0) * 1000
 
     corr_ac = _calcular_corrientes_ac(
         potencia_ac,
@@ -228,17 +248,14 @@ def ejecutar_nec(
     ee["circuitos_mppt"] = circuitos_mppt
 
     # ------------------------------------------------------
-    # ADAPTADOR PARA PAQUETE NEC
+    # ENTRADA PARA PAQUETE NEC (CORREGIDO)
     # ------------------------------------------------------
+
+    lista = _lista_strings(strings)
 
     entrada_nec = {
 
-        "strings": {
-            "corrientes_input": {
-                "i_operacion_a": corr_string["i_nominal"],
-                "isc_a": corr_string["i_nominal"] * 1.05
-            }
-        },
+        "strings": lista,
 
         "potencia_dc_w": dc["potencia_dc_w"],
         "potencia_ac_w": potencia_ac,
@@ -251,7 +268,7 @@ def ejecutar_nec(
     }
 
     # ------------------------------------------------------
-    # Generar paquete NEC
+    # Ejecutar NEC
     # ------------------------------------------------------
 
     paquete = armar_paquete_nec(entrada_nec)
