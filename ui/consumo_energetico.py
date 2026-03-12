@@ -1,222 +1,278 @@
-# ui/consumo_energetico.py
-from __future__ import annotations
-from typing import List, Tuple
+"""
+PASO 2 — CONSUMO ENERGÉTICO
+FV Engine
 
-import streamlit as st
-import pandas as pd
+Este módulo implementa el segundo paso del wizard de la interfaz de usuario.
 
-from core.servicios.analisis_cobertura import analizar_cobertura
+OBJETIVO
+--------
+Capturar y validar el consumo energético del usuario durante los últimos
+12 meses junto con los parámetros de facturación eléctrica.
 
+Este módulo pertenece a la capa:
 
-_MESES = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"]
+    UI / Presentation Layer
 
 
-# ---------------------------------------------------------
-# Gráfica Demanda vs FV
-# ---------------------------------------------------------
+FRONTERA DEL MÓDULO
+-------------------
 
-def render_demanda_vs_fv(ctx, energia_mensual_kwh):
+Entrada:
+    WizardCtx (estado global del wizard)
 
-    st.markdown("#### Demanda vs Generación FV mensual")
+Salida:
+    ctx.consumo actualizado
 
-    demanda = ctx.consumo["kwh_12m"]
 
-    df_graf = pd.DataFrame({
-        "Mes": _MESES,
-        "Demanda": demanda,
-        "FV": energia_mensual_kwh
-    })
+DEPENDENCIAS PERMITIDAS
+-----------------------
 
-    # forzar orden correcto de meses
-    df_graf["Mes"] = pd.Categorical(
-        df_graf["Mes"],
-        categories=_MESES,
-        ordered=True
-    )
+streamlit
+pandas
+core.servicios.analisis_cobertura
 
-    df_graf = df_graf.sort_values("Mes").set_index("Mes")
 
-    st.bar_chart(df_graf)
-# ---------------------------------------------------------
-# Análisis de cobertura FV
-# ---------------------------------------------------------
+DEPENDENCIAS PROHIBIDAS
+-----------------------
 
-def render_analisis_cobertura(ctx):
+Este módulo NO puede importar:
 
-    st.markdown("### Análisis de tamaño del sistema FV")
+    electrical.*
+    paneles.*
+    nec.*
+    finanzas.*
 
-    if st.button("Analizar escenarios de cobertura"):
+La UI no realiza cálculos eléctricos ni dimensionamiento.
 
-        try:
 
-            consumo_anual = sum(ctx.consumo.get("kwh_12m", [0]*12))
+RESPONSABILIDADES
+-----------------
 
-            escenarios = analizar_cobertura(
-                consumo_anual_kwh=consumo_anual,
-                potencia_panel_kw=0.33,
-                energia_1kwp_anual=1450,
-                tarifa_energia=ctx.consumo["tarifa_energia_L_kwh"],
-            )
+Este módulo se encarga de:
 
-            if not escenarios:
-                st.warning("No se generaron escenarios.")
-                return
+    1. Capturar consumo mensual (12 meses)
+    2. Capturar tarifa eléctrica
+    3. Capturar cargos fijos
+    4. Validar datos ingresados
+    5. Mostrar métricas de consumo
+    6. Ejecutar análisis exploratorio de cobertura FV
+    7. Mostrar gráfica Demanda vs Generación FV
 
-            df = pd.DataFrame([e.__dict__ for e in escenarios])
 
-            df["cobertura"] = (df["cobertura"] * 100).astype(int).astype(str) + " %"
+NO ES RESPONSABLE DE
 
-            df = df.rename(columns={
-                "cobertura": "Cobertura %",
-                "potencia_fv_kw": "Sistema FV (kW)",
-                "paneles": "Paneles",
-                "produccion_anual_kwh": "Producción anual (kWh)",
-                "inversion": "Inversión",
-                "ahorro_anual": "Ahorro anual",
-                "roi": "ROI",
-                "payback": "Payback (años)",
-            })
+    dimensionamiento FV
+    cálculo de strings
+    cálculo energético real
+    cálculo NEC
+    cálculos financieros
 
-            df["Sistema FV (kW)"] = df["Sistema FV (kW)"].round(2)
+Estos cálculos pertenecen al motor FV.
 
-            df["Inversión"] = df["Inversión"].map(lambda x: f"L. {x:,.0f}")
-            df["Ahorro anual"] = df["Ahorro anual"].map(lambda x: f"L. {x:,.0f}")
 
-            df["ROI"] = df["ROI"].round(2)
-            df["Payback (años)"] = df["Payback (años)"].round(2)
+ENTRADA DEL MÓDULO
+------------------
 
-            st.dataframe(df, use_container_width=True)
+ctx : WizardCtx
 
-            
+El módulo utiliza principalmente:
 
-        except Exception as e:
+ctx.consumo
 
-            st.error(f"Error ejecutando análisis de cobertura: {e}")
 
+ESTRUCTURA DE ctx.consumo
+-------------------------
 
-# ---------------------------------------------------------
-# UI Consumo energético
-# ---------------------------------------------------------
+ctx.consumo = {
 
-def render(ctx) -> None:
+    "kwh_12m": list[float],      # consumo mensual (12 valores)
 
-    st.markdown("### Consumo energético (últimos 12 meses)")
+    "cargos_fijos_L_mes": float, # cargo fijo factura
 
-    c = ctx.consumo
+    "tarifa_energia_L_kwh": float, # tarifa variable energía
 
-    col1, col2, col3 = st.columns(3)
+    "fuente": str                # manual | recibo | csv
+}
 
-    with col1:
-        c["tarifa_energia_L_kwh"] = st.number_input(
-            "Tarifa energía (L/kWh)",
-            min_value=0.0,
-            step=0.1,
-            value=float(c.get("tarifa_energia_L_kwh", 0.0)),
-        )
 
-    with col2:
-        c["cargos_fijos_L_mes"] = st.number_input(
-            "Cargos fijos (L/mes)",
-            min_value=0.0,
-            step=10.0,
-            value=float(c.get("cargos_fijos_L_mes", 0.0)),
-        )
+VARIABLES INTERNAS IMPORTANTES
+------------------------------
 
-    with col3:
-        c["fuente"] = st.selectbox(
-            "Fuente de datos",
-            options=["manual"],
-            index=0,
-        )
+_MESES : list[str]
 
-    st.markdown("#### kWh por mes")
+Lista de meses usada para:
 
-    kwh = list(c.get("kwh_12m", [0.0] * 12))
+    UI
+    tablas
+    gráficos
 
-    if len(kwh) != 12:
-        kwh = [0.0] * 12
 
-    for fila in range(3):
+kwh : list[float]
 
-        cols = st.columns(4)
+Vector temporal usado para capturar el consumo mensual.
 
-        for j in range(4):
 
-            i = fila * 4 + j
+total : float
 
-            with cols[j]:
+Consumo total anual.
 
-                kwh[i] = st.number_input(
-                    f"{_MESES[i]} (kWh)",
-                    min_value=0.0,
-                    step=10.0,
-                    value=float(kwh[i] or 0.0),
-                    key=f"kwh_{i}",
-                )
 
-    c["kwh_12m"] = kwh
+prom : float
 
-    total = float(sum(kwh))
-    prom = total / 12.0
+Consumo promedio mensual.
 
-    a, b = st.columns(2)
 
-    with a:
-        st.metric("Consumo anual (kWh)", f"{total:,.0f}")
+energia_mensual_fv : list[float]
 
-    with b:
-        st.metric("Promedio mensual (kWh)", f"{prom:,.0f}")
+Vector temporal usado únicamente para visualización
+de la gráfica Demanda vs FV.
 
-    ctx.consumo = c
 
-    # análisis cobertura
-    render_analisis_cobertura(ctx)
+FUNCIONES DEL MÓDULO
+--------------------
 
-    # generación FV estimada para la gráfica (provisional)
-    from electrical.energia.irradiancia import hsp_12m_base, DIAS_MES
 
-    hsp = hsp_12m_base()
+render(ctx)
 
-    # estimación simple de tamaño FV basada en consumo
-    cobertura = 0.80
-    kwp_estimado = total * cobertura / 1450
-    
+    Función principal del paso del wizard.
 
-    PR = 1
+    Responsabilidades:
 
-    energia_mensual_fv = [
-        kwp_estimado * h * d * PR
-        for h, d in zip(hsp, DIAS_MES)
-    ]
+        - renderizar inputs de consumo
+        - capturar valores
+        - actualizar ctx.consumo
+        - mostrar métricas
+        - ejecutar análisis de cobertura
+        - mostrar gráfica comparativa
 
-    render_demanda_vs_fv(ctx, energia_mensual_fv)
+    Entrada:
 
+        ctx : WizardCtx
 
-# ---------------------------------------------------------
-# Validación
-# ---------------------------------------------------------
+    Salida:
 
-def validar(ctx) -> Tuple[bool, List[str]]:
+        ctx.consumo actualizado
 
-    errores: List[str] = []
 
-    c = ctx.consumo
-    kwh = c.get("kwh_12m", [])
 
-    if not isinstance(kwh, list) or len(kwh) != 12:
-        errores.append("Debe ingresar 12 valores de consumo (kWh).")
-        return False, errores
+render_analisis_cobertura(ctx)
 
-    try:
-        kwh_vals = [float(x) for x in kwh]
-    except Exception:
-        errores.append("Consumo inválido.")
-        return False, errores
+    Ejecuta un análisis exploratorio de diferentes
+    tamaños de sistema FV.
 
-    if any(v < 0 for v in kwh_vals):
-        errores.append("No se permiten valores negativos.")
+    Utiliza:
 
-    if max(kwh_vals) <= 0:
-        errores.append("Al menos un mes debe ser mayor que 0 kWh.")
+        core.servicios.analisis_cobertura
 
-    return (len(errores) == 0), errores
+
+    Entrada:
+
+        consumo_anual
+        tarifa_energia
+
+    Salida:
+
+        tabla de escenarios FV
+
+
+
+render_demanda_vs_fv(ctx, energia_mensual_kwh)
+
+    Muestra una gráfica comparando:
+
+        demanda mensual
+        generación FV estimada
+
+
+    Entrada:
+
+        ctx
+        energia_mensual_kwh
+
+
+    Salida:
+
+        gráfico streamlit
+
+
+
+validar(ctx)
+
+    Valida los datos ingresados por el usuario.
+
+    Validaciones:
+
+        1. Deben existir 12 meses
+        2. No se permiten valores negativos
+        3. Al menos un mes debe tener consumo > 0
+
+
+    Entrada:
+
+        ctx : WizardCtx
+
+    Salida:
+
+        (bool, list[str])
+
+        bool        → paso válido
+        list[str]   → lista de errores
+
+
+
+SALIDA DEL MÓDULO
+-----------------
+
+El módulo actualiza:
+
+ctx.consumo
+
+
+Ejemplo:
+
+ctx.consumo = {
+
+    "kwh_12m": [
+        820, 790, 860, 910, 950, 980,
+        1020, 1000, 940, 890, 860, 830
+    ],
+
+    "cargos_fijos_L_mes": 250.0,
+
+    "tarifa_energia_L_kwh": 6.75,
+
+    "fuente": "manual"
+}
+
+
+FLUJO DENTRO DEL WIZARD
+-----------------------
+
+Paso 1
+
+    datos_cliente
+
+        ↓
+
+Paso 2
+
+    consumo_energetico
+
+        ↓
+
+Paso 3
+
+    dimensionamiento FV
+
+
+El consumo capturado en este módulo es utilizado por:
+
+    core.orquestador_estudio
+
+para calcular:
+
+    sizing
+    producción energética
+    dimensionamiento eléctrico
+    análisis financiero
+"""
