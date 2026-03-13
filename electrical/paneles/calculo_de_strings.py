@@ -142,29 +142,32 @@ def distribuir_strings_por_inversor(
     mppt_por_inv: int
 ):
 
+    total_mppt = n_inversores * mppt_por_inv
+
+    base = n_strings_total // total_mppt
+    resto = n_strings_total % total_mppt
+
     asignaciones = []
 
-    s = 0
+    idx = 0
 
     for inv in range(1, n_inversores + 1):
 
         for mppt in range(1, mppt_por_inv + 1):
 
-            if s < n_strings_total:
+            n = base + (1 if idx < resto else 0)
 
-                asignaciones.append({
-                    "inversor": inv,
-                    "mppt": mppt,
-                    "n_strings": 1
-                })
+            if n > 0:
 
-                s += 1
+                asignaciones.append(
+                    {
+                        "inversor": inv,
+                        "mppt": mppt,
+                        "n_strings": n
+                    }
+                )
 
-            else:
-                break
-
-        if s >= n_strings_total:
-            break
+            idx += 1
 
     return asignaciones
 
