@@ -139,46 +139,53 @@ def _split_por_mppt(
 def distribuir_strings_por_inversor(
     n_strings_total: int,
     n_inversores: int,
-    mppt_por_inv: int
+    mppt_por_inversor: int,
 ):
+    """
+    Distribuye los strings de forma balanceada:
 
-    asignaciones = {}
+    1) Primero entre inversores
+    2) Luego entre MPPT del inversor
+    """
 
-    for inv in range(1, n_inversores + 1):
-        for mppt in range(1, mppt_por_inv + 1):
-            asignaciones[(inv, mppt)] = 0
+    distribucion = []
 
-    total_mppt = n_inversores * mppt_por_inv
+    # strings por inversor
+    strings_por_inv = n_strings_total // n_inversores
+    resto = n_strings_total % n_inversores
 
-    s = 0
+    strings_inversor = []
 
-    while s < n_strings_total:
+    for i in range(n_inversores):
 
-        for inv in range(1, n_inversores + 1):
+        s = strings_por_inv
 
-            for mppt in range(1, mppt_por_inv + 1):
+        if i < resto:
+            s += 1
 
-                if s >= n_strings_total:
-                    break
+        strings_inversor.append(s)
 
-                asignaciones[(inv, mppt)] += 1
-                s += 1
+    # distribuir dentro de MPPT
+    for inv_id, strings_inv in enumerate(strings_inversor, start=1):
 
-    ramas = []
+        if strings_inv == 0:
+            continue
 
-    for (inv, mppt), n in asignaciones.items():
+        mppt_base = strings_inv // mppt_por_inversor
+        mppt_extra = strings_inv % mppt_por_inversor
 
-        if n > 0:
+        for mppt in range(1, mppt_por_inversor + 1):
 
-            ramas.append(
-                {
-                    "inversor": inv,
-                    "mppt": mppt,
-                    "n_strings": n
-                }
-            )
+            n = mppt_base
 
-    return ramas
+            if mppt <= mppt_extra:
+                n += 1
+
+            for _ in range(n):
+
+                distribucion.append((inv_id, mppt))
+
+    return distribucion
 # ==========================================================
 # GENERACION DE STRINGS
 # ==========================================================
