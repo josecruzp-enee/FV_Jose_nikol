@@ -1,78 +1,146 @@
+from typing import Dict, Any
 from reportlab.platypus import Table, TableStyle
+from reportlab.lib import colors
 
 
-def crear_tabla_diseno_nec(paq, pal, content_w):
+# ==========================================================
+# TABLA 1 — PARÁMETROS ELÉCTRICOS
+# ==========================================================
 
-    corr = paq.get("corrientes", {})
-    ocpd = paq.get("ocpd", {})
-    cond = paq.get("conductores", {})
+def crear_tabla_parametros_electricos(resultado, pal, content_w):
 
-    def fmt_corriente(v):
-        try:
-            return f"{float(v):.2f} A"
-        except:
-            return "-"
+    corr = resultado.get("nec", {}).get("corrientes", {})
 
-    data = [
+    def leer(nivel):
+        d = corr.get(nivel, {})
+        return (
+            float(d.get("i_operacion_a", 0)),
+            float(d.get("i_diseno_a", 0)),
+        )
 
-        ["Circuito", "I nominal", "I diseño", "Protección", "Conductor"],
+    panel_nom, panel_dis = leer("panel")
+    string_nom, string_dis = leer("string")
+    mppt_nom, mppt_dis = leer("mppt")
+    dc_nom, dc_dis = leer("dc_total")
+    ac_nom, ac_dis = leer("ac")
 
-        [
-            "String",
-            fmt_corriente(corr.get("string", {}).get("i_nominal")),
-            fmt_corriente(corr.get("string", {}).get("i_diseno")),
-            ocpd.get("string", {}).get("proteccion", "-"),
-            cond.get("string", {}).get("calibre", "-"),
-        ],
+    rows = [
+        ["Nivel", "Corriente nominal", "Corriente diseño"],
 
-        [
-            "MPPT",
-            fmt_corriente(corr.get("mppt", {}).get("i_nominal")),
-            fmt_corriente(corr.get("mppt", {}).get("i_diseno")),
-            ocpd.get("mppt", {}).get("proteccion", "-"),
-            cond.get("mppt", {}).get("calibre", "-"),
-        ],
-
-        [
-            "DC Inversor",
-            fmt_corriente(corr.get("dc_inversor", {}).get("i_nominal")),
-            fmt_corriente(corr.get("dc_inversor", {}).get("i_diseno")),
-            ocpd.get("dc_inversor", {}).get("proteccion", "-"),
-            cond.get("dc_inversor", {}).get("calibre", "-"),
-        ],
-
-        [
-            "AC salida",
-            fmt_corriente(corr.get("ac_salida", {}).get("i_nominal")),
-            fmt_corriente(corr.get("ac_salida", {}).get("i_diseno")),
-            ocpd.get("ac_salida", {}).get("proteccion", "-"),
-            cond.get("ac_salida", {}).get("calibre", "-"),
-        ],
+        ["Panel", f"{panel_nom:.2f} A", f"{panel_dis:.2f} A"],
+        ["String", f"{string_nom:.2f} A", f"{string_dis:.2f} A"],
+        ["MPPT", f"{mppt_nom:.2f} A", f"{mppt_dis:.2f} A"],
+        ["Entrada inversor DC", f"{dc_nom:.2f} A", f"{dc_dis:.2f} A"],
+        ["Salida inversor AC", f"{ac_nom:.2f} A", f"{ac_dis:.2f} A"],
     ]
 
-    colw = [
-        content_w * 0.20,
-        content_w * 0.20,
-        content_w * 0.20,
-        content_w * 0.20,
-        content_w * 0.20,
-    ]
+    colw = [content_w * 0.4, content_w * 0.3, content_w * 0.3]
 
-    tabla = Table(data, colWidths=colw)
+    tbl = Table(rows, colWidths=colw)
 
-    tabla.setStyle(TableStyle([
-
+    tbl.setStyle(TableStyle([
         ("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),
         ("BACKGROUND",(0,0),(-1,0),pal["SOFT"]),
         ("TEXTCOLOR",(0,0),(-1,0),pal["PRIMARY"]),
-
-        ("ALIGN",(1,1),(-1,-1),"RIGHT"),
-
+        ("ALIGN",(1,1),(-1,-1),"CENTER"),
         ("GRID",(0,0),(-1,-1),0.3,pal["BORDER"]),
-        ("FONTSIZE",(0,0),(-1,-1),9),
-
-        ("VALIGN",(0,0),(-1,-1),"MIDDLE")
-
+        ("FONTSIZE",(0,0),(-1,-1),10),
     ]))
 
-    return tabla
+    return tbl
+
+
+# ==========================================================
+# TABLA 2 — DIMENSIONAMIENTO NEC
+# ==========================================================
+
+def crear_tabla_dimensionamiento_nec(resultado, pal, content_w):
+
+    nec = resultado.get("nec", {}).get("protecciones", {})
+
+    rows = [
+        ["Circuito", "Corriente diseño", "Protección", "Conductor"],
+    ]
+
+    for circuito, d in nec.items():
+
+        rows.append([
+            circuito.replace("_"," ").title(),
+            f"{float(d.get('i_diseno_a',0)):.2f} A",
+            d.get("proteccion","—"),
+            d.get("conductor","—"),
+        ])
+
+    colw = [
+        content_w * 0.30,
+        content_w * 0.20,
+        content_w * 0.25,
+        content_w * 0.25,
+    ]
+
+    tbl = Table(rows, colWidths=colw)
+
+    tbl.setStyle(TableStyle([
+        ("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),
+        ("BACKGROUND",(0,0),(-1,0),pal["SOFT"]),
+        ("TEXTCOLOR",(0,0),(-1,0),pal["PRIMARY"]),
+        ("ALIGN",(1,1),(-1,-1),"CENTER"),
+        ("GRID",(0,0),(-1,-1),0.3,pal["BORDER"]),
+        ("FONTSIZE",(0,0),(-1,-1),10),
+    ]))
+
+    return tbl
+
+
+# ==========================================================
+# TABLA 3 — INDICADORES TÉCNICOS
+# ==========================================================
+
+def crear_tabla_indicadores(resultado, pal, content_w):
+
+    sizing = resultado.get("sizing", {})
+    strings = resultado.get("strings", {}).get("strings", [])
+
+    n_paneles = sizing.get("n_paneles",0)
+    panel_wp = sizing.get("panel_wp",450)
+    kw_ac = sizing.get("kw_ac",0)
+
+    paneles_usados = sum(s.get("n_series",0) for s in strings)
+    paneles_sobrantes = max(0, n_paneles - paneles_usados)
+
+    utiliz_panel = (paneles_usados/n_paneles)*100 if n_paneles else 0
+
+    n_mppt_total = sizing.get("n_inversores",1) * sizing.get("mppt_por_inversor",2)
+    utiliz_mppt = (len(strings)/n_mppt_total)*100 if n_mppt_total else 0
+
+    kwp_dc = sizing.get("pdc_kw",0)
+
+    relacion = kwp_dc/kw_ac if kw_ac else 0
+
+    carga_inv = kwp_dc / sizing.get("n_inversores",1)
+
+    rows = [
+
+        ["Indicador","Valor"],
+
+        ["Utilización de paneles", f"{utiliz_panel:.1f} %"],
+        ["Utilización de MPPT", f"{utiliz_mppt:.1f} %"],
+        ["Relación DC/AC", f"{relacion:.2f}"],
+        ["Carga promedio inversor", f"{carga_inv:.1f} kW DC"],
+
+    ]
+
+    colw = [content_w * 0.55, content_w * 0.45]
+
+    tbl = Table(rows, colWidths=colw)
+
+    tbl.setStyle(TableStyle([
+        ("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),
+        ("BACKGROUND",(0,0),(-1,0),pal["SOFT"]),
+        ("TEXTCOLOR",(0,0),(-1,0),pal["PRIMARY"]),
+        ("ALIGN",(1,1),(-1,-1),"RIGHT"),
+        ("GRID",(0,0),(-1,-1),0.3,pal["BORDER"]),
+        ("FONTSIZE",(0,0),(-1,-1),10),
+    ]))
+
+    return tbl
