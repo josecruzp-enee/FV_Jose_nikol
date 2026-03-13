@@ -139,8 +139,8 @@ def _resolver_conductores(entrada, corrientes, warnings):
 
     try:
 
-        dc_i = corrientes.get("dc_total", {}).get("i_diseno_nec_a")
-
+        dc_i = corrientes.get("dc_total", {}).get("i_diseno_a")
+       
         if dc_i:
 
             circuitos.append(
