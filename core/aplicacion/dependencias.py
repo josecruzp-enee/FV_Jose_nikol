@@ -167,6 +167,7 @@ class PanelesAdapter(PuertoPaneles):
             panel=panel,
             inversor=inversor,
             n_paneles_total=sizing.n_paneles,
+            n_inversores=sizing.n_inversores,
             t_min_c=10,
             t_oper_c=50,
         )
