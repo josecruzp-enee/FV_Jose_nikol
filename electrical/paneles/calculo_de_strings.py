@@ -137,53 +137,21 @@ def _split_por_mppt(
 # ==========================================================
 
 def distribuir_strings_por_inversor(
-    n_strings_total: int,
-    n_inversores: int,
-    mppt_por_inversor: int,
+    n_strings_total,
+    n_inversores,
+    mppt_por_inversor
 ):
-    """
-    Distribuye los strings de forma balanceada:
 
-    1) Primero entre inversores
-    2) Luego entre MPPT del inversor
-    """
+    posiciones = []
+
+    for mppt in range(1, mppt_por_inversor + 1):
+        for inv in range(1, n_inversores + 1):
+            posiciones.append((inv, mppt))
 
     distribucion = []
 
-    # strings por inversor
-    strings_por_inv = n_strings_total // n_inversores
-    resto = n_strings_total % n_inversores
-
-    strings_inversor = []
-
-    for i in range(n_inversores):
-
-        s = strings_por_inv
-
-        if i < resto:
-            s += 1
-
-        strings_inversor.append(s)
-
-    # distribuir dentro de MPPT
-    for inv_id, strings_inv in enumerate(strings_inversor, start=1):
-
-        if strings_inv == 0:
-            continue
-
-        mppt_base = strings_inv // mppt_por_inversor
-        mppt_extra = strings_inv % mppt_por_inversor
-
-        for mppt in range(1, mppt_por_inversor + 1):
-
-            n = mppt_base
-
-            if mppt <= mppt_extra:
-                n += 1
-
-            for _ in range(n):
-
-                distribucion.append((inv_id, mppt))
+    for i in range(n_strings_total):
+        distribucion.append(posiciones[i])
 
     return distribucion
 # ==========================================================
