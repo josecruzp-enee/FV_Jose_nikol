@@ -1,23 +1,22 @@
-from __future__ import annotations
+from **future** import annotations
 
 """
 ORQUESTADOR DEL DOMINIO PANELES
 
-FRONTERA DEL DOMINIO
---------------------
+## FRONTERA DEL DOMINIO
 
 Este módulo coordina el cálculo del generador fotovoltaico.
 
 Flujo del dominio:
 
 EntradaPaneles
-      ↓
+↓
 validaciones
-      ↓
+↓
 dimensionado de paneles
-      ↓
+↓
 cálculo de strings
-      ↓
+↓
 resultado del dominio
 
 Este módulo NO implementa cálculos físicos complejos.
@@ -32,14 +31,15 @@ from .calculo_de_strings import calcular_strings_fv
 from .dimensionado_paneles import dimensionar_paneles
 from .entrada_panel import EntradaPaneles
 from .validacion_strings import (
-    validar_panel,
-    validar_inversor,
-    validar_parametros_generales
+validar_panel,
+validar_inversor,
+validar_parametros_generales,
 )
 
-
 # ==========================================================
+
 # ORQUESTADOR
+
 # ==========================================================
 
 def ejecutar_paneles(
@@ -77,7 +77,6 @@ errores += e
 warnings += w
 
 if errores:
-
     return {
         "ok": False,
         "errores": errores,
@@ -91,7 +90,6 @@ if errores:
 dim = dimensionar_paneles(entrada)
 
 if not dim.ok:
-
     return {
         "ok": False,
         "errores": dim.errores,
@@ -122,7 +120,6 @@ st.write({
 })
 
 resultado = calcular_strings_fv(
-
     n_paneles_total=n_paneles_total,
     panel=panel,
     inversor=inversor,
@@ -156,38 +153,70 @@ resultado["meta"]["pdc_kw"] = dim.pdc_kw
 return resultado
 ```
 
+# ==========================================================
+
+# SALIDAS DEL ARCHIVO
 
 # ==========================================================
-# SALIDAS DEL ARCHIVO
-# ==========================================================
+
 #
+
 # ejecutar_paneles(entrada: EntradaPaneles)
+
 #
+
 # devuelve:
+
 #
+
 # ok : bool
+
 # errores : list[str]
+
 # warnings : list[str]
+
 #
+
 # strings : list
+
 #
+
 # recomendacion:
-#   n_series
-#   n_strings_total
-#   vmp_string_v
-#   voc_string_v
-#   imp_array_a
-#   isc_array_total_a
+
+# n_series
+
+# n_strings_total
+
+# vmp_string_v
+
+# voc_string_v
+
+# imp_array_a
+
+# isc_array_total_a
+
 #
+
 # bounds:
-#   n_min
-#   n_max
+
+# n_min
+
+# n_max
+
 #
+
 # meta:
-#   n_paneles_total
-#   pdc_kw
+
+# n_paneles_total
+
+# pdc_kw
+
 #
+
 # Consumido por:
+
 # core
+
 #
+
 # ==========================================================
