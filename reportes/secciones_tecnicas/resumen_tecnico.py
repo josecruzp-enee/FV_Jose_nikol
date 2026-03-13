@@ -87,22 +87,30 @@ def obtener_configuracion_strings(resultado):
 
 def obtener_corrientes(resultado):
 
-    nec = resultado.get("nec", {})
+    strings_data = resultado.get("strings", {}).get("strings", [])
 
+    imp_string = 0
+    isc_string = 0
+
+    if strings_data:
+        s = strings_data[0]
+        imp_string = float(s.get("imp_string_a", 0))
+        isc_string = float(s.get("isc_string_a", 0))
+
+    nec = resultado.get("nec", {})
     corr = nec.get("corrientes", {})
 
-    panel = corr.get("panel", {}).get("i_operacion_a", 0)
+    panel = corr.get("panel", {}).get("i_operacion_a", imp_string)
 
-    string = corr.get("string", {}).get("i_operacion_a", 0)
+    string = corr.get("string", {}).get("i_operacion_a", imp_string)
 
-    mppt = corr.get("mppt", {}).get("i_operacion_a", 0)
+    mppt = corr.get("mppt", {}).get("i_operacion_a", imp_string)
 
     dc_total = corr.get("dc_total", {}).get("i_operacion_a", 0)
 
     ac = corr.get("ac", {}).get("i_operacion_a", 0)
 
-    return panel, string, mppt, dc_total, ac
-
+    return panel, string, mppt, dc_total, ac, isc_string
 
 # ==========================================================
 # Calcular parámetros del sistema
@@ -210,7 +218,7 @@ def build_resumen_tecnico(resultado, pal, styles, content_w):
 
     n_series, n_strings, vmp, voc = obtener_configuracion_strings(resultado)
 
-    panel_i, string_i, mppt_i, dc_i, ac_i = obtener_corrientes(resultado)
+    panel_i, string_i, mppt_i, dc_i, ac_i, isc = obtener_corrientes(resultado)
 
     panel_wp, potencia_inversor, relacion_dc_ac, paneles_usados, paneles_sobrantes = calcular_parametros_generales(
         kwp_dc,
