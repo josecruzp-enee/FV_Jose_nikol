@@ -42,16 +42,18 @@ except Exception:
 
 from dataclasses import asdict
 
+
 def _corrientes_dict(c):
+
+    print("DEBUG INGENIERIA ELECTRICA")
+    print(c)
 
     if c is None:
         return {}
 
-    # si ya es dict
     if isinstance(c, dict):
         return c
 
-    # si es dataclass
     try:
         return asdict(c)
     except Exception:
