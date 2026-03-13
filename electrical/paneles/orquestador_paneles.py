@@ -46,7 +46,7 @@ def ejecutar_paneles(
 entrada: EntradaPaneles
 ) -> Dict:
 
-```
+
 import streamlit as st
 
 errores: List[str] = []
@@ -151,7 +151,7 @@ resultado["meta"]["n_paneles_total"] = n_paneles_total
 resultado["meta"]["pdc_kw"] = dim.pdc_kw
 
 return resultado
-```
+
 
 # ==========================================================
 
