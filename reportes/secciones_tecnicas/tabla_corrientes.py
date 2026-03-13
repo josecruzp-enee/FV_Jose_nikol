@@ -6,22 +6,22 @@ def crear_tabla_corrientes(corr, pal, content_w):
     panel = corr.get("panel", {})
     string = corr.get("string", {})
     mppt = corr.get("mppt", {})
-    dc_total = corr.get("dc_inversor", {})
-    ac = corr.get("ac_salida", {})
+    dc_total = corr.get("dc_total", {})
+    ac = corr.get("ac", {})
 
     data = [
 
         ["Nivel eléctrico", "Corriente (A)"],
 
-        ["Panel", f"{panel.get('i_nominal',0):.2f}"],
+        ["Panel", f"{panel.get('i_operacion_a',0):.2f}"],
 
-        ["String", f"{string.get('i_nominal',0):.2f}"],
+        ["String", f"{string.get('i_operacion_a',0):.2f}"],
 
-        ["MPPT", f"{mppt.get('i_nominal',0):.2f}"],
+        ["MPPT", f"{mppt.get('i_operacion_a',0):.2f}"],
 
-        ["Entrada inversor DC", f"{dc_total.get('i_nominal',0):.2f}"],
+        ["Entrada inversor DC", f"{dc_total.get('i_operacion_a',0):.2f}"],
 
-        ["Salida inversor AC", f"{ac.get('i_nominal',0):.2f}"],
+        ["Salida inversor AC", f"{ac.get('i_operacion_a',0):.2f}"],
     ]
 
     colw = [content_w * 0.6, content_w * 0.4]
