@@ -5,14 +5,14 @@ ADAPTADOR NEC — FV ENGINE
 
 Este módulo actúa como frontera entre:
 
-    Motor FV
+    Motor FV (core)
         ↓
-    Motor NEC
+    Motor NEC (electrical)
 
 Responsabilidad:
     - leer resultados de sizing y strings
     - construir entrada NEC
-    - ejecutar paquete NEC
+    - ejecutar motor de ingeniería eléctrica
 
 NO calcula ingeniería eléctrica directamente.
 """
@@ -102,7 +102,7 @@ def _datos_strings(strings):
 
 
 # ==========================================================
-# CONSTRUIR ENTRADA NEC
+# CONSTRUIR ENTRADA NEC (alineada con ingenieria_electrica)
 # ==========================================================
 
 def _construir_entrada_nec(
@@ -115,24 +115,49 @@ def _construir_entrada_nec(
 
     datos_strings = _datos_strings(strings)
 
-    potencia_dc = getattr(sizing, "pdc_kw", 0) * 1000
-    potencia_ac = getattr(sizing, "kw_ac", 0) * 1000
-
     entrada_nec = {
+
+        # --------------------------------------------------
+        # STRINGS (entrada para calcular_corrientes)
+        # --------------------------------------------------
+
+        "strings": {
+            "corrientes_input": {
+
+                "imp_string_a": datos_strings["imp_string_a"],
+                "isc_string_a": datos_strings["isc_string_a"],
+                "vmp_string_v": datos_strings["vmp_string_v"]
+
+            }
+        },
+
+        # --------------------------------------------------
+        # DATOS DEL INVERSOR
+        # --------------------------------------------------
+
+        "inversor": {
+
+            "kw_ac": getattr(sizing, "kw_ac", 0),
+
+            "v_ac_nom_v": vac_ll,
+
+            "fases": fases,
+
+            "fp": fp
+
+        },
+
+        # --------------------------------------------------
+        # PARÁMETROS GENERALES
+        # --------------------------------------------------
 
         "n_strings": datos_strings["n_strings"],
 
-        "imp_string_a": datos_strings["imp_string_a"],
-        "isc_string_a": datos_strings["isc_string_a"],
-
-        "potencia_dc_w": potencia_dc,
-        "potencia_ac_w": potencia_ac,
+        "isc_mod_a": datos_strings["isc_string_a"],
 
         "vdc_nom": datos_strings["vmp_string_v"],
-        "vac_ll": vac_ll,
 
-        "fases": fases,
-        "fp": fp
+        "vac_ll": vac_ll
     }
 
     return entrada_nec
@@ -156,12 +181,10 @@ def ejecutar_nec(
 
     paquete = ejecutar_ingenieria_electrica(entrada_nec)
 
-    resultado = {
+    return {
         "entrada_nec": entrada_nec,
         "paquete_nec": paquete
     }
-
-    return resultado
 
 
 # ==========================================================
@@ -179,7 +202,7 @@ def ejecutar_nec(
 #   dict
 #
 # Descripción:
-#   Adaptador entre el motor FV y el motor NEC.
+#   Adaptador entre el motor FV (core) y el motor NEC.
 #
 # Consumido por:
 #   core.orquestador_estudio
