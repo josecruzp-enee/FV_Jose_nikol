@@ -1,3 +1,16 @@
+from __future__ import annotations
+
+from core.aplicacion.orquestador_estudio import DependenciasEstudio
+
+from core.servicios.sizing import calcular_sizing_unificado
+from electrical.paneles.orquestador_paneles import ejecutar_paneles
+from electrical.energia.orquestador_energia import ejecutar_motor_energia
+from electrical.nec.orquestador_nec import ejecutar_nec
+from core.servicios.finanzas import ejecutar_finanzas
+
+from electrical.paneles.entrada_panel import EntradaPaneles
+from electrical.catalogos import get_panel, get_inversor
+
 from core.dominio.contrato import ResultadoStrings
 
 
