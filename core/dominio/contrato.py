@@ -1,82 +1,6 @@
-"""
-CONTRATO MAESTRO DE RESULTADOS — FV ENGINE
-
-Este módulo define las estructuras oficiales de salida del motor FV Engine.
-No contiene lógica de cálculo. Solo define modelos de datos utilizados
-para transportar resultados entre dominios del sistema.
-
----------------------------------------------------------------------
-
-ARQUITECTURA
-
-UI
-↓
-core.orquestador_estudio
-↓
-DOMINIOS
-
-    paneles
-    energia
-    ingenieria_electrica (NEC)
-    finanzas
-
-↓
-ResultadoProyecto
-
----------------------------------------------------------------------
-
-RESPONSABILIDAD
-
-Definir los contratos de datos que representan los resultados generados
-por cada dominio del sistema FV:
-
-    ResultadoSizing
-    ResultadoStrings
-    ResultadoNEC
-    ResultadoFinanciero
-    ResultadoProyecto
-
-Estos modelos permiten transportar datos entre capas sin acoplar
-los dominios entre sí.
-
----------------------------------------------------------------------
-
-REGLAS DE ARQUITECTURA
-
-Este módulo:
-
-✔ define estructuras de datos del dominio
-✔ es consumido por core, UI y reportes
-
-Este módulo NO debe:
-
-✘ ejecutar cálculos
-✘ leer archivos
-✘ ejecutar simulaciones
-✘ depender de UI o PDF
-✘ contener lógica de negocio
-
----------------------------------------------------------------------
-
-FLUJO DEL SISTEMA
-
-DatosProyecto
-↓
-Sizing
-↓
-Strings
-↓
-Energía
-↓
-Ingeniería NEC
-↓
-Finanzas
-↓
-ResultadoProyecto
-"""
-
 from dataclasses import dataclass
 from typing import List, Dict, Any
+
 from electrical.energia.contrato import EnergiaResultado
 
 
@@ -87,7 +11,7 @@ from electrical.energia.contrato import EnergiaResultado
 @dataclass(frozen=True)
 class MesEnergia:
     """
-    Representa el balance energético mensual del sistema FV.
+    Balance energético mensual del sistema FV.
     """
 
     mes: str
@@ -100,7 +24,7 @@ class MesEnergia:
 # RESULTADO DEL SIZING
 # =========================================================
 
-@dataclass
+@dataclass(frozen=True)
 class ResultadoSizing:
     """
     Resultado del dimensionamiento del sistema FV.
@@ -109,44 +33,57 @@ class ResultadoSizing:
     n_paneles: int
     kwp_dc: float
     pdc_kw: float
-    kw_ac: float
 
+    kw_ac: float
     n_inversores: int
+
     paneles_por_inversor: int
 
     energia_12m: List[MesEnergia]
 
 
 # =========================================================
-# INFORMACIÓN DE STRINGS FV
+# INFORMACIÓN DE STRING FV
 # =========================================================
 
 @dataclass(frozen=True)
 class StringInfo:
     """
-    Información eléctrica de un string conectado a un MPPT.
+    Representa un string conectado a un MPPT.
     """
+
+    id: int
 
     inversor: int
     mppt: int
 
     n_series: int
-    n_paralelo: int
 
     vmp_string_v: float
     voc_frio_string_v: float
 
-    imp_a: float
-    isc_a: float
+    imp_string_a: float
+    isc_string_a: float
 
+
+# =========================================================
+# RESULTADO DE STRINGS
+# =========================================================
 
 @dataclass(frozen=True)
 class ResultadoStrings:
     """
-    Resultado del cálculo de configuración de strings FV.
+    Resultado del cálculo de configuración del generador FV.
     """
 
     ok: bool
+
+    n_series: int
+    n_strings_total: int
+
+    vmp_string_v: float
+    voc_string_v: float
+
     strings: List[StringInfo]
 
 
@@ -157,10 +94,11 @@ class ResultadoStrings:
 @dataclass(frozen=True)
 class NECInversor:
     """
-    Corrientes nominales del inversor utilizadas en ingeniería NEC.
+    Corrientes nominales por inversor para ingeniería NEC.
     """
 
     inversor: int
+
     idc_nom: float
     iac_nom: float
 
@@ -168,10 +106,11 @@ class NECInversor:
 @dataclass(frozen=True)
 class NECResumen:
     """
-    Resumen eléctrico del sistema utilizado por la ingeniería NEC.
+    Resumen eléctrico del sistema.
     """
 
     inversores: List[NECInversor]
+
     vdc_nom: float
     vac_nom: float
 
@@ -179,11 +118,13 @@ class NECResumen:
 @dataclass(frozen=True)
 class ResultadoNEC:
     """
-    Resultado del cálculo de ingeniería eléctrica NEC.
+    Resultado del cálculo de ingeniería eléctrica.
     """
 
     ok: bool
+
     resumen: NECResumen
+
     paq: Dict[str, Any]
 
 
@@ -194,11 +135,12 @@ class ResultadoNEC:
 @dataclass(frozen=True)
 class ResultadoFinanciero:
     """
-    Resultado del análisis financiero del sistema FV.
+    Resultado del análisis financiero del proyecto FV.
     """
 
     capex_L: float
     opex_L: float
+
     tir: float
     van: float
     payback_simple: float
@@ -213,14 +155,19 @@ class ResultadoFinanciero:
 @dataclass(frozen=True)
 class ResultadoProyecto:
     """
-    Resultado final consolidado del estudio FV.
+    Resultado consolidado del estudio FV.
 
-    Este contrato unifica los resultados generados por
-    todos los dominios del motor FV Engine.
+    Unifica todos los dominios del motor.
     """
 
     sizing: ResultadoSizing
+
     strings: ResultadoStrings
+
     energia: EnergiaResultado
+
     nec: ResultadoNEC
+
     financiero: ResultadoFinanciero
+
+    meta: Dict[str, Any]
