@@ -164,7 +164,7 @@ class EnergiaAdapter:
 
 
         permitir_curtailment=True
-        )
+        
 
         return ejecutar_motor_energia(entrada)
 
