@@ -14,6 +14,15 @@ from core.aplicacion.puertos import (
 )
 
 
+@dataclass
+class DependenciasEstudio:
+
+    sizing: PuertoSizing
+    paneles: PuertoPaneles
+    energia: PuertoEnergia
+    nec: PuertoNEC
+    finanzas: PuertoFinanzas
+
 def ejecutar_estudio(
     datos: Any,
     deps: DependenciasEstudio,
