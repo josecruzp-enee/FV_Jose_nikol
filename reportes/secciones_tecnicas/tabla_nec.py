@@ -8,11 +8,13 @@ from reportlab.platypus import Table, TableStyle
 
 def crear_tabla_parametros_electricos(resultado, pal, content_w):
 
-    # Leer corrientes desde ingeniería eléctrica
-    corr = resultado.get("nec", {}).get("paquete_nec", {}).get("corrientes", {})
+    nec = getattr(resultado, "nec", {})
+    corr = nec.get("paquete_nec", {}).get("corrientes", {})
 
     def leer(nivel):
+
         d = corr.get(nivel, {})
+
         return (
             float(d.get("i_operacion_a", 0)),
             float(d.get("i_diseno_a", 0)),
@@ -25,6 +27,7 @@ def crear_tabla_parametros_electricos(resultado, pal, content_w):
     ac_nom, ac_dis = leer("ac")
 
     rows = [
+
         ["Nivel", "Corriente nominal", "Corriente diseño"],
 
         ["Panel", f"{panel_nom:.2f} A", f"{panel_dis:.2f} A"],
@@ -60,13 +63,12 @@ def crear_tabla_parametros_electricos(resultado, pal, content_w):
 # TABLA 2 — DIMENSIONAMIENTO NEC
 # ==========================================================
 
-from reportlab.platypus import Table, TableStyle
-
 def crear_tabla_dimensionamiento_nec(resultado, pal, content_w):
 
-    nec = resultado.get("nec", {}).get("paquete_nec", {})
+    nec = getattr(resultado, "nec", {}).get("paquete_nec", {})
+
     corr = nec.get("corrientes", {})
-    prot = nec.get("protecciones", {})
+    prot = nec.get("protecciones")
     cond = nec.get("conductores", {}).get("circuitos", [])
 
     if not corr:
@@ -75,18 +77,23 @@ def crear_tabla_dimensionamiento_nec(resultado, pal, content_w):
     # Buscar calibres DC y AC
     cond_dc = "—"
     cond_ac = "—"
+
     for c in cond:
+
         if c.get("nombre") == "DC":
             cond_dc = f'{c.get("awg","—")} AWG'
+
         if c.get("nombre") == "AC":
             cond_ac = f'{c.get("awg","—")} AWG'
 
     # Protecciones
-    breaker_ac = prot.get("breaker_ac", {})
-    fusible_str = prot.get("fusible_string", {})
+    breaker_ac = getattr(prot, "breaker_ac", None)
+    fusible_str = getattr(prot, "fusible_string", None)
 
     rows = [
+
         ["Circuito", "Corriente operación", "Corriente diseño NEC", "Protección", "Conductor"],
+
     ]
 
     orden = [
@@ -105,8 +112,9 @@ def crear_tabla_dimensionamiento_nec(resultado, pal, content_w):
         i_dis = d.get("i_diseno_a", 0)
 
         proteccion = "—"
+
         if p:
-            proteccion = f'{p.get("tamano_a","—")} A'
+            proteccion = f'{getattr(p,"tamano_a","—")} A'
 
         conductor = c if c else "—"
 
@@ -139,37 +147,35 @@ def crear_tabla_dimensionamiento_nec(resultado, pal, content_w):
     ]))
 
     return tbl
+
+
 # ==========================================================
 # TABLA 3 — INDICADORES TÉCNICOS
 # ==========================================================
 
 def crear_tabla_indicadores(resultado, pal, content_w):
 
-    sizing = resultado.get("sizing", {})
-    strings = resultado.get("strings", {}).get("strings", [])
+    sizing = getattr(resultado, "sizing", None)
+    strings_block = getattr(resultado, "strings", None)
 
-    n_paneles = sizing.get("n_paneles", 0)
-    kw_ac = sizing.get("kw_ac", 0)
+    strings = getattr(strings_block, "strings", []) if strings_block else []
 
-    paneles_usados = sum(s.get("n_series", 0) for s in strings)
+    n_paneles = getattr(sizing, "n_paneles", 0)
+    kw_ac = getattr(sizing, "kw_ac", 0)
+
+    paneles_usados = sum(getattr(s, "n_series", 0) for s in strings)
 
     utiliz_panel = (paneles_usados / n_paneles) * 100 if n_paneles else 0
 
-    n_mppt_total = (
-        sizing.get("n_inversores", 1) *
-        sizing.get("mppt_por_inversor", 2)
-    )
+    n_mppt_total = getattr(sizing, "n_inversores", 1) * getattr(sizing, "mppt_por_inversor", 2)
 
-    utiliz_mppt = (
-        len(strings) / n_mppt_total * 100
-        if n_mppt_total else 0
-    )
+    utiliz_mppt = len(strings) / n_mppt_total * 100 if n_mppt_total else 0
 
-    kwp_dc = sizing.get("pdc_kw", 0)
+    kwp_dc = getattr(sizing, "pdc_kw", 0)
 
     relacion = kwp_dc / kw_ac if kw_ac else 0
 
-    carga_inv = kwp_dc / sizing.get("n_inversores", 1)
+    carga_inv = kwp_dc / getattr(sizing, "n_inversores", 1)
 
     rows = [
 
