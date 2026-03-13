@@ -193,7 +193,7 @@ def _mostrar_sizing(sizing):
 # MOSTRAR NEC
 # ==========================================================
 
-def _mostrar_nec(nec):
+ddef _mostrar_nec(nec):
 
     st.subheader("Ingeniería eléctrica (NEC)")
 
@@ -227,7 +227,7 @@ def _mostrar_nec(nec):
 
         st.metric(
             "Corriente DC diseño NEC",
-            _fmt(dc.get("i_diseno_nec_a"), "A")
+            _fmt(dc.get("i_diseno_a"), "A")
         )
 
     # ======================================================
@@ -243,7 +243,7 @@ def _mostrar_nec(nec):
 
         st.metric(
             "Corriente AC diseño",
-            _fmt(ac.get("i_diseno_nec_a"), "A")
+            _fmt(ac.get("i_diseno_a"), "A")
         )
 
         breaker = protecciones.get("breaker_ac", {})
@@ -286,7 +286,6 @@ def _mostrar_nec(nec):
         df = pd.DataFrame(filas)
 
         st.dataframe(df, use_container_width=True)
-
 # ==========================================================
 # RENDER PRINCIPAL
 # ==========================================================
