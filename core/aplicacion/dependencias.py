@@ -11,15 +11,26 @@ from core.servicios.finanzas import ejecutar_finanzas
 from electrical.paneles.entrada_panel import EntradaPaneles
 
 
+from electrical.catalogos import get_panel, get_inversor
+
+
 class PanelesAdapter:
 
     def ejecutar(self, datos, sizing):
 
+        eq = getattr(datos, "equipos", {}) or {}
+
+        panel_id = eq.get("panel_id")
+        inversor_id = eq.get("inversor_id")
+
+        panel = get_panel(panel_id)
+        inversor = get_inversor(inversor_id)
+
         entrada = EntradaPaneles(
 
-            panel=sizing.panel,
+            panel=panel,
 
-            inversor=sizing.inversor,
+            inversor=inversor,
 
             n_paneles_total=sizing.n_paneles,
 
