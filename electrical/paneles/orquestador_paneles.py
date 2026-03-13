@@ -43,116 +43,118 @@ from .validacion_strings import (
 # ==========================================================
 
 def ejecutar_paneles(
-    entrada: EntradaPaneles
+entrada: EntradaPaneles
 ) -> Dict:
 
-    errores: List[str] = []
-    warnings: List[str] = []
+```
+import streamlit as st
 
-    panel: PanelSpec = entrada.panel
-    inversor: InversorSpec = entrada.inversor
+errores: List[str] = []
+warnings: List[str] = []
 
-    # ------------------------------------------------------
-    # VALIDACIONES
-    # ------------------------------------------------------
+panel: PanelSpec = entrada.panel
+inversor: InversorSpec = entrada.inversor
 
-    e, w = validar_panel(panel)
-    errores += e
-    warnings += w
+# ------------------------------------------------------
+# VALIDACIONES
+# ------------------------------------------------------
 
-    e, w = validar_inversor(inversor)
-    errores += e
-    warnings += w
+e, w = validar_panel(panel)
+errores += e
+warnings += w
 
-    e, w = validar_parametros_generales(
-        entrada.n_paneles_total,
-        entrada.t_min_c,
-        entrada.t_oper_c,
-    )
+e, w = validar_inversor(inversor)
+errores += e
+warnings += w
 
-    errores += e
-    warnings += w
+e, w = validar_parametros_generales(
+    entrada.n_paneles_total,
+    entrada.t_min_c,
+    entrada.t_oper_c,
+)
 
-    if errores:
+errores += e
+warnings += w
 
-        return {
-            "ok": False,
-            "errores": errores,
-            "warnings": warnings,
-        }
+if errores:
 
-    # ------------------------------------------------------
-    # DIMENSIONADO DE PANELES
-    # ------------------------------------------------------
+    return {
+        "ok": False,
+        "errores": errores,
+        "warnings": warnings,
+    }
 
-    dim = dimensionar_paneles(entrada)
+# ------------------------------------------------------
+# DIMENSIONADO DE PANELES
+# ------------------------------------------------------
 
-    if not dim.ok:
+dim = dimensionar_paneles(entrada)
 
-        return {
-            "ok": False,
-            "errores": dim.errores,
-            "warnings": warnings,
-        }
+if not dim.ok:
 
-    n_paneles_total = dim.n_paneles
-    import streamlit as st
+    return {
+        "ok": False,
+        "errores": dim.errores,
+        "warnings": warnings,
+    }
 
-    st.write("DEBUG DIMENSIONADO PANELES")
-    st.write({
-        "entrada_paneles": entrada.n_paneles_total,
-        "paneles_dimensionados": dim.n_paneles,
-        "pdc_kw": dim.pdc_kw
-    })
-    # ------------------------------------------------------
-    # CÁLCULO DE STRINGS
-    # ------------------------------------------------------
-    n_inversores = int(entrada.n_inversores or 1)
-    st.write("DEBUG ANTES DE STRINGS")
+n_paneles_total = dim.n_paneles
 
-    st.write({
-        "n_paneles_total_enviado": n_paneles_total,
-        "n_inversores": n_inversores,
-        "mppt_por_inversor": inversor.n_mppt
-    })  
-    resultado = calcular_strings_fv(
-    st.write("DEBUG RESULTADO STRINGS")
-    st.write("numero strings:", len(resultado.get("strings", [])))
-        n_paneles_total=n_paneles_total,
+# DEBUG DIMENSIONADO
+st.write("DEBUG DIMENSIONADO PANELES")
+st.write({
+    "entrada_paneles": entrada.n_paneles_total,
+    "paneles_dimensionados": dim.n_paneles,
+    "pdc_kw": dim.pdc_kw
+})
 
-        panel=panel,
+# ------------------------------------------------------
+# CÁLCULO DE STRINGS
+# ------------------------------------------------------
 
-        inversor=inversor,
+n_inversores = int(entrada.n_inversores or 1)
 
-        n_inversores=n_inversores,
+st.write("DEBUG ANTES DE STRINGS")
+st.write({
+    "n_paneles_total_enviado": n_paneles_total,
+    "n_inversores": n_inversores,
+    "mppt_por_inversor": inversor.n_mppt
+})
 
-        t_min_c=float(entrada.t_min_c),
+resultado = calcular_strings_fv(
 
-        dos_aguas=bool(entrada.dos_aguas),
+    n_paneles_total=n_paneles_total,
+    panel=panel,
+    inversor=inversor,
+    n_inversores=n_inversores,
+    t_min_c=float(entrada.t_min_c),
+    dos_aguas=bool(entrada.dos_aguas),
+    objetivo_dc_ac=entrada.objetivo_dc_ac,
+    pdc_kw_objetivo=entrada.pdc_kw_objetivo,
+    t_oper_c=entrada.t_oper_c,
+)
 
-        objetivo_dc_ac=entrada.objetivo_dc_ac,
+# DEBUG RESULTADO
+st.write("DEBUG RESULTADO STRINGS")
+st.write("numero strings:", len(resultado.get("strings", [])))
 
-        pdc_kw_objetivo=entrada.pdc_kw_objetivo,
+resultado.setdefault("ok", False)
+resultado.setdefault("errores", [])
+resultado.setdefault("warnings", [])
 
-        t_oper_c=entrada.t_oper_c,
-    )
+resultado["warnings"] = warnings + resultado["warnings"]
 
-    resultado.setdefault("ok", False)
-    resultado.setdefault("errores", [])
-    resultado.setdefault("warnings", [])
+# ------------------------------------------------------
+# META DEL DIMENSIONADO
+# ------------------------------------------------------
 
-    resultado["warnings"] = warnings + resultado["warnings"]
+resultado.setdefault("meta", {})
 
-    # ------------------------------------------------------
-    # META DEL DIMENSIONADO
-    # ------------------------------------------------------
+resultado["meta"]["n_paneles_total"] = n_paneles_total
+resultado["meta"]["pdc_kw"] = dim.pdc_kw
 
-    resultado.setdefault("meta", {})
-
-    resultado["meta"]["n_paneles_total"] = n_paneles_total
-    resultado["meta"]["pdc_kw"] = dim.pdc_kw
-
-    return resultado
+return resultado
+```
 
 
 # ==========================================================
