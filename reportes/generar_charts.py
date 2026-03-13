@@ -170,7 +170,7 @@ def generar_charts(
     base = _mkdir_charts(out_dir)
 
     pdc_kw = _leer_pdc_kw(res)
-
+    st.write("DEBUG PDC KW:", pdc_kw)
     meses = [
         "Ene","Feb","Mar","Abr","May","Jun",
         "Jul","Ago","Sep","Oct","Nov","Dic"
