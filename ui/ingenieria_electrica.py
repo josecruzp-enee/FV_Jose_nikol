@@ -275,6 +275,13 @@ def render(ctx):
         deps = construir_dependencias()
 
         resultado = ejecutar_estudio(datos, deps)
+        st.subheader("DEBUG RESULTADO")
+
+        st.write("Tipo resultado:")
+        st.write(type(resultado))
+
+        st.write("Contenido resultado:")
+        st.write(resultado)
 
         # ======================================================
         # DEBUG
