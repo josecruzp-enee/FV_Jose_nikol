@@ -189,10 +189,6 @@ def _mostrar_sizing(sizing):
 # MOSTRAR NEC
 # ==========================================================
 
-# ==========================================================
-# MOSTRAR NEC
-# ==========================================================
-
 def _mostrar_nec(nec):
 
     st.subheader("Ingeniería eléctrica (NEC)")
@@ -201,12 +197,22 @@ def _mostrar_nec(nec):
         st.info("Sin resultados NEC.")
         return
 
-    corrientes = nec.get("corrientes", {})
-    protecciones = nec.get("protecciones")
-    conductores = nec.get("conductores", {}).get("circuitos", [])
+    # ======================================================
+    # DEBUG
+    # ======================================================
 
     st.subheader("DEBUG NEC")
     st.json(nec)
+
+    # ======================================================
+    # Leer paquete NEC real
+    # ======================================================
+
+    paquete = nec.get("paquete_nec", {})
+
+    corrientes = paquete.get("corrientes", {})
+    protecciones = paquete.get("protecciones", {})
+    conductores = paquete.get("conductores", {}).get("circuitos", [])
 
     st.subheader("DEBUG CORRIENTES")
     st.json(corrientes)
@@ -219,17 +225,6 @@ def _mostrar_nec(nec):
 
     st.subheader("DEBUG AC")
     st.json(ac)
-
-    # ------------------------------------------------------
-    # Lectura segura del contrato eléctrico
-    # ------------------------------------------------------
-
-    corrientes = nec.get("corrientes", {})
-    protecciones = nec.get("protecciones")
-    conductores = nec.get("conductores", {}).get("circuitos", [])
-
-    dc = corrientes.get("dc_total", {})
-    ac = corrientes.get("ac", {})
 
     tabs = st.tabs(["DC", "AC", "Conductores"])
 
@@ -265,17 +260,13 @@ def _mostrar_nec(nec):
             _fmt(ac.get("i_diseno_a"), "A")
         )
 
-        breaker = None
-
-        # protecciones es dataclass
-        if protecciones and hasattr(protecciones, "breaker_ac"):
-            breaker = protecciones.breaker_ac
+        breaker = protecciones.get("breaker_ac", {})
 
         if breaker:
 
             st.metric(
                 "Breaker AC",
-                _fmt(breaker.tamano_a, "A")
+                _fmt(breaker.get("tamano_a"), "A")
             )
 
     # ======================================================
@@ -295,13 +286,9 @@ def _mostrar_nec(nec):
             filas.append({
 
                 "Circuito": c.get("nombre"),
-
                 "Calibre": c.get("calibre"),
-
                 "I diseño": _fmt(c.get("i_diseno_a"), "A"),
-
                 "Ampacidad": _fmt(c.get("ampacidad_ajustada_a"), "A"),
-
                 "VD": _fmt(c.get("vd_pct"), "%"),
 
             })
@@ -309,6 +296,12 @@ def _mostrar_nec(nec):
         df = pd.DataFrame(filas)
 
         st.dataframe(df, use_container_width=True)
+
+
+
+
+
+
 # ==========================================================
 # RENDER PRINCIPAL
 # ==========================================================
