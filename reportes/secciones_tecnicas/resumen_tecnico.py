@@ -73,7 +73,6 @@ def calcular_parametros_generales(kwp_dc, kw_ac, n_paneles, n_inversores):
 def obtener_configuracion_strings(resultado):
 
     paneles = resultado.get("strings", {})
-
     strings = paneles.get("strings", [])
 
     if not strings:
@@ -83,8 +82,8 @@ def obtener_configuracion_strings(resultado):
 
     n_series = int(s.get("n_series", 0))
 
-    # número total de strings
-    n_paralelo = len(strings)
+    # total real de strings
+    n_paralelo = sum(s.get("n_strings", 1) for s in strings)
 
     vmp = float(s.get("vmp_string_v", 0))
 
@@ -95,9 +94,7 @@ def obtener_configuracion_strings(resultado):
     )
 
     return n_series, n_paralelo, vmp, voc
-# ==========================================================
-# Obtener corrientes del sistema FV
-# ==========================================================
+
 
 # ==========================================================
 # Obtener corrientes del sistema FV
