@@ -70,8 +70,21 @@ def calcular_parametros_generales(kwp_dc, kw_ac, n_paneles, n_inversores):
 # Obtener configuración de strings
 # ==========================================================
 
+import streamlit as st
+
 def obtener_configuracion_strings(resultado):
 
+    st.subheader("DEBUG RESULTADO PANEL")
+
+    st.write("Keys resultado:", list(resultado.keys()))
+
+    if "paneles" in resultado:
+        st.write("Keys paneles:", list(resultado["paneles"].keys()))
+
+    if "strings" in resultado:
+        st.write("Tipo resultado['strings']:", type(resultado["strings"]))
+
+    st.json(resultado)
     strings = resultado.get("strings", [])
 
     if not strings:
