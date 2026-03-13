@@ -2,7 +2,7 @@ from typing import List, Dict, Any
 from reportlab.platypus import Table, TableStyle
 
 
-def crear_tabla_strings(strings: List[Dict[str, Any]], n_inversores: int, pal, content_w):
+def crear_tabla_strings(strings: List[Dict[str, Any]], pal, content_w):
 
     header = [
         "Inv",
@@ -17,32 +17,29 @@ def crear_tabla_strings(strings: List[Dict[str, Any]], n_inversores: int, pal, c
 
     rows = [header]
 
-    for inv in range(1, n_inversores + 1):
+    for s in strings:
 
-        for s in strings:
+        rows.append([
+            str(int(s.get("inversor", 0))),
 
-            rows.append([
-                str(inv),
+            str(int(s.get("mppt", 0))),
 
-                str(int(s.get("mppt", 0))),
+            str(int(s.get("n_series", 0))),
 
-                str(int(s.get("n_series", 0))),
+            "1",
 
-                # ahora cada fila es un string
-                "1",
+            f"{float(s.get('vmp_string_v', 0)):.0f}",
 
-                f"{float(s.get('vmp_string_v', 0)):.0f}",
+            f"{float(
+                s.get('voc_frio_string_v')
+                or s.get('voc_string_v')
+                or 0
+            ):.0f}",
 
-                f"{float(
-                    s.get('voc_frio_string_v')
-                    or s.get('voc_string_v')
-                    or 0
-                ):.0f}",
+            f"{float(s.get('imp_string_a', 0)):.2f}",
 
-                f"{float(s.get('imp_string_a', 0)):.2f}",
-
-                f"{float(s.get('isc_string_a', 0)):.2f}",
-            ])
+            f"{float(s.get('isc_string_a', 0)):.2f}",
+        ])
 
     colw = [
         content_w * 0.08,
