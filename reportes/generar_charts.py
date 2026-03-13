@@ -182,7 +182,6 @@ def _chart_anual(energia_anual: float, path: Path):
 # ==========================================================
 # GENERADOR PRINCIPAL
 # ==========================================================
-
 def generar_charts(
     res: Any,
     out_dir: str | None = None,
@@ -214,55 +213,68 @@ def generar_charts(
 
     paths = {}
 
-    # energía mensual
+    # ======================================================
+    # ENERGÍA MENSUAL
+    # ======================================================
+
     p1 = base / "fv_energia_mensual.png"
     _chart_mensual(meses, energia_mensual, p1)
     paths["chart_energia_mensual"] = str(p1)
 
-    # energía diaria
+    # ======================================================
+    # ENERGÍA DIARIA PROMEDIO
+    # ======================================================
+
     p2 = base / "fv_energia_diaria.png"
     _chart_diaria(meses, energia_diaria, p2)
     paths["chart_energia_diaria"] = str(p2)
 
-    # potencia horaria
+    # ======================================================
+    # POTENCIA HORARIA
+    # ======================================================
+
     p3 = base / "fv_potencia_horaria.png"
     _chart_potencia_horaria(pdc_kw, p3)
     paths["chart_potencia_horaria"] = str(p3)
 
-    # energía horaria
+    # ======================================================
+    # ENERGÍA HORARIA
+    # ======================================================
+
     p4 = base / "fv_energia_horaria.png"
     _chart_energia_horaria(pdc_kw, p4)
     paths["chart_energia_horaria"] = str(p4)
 
-    # energía anual
+    # ======================================================
+    # ENERGÍA ANUAL
+    # ======================================================
+
     p5 = base / "fv_energia_anual.png"
     _chart_anual(energia_anual, p5)
     paths["chart_anual"] = str(p5)
 
-    from reportes.generar_string_fv import generar_string_fv
-
-    # chart anual
-    _chart_anual(energia_anual, p5)
-    paths["chart_anual"] = str(p5)
-
-
     # ======================================================
-    # DIAGRAMA STRING FV
+    # DIAGRAMA STRING FV (REPRESENTATIVO)
     # ======================================================
 
-    if resultado.strings:
+    try:
 
-        p6 = out_dir / "string_fv.png"
+        from reportes.generar_string_fv import generar_string_fv
 
-        generar_string_fv(
-            resultado.strings[0].n_series,
-            p6
-        )
+        strings = getattr(res, "strings", None)
 
-        paths["string_fv"] = str(p6)
+        if strings:
 
+            p6 = base / "string_fv.png"
+
+            generar_string_fv(
+                strings[0].n_series,
+                p6
+            )
+
+            paths["string_fv"] = str(p6)
+
+    except Exception:
+        pass
 
     return paths
-
-
-    
