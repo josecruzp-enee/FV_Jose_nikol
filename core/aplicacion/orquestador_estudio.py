@@ -1,3 +1,19 @@
+from __future__ import annotations
+
+from dataclasses import dataclass, asdict
+from typing import Any
+
+from core.dominio.contrato import ResultadoProyecto
+
+from core.aplicacion.puertos import (
+    PuertoSizing,
+    PuertoPaneles,
+    PuertoEnergia,
+    PuertoNEC,
+    PuertoFinanzas,
+)
+
+
 def ejecutar_estudio(
     datos: Any,
     deps: DependenciasEstudio,
