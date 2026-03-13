@@ -153,7 +153,7 @@ class EnergiaAdapter:
 
         )
 
-        return ejecutar_motor_energia(entrada))
+        return ejecutar_motor_energia(entrada)
 
 # ==========================================================
 # ADAPTER NEC
