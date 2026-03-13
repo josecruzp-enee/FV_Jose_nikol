@@ -107,13 +107,7 @@ def ejecutar_paneles(
 
     n_paneles_total = dim.n_paneles
 
-    if DEBUG_UI:
-        st.write("DEBUG DIMENSIONADO PANELES")
-        st.write({
-            "entrada_paneles": entrada.n_paneles_total,
-            "paneles_dimensionados": dim.n_paneles,
-            "pdc_kw": dim.pdc_kw
-        })
+    
 
     if n_paneles_total <= 0:
 
@@ -129,16 +123,7 @@ def ejecutar_paneles(
 
     n_inversores = int(entrada.n_inversores or 1)
 
-    if DEBUG_UI:
-        st.write("DEBUG DATOS ANTES DE CALCULAR STRINGS")
-        st.write({
-            "n_paneles_total": n_paneles_total,
-            "n_inversores": n_inversores,
-            "mppt_por_inversor": inversor.n_mppt,
-            "voc_panel": panel.voc_v,
-            "vmp_panel": panel.vmp_v
-        })
-
+   
     # ------------------------------------------------------
     # CÁLCULO DE STRINGS
     # ------------------------------------------------------
@@ -165,10 +150,7 @@ def ejecutar_paneles(
 
     )
 
-    if DEBUG_UI:
-        st.write("DEBUG RESULTADO STRINGS")
-        st.write("numero strings:", len(resultado.get("strings", [])))
-        st.write(resultado)
+    
 
     # ------------------------------------------------------
     # NORMALIZAR RESULTADO
