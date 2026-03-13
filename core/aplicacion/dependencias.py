@@ -43,48 +43,62 @@ class PanelesAdapter:
         panel = get_panel(panel_id)
         inversor = get_inversor(inversor_id)
 
-        # ------------------------------------------------------
-        # MODO DE DIMENSIONADO
-        # ------------------------------------------------------
+        # --------------------------------------------------
+        # MODO DE DIMENSIONADO (UI Streamlit)
+        # --------------------------------------------------
 
         modo = sf.get("modo_dimensionado", "auto")
 
         if modo == "manual":
-            n_paneles_total = sizing.n_paneles
+
+            n_paneles_total = int(sf.get("n_paneles_manual", sizing.n_paneles))
             pdc_kw_objetivo = None
+
         else:
-            n_paneles_total = None
+
+            n_paneles_total = sizing.n_paneles
             pdc_kw_objetivo = sizing.pdc_kw
 
-        # ------------------------------------------------------
-        # CONSTRUIR ENTRADA DEL DOMINIO
-        # ------------------------------------------------------
+        # --------------------------------------------------
+        # CONSTRUIR ENTRADA DEL DOMINIO PANELES
+        # --------------------------------------------------
 
         entrada = EntradaPaneles(
+
             panel=panel,
             inversor=inversor,
+
             n_paneles_total=n_paneles_total,
             n_inversores=sizing.n_inversores,
+
             t_min_c=sf.get("t_min_c", 10),
             t_oper_c=sf.get("t_oper_c", 45),
+
             dos_aguas=sf.get("dos_aguas", False),
             objetivo_dc_ac=sf.get("dc_ac_ratio", 1.2),
-            pdc_kw_objetivo=pdc_kw_objetivo,
+
+            pdc_kw_objetivo=pdc_kw_objetivo
         )
 
-        res = ejecutar_paneles(entrada)
+        # --------------------------------------------------
+        # EJECUTAR DOMINIO PANELES
+        # --------------------------------------------------
 
-        # ------------------------------------------------------
-        # ADAPTAR DICT → ResultadoStrings
-        # ------------------------------------------------------
+        res = ejecutar_paneles(entrada)
 
         if not res.get("ok", False):
             raise ValueError(f"Error en dominio paneles: {res.get('errores')}")
 
+        # --------------------------------------------------
+        # ADAPTAR dict → ResultadoStrings
+        # --------------------------------------------------
+
         strings_raw = res.get("strings", [])
+
         strings = []
 
         for s in strings_raw:
+
             strings.append(
                 StringInfo(
                     id=s["id"],
@@ -101,14 +115,22 @@ class PanelesAdapter:
         rec = res.get("recomendacion", {})
 
         return ResultadoStrings(
+
             ok=True,
+
             n_series=rec.get("n_series", 0),
-            n_strings_total=rec.get("n_strings_total", len(strings)),
+
+            n_strings_total=rec.get(
+                "n_strings_total",
+                len(strings)
+            ),
+
             vmp_string_v=rec.get("vmp_string_v", 0),
+
             voc_string_v=rec.get("voc_string_v", 0),
+
             strings=strings,
         )
-
 
 
 
