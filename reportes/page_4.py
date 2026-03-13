@@ -7,13 +7,28 @@ from reportlab.platypus import Paragraph, Spacer, TableStyle, PageBreak
 from .helpers_pdf import make_table, table_style_uniform, box_paragraph, money_L
 
 
-# ==========================================================
-# Tabla impacto mensual año 1
-# ==========================================================
+# =========================================================
+# LECTURA SEGURA
+# =========================================================
+
+def leer(obj, campo, default=None):
+
+    if obj is None:
+        return default
+
+    if isinstance(obj, dict):
+        return obj.get(campo, default)
+
+    return getattr(obj, campo, default)
+
+
+# =========================================================
+# TABLA IMPACTO AÑO 1
+# =========================================================
 
 def tabla_impacto_mensual_anio1(resultado: Any, pal: dict, content_w: float):
 
-    financiero = getattr(resultado, "financiero", {})
+    financiero = leer(resultado, "financiero", {})
     tabla_12m = financiero.get("tabla_12m", [])
     cuota_m = float(financiero.get("cuota_mensual", 0.0))
 
@@ -97,6 +112,7 @@ def tabla_impacto_mensual_anio1(resultado: Any, pal: dict, content_w: float):
     last_row = len(table_data) - 1
 
     t.setStyle(TableStyle([
+
         ("ALIGN", (0,1), (0,-1), "CENTER"),
         ("ALIGN", (1,1), (3,-1), "RIGHT"),
         ("ALIGN", (4,1), (-1,-1), "RIGHT"),
@@ -111,14 +127,15 @@ def tabla_impacto_mensual_anio1(resultado: Any, pal: dict, content_w: float):
         ("BOTTOMPADDING",(0,0),(-1,-1),4),
         ("LEFTPADDING",(0,0),(-1,-1),6),
         ("RIGHTPADDING",(0,0),(-1,-1),6),
+
     ]))
 
     return [t, Spacer(1, 10)]
 
 
-# ==========================================================
-# Página 4 completa
-# ==========================================================
+# =========================================================
+# PAGE 4
+# =========================================================
 
 def build_page_4(
     resultado: Any,
@@ -139,12 +156,12 @@ def build_page_4(
 
     story += tabla_impacto_mensual_anio1(resultado, pal, content_w)
 
-    # ======================================================
-    # Configuración eléctrica DC
-    # ======================================================
+    # =====================================================
+    # CONFIGURACIÓN DC
+    # =====================================================
 
-    strings_block = getattr(resultado, "strings", None)
-    strings = getattr(strings_block, "strings", []) if strings_block else []
+    strings_block = leer(resultado, "strings", None)
+    strings = leer(strings_block, "strings", []) if strings_block else []
 
     if strings:
 
@@ -156,22 +173,24 @@ def build_page_4(
         for s in strings:
 
             lines.append(
-                f"MPPT {getattr(s,'mppt','')}: "
-                f"{getattr(s,'n_series','')} módulos en serie × "
-                f"{getattr(s,'n_paralelo','')} paralelo "
-                f"(Vmp={getattr(s,'vmp_string_v','')} V, "
-                f"Voc frío={getattr(s,'voc_frio_string_v','')} V)"
+                f"MPPT {leer(s,'mppt','')}: "
+                f"{leer(s,'n_series','')} módulos en serie "
+                f"(Vmp={leer(s,'vmp_string_v','')} V, "
+                f"Voc frío={leer(s,'voc_frio_string_v','')} V)"
             )
 
-        story.append(box_paragraph("<br/>".join(lines), pal, content_w, font_size=9.5))
+        story.append(
+            box_paragraph("<br/>".join(lines), pal, content_w, font_size=9.5)
+        )
+
         story.append(Spacer(1, 8))
 
-    # ======================================================
-    # Resumen NEC
-    # ======================================================
+    # =====================================================
+    # RESUMEN NEC
+    # =====================================================
 
-    nec_block = getattr(resultado, "nec", {})
-    nec_paq = nec_block.get("paquete_nec", {})
+    nec_block = leer(resultado, "nec", {})
+    nec_paq = leer(nec_block, "paquete_nec", {})
 
     resumen_pdf = nec_paq.get("resumen_pdf")
 
@@ -181,11 +200,17 @@ def build_page_4(
         story.append(Spacer(1, 6))
 
         lines = [
+
             f"I DC diseño: {resumen_pdf.get('i_dc_nom', '—')} A",
+
             f"I AC diseño: {resumen_pdf.get('i_ac_nom', '—')} A",
+
         ]
 
-        story.append(box_paragraph("<br/>".join(lines), pal, content_w, font_size=9.5))
+        story.append(
+            box_paragraph("<br/>".join(lines), pal, content_w, font_size=9.5)
+        )
+
         story.append(Spacer(1, 8))
 
     story.append(PageBreak())
