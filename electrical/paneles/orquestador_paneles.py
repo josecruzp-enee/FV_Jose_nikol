@@ -96,13 +96,28 @@ def ejecutar_paneles(
         }
 
     n_paneles_total = dim.n_paneles
+    import streamlit as st
 
+    st.write("DEBUG DIMENSIONADO PANELES")
+    st.write({
+        "entrada_paneles": entrada.n_paneles_total,
+        "paneles_dimensionados": dim.n_paneles,
+        "pdc_kw": dim.pdc_kw
+    })
     # ------------------------------------------------------
     # CÁLCULO DE STRINGS
     # ------------------------------------------------------
     n_inversores = int(entrada.n_inversores or 1)
-    resultado = calcular_strings_fv(
+    st.write("DEBUG ANTES DE STRINGS")
 
+     st.write({
+         "n_paneles_total_enviado": n_paneles_total,
+         "n_inversores": n_inversores,
+         "mppt_por_inversor": inversor.n_mppt
+    })  
+    resultado = calcular_strings_fv(
+    st.write("DEBUG RESULTADO STRINGS")
+    st.write("numero strings:", len(resultado.get("strings", [])))
         n_paneles_total=n_paneles_total,
 
         panel=panel,
