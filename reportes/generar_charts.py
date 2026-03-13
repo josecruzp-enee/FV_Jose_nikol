@@ -14,11 +14,23 @@ from electrical.energia.irradiancia import hsp_a_perfil_horario
 # -------------------------
 
 def _get_sizing_moderno(res: Dict[str, Any]) -> Dict[str, Any]:
+
     if not isinstance(res, dict):
         return {}
-    tecnico = res.get("tecnico") or {}
-    return tecnico.get("sizing") or {}
 
+    # formato nuevo
+    sizing = res.get("sizing")
+    if isinstance(sizing, dict):
+        return sizing
+
+    # compatibilidad con formato antiguo
+    tecnico = res.get("tecnico") or {}
+    if isinstance(tecnico, dict):
+        sizing = tecnico.get("sizing")
+        if isinstance(sizing, dict):
+            return sizing
+
+    return {}
 
 def _as_float(x: Any, default: float = 0.0) -> float:
     try:
