@@ -275,7 +275,8 @@ def generar_charts(
 
                 generar_string_fv(
                     n_series,
-                    p6
+                    p6,
+                    n_strings=len(strings)
                 )
 
                 paths["string_fv"] = str(p6)
