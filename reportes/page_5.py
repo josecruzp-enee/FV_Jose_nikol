@@ -1,5 +1,9 @@
-from reportlab.platypus import Paragraph, Spacer, PageBreak, Image
+from __future__ import annotations
+
 from pathlib import Path
+from typing import Any
+
+from reportlab.platypus import Paragraph, Spacer, PageBreak, Image
 
 from .secciones_tecnicas.resumen_tecnico import build_resumen_tecnico
 from .secciones_tecnicas.tabla_strings import crear_tabla_strings
@@ -12,9 +16,45 @@ from .secciones_tecnicas.tabla_nec import (
 from .secciones_tecnicas.layout_paneles import insertar_layout_paneles
 
 
-# ======================================================
+# =========================================================
+# LECTURA SEGURA
+# =========================================================
+
+def leer(obj, campo, default=None):
+
+    if obj is None:
+        return default
+
+    if isinstance(obj, dict):
+        return obj.get(campo, default)
+
+    return getattr(obj, campo, default)
+
+
+# =========================================================
+# UTILIDAD GRÁFICOS
+# =========================================================
+
+def _insert_chart(story, path, styles, content_w, error_msg):
+
+    if path and Path(str(path)).exists():
+
+        img = Image(str(path))
+        img.drawWidth = content_w
+        img.drawHeight = content_w * 0.45
+
+        story.append(img)
+
+    else:
+
+        story.append(Paragraph(error_msg, styles["BodyText"]))
+
+    story.append(Spacer(1, 12))
+
+
+# =========================================================
 # SECCIONES
-# ======================================================
+# =========================================================
 
 def _section_resumen(story, resultado, pal, styles, content_w):
 
@@ -93,30 +133,9 @@ def _section_indicadores(story, resultado, pal, styles, content_w):
     story.append(Spacer(1, 12))
 
 
-# ======================================================
-# UTILIDAD PARA INSERTAR GRÁFICOS
-# ======================================================
-
-def _insert_chart(story, path, styles, content_w, error_msg):
-
-    if path and Path(path).exists():
-
-        img = Image(path)
-        img.drawWidth = content_w
-        img.drawHeight = content_w * 0.45
-
-        story.append(img)
-
-    else:
-
-        story.append(Paragraph(error_msg, styles["BodyText"]))
-
-    story.append(Spacer(1, 12))
-
-
-# ======================================================
+# =========================================================
 # GRÁFICOS FV
-# ======================================================
+# =========================================================
 
 def _section_potencia_horaria(story, paths, styles, content_w):
 
@@ -175,91 +194,42 @@ def _section_energia_mensual(story, paths, styles, content_w):
     )
 
 
-# ======================================================
-# LAYOUT DE PANELES
-# ======================================================
-
-def _section_layout_paneles(story, paths, styles, content_w):
-
-    insertar_layout_paneles(story, paths, styles, content_w)
-
-
-# ======================================================
-# ORQUESTADOR DE LA PÁGINA
-# ======================================================
+# =========================================================
+# PAGE 5
+# =========================================================
 
 def build_page_5(resultado, datos, paths, pal, styles, content_w):
 
     story = []
 
-    strings_block = getattr(resultado, "strings", None)
-    strings = getattr(strings_block, "strings", []) if strings_block else []
-
-
-    # ======================================================
-    # RESUMEN TÉCNICO
-    # ======================================================
+    strings_block = leer(resultado, "strings", None)
+    strings = leer(strings_block, "strings", []) if strings_block else []
 
     _section_resumen(story, resultado, pal, styles, content_w)
-
-    # ======================================================
-    # DISTRIBUCIÓN DE STRINGS
-    # ======================================================
-
     _section_distribucion_strings(story, strings, pal, styles, content_w)
-
-    # ======================================================
-    # CONFIGURACIÓN ELÉCTRICA STRINGS
-    # ======================================================
-
     _section_config_strings(story, strings, pal, styles, content_w)
-
-    # ======================================================
-    # PARÁMETROS ELÉCTRICOS
-    # ======================================================
-
     _section_parametros_electricos(story, resultado, pal, styles, content_w)
-
-    # ======================================================
-    # DIMENSIONAMIENTO NEC
-    # ======================================================
-
     _section_nec(story, resultado, pal, styles, content_w)
-
-    # ======================================================
-    # INDICADORES TÉCNICOS
-    # ======================================================
-
     _section_indicadores(story, resultado, pal, styles, content_w)
 
-    # ======================================================
-    # GRÁFICOS FV
-    # ======================================================
-
     _section_potencia_horaria(story, paths, styles, content_w)
-
     _section_energia_horaria(story, paths, styles, content_w)
-
     _section_energia_mensual(story, paths, styles, content_w)
 
-    # ======================================================
-    # LAYOUT DE PANELES
-    # ======================================================
-
-    _section_layout_paneles(story, paths, styles, content_w)
+    insertar_layout_paneles(story, paths, styles, content_w)
 
     story.append(PageBreak())
 
-    # ======================================================
-    # DIAGRAMA STRING FV REPRESENTATIVO
-    # ======================================================
+    # =====================================================
+    # DIAGRAMA STRING FV
+    # =====================================================
 
     if isinstance(paths, dict) and paths.get("string_fv") and Path(paths["string_fv"]).exists():
 
         story.append(Paragraph("Configuración del String Fotovoltaico", styles["Heading2"]))
         story.append(Spacer(1, 6))
 
-        img = Image(paths["string_fv"], width=420, height=120)
+        img = Image(str(paths["string_fv"]), width=content_w, height=content_w * 0.28)
         img.hAlign = "CENTER"
 
         story.append(img)
