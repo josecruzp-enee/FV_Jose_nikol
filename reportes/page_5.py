@@ -1,19 +1,5 @@
-# reportes/page_5.py
-
-from reportlab.platypus import Paragraph, Spacer, PageBreak
-
-from .secciones_tecnicas.resumen_tecnico import build_resumen_tecnico
-from .secciones_tecnicas.tabla_strings import crear_tabla_strings
-from .secciones_tecnicas.tabla_distribucion_strings import crear_tabla_distribucion_inversores
-from .secciones_tecnicas.tabla_nec import (
-    crear_tabla_parametros_electricos,
-    crear_tabla_dimensionamiento_nec,
-    crear_tabla_indicadores
-)
-from .secciones_tecnicas.layout_paneles import insertar_layout_paneles
-from reportlab.platypus import Image
-
-from reportlab.platypus import Paragraph, Spacer, PageBreak
+from reportlab.platypus import Paragraph, Spacer, PageBreak, Image
+from pathlib import Path
 
 from .secciones_tecnicas.resumen_tecnico import build_resumen_tecnico
 from .secciones_tecnicas.tabla_strings import crear_tabla_strings
@@ -130,25 +116,26 @@ def _section_indicadores(story, resultado, pal, styles, content_w):
 
     story.append(Spacer(1, 12))
 
-from pathlib import Path
 
-def _section_generacion_diaria(story, paths, styles, content_w):
+# ======================================================
+# GRÁFICOS FV
+# ======================================================
+
+def _section_potencia_horaria(story, paths, styles, content_w):
 
     story.append(
-        Paragraph("Perfil horario de generación fotovoltaica", styles["Heading2"])
+        Paragraph("Perfil horario de potencia fotovoltaica", styles["Heading2"])
     )
-
     story.append(Spacer(1, 6))
 
     chart = None
 
     if isinstance(paths, dict):
-        chart = paths.get("chart_horaria")
+        chart = paths.get("chart_potencia_horaria") or paths.get("chart_horaria")
 
     if chart and Path(chart).exists():
 
         img = Image(chart)
-
         img.drawWidth = content_w
         img.drawHeight = content_w * 0.45
 
@@ -158,12 +145,81 @@ def _section_generacion_diaria(story, paths, styles, content_w):
 
         story.append(
             Paragraph(
-                "No se pudo generar la gráfica de generación horaria.",
+                "No se pudo generar la gráfica de potencia horaria.",
                 styles["BodyText"],
             )
         )
 
     story.append(Spacer(1, 12))
+
+
+def _section_energia_horaria(story, paths, styles, content_w):
+
+    story.append(
+        Paragraph("Energía generada por hora", styles["Heading2"])
+    )
+    story.append(Spacer(1, 6))
+
+    chart = None
+
+    if isinstance(paths, dict):
+        chart = paths.get("chart_energia_horaria")
+
+    if chart and Path(chart).exists():
+
+        img = Image(chart)
+        img.drawWidth = content_w
+        img.drawHeight = content_w * 0.45
+
+        story.append(img)
+
+    else:
+
+        story.append(
+            Paragraph(
+                "No se pudo generar la gráfica de energía horaria.",
+                styles["BodyText"],
+            )
+        )
+
+    story.append(Spacer(1, 12))
+
+
+def _section_energia_mensual(story, paths, styles, content_w):
+
+    story.append(
+        Paragraph("Generación fotovoltaica mensual", styles["Heading2"])
+    )
+    story.append(Spacer(1, 6))
+
+    chart = None
+
+    if isinstance(paths, dict):
+        chart = paths.get("chart_energia_mensual") or paths.get("chart_mensual")
+
+    if chart and Path(chart).exists():
+
+        img = Image(chart)
+        img.drawWidth = content_w
+        img.drawHeight = content_w * 0.45
+
+        story.append(img)
+
+    else:
+
+        story.append(
+            Paragraph(
+                "No se pudo generar la gráfica de generación mensual.",
+                styles["BodyText"],
+            )
+        )
+
+    story.append(Spacer(1, 12))
+
+
+# ======================================================
+# LAYOUT DE PANELES
+# ======================================================
 
 def _section_layout_paneles(story, paths, styles, content_w):
 
@@ -181,40 +237,27 @@ def build_page_5(resultado, datos, paths, pal, styles, content_w):
     strings_block = resultado.get("strings", {})
     strings = strings_block.get("strings", [])
 
-    _section_resumen(
-        story, resultado, pal, styles, content_w
-    )
+    _section_resumen(story, resultado, pal, styles, content_w)
 
-    _section_distribucion_strings(
-        story, strings, pal, styles, content_w
-    )
+    _section_distribucion_strings(story, strings, pal, styles, content_w)
 
-    _section_config_strings(
-        story, strings, pal, styles, content_w
-    )
+    _section_config_strings(story, strings, pal, styles, content_w)
 
-    _section_parametros_electricos(
-        story, resultado, pal, styles, content_w
-    )
+    _section_parametros_electricos(story, resultado, pal, styles, content_w)
 
-    _section_nec(
-        story, resultado, pal, styles, content_w
-    )
+    _section_nec(story, resultado, pal, styles, content_w)
 
-    _section_indicadores(
-        story, resultado, pal, styles, content_w
-    )
-    import streamlit as st
-    st.subheader("DEBUG PATHS PAGE 5")
-    st.json(paths)
-    
-    _section_generacion_diaria(
-        story, paths, styles, content_w
-    )
-    
-    _section_layout_paneles(
-        story, paths, styles, content_w
-    )
+    _section_indicadores(story, resultado, pal, styles, content_w)
+
+    # gráficos FV
+    _section_potencia_horaria(story, paths, styles, content_w)
+
+    _section_energia_horaria(story, paths, styles, content_w)
+
+    _section_energia_mensual(story, paths, styles, content_w)
+
+    # layout paneles
+    _section_layout_paneles(story, paths, styles, content_w)
 
     story.append(PageBreak())
 
