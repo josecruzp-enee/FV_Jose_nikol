@@ -148,26 +148,20 @@ class EnergiaAdapter:
         sf = getattr(datos, "sistema_fv", {}) or {}
 
         entrada = EnergiaInput(
-
-            # Potencias del sistema
             pdc_instalada_kw=sizing.pdc_kw,
             pac_nominal_kw=sizing.kw_ac,
-
-            # Recurso solar
             hsp_12m=sf.get("hsp_12m", [5.5]*12),
-
-            # Días por mes
-            dias_mes=[
-                31,28,31,30,31,30,
-                31,31,30,31,30,31
-            ],
-
-            # Factores del sistema
+            dias_mes=[31,28,31,30,31,30,31,31,30,31,30,31],
             factor_orientacion=sf.get("factor_orientacion", 1.0),
-
             perdidas_dc_pct=sf.get("perdidas_dc_pct", 0.03),
             perdidas_ac_pct=sf.get("perdidas_ac_pct", 0.02),
             sombras_pct=sf.get("sombras_pct", 0.0),
+        )
+
+        modo = sf.get("modo_simulacion", "mensual")
+
+        object.__setattr__(entrada, "modo_simulacion", modo)
+
 
             permitir_curtailment=True
         )
