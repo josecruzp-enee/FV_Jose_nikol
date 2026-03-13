@@ -123,7 +123,8 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
     # SELECCIÓN DE MOTOR
     # ------------------------------------------------------
 
-    if inp.modo_simulacion == "8760":
+    modo = getattr(inp, "modo_simulacion", "mensual")
+    if modo == "8760":
 
         resultado, errores = _modelo_8760(inp)
 
