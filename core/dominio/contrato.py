@@ -1,8 +1,33 @@
-from dataclasses import dataclass
+from __future__ import annotations
+
+"""
+CONTRATO MAESTRO DE RESULTADOS — FV Engine
+
+Este archivo define todas las estructuras de datos que representan
+los resultados del motor FV.
+
+Reglas de arquitectura:
+
+- Ningún módulo externo debe depender de estructuras internas
+  de cálculo de los dominios.
+
+- Todos los módulos consumidores deben usar exclusivamente
+  las clases definidas aquí.
+
+Este contrato unifica los resultados de:
+
+    sizing
+    paneles / strings
+    ingeniería eléctrica
+    energía
+    finanzas
+"""
+
+from dataclasses import dataclass, field
 from typing import List, Dict, Any
 
 from electrical.energia.contrato import EnergiaResultado
-from dataclasses import field
+
 
 # =========================================================
 # ENERGÍA MENSUAL
@@ -31,12 +56,13 @@ class ResultadoSizing:
     """
 
     n_paneles: int
+
     kwp_dc: float
     pdc_kw: float
 
     kw_ac: float
-    n_inversores: int
 
+    n_inversores: int
     paneles_por_inversor: int
 
     energia_12m: List[MesEnergia]
@@ -106,7 +132,7 @@ class NECInversor:
 @dataclass(frozen=True)
 class NECResumen:
     """
-    Resumen eléctrico del sistema.
+    Resumen eléctrico del sistema FV.
     """
 
     inversores: List[NECInversor]
@@ -161,13 +187,14 @@ class ResultadoProyecto:
     """
 
     sizing: ResultadoSizing
-
     strings: ResultadoStrings
-
     energia: EnergiaResultado
-
     nec: ResultadoNEC
-
     financiero: ResultadoFinanciero
 
+    # estado global del estudio
+    ok: bool = True
+    errores: List[str] = field(default_factory=list)
+
+    # metadata adicional
     meta: Dict[str, Any] = field(default_factory=dict)
