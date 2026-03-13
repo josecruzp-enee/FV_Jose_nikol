@@ -11,9 +11,9 @@ from .helpers_pdf import make_table, table_style_uniform, box_paragraph, money_L
 # Tabla impacto mensual año 1
 # ==========================================================
 
-def tabla_impacto_mensual_anio1(resultado: Dict[str, Any], pal: dict, content_w: float):
+def tabla_impacto_mensual_anio1(resultado: Any, pal: dict, content_w: float):
 
-    financiero = resultado.get("financiero", {})
+    financiero = getattr(resultado, "financiero", {})
     tabla_12m = financiero.get("tabla_12m", [])
     cuota_m = float(financiero.get("cuota_mensual", 0.0))
 
@@ -121,7 +121,7 @@ def tabla_impacto_mensual_anio1(resultado: Dict[str, Any], pal: dict, content_w:
 # ==========================================================
 
 def build_page_4(
-    resultado: Dict[str, Any],
+    resultado: Any,
     datos: Any,
     paths: Dict[str, Any],
     pal: dict,
@@ -143,8 +143,8 @@ def build_page_4(
     # Configuración eléctrica DC
     # ======================================================
 
-    strings_block = resultado.get("strings", {})
-    strings = strings_block.get("strings", [])
+    strings_block = getattr(resultado, "strings", None)
+    strings = getattr(strings_block, "strings", []) if strings_block else []
 
     if strings:
 
@@ -156,11 +156,11 @@ def build_page_4(
         for s in strings:
 
             lines.append(
-                f"MPPT {s.get('mppt')}: "
-                f"{s.get('n_series')} módulos en serie × "
-                f"{s.get('n_paralelo')} paralelo "
-                f"(Vmp={s.get('vmp_string_v')} V, "
-                f"Voc frío={s.get('voc_frio_string_v')} V)"
+                f"MPPT {getattr(s,'mppt','')}: "
+                f"{getattr(s,'n_series','')} módulos en serie × "
+                f"{getattr(s,'n_paralelo','')} paralelo "
+                f"(Vmp={getattr(s,'vmp_string_v','')} V, "
+                f"Voc frío={getattr(s,'voc_frio_string_v','')} V)"
             )
 
         story.append(box_paragraph("<br/>".join(lines), pal, content_w, font_size=9.5))
@@ -170,8 +170,8 @@ def build_page_4(
     # Resumen NEC
     # ======================================================
 
-    nec_block = resultado.get("nec", {})
-    nec_paq = nec_block.get("paq", {})
+    nec_block = getattr(resultado, "nec", {})
+    nec_paq = nec_block.get("paquete_nec", {})
 
     resumen_pdf = nec_paq.get("resumen_pdf")
 
@@ -181,8 +181,8 @@ def build_page_4(
         story.append(Spacer(1, 6))
 
         lines = [
-            f"I DC diseño: {resumen_pdf.get('idc_nom', '—')} A",
-            f"I AC diseño: {resumen_pdf.get('iac_nom', '—')} A",
+            f"I DC diseño: {resumen_pdf.get('i_dc_nom', '—')} A",
+            f"I AC diseño: {resumen_pdf.get('i_ac_nom', '—')} A",
         ]
 
         story.append(box_paragraph("<br/>".join(lines), pal, content_w, font_size=9.5))
