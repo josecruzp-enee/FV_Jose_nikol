@@ -38,13 +38,6 @@ def ejecutar_estudio(
 ):
    
 
-    if isinstance(resultado, dict):
-        st.error("⚠️ ERROR: resultado es dict")
-    else:
-        st.success("resultado es objeto correcto")
-
-    st.write(resultado)
-
     # ------------------------------------------------------
     # 1. Dimensionamiento FV
     # ------------------------------------------------------
