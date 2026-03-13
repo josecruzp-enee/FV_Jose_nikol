@@ -70,35 +70,24 @@ def calcular_parametros_generales(kwp_dc, kw_ac, n_paneles, n_inversores):
 # Obtener configuración de strings
 # ==========================================================
 
-import streamlit as st
-
 def obtener_configuracion_strings(resultado):
 
-    st.subheader("DEBUG RESULTADO PANEL")
+    paneles = resultado.get("strings", {})
 
-    st.write("Keys resultado:", list(resultado.keys()))
-
-    if "paneles" in resultado:
-        st.write("Keys paneles:", list(resultado["paneles"].keys()))
-
-    if "strings" in resultado:
-        st.write("Tipo resultado['strings']:", type(resultado["strings"]))
-
-    st.json(resultado)
-    strings = resultado.get("strings", [])
+    strings = paneles.get("strings", [])
 
     if not strings:
         return 0, 0, 0, 0
 
-    # primer string para parámetros eléctricos
     s = strings[0]
 
     n_series = int(s.get("n_series", 0))
 
-    # número de strings reales del generador
+    # número total de strings
     n_paralelo = len(strings)
 
     vmp = float(s.get("vmp_string_v", 0))
+
     voc = float(
         s.get("voc_frio_string_v")
         or s.get("voc_string_v")
