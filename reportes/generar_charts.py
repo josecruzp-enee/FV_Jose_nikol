@@ -1,99 +1,276 @@
 from __future__ import annotations
 
+from pathlib import Path
+from typing import Dict, List, Any
+
+import math
 import matplotlib
 matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
-from matplotlib.patches import Rectangle
+
+from electrical.energia.irradiancia import (
+    hsp_12m_base,
+    DIAS_MES
+)
+
+from reportes.generar_string_fv import generar_string_fv
 
 
-def generar_string_fv(
-    n_series: int,
-    out_path,
-    *,
-    n_strings: int = 1,
-    panel_w: float = 0.6,
-    panel_h: float = 1.2,
-    gap: float = 0.25,
-):
+# ==========================================================
+# Crear carpeta charts
+# ==========================================================
 
-    width = n_series * (panel_w + gap)
+def _mkdir_charts(out_dir: str | None) -> Path:
 
-    fig = plt.figure(figsize=(10, 3 if n_strings == 1 else 4), dpi=170)
-    ax = fig.add_subplot(111)
+    base = Path(out_dir) if out_dir else Path("salidas") / "charts"
+    base.mkdir(parents=True, exist_ok=True)
 
-    ax.set_title("Configuración del String Fotovoltaico")
+    return base
 
-    ax.set_xlim(-0.5, width + 1)
-    ax.set_ylim(-0.5, 3)
 
-    def draw_string(y):
+# ==========================================================
+# Extraer potencia DC desde ResultadoProyecto
+# ==========================================================
 
-        for i in range(n_series):
+def _leer_pdc_kw(res):
 
-            x = i * (panel_w + gap)
+    sizing = (res or {}).get("sizing") or {}
 
-            ax.add_patch(
-                Rectangle(
-                    (x, y),
-                    panel_w,
-                    panel_h,
-                    linewidth=0.8,
-                    edgecolor="#0B2E4A",
-                    facecolor="#1F2A37",
+    kwp = sizing.get("kwp_dc")
+    if kwp:
+        return float(kwp)
+
+    kwp = sizing.get("kwp_recomendado")
+    if kwp:
+        return float(kwp)
+
+    pdc_w = sizing.get("potencia_dc_w")
+    if pdc_w:
+        return float(pdc_w) / 1000.0
+
+    return 0.0
+
+
+# ==========================================================
+# Gráfica energía mensual
+# ==========================================================
+
+def _chart_mensual(meses: List[str], energia: List[float], path: Path):
+
+    plt.figure()
+
+    plt.bar(meses, energia)
+
+    plt.title("Generación FV mensual")
+    plt.ylabel("Energía (kWh)")
+    plt.xticks(rotation=45)
+    plt.grid(True)
+
+    plt.tight_layout()
+    plt.savefig(path, dpi=160)
+    plt.close()
+
+
+# ==========================================================
+# Gráfica energía diaria promedio
+# ==========================================================
+
+def _chart_diaria(meses: List[str], energia: List[float], path: Path):
+
+    plt.figure()
+
+    plt.bar(meses, energia)
+
+    plt.title("Energía diaria promedio")
+    plt.ylabel("kWh/día")
+    plt.xticks(rotation=45)
+    plt.grid(True)
+
+    plt.tight_layout()
+    plt.savefig(path, dpi=160)
+    plt.close()
+
+
+# ==========================================================
+# Perfil horario de potencia
+# ==========================================================
+
+def _chart_potencia_horaria(pdc_kw: float, path: Path):
+
+    horas = list(range(24))
+    potencia = []
+
+    PR = 0.82
+
+    for h in horas:
+
+        if 6 <= h <= 18:
+            angulo = (h - 6) / 12 * math.pi
+            irr_rel = math.sin(angulo)
+        else:
+            irr_rel = 0
+
+        p = pdc_kw * irr_rel * PR
+        potencia.append(p)
+
+    plt.figure()
+
+    plt.plot(horas, potencia, marker="o")
+
+    plt.title("Perfil horario de potencia FV")
+    plt.xlabel("Hora")
+    plt.ylabel("Potencia (kW)")
+    plt.xticks(range(24))
+    plt.grid(True)
+
+    plt.tight_layout()
+    plt.savefig(path, dpi=160)
+    plt.close()
+
+
+# ==========================================================
+# Energía horaria
+# ==========================================================
+
+def _chart_energia_horaria(pdc_kw: float, path: Path):
+
+    horas = list(range(24))
+    energia = []
+
+    PR = 0.82
+
+    for h in horas:
+
+        if 6 <= h <= 18:
+            angulo = (h - 6) / 12 * math.pi
+            irr_rel = math.sin(angulo)
+        else:
+            irr_rel = 0
+
+        e = pdc_kw * irr_rel * PR
+        energia.append(e)
+
+    plt.figure()
+
+    plt.bar(horas, energia)
+
+    plt.title("Energía generada por hora")
+    plt.xlabel("Hora")
+    plt.ylabel("Energía (kWh)")
+    plt.xticks(range(24))
+    plt.grid(True)
+
+    plt.tight_layout()
+    plt.savefig(path, dpi=160)
+    plt.close()
+
+
+# ==========================================================
+# Energía anual
+# ==========================================================
+
+def _chart_anual(energia_anual: float, path: Path):
+
+    plt.figure()
+
+    plt.bar(["Anual"], [energia_anual])
+
+    plt.title("Generación FV anual")
+    plt.ylabel("Energía (kWh)")
+
+    plt.tight_layout()
+    plt.savefig(path, dpi=160)
+    plt.close()
+
+
+# ==========================================================
+# GENERADOR PRINCIPAL
+# ==========================================================
+
+def generar_charts(
+    res: Any,
+    out_dir: str | None = None,
+    vista_resultados: Dict | None = None
+) -> Dict[str, str]:
+
+    base = _mkdir_charts(out_dir)
+
+    pdc_kw = _leer_pdc_kw(res)
+
+    meses = [
+        "Ene","Feb","Mar","Abr","May","Jun",
+        "Jul","Ago","Sep","Oct","Nov","Dic"
+    ]
+
+    hsp = hsp_12m_base()
+
+    energia_mensual = []
+    energia_diaria = []
+
+    for hsp_mes, dias in zip(hsp, DIAS_MES):
+
+        e_mes = pdc_kw * hsp_mes * dias
+
+        energia_mensual.append(e_mes)
+        energia_diaria.append(e_mes / dias)
+
+    energia_anual = sum(energia_mensual)
+
+    paths = {}
+
+    # energía mensual
+    p1 = base / "fv_energia_mensual.png"
+    _chart_mensual(meses, energia_mensual, p1)
+    paths["chart_energia_mensual"] = str(p1)
+
+    # energía diaria
+    p2 = base / "fv_energia_diaria.png"
+    _chart_diaria(meses, energia_diaria, p2)
+    paths["chart_energia_diaria"] = str(p2)
+
+    # potencia horaria
+    p3 = base / "fv_potencia_horaria.png"
+    _chart_potencia_horaria(pdc_kw, p3)
+    paths["chart_potencia_horaria"] = str(p3)
+
+    # energía horaria
+    p4 = base / "fv_energia_horaria.png"
+    _chart_energia_horaria(pdc_kw, p4)
+    paths["chart_energia_horaria"] = str(p4)
+
+    # energía anual
+    p5 = base / "fv_energia_anual.png"
+    _chart_anual(energia_anual, p5)
+    paths["chart_anual"] = str(p5)
+
+    # ======================================================
+    # DIAGRAMA STRING FV
+    # ======================================================
+
+    try:
+
+        strings_block = (res or {}).get("strings", {})
+        strings = strings_block.get("strings", [])
+
+        if strings:
+
+            n_series = strings[0].get("n_series")
+
+            if n_series:
+
+                p6 = base / "string_fv.png"
+
+                generar_string_fv(
+                    n_series,
+                    p6,
+                    n_strings=len(strings)
                 )
-            )
 
-            ax.text(x + panel_w * 0.25, y - 0.12, "+", color="red", fontsize=8, ha="center")
-            ax.text(x + panel_w * 0.75, y - 0.12, "-", color="black", fontsize=8, ha="center")
+                paths["string_fv"] = str(p6)
 
-            if i < n_series - 1:
-                x2 = x + panel_w
-                x3 = (i + 1) * (panel_w + gap)
+    except Exception as e:
 
-                ax.plot(
-                    [x2, x3],
-                    [y + panel_h / 2, y + panel_h / 2],
-                    color="black",
-                    linewidth=1.2
-                )
+        print("Error generando diagrama string FV:", e)
 
-    # ===== 1 string =====
-    if n_strings == 1:
-
-        draw_string(0.8)
-
-        ax.text(
-            width / 2,
-            2.2,
-            f"String FV representativo\n{n_series} módulos conectados en serie",
-            ha="center",
-            fontsize=10
-        )
-
-    # ===== paralelo =====
-    else:
-
-        y1 = 1.6
-        y2 = 0.4
-
-        draw_string(y1)
-        draw_string(y2)
-
-        x_bus = width + 0.15
-
-        ax.plot([x_bus, x_bus], [y2 + panel_h / 2, y1 + panel_h / 2], linewidth=2)
-
-        ax.text(
-            width / 2,
-            2.6,
-            f"{n_series} módulos por string · {n_strings} strings en paralelo",
-            ha="center",
-            fontsize=10
-        )
-
-    ax.axis("off")
-
-    fig.tight_layout()
-    fig.savefig(out_path, dpi=200, bbox_inches="tight")
-    plt.close(fig)
+    return paths
