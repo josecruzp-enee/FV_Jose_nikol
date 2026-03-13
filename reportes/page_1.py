@@ -60,10 +60,9 @@ def p1_tabla_solucion_unica(datos, sizing, energia, financiero, pal, content_w):
     capex = float(financiero.get("capex_L", 0.0))
 
     energia_12m = getattr(energia, "energia_util_12m", [])
-
     prod_anual = sum(energia_12m) if isinstance(energia_12m, list) else 0.0
 
-    n_paneles = int(sizing.get("n_paneles", 0))
+    n_paneles = int(getattr(sizing, "n_paneles", 0))
 
     panel_wp = 0
     if n_paneles > 0 and kwp > 0:
@@ -147,72 +146,4 @@ def p1_tabla_decision(financiero, pal, content_w):
         ["Pago actual ENEE (sin FV)", money_L(pago_actual)],
         ["Pago ENEE con FV (residual)", money_L(pago_residual)],
         ["Cuota de financiamiento", money_L(cuota)],
-        ["Pago total con FV (ENEE + cuota)", money_L(pago_total)],
-        ["Ahorro neto mensual estimado", money_L(ahorro)],
-        [f"Pago después del año {plazo_anios} (solo ENEE residual)", money_L(pago_residual)],
-    ]
-
-    t = tabla_2cols(
-        header=["Concepto", "Monto (L/mes)"],
-        rows=rows,
-        content_w=content_w,
-        pal=pal,
-        highlight_row=4,
-        font_header=10,
-        font_body=9,
-    )
-
-    story.append(t)
-    story.append(Spacer(1, 12))
-    return story
-
-def p1_conclusion(financiero, sizing, datos, pal, content_w):
-
-    evaluacion = financiero.get("evaluacion", {})
-
-    impacto = float(financiero.get("ahorro_mensual", 0.0))
-    ds = float(evaluacion.get("dscr", 0.0))
-    peor = float(evaluacion.get("peor_mes", 0.0))
-    estado = str(evaluacion.get("estado", "")).upper()
-
-    kwp = float(sizing.get("kwp_dc", sizing.get("pdc_kw", 0.0)))
-    cobertura_objetivo = float(get_field(datos, "cobertura_objetivo", 0.0))
-
-    recomend = (
-        "Se recomienda avanzar a visita técnica y propuesta final."
-        if "VIABLE" in estado
-        else "No se recomienda avanzar sin ajustar variables (CAPEX/plazo/cobertura)."
-    )
-
-    concl = (
-        "<b>Conclusión ejecutiva</b><br/><br/>"
-        f"• <b>Impacto financiero:</b> {money_L(impacto)}/mes (año 1).<br/>"
-        f"• <b>Riesgo y capacidad de pago:</b> DSCR <b>{ds:.2f}</b>; peor mes neto <b>{money_L(peor)}</b>.<br/>"
-        f"• <b>Propuesta técnica:</b> {num(kwp,2)} kWp para cobertura {cobertura_objetivo*100:.0f}% (sin exportación).<br/>"
-        f"• <b>Recomendación:</b> {recomend}"
-    )
-
-    return [box_paragraph(concl, pal, content_w, font_size=10)]
-
-
-def build_page_1(resultado: Dict[str, Any], datos, paths, pal, styles, content_w):
-
-    story = []
-
-    sizing = resultado.get("sizing", {})
-    energia = resultado.get("energia", {})
-    financiero = resultado.get("financiero", {})
-
-    fecha = datetime.now().strftime("%Y-%m-%d")
-
-    story.append(Paragraph("Reporte Ejecutivo — Evaluación Fotovoltaica", styles["Title"]))
-    story.append(Spacer(1, 10))
-
-    story += p1_tabla_cliente(datos, sizing, fecha, pal, content_w)
-    story += p1_tabla_solucion_unica(datos, sizing, energia, financiero, pal, content_w)
-    story += p1_tabla_decision(financiero, pal, content_w)
-    story += p1_conclusion(financiero, sizing, datos, pal, content_w)
-
-    story.append(PageBreak())
-
-    return story
+        ["Pago total con FV (ENEE + cuota)", mone]()
