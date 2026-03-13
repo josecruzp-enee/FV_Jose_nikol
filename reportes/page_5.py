@@ -90,6 +90,7 @@ def build_page_5(resultado, datos, paths, pal, styles, content_w):
 
     story.append(Spacer(1, 12))
 
+   
     # ======================================================
     # 5. Diseño eléctrico NEC
     # ======================================================
@@ -99,7 +100,7 @@ def build_page_5(resultado, datos, paths, pal, styles, content_w):
     )
     story.append(Spacer(1, 6))
 
-    tabla_nec = crear_tabla_diseno_nec(paq, pal, content_w)
+    tabla_nec = crear_tabla_dimensionamiento_nec(resultado, pal, content_w)
 
     if tabla_nec:
         story.append(tabla_nec)
@@ -107,8 +108,6 @@ def build_page_5(resultado, datos, paths, pal, styles, content_w):
         story.append(
             Paragraph("No hay dimensionamiento NEC disponible.", styles["BodyText"])
         )
-
-    story.append(Spacer(1, 12))
 
     # ======================================================
     # 6. Layout de paneles
