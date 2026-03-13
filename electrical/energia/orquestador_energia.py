@@ -7,7 +7,7 @@ from .perdidas_fisicas import aplicar_perdidas
 from .limitacion_inversor import aplicar_curtailment
 
 # motor avanzado
-from .clima.simulacion_8760 import ejecutar_simulacion_8760
+from .clima.simulacion_8760 import simular_8760
 from .clima.agregacion_8760 import agregar_energia_por_mes
 
 
