@@ -73,21 +73,37 @@ def _chart_mensual(meses: List[str], energia: List[float], path: Path):
 # Gráfica diaria promedio
 # ==========================================================
 
-def _chart_diaria(meses: List[str], energia: List[float], path: Path):
+def _chart_horaria(pdc_kw: float, hsp_dia: float, path: Path):
+
+    horas = list(range(24))
+    potencia = []
+
+    PR = 0.82
+
+    for h in horas:
+
+        if 6 <= h <= 18:
+            angulo = (h - 6) / 12 * math.pi
+            irradiancia_rel = math.sin(angulo)   # 0 → 1
+        else:
+            irradiancia_rel = 0
+
+        p = pdc_kw * irradiancia_rel * PR
+
+        potencia.append(p)
 
     plt.figure()
+    plt.plot(horas, potencia, marker="o")
 
-    plt.bar(meses, energia)
-
-    plt.title("Generación FV diaria promedio")
-    plt.ylabel("kWh/día")
-    plt.xticks(rotation=45)
+    plt.title("Perfil horario de generación FV")
+    plt.xlabel("Hora")
+    plt.ylabel("Potencia (kW)")
+    plt.xticks(range(24))
     plt.grid(True)
 
     plt.tight_layout()
     plt.savefig(path, dpi=160)
     plt.close()
-
 
 # ==========================================================
 # Gráfica horaria
