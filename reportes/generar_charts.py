@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Any
 
 import matplotlib.pyplot as plt
 
@@ -22,6 +22,31 @@ def _mkdir_charts(out_dir: str | None) -> Path:
     base.mkdir(parents=True, exist_ok=True)
 
     return base
+
+
+# ==========================================================
+# Extraer potencia DC desde ResultadoProyecto
+# ==========================================================
+
+def _leer_pdc_kw(res: Any) -> float:
+
+    try:
+
+        if isinstance(res, dict):
+
+            sizing = res.get("sizing", {})
+            pdc_w = sizing.get("potencia_dc_w", 0)
+
+        else:
+
+            sizing = getattr(res, "sizing", None)
+            pdc_w = getattr(sizing, "potencia_dc_w", 0)
+
+        return pdc_w / 1000
+
+    except Exception:
+
+        return 0.0
 
 
 # ==========================================================
@@ -121,9 +146,15 @@ def _chart_anual(energia_anual: float, path: Path):
 # GENERADOR PRINCIPAL
 # ==========================================================
 
-def generar_charts(pdc_kw: float, out_dir: str | None = None) -> Dict[str,str]:
+def generar_charts(
+    res: Any,
+    out_dir: str | None = None,
+    vista_resultados: Dict | None = None
+) -> Dict[str, str]:
 
     base = _mkdir_charts(out_dir)
+
+    pdc_kw = _leer_pdc_kw(res)
 
     meses = [
         "Ene","Feb","Mar","Abr","May","Jun",
