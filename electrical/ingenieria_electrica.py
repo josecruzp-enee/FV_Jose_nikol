@@ -1,5 +1,5 @@
 from __future__ import annotations
-
+import streamlit as st
 """
 ORQUESTADOR DE INGENIERÍA ELÉCTRICA — FV ENGINE
 
@@ -98,15 +98,16 @@ def _resolver_corrientes(entrada):
     strings = entrada["strings"]
     inversor = entrada["inversor"]
 
-    print("\nDEBUG STRINGS ENTRADA INGENIERIA")
-    print(strings)
+    st.write("DEBUG STRINGS QUE LLEGAN A INGENIERIA")
+    st.json(strings)
 
     return calcular_corrientes(
-        strings=strings,
-        inv=inversor
-    ))
-
-
+        strings=strings.get("corrientes_input"),
+        inv=inversor,
+        cfg_tecnicos={
+            "n_strings_total": entrada["n_strings"]
+        }
+    )
 # ==========================================================
 # PROTECCIONES
 # ==========================================================
