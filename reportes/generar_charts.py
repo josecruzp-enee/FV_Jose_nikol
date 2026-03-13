@@ -189,73 +189,68 @@ def _chart_anual(energia_anual: float, path: Path):
 # ==========================================================
 
 def generar_charts(
-    res: Any,
-    out_dir: str | None = None,
-    vista_resultados: Dict | None = None
-) -> Dict[str, str]:
+    res,
+    out_dir=None,
+    vista_resultados=None
+):
 
     base = _mkdir_charts(out_dir)
 
-    pdc_kw = _leer_pdc_kw(res)
+    energia = getattr(res, "energia", None)
+
+    if energia:
+
+        energia_mensual = list(getattr(energia, "energia_util_12m", []))
+
+    else:
+
+        energia_mensual = [0]*12
 
     meses = [
         "Ene","Feb","Mar","Abr","May","Jun",
         "Jul","Ago","Sep","Oct","Nov","Dic"
     ]
 
-    hsp = hsp_12m_base()
-
-    energia_mensual = []
-    energia_diaria = []
-
-    for hsp_mes, dias in zip(hsp, DIAS_MES):
-
-        e_mes = pdc_kw * hsp_mes * dias
-
-        energia_mensual.append(e_mes)
-        energia_diaria.append(e_mes / dias)
-
     energia_anual = sum(energia_mensual)
 
     paths = {}
 
-    # energía mensual
     p1 = base / "fv_energia_mensual.png"
     _chart_mensual(meses, energia_mensual, p1)
     paths["chart_energia_mensual"] = str(p1)
 
-    # energía diaria
+    # energía diaria promedio
+    energia_diaria = [
+        e/d for e,d in zip(energia_mensual, DIAS_MES)
+    ]
+
     p2 = base / "fv_energia_diaria.png"
     _chart_diaria(meses, energia_diaria, p2)
     paths["chart_energia_diaria"] = str(p2)
 
-    # potencia horaria
+    pdc_kw = _leer_pdc_kw(res)
+
     p3 = base / "fv_potencia_horaria.png"
     _chart_potencia_horaria(pdc_kw, p3)
     paths["chart_potencia_horaria"] = str(p3)
 
-    # energía horaria
     p4 = base / "fv_energia_horaria.png"
     _chart_energia_horaria(pdc_kw, p4)
     paths["chart_energia_horaria"] = str(p4)
 
-    # energía anual
     p5 = base / "fv_energia_anual.png"
     _chart_anual(energia_anual, p5)
     paths["chart_anual"] = str(p5)
 
-    # ======================================================
-    # DIAGRAMA STRING FV
-    # ======================================================
-
+    # strings
     try:
 
-        strings_block = (res or {}).get("strings", {})
-        strings = strings_block.get("strings", [])
+        strings_block = getattr(res, "strings", None)
+        strings = getattr(strings_block, "strings", [])
 
         if strings:
 
-            n_series = strings[0].get("n_series")
+            n_series = getattr(strings[0], "n_series", None)
 
             if n_series:
 
