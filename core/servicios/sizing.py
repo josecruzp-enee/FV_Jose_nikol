@@ -179,6 +179,9 @@ def calcular_sizing_unificado(
 
         pdc_kw_objetivo=kwp_objetivo if modo_dimensionado == "auto" else None,
 
+        t_min_c=10,
+        t_oper_c=50,
+
         n_paneles_total=n_paneles_manual if modo_dimensionado == "manual" else None,
     )
 
