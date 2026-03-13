@@ -28,39 +28,24 @@ def _mkdir_charts(out_dir: str | None) -> Path:
 # Extraer potencia DC desde ResultadoProyecto
 # ==========================================================
 
-def _leer_pdc_kw(res) -> float:
+def _leer_pdc_kw(res):
 
-    try:
+    sizing = (res or {}).get("sizing") or {}
 
-        # ResultadoProyecto como dict
-        if isinstance(res, dict):
+    # 1️⃣ kwp directo
+    kwp = sizing.get("kwp_dc")
+    if kwp:
+        return float(kwp)
 
-            # ruta nueva
-            if "tecnico" in res:
-                sistema = res["tecnico"].get("sistema", {})
-                if "potencia_dc_kw" in sistema:
-                    return float(sistema["potencia_dc_kw"])
+    # 2️⃣ kwp recomendado
+    kwp = sizing.get("kwp_recomendado")
+    if kwp:
+        return float(kwp)
 
-            # ruta sizing
-            sizing = res.get("sizing", {})
-            if "potencia_dc_w" in sizing:
-                return float(sizing["potencia_dc_w"]) / 1000
-
-        # ResultadoProyecto como dataclass
-        else:
-
-            if hasattr(res, "tecnico"):
-                sistema = getattr(res.tecnico, "sistema", None)
-                if sistema and hasattr(sistema, "potencia_dc_kw"):
-                    return float(sistema.potencia_dc_kw)
-
-            if hasattr(res, "sizing"):
-                sizing = res.sizing
-                if hasattr(sizing, "potencia_dc_w"):
-                    return float(sizing.potencia_dc_w) / 1000
-
-    except Exception:
-        pass
+    # 3️⃣ potencia en watts
+    pdc_w = sizing.get("potencia_dc_w")
+    if pdc_w:
+        return float(pdc_w) / 1000.0
 
     return 0.0
 
