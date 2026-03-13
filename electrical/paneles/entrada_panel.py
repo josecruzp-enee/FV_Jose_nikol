@@ -47,7 +47,7 @@ class EntradaPaneles:
     # ----------------------------------------------
 
     n_paneles_total: int
-    n_inversores: int
+    n_inversores: Optional[int] = None
     # ----------------------------------------------
     # Condiciones térmicas
     # ----------------------------------------------
