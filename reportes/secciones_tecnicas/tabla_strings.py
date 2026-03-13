@@ -18,14 +18,8 @@ def crear_tabla_strings(strings: List[Dict[str, Any]], pal, content_w):
 
     rows = [header]
 
-    strings = sorted(
-        strings,
-        key=lambda s: (
-            s.get("inversor", 0),
-            s.get("mppt", 0),
-            s.get("id", 0),
-        )
-    )
+    # Ordenar strings por ID
+    strings = sorted(strings, key=lambda s: s.get("id", 0))
 
     for s in strings:
 
