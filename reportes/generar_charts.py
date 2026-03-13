@@ -182,6 +182,7 @@ def _chart_anual(energia_anual: float, path: Path):
 # ==========================================================
 # GENERADOR PRINCIPAL
 # ==========================================================
+
 def generar_charts(
     res: Any,
     out_dir: str | None = None,
@@ -254,27 +255,33 @@ def generar_charts(
     paths["chart_anual"] = str(p5)
 
     # ======================================================
-    # DIAGRAMA STRING FV (REPRESENTATIVO)
+    # DIAGRAMA STRING FV
     # ======================================================
 
     try:
 
         from reportes.generar_string_fv import generar_string_fv
 
-        strings = getattr(res, "strings", None)
+        strings_block = (res or {}).get("strings", {})
+        strings = strings_block.get("strings", [])
 
         if strings:
 
-            p6 = base / "string_fv.png"
+            n_series = strings[0].get("n_series")
 
-            generar_string_fv(
-                strings[0].n_series,
-                p6
-            )
+            if n_series:
 
-            paths["string_fv"] = str(p6)
+                p6 = base / "string_fv.png"
 
-    except Exception:
-        pass
+                generar_string_fv(
+                    n_series,
+                    p6
+                )
+
+                paths["string_fv"] = str(p6)
+
+    except Exception as e:
+
+        print("Error generando diagrama string FV:", e)
 
     return paths
