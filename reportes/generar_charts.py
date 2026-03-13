@@ -278,21 +278,28 @@ def generar_charts(
     # NUEVA GRÁFICA HORARIA FV
     # -------------------------------------------------------
 
-    hsp_12m = aprox["hsp_12m"]
-    pdc_kw = aprox["pdc_kw"]
+    # -------------------------------------------------------
+    # GRÁFICA HORARIA FV (SIEMPRE GENERAR)
+    # -------------------------------------------------------
 
-    if isinstance(hsp_12m,list) and len(hsp_12m)==12:
+    from electrical.energia.irradiancia import hsp_12m_base
 
-        hsp_mes = hsp_12m[2]  # marzo ejemplo
+    hsp_12m = hsp_12m_base()
 
-        p5 = base / "fv_chart_generacion_horaria.png"
+    if hsp_12m:
 
-        _plot_generacion_horaria(
-            pdc_kw,
-            hsp_mes,
-            p5
-        )
+        hsp_mes = max(hsp_12m)
 
-        paths_out["chart_generacion_horaria"] = str(p5)
+        pdc_kw = aprox.get("pdc_kw", 0)
 
-    return paths_out
+        if pdc_kw > 0:
+
+            p5 = base / "fv_chart_generacion_horaria.png"
+
+            _plot_generacion_horaria(
+                pdc_kw,
+                hsp_mes,
+                p5
+            )
+
+            paths_out["chart_generacion_horaria"] = str(p5)
