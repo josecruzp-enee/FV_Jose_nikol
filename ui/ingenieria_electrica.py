@@ -201,6 +201,25 @@ def _mostrar_nec(nec):
         st.info("Sin resultados NEC.")
         return
 
+    corrientes = nec.get("corrientes", {})
+    protecciones = nec.get("protecciones")
+    conductores = nec.get("conductores", {}).get("circuitos", [])
+
+    st.subheader("DEBUG NEC")
+    st.json(nec)
+
+    st.subheader("DEBUG CORRIENTES")
+    st.json(corrientes)
+
+    dc = corrientes.get("dc_total", {})
+    ac = corrientes.get("ac", {})
+
+    st.subheader("DEBUG DC")
+    st.json(dc)
+
+    st.subheader("DEBUG AC")
+    st.json(ac)
+
     # ------------------------------------------------------
     # Lectura segura del contrato eléctrico
     # ------------------------------------------------------
