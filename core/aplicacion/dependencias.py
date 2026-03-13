@@ -137,14 +137,41 @@ class SizingAdapter(PuertoSizing):
 # ADAPTADOR: PANELES
 # ==========================================================
 
+# ==========================================================
+# ADAPTADOR: PANELES
+# ==========================================================
+
+from electrical.paneles.entrada_panel import EntradaPaneles
+from electrical.catalogos import get_panel, get_inversor
+
+
 class PanelesAdapter(PuertoPaneles):
 
     def ejecutar(self, datos, sizing):
         """
-        Ejecuta el cálculo de strings y configuración
-        del generador FV.
+        Ejecuta el cálculo de configuración del generador FV.
         """
-        return ejecutar_paneles(datos)
+
+        eq = getattr(datos, "equipos", {}) or {}
+
+        panel = get_panel(eq.get("panel_id"))
+        inversor = get_inversor(eq.get("inversor_id"))
+
+        if panel is None:
+            raise ValueError("Panel no encontrado en catálogo")
+
+        if inversor is None:
+            raise ValueError("Inversor no encontrado en catálogo")
+
+        entrada = EntradaPaneles(
+            panel=panel,
+            inversor=inversor,
+            n_paneles_total=sizing.n_paneles,
+            t_min_c=10,
+            t_oper_c=50,
+        )
+
+        return ejecutar_paneles(entrada)
 
 
 # ==========================================================
