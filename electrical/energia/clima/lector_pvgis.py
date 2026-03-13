@@ -1,39 +1,13 @@
 from __future__ import annotations
 
-"""
-LECTOR PVGIS — FV Engine
-
-Responsabilidad
----------------
-Descargar datos climáticos horarios desde PVGIS.
-
-Datos obtenidos:
-    • GHI (irradiancia horizontal)
-    • temperatura ambiente
-
-Salida:
-    List[ClimaHora] con 8760 horas.
-
-Fuente:
-    https://re.jrc.ec.europa.eu/api/
-"""
-
 from typing import List
 import requests
 
 from .clima_modelo import ClimaHora
 
 
-# ==========================================================
-# URL BASE PVGIS
-# ==========================================================
-
 PVGIS_URL = "https://re.jrc.ec.europa.eu/api/seriescalc"
 
-
-# ==========================================================
-# DESCARGA CLIMA PVGIS
-# ==========================================================
 
 def descargar_clima_pvgis(
     lat: float,
@@ -73,13 +47,26 @@ def descargar_clima_pvgis(
     for h in hourly:
 
         ghi = h.get("G(h)", 0)
+        dni = h.get("Gb(n)", 0)
+        dhi = h.get("Gd(h)", 0)
+
         temp = h.get("T2m", 25)
+
+        tiempo = h.get("time")
 
         clima.append(
             ClimaHora(
+                tiempo=tiempo,
                 ghi_wm2=float(ghi),
+                dni_wm2=float(dni),
+                dhi_wm2=float(dhi),
                 temp_amb_c=float(temp)
             )
+        )
+
+    if len(clima) != 8760:
+        raise RuntimeError(
+            f"PVGIS devolvió {len(clima)} horas en lugar de 8760"
         )
 
     return clima
