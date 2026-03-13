@@ -275,27 +275,51 @@ def render(ctx):
         deps = construir_dependencias()
 
         resultado = ejecutar_estudio(datos, deps)
-        st.subheader("DEBUG RESULTADO")
-
-        st.write("Tipo resultado:")
-        st.write(type(resultado))
-
-        st.write("Contenido resultado:")
-        st.write(resultado)
 
         # ======================================================
-        # DEBUG
+        # DEBUG MOTOR FV
         # ======================================================
 
-        st.write("DEBUG TIPO RESULTADO:")
-        st.write(type(resultado))
+        with st.expander("🔎 DEBUG MOTOR FV", expanded=True):
 
-        if isinstance(resultado, dict):
-            st.error("⚠️ ERROR: resultado es dict")
-        else:
-            st.success("resultado es objeto correcto")
+            st.write("Tipo resultado:")
+            st.write(type(resultado))
 
-        st.write(resultado)
+            st.write("Contenido completo:")
+            st.write(resultado)
+
+            if hasattr(resultado, "sizing"):
+
+                st.subheader("Sizing")
+
+                st.write("paneles:", resultado.sizing.n_paneles)
+                st.write("pdc_kw:", resultado.sizing.pdc_kw)
+                st.write("kw_ac:", resultado.sizing.kw_ac)
+                st.write("n_inversores:", resultado.sizing.n_inversores)
+
+            if hasattr(resultado, "strings"):
+
+                st.subheader("Strings")
+
+                st.write("tipo strings:", type(resultado.strings))
+
+                if hasattr(resultado.strings, "n_strings_total"):
+                    st.write("n_strings_total:", resultado.strings.n_strings_total)
+
+                if hasattr(resultado.strings, "n_series"):
+                    st.write("n_series:", resultado.strings.n_series)
+
+                if hasattr(resultado.strings, "strings"):
+                    st.write("lista strings:")
+                    st.write(resultado.strings.strings)
+
+            if hasattr(resultado, "nec"):
+
+                st.subheader("NEC")
+
+                st.write(resultado.nec)
+
+        # ------------------------------------------------------
 
         ctx.resultado_proyecto = resultado
 
@@ -311,8 +335,6 @@ def render(ctx):
 
         st.error("Error en motor FV")
         st.code(traceback.format_exc())
-
-
 # ==========================================================
 # VALIDACIÓN DEL PASO
 # ==========================================================
