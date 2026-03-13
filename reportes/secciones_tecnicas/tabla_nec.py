@@ -3,6 +3,18 @@ from reportlab.platypus import Table, TableStyle
 
 
 # ==========================================================
+# UTILIDAD — lectura segura
+# ==========================================================
+
+def _leer(obj, campo, default=0):
+
+    if isinstance(obj, dict):
+        return obj.get(campo, default)
+
+    return getattr(obj, campo, default)
+
+
+# ==========================================================
 # TABLA 1 — PARÁMETROS ELÉCTRICOS
 # ==========================================================
 
@@ -16,8 +28,8 @@ def crear_tabla_parametros_electricos(resultado, pal, content_w):
         d = corr.get(nivel, {})
 
         return (
-            float(d.get("i_operacion_a", 0)),
-            float(d.get("i_diseno_a", 0)),
+            float(_leer(d, "i_operacion_a", 0)),
+            float(_leer(d, "i_diseno_a", 0)),
         )
 
     panel_nom, panel_dis = leer("panel")
@@ -46,6 +58,7 @@ def crear_tabla_parametros_electricos(resultado, pal, content_w):
     tbl = Table(rows, colWidths=colw)
 
     tbl.setStyle(TableStyle([
+
         ("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),
         ("BACKGROUND",(0,0),(-1,0),pal["SOFT"]),
         ("TEXTCOLOR",(0,0),(-1,0),pal["PRIMARY"]),
@@ -54,6 +67,7 @@ def crear_tabla_parametros_electricos(resultado, pal, content_w):
 
         ("GRID",(0,0),(-1,-1),0.3,pal["BORDER"]),
         ("FONTSIZE",(0,0),(-1,-1),10),
+
     ]))
 
     return tbl
@@ -68,27 +82,35 @@ def crear_tabla_dimensionamiento_nec(resultado, pal, content_w):
     nec = getattr(resultado, "nec", {}).get("paquete_nec", {})
 
     corr = nec.get("corrientes", {})
-    prot = nec.get("protecciones")
+    prot = nec.get("protecciones", None)
     cond = nec.get("conductores", {}).get("circuitos", [])
 
     if not corr:
         return None
 
-    # Buscar calibres DC y AC
+    # ------------------------------------------------------
+    # Buscar conductores
+    # ------------------------------------------------------
+
     cond_dc = "—"
     cond_ac = "—"
 
     for c in cond:
 
-        if c.get("nombre") == "DC":
-            cond_dc = f'{c.get("awg","—")} AWG'
+        nombre = _leer(c, "nombre")
 
-        if c.get("nombre") == "AC":
-            cond_ac = f'{c.get("awg","—")} AWG'
+        if nombre == "DC":
+            cond_dc = f'{_leer(c,"awg","—")} AWG'
 
+        if nombre == "AC":
+            cond_ac = f'{_leer(c,"awg","—")} AWG'
+
+    # ------------------------------------------------------
     # Protecciones
-    breaker_ac = getattr(prot, "breaker_ac", None)
-    fusible_str = getattr(prot, "fusible_string", None)
+    # ------------------------------------------------------
+
+    breaker_ac = getattr(prot, "breaker_ac", None) if prot else None
+    fusible_str = getattr(prot, "fusible_string", None) if prot else None
 
     rows = [
 
@@ -97,31 +119,33 @@ def crear_tabla_dimensionamiento_nec(resultado, pal, content_w):
     ]
 
     orden = [
+
         ("panel", "Panel", None, None),
         ("string", "String", fusible_str, cond_dc),
         ("mppt", "MPPT", None, cond_dc),
         ("dc_total", "Entrada inversor DC", None, cond_dc),
         ("ac", "Salida inversor AC", breaker_ac, cond_ac),
+
     ]
 
     for key, nombre, p, c in orden:
 
         d = corr.get(key, {})
 
-        i_op = d.get("i_operacion_a", 0)
-        i_dis = d.get("i_diseno_a", 0)
+        i_op = float(_leer(d, "i_operacion_a", 0))
+        i_dis = float(_leer(d, "i_diseno_a", 0))
 
         proteccion = "—"
 
         if p:
-            proteccion = f'{getattr(p,"tamano_a","—")} A'
+            proteccion = f'{_leer(p,"tamano_a","—")} A'
 
         conductor = c if c else "—"
 
         rows.append([
             nombre,
-            f"{float(i_op):.2f} A",
-            f"{float(i_dis):.2f} A",
+            f"{i_op:.2f} A",
+            f"{i_dis:.2f} A",
             proteccion,
             conductor
         ])
@@ -137,13 +161,17 @@ def crear_tabla_dimensionamiento_nec(resultado, pal, content_w):
     tbl = Table(rows, colWidths=colw)
 
     tbl.setStyle(TableStyle([
+
         ("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),
         ("BACKGROUND",(0,0),(-1,0),pal["SOFT"]),
         ("TEXTCOLOR",(0,0),(-1,0),pal["PRIMARY"]),
+
         ("ALIGN",(1,1),(2,-1),"RIGHT"),
         ("ALIGN",(3,1),(-1,-1),"CENTER"),
+
         ("GRID",(0,0),(-1,-1),0.3,pal["BORDER"]),
         ("FONTSIZE",(0,0),(-1,-1),10),
+
     ]))
 
     return tbl
@@ -160,22 +188,36 @@ def crear_tabla_indicadores(resultado, pal, content_w):
 
     strings = getattr(strings_block, "strings", []) if strings_block else []
 
-    n_paneles = getattr(sizing, "n_paneles", 0)
-    kw_ac = getattr(sizing, "kw_ac", 0)
+    n_paneles = _leer(sizing, "n_paneles", 0)
+    kw_ac = _leer(sizing, "kw_ac", 0)
+    kwp_dc = _leer(sizing, "pdc_kw", 0)
 
-    paneles_usados = sum(getattr(s, "n_series", 0) for s in strings)
+    # ------------------------------------------------------
+    # Paneles utilizados
+    # ------------------------------------------------------
 
-    utiliz_panel = (paneles_usados / n_paneles) * 100 if n_paneles else 0
+    paneles_usados = sum(_leer(s, "n_series", 0) for s in strings)
 
-    n_mppt_total = getattr(sizing, "n_inversores", 1) * getattr(sizing, "mppt_por_inversor", 2)
+    utiliz_panel = (paneles_usados / n_paneles * 100) if n_paneles else 0
 
-    utiliz_mppt = len(strings) / n_mppt_total * 100 if n_mppt_total else 0
+    # ------------------------------------------------------
+    # MPPT
+    # ------------------------------------------------------
 
-    kwp_dc = getattr(sizing, "pdc_kw", 0)
+    n_inv = _leer(sizing, "n_inversores", 1)
+    mppt_por_inv = _leer(sizing, "mppt_por_inversor", 2)
+
+    n_mppt_total = n_inv * mppt_por_inv
+
+    utiliz_mppt = (len(strings) / n_mppt_total * 100) if n_mppt_total else 0
+
+    # ------------------------------------------------------
+    # DC / AC
+    # ------------------------------------------------------
 
     relacion = kwp_dc / kw_ac if kw_ac else 0
 
-    carga_inv = kwp_dc / getattr(sizing, "n_inversores", 1)
+    carga_inv = kwp_dc / n_inv if n_inv else 0
 
     rows = [
 
@@ -196,6 +238,7 @@ def crear_tabla_indicadores(resultado, pal, content_w):
     tbl = Table(rows, colWidths=colw)
 
     tbl.setStyle(TableStyle([
+
         ("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),
         ("BACKGROUND",(0,0),(-1,0),pal["SOFT"]),
         ("TEXTCOLOR",(0,0),(-1,0),pal["PRIMARY"]),
@@ -204,6 +247,7 @@ def crear_tabla_indicadores(resultado, pal, content_w):
 
         ("GRID",(0,0),(-1,-1),0.3,pal["BORDER"]),
         ("FONTSIZE",(0,0),(-1,-1),10),
+
     ]))
 
     return tbl
