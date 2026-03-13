@@ -77,10 +77,10 @@ def dimensionar_paneles(
     panel = entrada.panel
 
     try:
-        panel_w = float(panel.potencia_w)
+        panel_w = float(panel.pmax_w)
     except Exception:
         panel_w = 0.0
-        errores.append("Panel inválido: potencia_w no numérica.")
+        errores.append("Panel inválido: pmax_w no numérica.")
 
     kwp_req = _safe_float(entrada.pdc_kw_objetivo, 0.0)
 
