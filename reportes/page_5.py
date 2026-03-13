@@ -17,18 +17,16 @@ def build_page_5(resultado, datos, paths, pal, styles, content_w):
 
     story = []
 
-    sizing = resultado.get("sizing", {})
     strings_block = resultado.get("strings", {})
-
     strings = strings_block.get("strings", [])
-
-    paq = resultado.get("nec", {})
 
     # ======================================================
     # 1. Resumen técnico
     # ======================================================
 
     story += build_resumen_tecnico(resultado, pal, styles, content_w)
+
+    story.append(Spacer(1, 12))
 
     # ======================================================
     # 2. Distribución de strings por inversor
@@ -90,9 +88,8 @@ def build_page_5(resultado, datos, paths, pal, styles, content_w):
 
     story.append(Spacer(1, 12))
 
-   
     # ======================================================
-    # 5. Diseño eléctrico NEC
+    # 5. Dimensionamiento eléctrico NEC
     # ======================================================
 
     story.append(
@@ -109,8 +106,30 @@ def build_page_5(resultado, datos, paths, pal, styles, content_w):
             Paragraph("No hay dimensionamiento NEC disponible.", styles["BodyText"])
         )
 
+    story.append(Spacer(1, 12))
+
     # ======================================================
-    # 6. Layout de paneles
+    # 6. Indicadores técnicos
+    # ======================================================
+
+    story.append(
+        Paragraph("Indicadores técnicos del sistema", styles["Heading2"])
+    )
+    story.append(Spacer(1, 6))
+
+    tabla_ind = crear_tabla_indicadores(resultado, pal, content_w)
+
+    if tabla_ind:
+        story.append(tabla_ind)
+    else:
+        story.append(
+            Paragraph("No hay indicadores disponibles.", styles["BodyText"])
+        )
+
+    story.append(Spacer(1, 12))
+
+    # ======================================================
+    # 7. Layout de paneles
     # ======================================================
 
     insertar_layout_paneles(story, paths, styles, content_w)
