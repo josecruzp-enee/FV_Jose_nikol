@@ -163,7 +163,7 @@ class EnergiaAdapter:
         object.__setattr__(entrada, "modo_simulacion", modo)
 
 
-            permitir_curtailment=True
+        permitir_curtailment=True
         )
 
         return ejecutar_motor_energia(entrada)
