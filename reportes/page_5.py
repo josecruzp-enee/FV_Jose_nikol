@@ -20,15 +20,15 @@ def build_page_5(resultado, datos, paths, pal, styles, content_w):
 
     sizing = resultado.get("sizing", {})
     strings_block = resultado.get("strings", {})
-    import streamlit as st
 
+    strings = strings_block.get("strings", [])
+
+    import streamlit as st
     st.write("DEBUG — número de strings:", len(strings))
     st.json(strings)
 
     paq = resultado.get("nec", {})
     corr = paq.get("corrientes", {})
-
-    strings = strings_block.get("strings", [])
 
     n_inv = int(sizing.get("n_inversores", 1))
 
