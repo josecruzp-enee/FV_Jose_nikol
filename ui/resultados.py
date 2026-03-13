@@ -106,7 +106,7 @@ def _render_kpis(resultado_proyecto: dict) -> None:
 
         return
 
-    pdc_kw = float(sizing.get("pdc_kw") or 0.0)
+    pdc_kw = float(getattr(sizing, "pdc_kw", 0.0))
     cuota = float(financiero.get("cuota_mensual") or 0.0)
 
     evaluacion = financiero.get("evaluacion") or {}
