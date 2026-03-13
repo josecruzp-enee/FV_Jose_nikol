@@ -18,16 +18,11 @@ def crear_tabla_resumen_tecnico(data, pal, content_w):
     tbl.setStyle(
         TableStyle([
             ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
-
             ("BACKGROUND", (0,0), (-1,0), pal["SOFT"]),
             ("TEXTCOLOR", (0,0), (-1,0), pal["PRIMARY"]),
-
             ("ALIGN", (1,1), (-1,-1), "RIGHT"),
-
             ("GRID", (0,0), (-1,-1), 0.3, pal["BORDER"]),
-
             ("FONTSIZE", (0,0), (-1,-1), 10),
-
             ("TOPPADDING", (0,0), (-1,-1), 6),
             ("BOTTOMPADDING", (0,0), (-1,-1), 6),
         ])
@@ -42,13 +37,16 @@ def crear_tabla_resumen_tecnico(data, pal, content_w):
 
 def extraer_datos_sistema(resultado):
 
-    sizing = resultado.get("sizing", {})
+    sizing = getattr(resultado, "sizing", None)
 
-    kwp_dc = float(sizing.get("kwp_dc", sizing.get("pdc_kw", 0)))
-    kw_ac = float(sizing.get("kw_ac", 0))
+    if not sizing:
+        return 0, 0, 0, 0
 
-    n_paneles = int(sizing.get("n_paneles", 0))
-    n_inversores = int(sizing.get("n_inversores", 1))
+    kwp_dc = float(getattr(sizing, "kwp_dc", getattr(sizing, "pdc_kw", 0)))
+    kw_ac = float(getattr(sizing, "kw_ac", 0))
+
+    n_paneles = int(getattr(sizing, "n_paneles", 0))
+    n_inversores = int(getattr(sizing, "n_inversores", 1))
 
     return kwp_dc, kw_ac, n_paneles, n_inversores
 
@@ -59,23 +57,22 @@ def extraer_datos_sistema(resultado):
 
 def obtener_configuracion_strings(resultado):
 
-    paneles = resultado.get("strings", {})
-    strings = paneles.get("strings", [])
+    strings_block = getattr(resultado, "strings", None)
+    strings = getattr(strings_block, "strings", []) if strings_block else []
 
     if not strings:
         return 0, 0, 0, 0
 
     s = strings[0]
 
-    n_series = int(s.get("n_series", 0))
+    n_series = int(getattr(s, "n_series", 0))
     n_strings = len(strings)
 
-    vmp = float(s.get("vmp_string_v", 0))
+    vmp = float(getattr(s, "vmp_string_v", 0))
 
     voc = float(
-        s.get("voc_frio_string_v")
-        or s.get("voc_string_v")
-        or 0
+        getattr(s, "voc_frio_string_v", None)
+        or getattr(s, "voc_string_v", 0)
     )
 
     return n_series, n_strings, vmp, voc
@@ -87,30 +84,33 @@ def obtener_configuracion_strings(resultado):
 
 def obtener_corrientes(resultado):
 
-    strings_data = resultado.get("strings", {}).get("strings", [])
+    strings_block = getattr(resultado, "strings", None)
+    strings_data = getattr(strings_block, "strings", []) if strings_block else []
 
     imp_string = 0
     isc_string = 0
 
     if strings_data:
-        s = strings_data[0]
-        imp_string = float(s.get("imp_string_a", 0))
-        isc_string = float(s.get("isc_string_a", 0))
 
-    nec = resultado.get("nec", {})
-    corr = nec.get("corrientes", {})
+        s = strings_data[0]
+
+        imp_string = float(getattr(s, "imp_string_a", 0))
+        isc_string = float(getattr(s, "isc_string_a", 0))
+
+    nec = getattr(resultado, "nec", {})
+    paquete = nec.get("paquete_nec", {})
+
+    corr = paquete.get("corrientes", {})
 
     panel = corr.get("panel", {}).get("i_operacion_a", imp_string)
-
     string = corr.get("string", {}).get("i_operacion_a", imp_string)
-
     mppt = corr.get("mppt", {}).get("i_operacion_a", imp_string)
 
     dc_total = corr.get("dc_total", {}).get("i_operacion_a", 0)
-
     ac = corr.get("ac", {}).get("i_operacion_a", 0)
 
     return panel, string, mppt, dc_total, ac, isc_string
+
 
 # ==========================================================
 # Calcular parámetros del sistema
@@ -229,10 +229,6 @@ def build_resumen_tecnico(resultado, pal, styles, content_w):
         n_inversores
     )
 
-    # ======================================================
-    # SISTEMA FV
-    # ======================================================
-
     story.append(Paragraph("Resumen del sistema FV", styles["Heading1"]))
     story.append(Spacer(1, 10))
 
@@ -252,10 +248,6 @@ def build_resumen_tecnico(resultado, pal, styles, content_w):
 
     story.append(Spacer(1, 16))
 
-    # ======================================================
-    # GENERADOR FV
-    # ======================================================
-
     story.append(Paragraph("Generador fotovoltaico", styles["Heading2"]))
     story.append(Spacer(1, 8))
 
@@ -265,7 +257,7 @@ def build_resumen_tecnico(resultado, pal, styles, content_w):
         vmp,
         voc,
         string_i,
-        11.60
+        isc
     )
 
     story.append(crear_tabla_resumen_tecnico(data_generador, pal, content_w))
