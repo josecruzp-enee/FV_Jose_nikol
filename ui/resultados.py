@@ -228,7 +228,10 @@ def _ejecutar_pipeline_pdf(ctx, resultado_proyecto: dict) -> None:
 
     # Generar artefactos gráficos
     try:
+        import streamlit as st
 
+        st.write("DEBUG RESULTADO_PROYECTO")
+        st.write(resultado_proyecto)
         arte = generar_artefactos(
             res=resultado_proyecto,
             out_dir=out_dir,
