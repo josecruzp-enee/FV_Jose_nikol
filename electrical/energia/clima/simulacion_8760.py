@@ -20,21 +20,15 @@ modelo térmico
 ↓
 potencia panel
 ↓
-potencia string
+potencia DC array
 ↓
-potencia AC
+potencia AC inversor
 ↓
-energía acumulada
+energía horaria
 
 Salida
 ------
-Producción:
-
-• horaria
-• mensual
-• anual
-• PR
-• yield específico
+Producción horaria + métricas del sistema.
 """
 
 from dataclasses import dataclass
@@ -61,27 +55,17 @@ class ResultadoSimulacion8760:
 
     energia_horaria_kwh: List[float]
 
-    energia_mensual_kwh: List[float]
-
     energia_anual_kwh: float
 
     yield_especifico_kwh_kwp: float
 
     performance_ratio: float
 
-
-# ==========================================================
-# HORAS POR MES
-# ==========================================================
-
-HORAS_MES = [
-    744, 672, 744, 720, 744, 720,
-    744, 744, 720, 744, 720, 744
-]
+    poa_total_kwh_m2: float
 
 
 # ==========================================================
-# SIMULADOR
+# SIMULADOR 8760
 # ==========================================================
 
 def simular_8760(
@@ -98,29 +82,31 @@ def simular_8760(
 
     n_paneles: int,
 
+    pac_nominal_kw: float,
+
     eficiencia_inversor: float = 0.96
 
 ) -> ResultadoSimulacion8760:
 
-    energia_horaria: List[float] = []
+    if len(clima) != 8760:
+        raise ValueError("La serie climática debe tener 8760 horas.")
 
-    energia_mensual = [0.0] * 12
+    energia_horaria: List[float] = []
 
     energia_anual = 0.0
 
     poa_total_kwh_m2 = 0.0
 
+    # Potencia STC del generador
     potencia_dc_stc_kw = (panel.pmax_w * n_paneles) / 1000
 
+    # Potencia AC máxima del inversor
+    pac_nominal_w = pac_nominal_kw * 1000
 
-    # ------------------------------------------------------
-    # CONTROL DE MESES
-    # ------------------------------------------------------
 
-    mes_actual = 0
-    horas_mes = HORAS_MES[0]
-    contador_mes = 0
-
+    # ======================================================
+    # SIMULACIÓN HORARIA
+    # ======================================================
 
     for h, hora_clima in enumerate(clima):
 
@@ -139,7 +125,7 @@ def simular_8760(
         )
 
         # --------------------------------------------------
-        # IRRADIANCIA EN PLANO DEL GENERADOR
+        # IRRADIANCIA EN PLANO DEL GENERADOR (POA)
         # --------------------------------------------------
 
         poa = calcular_irradiancia_plano(
@@ -155,6 +141,13 @@ def simular_8760(
             azimuth_superficie=azimuth
 
         )
+
+        # Si no hay irradiancia no hay producción
+        if poa <= 0:
+
+            energia_horaria.append(0.0)
+
+            continue
 
         poa_total_kwh_m2 += poa / 1000
 
@@ -205,59 +198,54 @@ def simular_8760(
         # POTENCIA DC DEL ARRAY
         # --------------------------------------------------
 
-        p_dc = panel_real.pmp_w * n_paneles
+        p_dc_w = panel_real.pmp_w * n_paneles
 
-        p_dc = max(p_dc, 0)
+        p_dc_w = max(p_dc_w, 0)
 
 
         # --------------------------------------------------
         # CONVERSIÓN A AC
         # --------------------------------------------------
 
-        p_ac = p_dc * eficiencia_inversor
+        p_ac_w = p_dc_w * eficiencia_inversor
+
+
+        # --------------------------------------------------
+        # CLIPPING DEL INVERSOR
+        # --------------------------------------------------
+
+        if p_ac_w > pac_nominal_w:
+
+            p_ac_w = pac_nominal_w
 
 
         # --------------------------------------------------
         # ENERGÍA HORARIA
         # --------------------------------------------------
 
-        energia_kwh = p_ac / 1000
+        energia_kwh = p_ac_w / 1000
 
         energia_horaria.append(energia_kwh)
 
         energia_anual += energia_kwh
 
 
-        # --------------------------------------------------
-        # ENERGÍA MENSUAL
-        # --------------------------------------------------
-
-        energia_mensual[mes_actual] += energia_kwh
-
-        contador_mes += 1
-
-        if contador_mes >= horas_mes:
-
-            mes_actual += 1
-
-            if mes_actual > 11:
-                mes_actual = 11
-
-            contador_mes = 0
-
-            horas_mes = HORAS_MES[mes_actual]
-
-
-    # ------------------------------------------------------
+    # ======================================================
     # YIELD ESPECÍFICO
-    # ------------------------------------------------------
+    # ======================================================
 
-    yield_especifico = energia_anual / potencia_dc_stc_kw
+    if potencia_dc_stc_kw > 0:
+
+        yield_especifico = energia_anual / potencia_dc_stc_kw
+
+    else:
+
+        yield_especifico = 0
 
 
-    # ------------------------------------------------------
+    # ======================================================
     # PERFORMANCE RATIO
-    # ------------------------------------------------------
+    # ======================================================
 
     if poa_total_kwh_m2 > 0:
 
@@ -272,12 +260,12 @@ def simular_8760(
 
         energia_horaria_kwh=energia_horaria,
 
-        energia_mensual_kwh=energia_mensual,
-
         energia_anual_kwh=energia_anual,
 
         yield_especifico_kwh_kwp=yield_especifico,
 
-        performance_ratio=pr
+        performance_ratio=pr,
+
+        poa_total_kwh_m2=poa_total_kwh_m2
 
     )
