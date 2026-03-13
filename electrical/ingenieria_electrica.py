@@ -36,6 +36,26 @@ try:
 except Exception:
     canalizacion_fv = None
 
+# ==========================================================
+# ADAPTADOR DATACLASS → DICT
+# ==========================================================
+
+from dataclasses import asdict
+
+def _corrientes_dict(c):
+
+    if c is None:
+        return {}
+
+    # si ya es dict
+    if isinstance(c, dict):
+        return c
+
+    # si es dataclass
+    try:
+        return asdict(c)
+    except Exception:
+        return {}
 
 # ==========================================================
 # VALIDACIÓN DE ENTRADAS
@@ -228,7 +248,7 @@ def ejecutar_ingenieria_electrica(
     # ------------------------------------------------------
 
     corrientes = _resolver_corrientes(entrada)
-
+    corrientes = _corrientes_dict(corrientes)
     # ------------------------------------------------------
     # Protecciones
     # ------------------------------------------------------
