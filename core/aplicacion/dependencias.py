@@ -58,7 +58,11 @@ class PanelesAdapter:
 
             n_paneles_total = None
             pdc_kw_objetivo = sizing.pdc_kw
+        import streamlit as st
 
+        st.write("DEBUG modo_dimensionado:", modo)
+        st.write("DEBUG n_paneles_total:", n_paneles_total)
+        st.write("DEBUG pdc_kw_objetivo:", pdc_kw_objetivo)
         # --------------------------------------------------
         # CONSTRUIR ENTRADA DEL DOMINIO PANELES
         # --------------------------------------------------
