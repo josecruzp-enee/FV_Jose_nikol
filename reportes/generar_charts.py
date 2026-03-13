@@ -3,11 +3,11 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Dict, List, Any
 
+import math
 import matplotlib.pyplot as plt
 
 from electrical.energia.irradiancia import (
     hsp_12m_base,
-    hsp_a_perfil_horario,
     DIAS_MES
 )
 
@@ -32,22 +32,20 @@ def _leer_pdc_kw(res):
 
     sizing = (res or {}).get("sizing") or {}
 
-    # 1️⃣ kwp directo
     kwp = sizing.get("kwp_dc")
     if kwp:
         return float(kwp)
 
-    # 2️⃣ kwp recomendado
     kwp = sizing.get("kwp_recomendado")
     if kwp:
         return float(kwp)
 
-    # 3️⃣ potencia en watts
     pdc_w = sizing.get("potencia_dc_w")
     if pdc_w:
         return float(pdc_w) / 1000.0
 
     return 0.0
+
 
 # ==========================================================
 # Gráfica mensual
@@ -73,7 +71,27 @@ def _chart_mensual(meses: List[str], energia: List[float], path: Path):
 # Gráfica diaria promedio
 # ==========================================================
 
-def _chart_horaria(pdc_kw: float, hsp_dia: float, path: Path):
+def _chart_diaria(meses: List[str], energia: List[float], path: Path):
+
+    plt.figure()
+
+    plt.bar(meses, energia)
+
+    plt.title("Generación FV diaria promedio")
+    plt.ylabel("kWh/día")
+    plt.xticks(rotation=45)
+    plt.grid(True)
+
+    plt.tight_layout()
+    plt.savefig(path, dpi=160)
+    plt.close()
+
+
+# ==========================================================
+# Gráfica horaria (perfil solar)
+# ==========================================================
+
+def _chart_horaria(pdc_kw: float, path: Path):
 
     horas = list(range(24))
     potencia = []
@@ -92,6 +110,7 @@ def _chart_horaria(pdc_kw: float, hsp_dia: float, path: Path):
         potencia.append(p)
 
     plt.figure()
+
     plt.plot(horas, potencia, marker="o")
 
     plt.title("Perfil horario de generación FV")
@@ -104,44 +123,6 @@ def _chart_horaria(pdc_kw: float, hsp_dia: float, path: Path):
     plt.savefig(path, dpi=160)
     plt.close()
 
-# ==========================================================
-# Gráfica horaria
-# ==========================================================
-
-def _chart_horaria(pdc_kw: float, hsp_dia: float, path: Path):
-
-    perfil = hsp_a_perfil_horario(hsp_dia)
-
-    horas = list(range(24))
-    potencia = []
-
-    PR = 0.82
-
-    for irr in perfil:
-
-        # convertir energía horaria a fracción del día solar
-        if hsp_dia > 0:
-            fraccion = irr / hsp_dia
-        else:
-            fraccion = 0
-
-        p = pdc_kw * fraccion * PR
-
-        potencia.append(p)
-
-    plt.figure()
-
-    plt.plot(horas, potencia, marker="o")
-
-    plt.title("Perfil horario de generación FV")
-    plt.xlabel("Hora")
-    plt.ylabel("Potencia (kW)")
-    plt.xticks(range(0,24))
-    plt.grid(True)
-
-    plt.tight_layout()
-    plt.savefig(path, dpi=160)
-    plt.close()
 
 # ==========================================================
 # Gráfica anual
@@ -174,10 +155,7 @@ def generar_charts(
     base = _mkdir_charts(out_dir)
 
     pdc_kw = _leer_pdc_kw(res)
-    import streamlit as st
 
-    st.write("DEBUG ResultadoProyecto:", res)
-    st.write("DEBUG PDC KW:", pdc_kw)
     meses = [
         "Ene","Feb","Mar","Abr","May","Jun",
         "Jul","Ago","Sep","Oct","Nov","Dic"
@@ -211,7 +189,7 @@ def generar_charts(
 
     # horaria
     p3 = base / "fv_chart_horaria.png"
-    _chart_horaria(pdc_kw, max(hsp), p3)
+    _chart_horaria(pdc_kw, p3)
     paths["chart_horaria"] = str(p3)
 
     # anual
