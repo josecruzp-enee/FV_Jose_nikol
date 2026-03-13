@@ -43,7 +43,7 @@ def build_page_5(resultado, datos, paths, pal, styles, content_w):
 
     if strings:
         story.append(
-            crear_tabla_strings(strings, n_inv, pal, content_w)
+            crear_tabla_strings(strings, pal, content_w)
         )
     else:
         story.append(
