@@ -28,26 +28,41 @@ def _mkdir_charts(out_dir: str | None) -> Path:
 # Extraer potencia DC desde ResultadoProyecto
 # ==========================================================
 
-def _leer_pdc_kw(res: Any) -> float:
+def _leer_pdc_kw(res) -> float:
 
     try:
 
+        # ResultadoProyecto como dict
         if isinstance(res, dict):
 
-            sizing = res.get("sizing", {})
-            pdc_w = sizing.get("potencia_dc_w", 0)
+            # ruta nueva
+            if "tecnico" in res:
+                sistema = res["tecnico"].get("sistema", {})
+                if "potencia_dc_kw" in sistema:
+                    return float(sistema["potencia_dc_kw"])
 
+            # ruta sizing
+            sizing = res.get("sizing", {})
+            if "potencia_dc_w" in sizing:
+                return float(sizing["potencia_dc_w"]) / 1000
+
+        # ResultadoProyecto como dataclass
         else:
 
-            sizing = getattr(res, "sizing", None)
-            pdc_w = getattr(sizing, "potencia_dc_w", 0)
+            if hasattr(res, "tecnico"):
+                sistema = getattr(res.tecnico, "sistema", None)
+                if sistema and hasattr(sistema, "potencia_dc_kw"):
+                    return float(sistema.potencia_dc_kw)
 
-        return pdc_w / 1000
+            if hasattr(res, "sizing"):
+                sizing = res.sizing
+                if hasattr(sizing, "potencia_dc_w"):
+                    return float(sizing.potencia_dc_w) / 1000
 
     except Exception:
+        pass
 
-        return 0.0
-
+    return 0.0
 
 # ==========================================================
 # Gráfica mensual
