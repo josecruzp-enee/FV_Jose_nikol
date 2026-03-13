@@ -54,19 +54,6 @@ def extraer_datos_sistema(resultado):
 
 
 # ==========================================================
-# Calcular parámetros del sistema
-# ==========================================================
-
-def calcular_parametros_generales(kwp_dc, kw_ac, n_paneles, n_inversores):
-
-    panel_wp = (kwp_dc * 1000) / n_paneles if n_paneles else 0
-    potencia_inversor = kw_ac / n_inversores if n_inversores else 0
-    relacion_dc_ac = kwp_dc / kw_ac if kw_ac else 0
-
-    return panel_wp, potencia_inversor, relacion_dc_ac
-
-
-# ==========================================================
 # Obtener configuración de strings
 # ==========================================================
 
@@ -81,9 +68,7 @@ def obtener_configuracion_strings(resultado):
     s = strings[0]
 
     n_series = int(s.get("n_series", 0))
-
-    # total real de strings
-    n_paralelo = sum(s.get("n_strings", 1) for s in strings)
+    n_strings = len(strings)
 
     vmp = float(s.get("vmp_string_v", 0))
 
@@ -93,7 +78,7 @@ def obtener_configuracion_strings(resultado):
         or 0
     )
 
-    return n_series, n_paralelo, vmp, voc
+    return n_series, n_strings, vmp, voc
 
 
 # ==========================================================
@@ -117,27 +102,54 @@ def obtener_corrientes(resultado):
     ac = corr.get("ac", {}).get("i_operacion_a", 0)
 
     return panel, string, mppt, dc_total, ac
+
+
 # ==========================================================
-# Construir datos del resumen técnico
+# Calcular parámetros del sistema
 # ==========================================================
 
-def construir_datos_resumen(
+def calcular_parametros_generales(
     kwp_dc,
     kw_ac,
     n_paneles,
-    panel_wp,
-    n_inversores,
-    potencia_inversor,
-    relacion_dc_ac,
     n_series,
-    n_paralelo,
-    vmp,
-    voc,
-    panel_i,
-    string_i,
-    mppt_i,
-    dc_i,
-    ac_i
+    n_strings,
+    n_inversores
+):
+
+    panel_wp = (kwp_dc * 1000) / n_paneles if n_paneles else 0
+
+    potencia_inversor = kw_ac / n_inversores if n_inversores else 0
+
+    relacion_dc_ac = kwp_dc / kw_ac if kw_ac else 0
+
+    paneles_usados = n_series * n_strings
+
+    paneles_sobrantes = max(0, n_paneles - paneles_usados)
+
+    return (
+        panel_wp,
+        potencia_inversor,
+        relacion_dc_ac,
+        paneles_usados,
+        paneles_sobrantes
+    )
+
+
+# ==========================================================
+# Resumen sistema FV
+# ==========================================================
+
+def construir_resumen_sistema(
+    kwp_dc,
+    kw_ac,
+    relacion_dc_ac,
+    n_paneles,
+    panel_wp,
+    paneles_usados,
+    paneles_sobrantes,
+    n_inversores,
+    potencia_inversor
 ):
 
     return [
@@ -149,18 +161,40 @@ def construir_datos_resumen(
         ["Relación DC/AC", f"{relacion_dc_ac:.2f}"],
 
         ["Número de módulos", f"{n_paneles} × {panel_wp:.0f} Wp"],
-        ["Número de inversores", f"{n_inversores} × {potencia_inversor:.1f} kW"],
 
-        ["Configuración strings", f"{n_series}S × {n_paralelo}P"],
+        ["Paneles utilizados", f"{paneles_usados}"],
+        ["Paneles sobrantes", f"{paneles_sobrantes}"],
+
+        ["Número de inversores", f"{n_inversores} × {potencia_inversor:.1f} kW"],
+    ]
+
+
+# ==========================================================
+# Generador FV
+# ==========================================================
+
+def construir_resumen_generador(
+    n_series,
+    n_strings,
+    vmp,
+    voc,
+    string_i,
+    isc
+):
+
+    return [
+
+        ["Parámetro", "Valor"],
+
+        ["Configuración strings", f"{n_series}S × {n_strings}P"],
 
         ["Voltaje operativo string (Vmp)", f"{vmp:.0f} V"],
-        ["Voltaje máximo frío (Voc)", f"{voc:.0f} V"],
+        ["Voltaje máximo en frío (Voc)", f"{voc:.0f} V"],
 
-        ["Corriente panel", f"{panel_i:.2f} A"],
-        ["Corriente string", f"{string_i:.2f} A"],
-        ["Corriente MPPT", f"{mppt_i:.2f} A"],
-        ["Corriente DC total", f"{dc_i:.2f} A"],
-        ["Corriente AC total", f"{ac_i:.2f} A"],
+        ["Corriente por string (Imp)", f"{string_i:.2f} A"],
+        ["Corriente de cortocircuito (Isc)", f"{isc:.2f} A"],
+
+        ["Strings totales", f"{n_strings}"],
     ]
 
 
@@ -174,41 +208,60 @@ def build_resumen_tecnico(resultado, pal, styles, content_w):
 
     kwp_dc, kw_ac, n_paneles, n_inversores = extraer_datos_sistema(resultado)
 
-    panel_wp, potencia_inversor, relacion_dc_ac = calcular_parametros_generales(
-        kwp_dc,
-        kw_ac,
-        n_paneles,
-        n_inversores
-    )
-
-    n_series, n_paralelo, vmp, voc = obtener_configuracion_strings(resultado)
+    n_series, n_strings, vmp, voc = obtener_configuracion_strings(resultado)
 
     panel_i, string_i, mppt_i, dc_i, ac_i = obtener_corrientes(resultado)
 
-    data = construir_datos_resumen(
+    panel_wp, potencia_inversor, relacion_dc_ac, paneles_usados, paneles_sobrantes = calcular_parametros_generales(
         kwp_dc,
         kw_ac,
         n_paneles,
-        panel_wp,
-        n_inversores,
-        potencia_inversor,
-        relacion_dc_ac,
         n_series,
-        n_paralelo,
-        vmp,
-        voc,
-        panel_i,
-        string_i,
-        mppt_i,
-        dc_i,
-        ac_i
+        n_strings,
+        n_inversores
     )
 
-    story.append(Paragraph("Resumen técnico del sistema FV", styles["Heading1"]))
+    # ======================================================
+    # SISTEMA FV
+    # ======================================================
+
+    story.append(Paragraph("Resumen del sistema FV", styles["Heading1"]))
     story.append(Spacer(1, 10))
 
-    story.append(crear_tabla_resumen_tecnico(data, pal, content_w))
+    data_sistema = construir_resumen_sistema(
+        kwp_dc,
+        kw_ac,
+        relacion_dc_ac,
+        n_paneles,
+        panel_wp,
+        paneles_usados,
+        paneles_sobrantes,
+        n_inversores,
+        potencia_inversor
+    )
 
-    story.append(Spacer(1, 14))
+    story.append(crear_tabla_resumen_tecnico(data_sistema, pal, content_w))
+
+    story.append(Spacer(1, 16))
+
+    # ======================================================
+    # GENERADOR FV
+    # ======================================================
+
+    story.append(Paragraph("Generador fotovoltaico", styles["Heading2"]))
+    story.append(Spacer(1, 8))
+
+    data_generador = construir_resumen_generador(
+        n_series,
+        n_strings,
+        vmp,
+        voc,
+        string_i,
+        11.60
+    )
+
+    story.append(crear_tabla_resumen_tecnico(data_generador, pal, content_w))
+
+    story.append(Spacer(1, 16))
 
     return story
