@@ -309,14 +309,13 @@ def calcular_strings_fv(
         )
 
     # ----------------------------------------------------------
-    # MPPT TOTALES DEL SISTEMA
+    # DISTRIBUCIÓN DE STRINGS EN INVERSORES Y MPPT
     # ----------------------------------------------------------
 
-    mppt_totales = int(inversor.n_mppt) * int(n_inversores)
-
-    ramas = _split_por_mppt(
+    ramas = distribuir_strings_por_inversor(
         n_strings_total,
-        mppt_totales
+        n_inversores,
+        inversor.n_mppt
     )
 
     # ----------------------------------------------------------
