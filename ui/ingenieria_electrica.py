@@ -1,6 +1,5 @@
 from __future__ import annotations
-import pandas as pd
-import streamlit as st
+
 """
 PASO 5 — INGENIERÍA ELÉCTRICA
 FV Engine
@@ -276,7 +275,11 @@ def render(ctx):
         deps = construir_dependencias()
 
         resultado = ejecutar_estudio(datos, deps)
-        import streamlit as st
+
+        # ======================================================
+        # DEBUG
+        # ======================================================
+
         st.write("DEBUG TIPO RESULTADO:")
         st.write(type(resultado))
 
@@ -287,8 +290,6 @@ def render(ctx):
 
         st.write(resultado)
 
-
-        
         ctx.resultado_proyecto = resultado
 
         st.success("Ingeniería generada correctamente.")
