@@ -130,6 +130,8 @@ def _section_indicadores(story, resultado, pal, styles, content_w):
 
     story.append(Spacer(1, 12))
 
+from pathlib import Path
+
 def _section_generacion_diaria(story, paths, styles, content_w):
 
     story.append(
@@ -138,9 +140,12 @@ def _section_generacion_diaria(story, paths, styles, content_w):
 
     story.append(Spacer(1, 6))
 
-    chart = paths.get("chart_generacion_horaria")
+    chart = None
 
-    if chart:
+    if isinstance(paths, dict):
+        chart = paths.get("chart_generacion_horaria")
+
+    if chart and Path(chart).exists():
 
         img = Image(chart)
 
