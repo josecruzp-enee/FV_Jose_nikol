@@ -1,4 +1,4 @@
-from panel.potencia_panel import *
+from electrical.paneles.potencia_panel import *
 
 entrada = PotenciaPanelInput(
 
