@@ -56,7 +56,7 @@ def p1_tabla_cliente(datos, sizing, fecha, pal, content_w):
 
 def p1_tabla_solucion_unica(datos, sizing, energia, financiero, pal, content_w):
 
-    kwp = float(sizing.get("kwp_dc", sizing.get("pdc_kw", 0.0)))
+    kwp = float(getattr(sizing, "kwp_dc", getattr(sizing, "pdc_kw", 0.0)))
     capex = float(financiero.get("capex_L", 0.0))
 
     energia_12m = energia.get("energia_util_12m", [])
