@@ -27,7 +27,6 @@ class SizingAdapter:
 # ==========================================================
 # ADAPTER PANELES
 # ==========================================================
-
 from core.dominio.contrato import ResultadoStrings, StringInfo
 
 
@@ -35,90 +34,83 @@ class PanelesAdapter:
 
     def ejecutar(self, datos, sizing):
 
-    eq = getattr(datos, "equipos", {}) or {}
-    sf = getattr(datos, "sistema_fv", {}) or {}
+        eq = getattr(datos, "equipos", {}) or {}
+        sf = getattr(datos, "sistema_fv", {}) or {}
 
-    panel_id = eq.get("panel_id")
-    inversor_id = eq.get("inversor_id")
+        panel_id = eq.get("panel_id")
+        inversor_id = eq.get("inversor_id")
 
-    panel = get_panel(panel_id)
-    inversor = get_inversor(inversor_id)
+        panel = get_panel(panel_id)
+        inversor = get_inversor(inversor_id)
 
-    # ------------------------------------------------------
-    # MODO DE DIMENSIONADO
-    # ------------------------------------------------------
+        # ------------------------------------------------------
+        # MODO DE DIMENSIONADO
+        # ------------------------------------------------------
 
-    modo = sf.get("modo_dimensionado", "auto")
+        modo = sf.get("modo_dimensionado", "auto")
 
-    if modo == "manual":
+        if modo == "manual":
+            n_paneles_total = sizing.n_paneles
+            pdc_kw_objetivo = None
+        else:
+            n_paneles_total = None
+            pdc_kw_objetivo = sizing.pdc_kw
 
-        n_paneles_total = sizing.n_paneles
-        pdc_kw_objetivo = None
+        # ------------------------------------------------------
+        # CONSTRUIR ENTRADA DEL DOMINIO
+        # ------------------------------------------------------
 
-    else:
-
-        n_paneles_total = None
-        pdc_kw_objetivo = sizing.pdc_kw
-
-    # ------------------------------------------------------
-    # CONSTRUIR ENTRADA DEL DOMINIO
-    # ------------------------------------------------------
-
-    entrada = EntradaPaneles(
-
-        panel=panel,
-        inversor=inversor,
-
-        n_paneles_total=n_paneles_total,
-        n_inversores=sizing.n_inversores,
-
-        t_min_c=sf.get("t_min_c", 10),
-        t_oper_c=sf.get("t_oper_c", 45),
-
-        dos_aguas=sf.get("dos_aguas", False),
-        objetivo_dc_ac=sf.get("dc_ac_ratio", 1.2),
-
-        pdc_kw_objetivo=pdc_kw_objetivo
-    )
-
-    res = ejecutar_paneles(entrada)
-
-    # ------------------------------------------------------
-    # ADAPTAR DICT → ResultadoStrings
-    # ------------------------------------------------------
-
-    if not res.get("ok", False):
-        raise ValueError(f"Error en dominio paneles: {res.get('errores')}")
-
-    strings_raw = res.get("strings", [])
-
-    strings = []
-
-    for s in strings_raw:
-
-        strings.append(
-            StringInfo(
-                id=s["id"],
-                inversor=s["inversor"],
-                mppt=s["mppt"],
-                n_series=s["n_series"],
-                vmp_string_v=s["vmp_string_v"],
-                voc_frio_string_v=s["voc_frio_string_v"],
-                imp_string_a=s["imp_string_a"],
-                isc_string_a=s["isc_string_a"],
-            )
+        entrada = EntradaPaneles(
+            panel=panel,
+            inversor=inversor,
+            n_paneles_total=n_paneles_total,
+            n_inversores=sizing.n_inversores,
+            t_min_c=sf.get("t_min_c", 10),
+            t_oper_c=sf.get("t_oper_c", 45),
+            dos_aguas=sf.get("dos_aguas", False),
+            objetivo_dc_ac=sf.get("dc_ac_ratio", 1.2),
+            pdc_kw_objetivo=pdc_kw_objetivo,
         )
 
-    rec = res.get("recomendacion", {})
+        res = ejecutar_paneles(entrada)
 
-    return ResultadoStrings(
-        ok=True,
-        n_series=rec.get("n_series", 0),
-        n_strings_total=rec.get("n_strings_total", len(strings)),
-        vmp_string_v=rec.get("vmp_string_v", 0),
-        voc_string_v=rec.get("voc_string_v", 0),
-        strings=strings,
-    )
+        # ------------------------------------------------------
+        # ADAPTAR DICT → ResultadoStrings
+        # ------------------------------------------------------
+
+        if not res.get("ok", False):
+            raise ValueError(f"Error en dominio paneles: {res.get('errores')}")
+
+        strings_raw = res.get("strings", [])
+        strings = []
+
+        for s in strings_raw:
+            strings.append(
+                StringInfo(
+                    id=s["id"],
+                    inversor=s["inversor"],
+                    mppt=s["mppt"],
+                    n_series=s["n_series"],
+                    vmp_string_v=s["vmp_string_v"],
+                    voc_frio_string_v=s["voc_frio_string_v"],
+                    imp_string_a=s["imp_string_a"],
+                    isc_string_a=s["isc_string_a"],
+                )
+            )
+
+        rec = res.get("recomendacion", {})
+
+        return ResultadoStrings(
+            ok=True,
+            n_series=rec.get("n_series", 0),
+            n_strings_total=rec.get("n_strings_total", len(strings)),
+            vmp_string_v=rec.get("vmp_string_v", 0),
+            voc_string_v=rec.get("voc_string_v", 0),
+            strings=strings,
+        )
+
+
+
 
 # ==========================================================
 # ADAPTER ENERGIA
