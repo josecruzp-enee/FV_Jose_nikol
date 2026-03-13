@@ -98,13 +98,13 @@ def _resolver_corrientes(entrada):
     strings = entrada["strings"]
     inversor = entrada["inversor"]
 
+    print("\nDEBUG STRINGS ENTRADA INGENIERIA")
+    print(strings)
+
     return calcular_corrientes(
         strings=strings,
-        inv=inversor,
-        cfg_tecnicos={
-            "n_strings_total": entrada["n_strings"]
-        }
-    )
+        inv=inversor
+    ))
 
 
 # ==========================================================
