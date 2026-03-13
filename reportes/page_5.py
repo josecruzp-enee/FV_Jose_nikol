@@ -195,29 +195,95 @@ def build_page_5(resultado, datos, paths, pal, styles, content_w):
     strings_block = resultado.get("strings", {})
     strings = strings_block.get("strings", [])
 
+    # ======================================================
+    # RESUMEN TÉCNICO
+    # ======================================================
+
     _section_resumen(story, resultado, pal, styles, content_w)
+
+    # ======================================================
+    # DISTRIBUCIÓN DE STRINGS
+    # ======================================================
 
     _section_distribucion_strings(story, strings, pal, styles, content_w)
 
+    # ======================================================
+    # CONFIGURACIÓN ELÉCTRICA STRINGS
+    # ======================================================
+
     _section_config_strings(story, strings, pal, styles, content_w)
+
+    # ======================================================
+    # PARÁMETROS ELÉCTRICOS
+    # ======================================================
 
     _section_parametros_electricos(story, resultado, pal, styles, content_w)
 
+    # ======================================================
+    # DIMENSIONAMIENTO NEC
+    # ======================================================
+
     _section_nec(story, resultado, pal, styles, content_w)
+
+    # ======================================================
+    # INDICADORES TÉCNICOS
+    # ======================================================
 
     _section_indicadores(story, resultado, pal, styles, content_w)
 
-    # gráficos FV
+    # ======================================================
+    # GRÁFICOS FV
+    # ======================================================
+
     _section_potencia_horaria(story, paths, styles, content_w)
 
     _section_energia_horaria(story, paths, styles, content_w)
 
     _section_energia_mensual(story, paths, styles, content_w)
 
-    # layout paneles
+    # ======================================================
+    # LAYOUT DE PANELES
+    # ======================================================
+
     _section_layout_paneles(story, paths, styles, content_w)
 
     story.append(PageBreak())
 
-    Image(paths["string_fv"], width=420, height=120)
+    # ======================================================
+    # DIAGRAMA STRING FV REPRESENTATIVO
+    # ======================================================
+
+    if isinstance(paths, dict) and paths.get("string_fv") and Path(paths["string_fv"]).exists():
+
+        story.append(Paragraph("Configuración del String Fotovoltaico", styles["Heading2"]))
+        story.append(Spacer(1, 6))
+
+        img = Image(paths["string_fv"], width=420, height=120)
+        img.hAlign = "CENTER"
+
+        story.append(img)
+        story.append(Spacer(1, 12))
+
+        story.append(
+            Paragraph(
+                "String representativo del generador fotovoltaico. "
+                "Todos los strings del sistema tienen la misma configuración "
+                "y se conectan en paralelo al inversor.",
+                styles["BodyText"]
+            )
+        )
+
+        story.append(Spacer(1, 12))
+
+    else:
+
+        story.append(
+            Paragraph(
+                "No se pudo generar el diagrama del string fotovoltaico.",
+                styles["BodyText"]
+            )
+        )
+
+        story.append(Spacer(1, 12))
+
     return story
