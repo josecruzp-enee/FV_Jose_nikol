@@ -106,21 +106,18 @@ def obtener_configuracion_strings(resultado):
 def obtener_corrientes(resultado):
 
     nec = resultado.get("nec", {})
-    paq = nec.get("paq", {})
-    corr = paq.get("corrientes", {})
-    corr_raw = paq.get("corrientes_raw", {})
 
-    # panel viene de corrientes_raw
-    panel = corr_raw.get("panel", {}).get("i_operacion_a", 0)
+    corr = nec.get("corrientes", {})
 
-    # los demás vienen de corrientes
-    string = corr.get("string", {}).get("i_nominal", 0)
+    panel = corr.get("panel", {}).get("i_operacion_a", 0)
 
-    mppt = corr.get("mppt", {}).get("i_nominal", 0)
+    string = corr.get("string", {}).get("i_operacion_a", 0)
 
-    dc_total = corr.get("dc_inversor", {}).get("i_nominal", 0)
+    mppt = corr.get("mppt", {}).get("i_operacion_a", 0)
 
-    ac = corr.get("ac_salida", {}).get("i_nominal", 0)
+    dc_total = corr.get("dc_total", {}).get("i_operacion_a", 0)
+
+    ac = corr.get("ac", {}).get("i_operacion_a", 0)
 
     return panel, string, mppt, dc_total, ac
 # ==========================================================
