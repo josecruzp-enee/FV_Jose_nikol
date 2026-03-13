@@ -8,26 +8,42 @@ def crear_tabla_distribucion_inversores(strings: List[Any], pal, content_w):
         return None
 
     # ======================================================
-    # Función segura para leer campos
+    # Lectura segura
     # ======================================================
 
     def leer(obj, campo, default=0):
+
         if isinstance(obj, dict):
             return obj.get(campo, default)
+
         return getattr(obj, campo, default)
 
     # ======================================================
-    # Detectar número de inversores y MPPT
+    # Detectar inversores y MPPT
     # ======================================================
 
-    n_inversores = max((int(leer(s, "inversor")) for s in strings), default=0)
-    n_mppt = max((int(leer(s, "mppt")) for s in strings), default=0)
+    inversores = set()
+    mppts = set()
 
-    if n_inversores == 0 or n_mppt == 0:
+    for s in strings:
+
+        inv = int(leer(s, "inversor", 0))
+        mppt = int(leer(s, "mppt", 0))
+
+        if inv > 0:
+            inversores.add(inv)
+
+        if mppt > 0:
+            mppts.add(mppt)
+
+    if not inversores or not mppts:
         return None
 
+    n_inversores = max(inversores)
+    n_mppt = max(mppts)
+
     # ======================================================
-    # Crear matriz de conteo
+    # Crear matriz
     # ======================================================
 
     matriz = {
@@ -37,26 +53,29 @@ def crear_tabla_distribucion_inversores(strings: List[Any], pal, content_w):
     }
 
     # ======================================================
-    # Contar strings por inversor y MPPT
+    # Contar strings
     # ======================================================
 
     for s in strings:
 
-        inv = int(leer(s, "inversor"))
-        mppt = int(leer(s, "mppt"))
+        inv = int(leer(s, "inversor", 0))
+        mppt = int(leer(s, "mppt", 0))
 
         if inv > 0 and mppt > 0:
-            matriz[(inv, mppt)] += 1
+
+            if (inv, mppt) in matriz:
+                matriz[(inv, mppt)] += 1
 
     # ======================================================
-    # Construir encabezado
+    # Encabezado
     # ======================================================
 
     header = ["Inversor"] + [f"MPPT {m}" for m in range(1, n_mppt + 1)]
+
     rows = [header]
 
     # ======================================================
-    # Construir filas
+    # Filas
     # ======================================================
 
     for inv in range(1, n_inversores + 1):
@@ -65,21 +84,19 @@ def crear_tabla_distribucion_inversores(strings: List[Any], pal, content_w):
 
         for mppt in range(1, n_mppt + 1):
 
-            n = matriz[(inv, mppt)]
+            n = matriz.get((inv, mppt), 0)
 
             if n == 0:
                 cell = "—"
-            elif n == 1:
-                cell = "1 string"
             else:
-                cell = f"{n} strings"
+                cell = str(n)
 
             row.append(cell)
 
         rows.append(row)
 
     # ======================================================
-    # Ancho de columnas
+    # Ancho columnas
     # ======================================================
 
     colw = [content_w * 0.30] + [content_w * 0.70 / n_mppt] * n_mppt
