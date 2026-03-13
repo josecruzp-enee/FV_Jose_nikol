@@ -216,7 +216,7 @@ def _armar_resumen(corrientes, protecciones, conductores):
         "i_ac_nom": corrientes.get("ac", {}).get("i_operacion_a"),
 
         "breaker_ac": (
-            protecciones.get("breaker_ac", {}).get("tamano_a")
+            protecciones.breaker_ac.tamano_a
             if protecciones else None
         ),
 
@@ -224,7 +224,6 @@ def _armar_resumen(corrientes, protecciones, conductores):
 
         "conductor_ac": ac.get("calibre") if ac else None,
     }
-
 
 # ==========================================================
 # ORQUESTADOR ELÉCTRICO
