@@ -2,23 +2,47 @@ from pathlib import Path
 from reportlab.platypus import Paragraph, Spacer, Image
 
 
+# ==========================================================
+# Insertar layout de paneles en el PDF
+# ==========================================================
+
 def insertar_layout_paneles(story, paths, styles, content_w):
 
-    layout = (paths or {}).get("layout_paneles")
+    if not paths or not isinstance(paths, dict):
+        layout = None
+    else:
+        layout = paths.get("layout_paneles")
 
-    if layout and Path(str(layout)).exists():
+    # ------------------------------------------------------
+    # Verificar existencia del archivo
+    # ------------------------------------------------------
 
-        story.append(Spacer(1, 10))
+    if layout and Path(layout).exists():
 
-        img = Image(str(layout), width=content_w, height=content_w * 0.45)
-        img.hAlign = "CENTER"
+        story.append(Spacer(1, 12))
 
-        story.append(img)
-        story.append(Spacer(1, 10))
+        try:
+
+            img = Image(str(layout))
+
+            # Ajustar tamaño manteniendo proporción
+            img.drawWidth = content_w
+            img.drawHeight = img.imageHeight * (content_w / img.imageWidth)
+
+            img.hAlign = "CENTER"
+
+            story.append(img)
+
+        except Exception:
+
+            story.append(
+                Paragraph("No se pudo cargar el layout de paneles.", styles["BodyText"])
+            )
 
     else:
 
         story.append(
             Paragraph("Layout de paneles no disponible.", styles["BodyText"])
         )
-        story.append(Spacer(1, 10))
+
+    story.append(Spacer(1, 12))
