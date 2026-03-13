@@ -1,8 +1,30 @@
-from typing import List, Dict, Any
+from typing import List, Any
 from reportlab.platypus import Table, TableStyle
 
 
-def crear_tabla_strings(strings: List[Dict[str, Any]], pal, content_w):
+# ==========================================================
+# TABLA — CONFIGURACIÓN DE STRINGS
+# ==========================================================
+
+def crear_tabla_strings(strings: List[Any], pal, content_w):
+
+    if not strings:
+        return None
+
+    # ------------------------------------------------------
+    # Lectura segura dict / dataclass
+    # ------------------------------------------------------
+
+    def leer(obj, campo, default=0):
+
+        if isinstance(obj, dict):
+            return obj.get(campo, default)
+
+        return getattr(obj, campo, default)
+
+    # ------------------------------------------------------
+    # Encabezado
+    # ------------------------------------------------------
 
     header = [
         "String",
@@ -18,49 +40,76 @@ def crear_tabla_strings(strings: List[Dict[str, Any]], pal, content_w):
 
     rows = [header]
 
-    # Ordenar strings por ID
-    strings = sorted(strings, key=lambda s: s.get("id", 0))
+    # ------------------------------------------------------
+    # Ordenar strings
+    # ------------------------------------------------------
+
+    strings = sorted(strings, key=lambda s: leer(s, "id"))
+
+    # ------------------------------------------------------
+    # Construir filas
+    # ------------------------------------------------------
 
     for s in strings:
 
+        voc = (
+            leer(s, "voc_frio_string_v")
+            or leer(s, "voc_string_v")
+            or 0
+        )
+
         rows.append([
-            int(s.get("id", 0)),
-            int(s.get("inversor", 0)),
-            int(s.get("mppt", 0)),
-            int(s.get("n_series", 0)),
-            1,
-            f"{float(s.get('vmp_string_v', 0)):.0f}",
-            f"{float(
-                s.get('voc_frio_string_v')
-                or s.get('voc_string_v')
-                or 0
-            ):.0f}",
-            f"{float(s.get('imp_string_a', 0)):.2f}",
-            f"{float(s.get('isc_string_a', 0)):.2f}",
+
+            int(leer(s, "id")),
+            int(leer(s, "inversor")),
+            int(leer(s, "mppt")),
+
+            int(leer(s, "n_series")),
+
+            1,  # strings en paralelo por MPPT
+
+            f"{float(leer(s,'vmp_string_v')):.0f}",
+            f"{float(voc):.0f}",
+
+            f"{float(leer(s,'imp_string_a')):.2f}",
+            f"{float(leer(s,'isc_string_a')):.2f}",
+
         ])
 
+    # ------------------------------------------------------
+    # Anchos de columna
+    # ------------------------------------------------------
+
     colw = [
+
         content_w * 0.08,
         content_w * 0.07,
         content_w * 0.07,
+
         content_w * 0.10,
         content_w * 0.10,
+
         content_w * 0.14,
         content_w * 0.14,
+
         content_w * 0.15,
         content_w * 0.15,
+
     ]
 
     tabla = Table(rows, colWidths=colw, repeatRows=1)
 
     tabla.setStyle(TableStyle([
 
-        ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
-        ("BACKGROUND", (0,0), (-1,0), pal["SOFT"]),
-        ("TEXTCOLOR", (0,0), (-1,0), pal["PRIMARY"]),
-        ("ALIGN", (0,0), (-1,-1), "CENTER"),
-        ("GRID", (0,0), (-1,-1), 0.3, pal["BORDER"]),
-        ("FONTSIZE", (0,0), (-1,-1), 9),
+        ("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),
+        ("BACKGROUND",(0,0),(-1,0),pal["SOFT"]),
+        ("TEXTCOLOR",(0,0),(-1,0),pal["PRIMARY"]),
+
+        ("ALIGN",(0,0),(-1,-1),"CENTER"),
+
+        ("GRID",(0,0),(-1,-1),0.3,pal["BORDER"]),
+
+        ("FONTSIZE",(0,0),(-1,-1),9),
 
     ]))
 
