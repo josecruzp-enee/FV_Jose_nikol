@@ -46,9 +46,9 @@ def aplicar_curtailment(
 
     if not errores:
 
-        # ------------------------------------------
+        # --------------------------------------------------
         # Sin limitación
-        # ------------------------------------------
+        # --------------------------------------------------
 
         if not permitir or kw_ac <= 0:
 
@@ -66,18 +66,19 @@ def aplicar_curtailment(
 
             else:
 
-                # ------------------------------------------
-                # Modelo simple de clipping
-                # ------------------------------------------
+                # --------------------------------------------------
+                # Modelo aproximado de clipping mensual
+                # --------------------------------------------------
 
-                exceso_factor = min(1.0, (ratio - 1.0) * 0.5)
+                exceso_factor = min(1.0, (ratio - 1.0) * 0.25)
 
                 energia_recortada = [
                     float(e) * exceso_factor for e in energia_12m
                 ]
 
                 energia_final = [
-                    float(e) - r for e, r in zip(energia_12m, energia_recortada)
+                    max(0.0, float(e) - r)
+                    for e, r in zip(energia_12m, energia_recortada)
                 ]
 
     ok = len(errores) == 0
@@ -88,29 +89,3 @@ def aplicar_curtailment(
         energia_final_12m_kwh=energia_final,
         energia_recortada_12m_kwh=energia_recortada,
     )
-
-
-# ==========================================================
-# SALIDAS DEL ARCHIVO
-# ==========================================================
-#
-# CurtailmentResultado
-#
-# Campos:
-#
-# ok : bool
-# errores : list[str]
-# energia_final_12m_kwh : list[float]
-# energia_recortada_12m_kwh : list[float]
-#
-# Descripción:
-# Energía mensual después de aplicar limitación del inversor
-# (clipping DC/AC).
-#
-# energia_recortada_12m_kwh representa la energía perdida
-# por saturación del inversor.
-#
-# Consumido por:
-# energia.orquestador_energia
-#
-# ==========================================================
