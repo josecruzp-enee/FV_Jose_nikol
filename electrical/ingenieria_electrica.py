@@ -250,6 +250,8 @@ def ejecutar_ingenieria_electrica(
 
     corrientes = _resolver_corrientes(entrada)
     corrientes = _corrientes_dict(corrientes)
+    import streamlit as st
+    st.json(corrientes)
     # ------------------------------------------------------
     # Protecciones
     # ------------------------------------------------------
