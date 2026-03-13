@@ -60,39 +60,70 @@ def crear_tabla_parametros_electricos(resultado, pal, content_w):
 # TABLA 2 — DIMENSIONAMIENTO NEC
 # ==========================================================
 
+from reportlab.platypus import Table, TableStyle
+
 def crear_tabla_dimensionamiento_nec(resultado, pal, content_w):
 
-    corr = resultado.get("nec", {}).get("paquete_nec", {}).get("corrientes", {})
+    nec = resultado.get("nec", {}).get("paquete_nec", {})
+    corr = nec.get("corrientes", {})
+    prot = nec.get("protecciones", {})
+    cond = nec.get("conductores", {}).get("circuitos", [])
 
     if not corr:
         return None
 
+    # Buscar calibres DC y AC
+    cond_dc = "—"
+    cond_ac = "—"
+    for c in cond:
+        if c.get("nombre") == "DC":
+            cond_dc = f'{c.get("awg","—")} AWG'
+        if c.get("nombre") == "AC":
+            cond_ac = f'{c.get("awg","—")} AWG'
+
+    # Protecciones
+    breaker_ac = prot.get("breaker_ac", {})
+    fusible_str = prot.get("fusible_string", {})
+
     rows = [
-        ["Circuito", "Corriente operación", "Corriente diseño NEC"],
+        ["Circuito", "Corriente operación", "Corriente diseño NEC", "Protección", "Conductor"],
     ]
 
     orden = [
-        ("panel", "Panel"),
-        ("string", "String"),
-        ("mppt", "MPPT"),
-        ("dc_total", "Entrada inversor DC"),
-        ("ac", "Salida inversor AC"),
+        ("panel", "Panel", None, None),
+        ("string", "String", fusible_str, cond_dc),
+        ("mppt", "MPPT", None, cond_dc),
+        ("dc_total", "Entrada inversor DC", None, cond_dc),
+        ("ac", "Salida inversor AC", breaker_ac, cond_ac),
     ]
 
-    for key, nombre in orden:
+    for key, nombre, p, c in orden:
 
         d = corr.get(key, {})
 
+        i_op = d.get("i_operacion_a", 0)
+        i_dis = d.get("i_diseno_a", 0)
+
+        proteccion = "—"
+        if p:
+            proteccion = f'{p.get("tamano_a","—")} A'
+
+        conductor = c if c else "—"
+
         rows.append([
             nombre,
-            f"{float(d.get('i_operacion_a',0)):.2f} A",
-            f"{float(d.get('i_diseno_a',0)):.2f} A",
+            f"{float(i_op):.2f} A",
+            f"{float(i_dis):.2f} A",
+            proteccion,
+            conductor
         ])
 
     colw = [
-        content_w * 0.40,
         content_w * 0.30,
-        content_w * 0.30,
+        content_w * 0.18,
+        content_w * 0.20,
+        content_w * 0.16,
+        content_w * 0.16,
     ]
 
     tbl = Table(rows, colWidths=colw)
@@ -101,16 +132,13 @@ def crear_tabla_dimensionamiento_nec(resultado, pal, content_w):
         ("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),
         ("BACKGROUND",(0,0),(-1,0),pal["SOFT"]),
         ("TEXTCOLOR",(0,0),(-1,0),pal["PRIMARY"]),
-
         ("ALIGN",(1,1),(2,-1),"RIGHT"),
-
+        ("ALIGN",(3,1),(-1,-1),"CENTER"),
         ("GRID",(0,0),(-1,-1),0.3,pal["BORDER"]),
         ("FONTSIZE",(0,0),(-1,-1),10),
     ]))
 
     return tbl
-
-
 # ==========================================================
 # TABLA 3 — INDICADORES TÉCNICOS
 # ==========================================================
