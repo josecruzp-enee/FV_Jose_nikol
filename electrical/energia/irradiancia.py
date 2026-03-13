@@ -3,17 +3,19 @@
 """
 Modelo de irradiancia base del sistema FV.
 
-Este módulo provee el perfil de HSP promedio diario por mes
-para Honduras.
+Este módulo provee:
 
-NO realiza cálculos de generación.
-NO depende de UI ni de core.
+• HSP promedio mensual
+• días por mes
+• conversión HSP → perfil horario (24h)
 
+NO realiza cálculos de generación FV.
 Es únicamente el origen climático del dominio energía.
 """
 
 from __future__ import annotations
 from typing import List
+import math
 
 
 # ==========================================================
@@ -42,17 +44,10 @@ DIAS_MES: List[int] = [
 
 def hsp_12m_base() -> List[float]:
     """
-    Perfil mensual oficial de HSP promedio diario.
+    Perfil mensual promedio de HSP.
 
     Unidad:
         kWh/m²/día
-
-    Fuente:
-        Modelo climático promedio Honduras.
-
-    Retorna:
-        Lista de 12 valores correspondientes a
-        Enero–Diciembre.
     """
 
     return [
@@ -72,30 +67,100 @@ def hsp_12m_base() -> List[float]:
 
 
 # ==========================================================
+# CONVERSIÓN HSP → PERFIL HORARIO
+# ==========================================================
+
+def hsp_a_perfil_horario(hsp_dia: float) -> List[float]:
+    """
+    Convierte HSP diario a perfil horario de irradiancia.
+
+    La suma de las 24 horas será igual al HSP.
+
+    Retorna:
+        24 valores (kWh/m² por hora)
+    """
+
+    curva = []
+
+    for h in range(24):
+
+        if 6 <= h <= 18:
+
+            angulo = (h - 6) / 12 * math.pi
+            valor = math.sin(angulo)
+
+        else:
+
+            valor = 0
+
+        curva.append(valor)
+
+    suma = sum(curva)
+
+    if suma == 0:
+        return [0] * 24
+
+    factor = hsp_dia / suma
+
+    perfil = [round(v * factor, 4) for v in curva]
+
+    return perfil
+
+
+# ==========================================================
+# PERFIL HORARIO POR MES
+# ==========================================================
+
+def perfiles_horarios_12m() -> List[List[float]]:
+    """
+    Genera perfil horario (24h) para cada mes.
+
+    Retorna:
+        Lista de 12 meses × 24 horas
+    """
+
+    hsp = hsp_12m_base()
+
+    perfiles = []
+
+    for valor in hsp:
+
+        perfil = hsp_a_perfil_horario(valor)
+
+        perfiles.append(perfil)
+
+    return perfiles
+
+
+# ==========================================================
 # SALIDAS DEL ARCHIVO
 # ==========================================================
 #
 # DIAS_MES
 #
-# Tipo:
 # list[int]
 #
-# Descripción:
-# Número de días de cada mes (Ene–Dic)
-#
-# Consumido por:
-# energia.generacion_bruta
+# Número de días por mes
 #
 #
 # hsp_12m_base()
 #
-# Tipo:
 # list[float]
 #
-# Descripción:
-# HSP promedio diario mensual (kWh/m²/día)
+# HSP promedio diario mensual
 #
-# Consumido por:
-# energia.generacion_bruta
+#
+# hsp_a_perfil_horario()
+#
+# list[float]
+#
+# Convierte HSP a perfil horario (24h)
+#
+#
+# perfiles_horarios_12m()
+#
+# list[list[float]]
+#
+# Perfiles horarios de irradiancia para los 12 meses
 #
 # ==========================================================
