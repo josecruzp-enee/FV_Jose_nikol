@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 """
-ORQUESTADOR DEL DOMINIO ENERGIA
+ORQUESTADOR DEL DOMINIO ENERGIA — FV Engine
 
-Este módulo coordina el cálculo energético completo del sistema FV.
+Responsabilidad
+---------------
+Coordinar el cálculo energético completo del sistema FV.
 
 FRONTERA DEL DOMINIO
 --------------------
@@ -34,15 +36,38 @@ from .limitacion_inversor import aplicar_curtailment
 
 
 # ==========================================================
+# FUNCIÓN AUXILIAR DE ERROR
+# ==========================================================
+
+def _resultado_error(inp: EnergiaInput, errores: list[str]) -> EnergiaResultado:
+
+    return EnergiaResultado(
+        ok=False,
+        errores=errores,
+        pdc_instalada_kw=inp.pdc_instalada_kw,
+        pac_nominal_kw=inp.pac_nominal_kw,
+        dc_ac_ratio=0.0,
+        energia_bruta_12m=[],
+        energia_despues_perdidas_12m=[],
+        energia_curtailment_12m=[],
+        energia_util_12m=[],
+        energia_bruta_anual=0.0,
+        energia_util_anual=0.0,
+        energia_curtailment_anual=0.0,
+        meta={},
+    )
+
+
+# ==========================================================
 # MOTOR ENERGÉTICO
 # ==========================================================
 
 def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
 
-    errores = []
+    errores: list[str] = []
 
     # ------------------------------------------------------
-    # Validaciones básicas de entrada
+    # VALIDACIONES DE ENTRADA
     # ------------------------------------------------------
 
     if inp.pdc_instalada_kw <= 0:
@@ -55,25 +80,10 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
         errores.append("dias_mes debe tener 12 valores.")
 
     if errores:
-
-        return EnergiaResultado(
-            ok=False,
-            errores=errores,
-            pdc_instalada_kw=inp.pdc_instalada_kw,
-            pac_nominal_kw=inp.pac_nominal_kw,
-            dc_ac_ratio=0.0,
-            energia_bruta_12m=[],
-            energia_despues_perdidas_12m=[],
-            energia_curtailment_12m=[],
-            energia_util_12m=[],
-            energia_bruta_anual=0.0,
-            energia_util_anual=0.0,
-            energia_curtailment_anual=0.0,
-            meta={},
-        )
+        return _resultado_error(inp, errores)
 
     # ------------------------------------------------------
-    # 1. Generación DC bruta
+    # 1. GENERACIÓN DC BRUTA
     # ------------------------------------------------------
 
     r_bruta = calcular_energia_bruta_dc(
@@ -84,27 +94,12 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
     )
 
     if not r_bruta.ok:
-
-        return EnergiaResultado(
-            ok=False,
-            errores=r_bruta.errores,
-            pdc_instalada_kw=inp.pdc_instalada_kw,
-            pac_nominal_kw=inp.pac_nominal_kw,
-            dc_ac_ratio=0.0,
-            energia_bruta_12m=[],
-            energia_despues_perdidas_12m=[],
-            energia_curtailment_12m=[],
-            energia_util_12m=[],
-            energia_bruta_anual=0.0,
-            energia_util_anual=0.0,
-            energia_curtailment_anual=0.0,
-            meta={},
-        )
+        return _resultado_error(inp, r_bruta.errores)
 
     energia_bruta = r_bruta.energia_mensual_dc_kwh
 
     # ------------------------------------------------------
-    # 2. Aplicar pérdidas físicas
+    # 2. APLICAR PÉRDIDAS FÍSICAS
     # ------------------------------------------------------
 
     r_perdidas = aplicar_perdidas(
@@ -115,27 +110,12 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
     )
 
     if not r_perdidas.ok:
-
-        return EnergiaResultado(
-            ok=False,
-            errores=r_perdidas.errores,
-            pdc_instalada_kw=inp.pdc_instalada_kw,
-            pac_nominal_kw=inp.pac_nominal_kw,
-            dc_ac_ratio=0.0,
-            energia_bruta_12m=[],
-            energia_despues_perdidas_12m=[],
-            energia_curtailment_12m=[],
-            energia_util_12m=[],
-            energia_bruta_anual=0.0,
-            energia_util_anual=0.0,
-            energia_curtailment_anual=0.0,
-            meta={},
-        )
+        return _resultado_error(inp, r_perdidas.errores)
 
     energia_perdidas = r_perdidas.energia_neta_12m_kwh
 
     # ------------------------------------------------------
-    # 3. Curtailment por inversor
+    # 3. CURTAILMENT DEL INVERSOR
     # ------------------------------------------------------
 
     r_curt = aplicar_curtailment(
@@ -146,28 +126,13 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
     )
 
     if not r_curt.ok:
-
-        return EnergiaResultado(
-            ok=False,
-            errores=r_curt.errores,
-            pdc_instalada_kw=inp.pdc_instalada_kw,
-            pac_nominal_kw=inp.pac_nominal_kw,
-            dc_ac_ratio=0.0,
-            energia_bruta_12m=[],
-            energia_despues_perdidas_12m=[],
-            energia_curtailment_12m=[],
-            energia_util_12m=[],
-            energia_bruta_anual=0.0,
-            energia_util_anual=0.0,
-            energia_curtailment_anual=0.0,
-            meta={},
-        )
+        return _resultado_error(inp, r_curt.errores)
 
     energia_util = r_curt.energia_final_12m_kwh
     energia_recortada = r_curt.energia_recortada_12m_kwh
 
     # ------------------------------------------------------
-    # Cálculos finales
+    # CÁLCULOS FINALES
     # ------------------------------------------------------
 
     energia_bruta_anual = sum(energia_bruta)
@@ -181,7 +146,7 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
     )
 
     # ------------------------------------------------------
-    # Resultado final del dominio
+    # RESULTADO FINAL
     # ------------------------------------------------------
 
     return EnergiaResultado(
@@ -202,7 +167,7 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
 
 
 # ==========================================================
-# SALIDAS DEL ARCHIVO
+# SALIDA DEL ARCHIVO
 # ==========================================================
 #
 # ejecutar_motor_energia()
@@ -215,7 +180,8 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
 #
 # Descripción:
 # Ejecuta el modelo energético completo del sistema FV
-# aplicando generación, pérdidas y limitación del inversor.
+# aplicando generación DC, pérdidas físicas y limitación
+# del inversor.
 #
 # Consumido por:
 # core.orquestador_estudio
