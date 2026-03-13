@@ -103,4 +103,4 @@ def ejecutar_estudio(
         financiero=financiero,
     )
 
-    return asdict(resultado)
+    return resultado
