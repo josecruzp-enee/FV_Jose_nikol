@@ -3,29 +3,6 @@ from __future__ import annotations
 """
 PASO 5 — INGENIERÍA ELÉCTRICA
 FV Engine
-
-CAPA
-----
-UI / Presentation Layer
-
-FRONTERA
---------
-Entrada:
-    ctx : WizardCtx
-
-Salida:
-    ctx.resultado_proyecto
-
-Este módulo:
-
-    • Captura parámetros eléctricos
-    • Ejecuta el motor FV
-    • Muestra resultados técnicos
-
-No realiza cálculos eléctricos.
-Los cálculos ocurren en:
-
-    core.aplicacion.orquestador_estudio
 """
 
 from typing import List, Tuple
@@ -178,11 +155,11 @@ def _mostrar_sizing(sizing):
 
     c1, c2, c3 = st.columns(3)
 
-    c1.metric("Paneles", sizing.get("n_paneles"))
+    c1.metric("Paneles", sizing.n_paneles)
 
-    c2.metric("Potencia DC", f"{sizing.get('kwp_dc')} kWp")
+    c2.metric("Potencia DC", f"{sizing.pdc_kw} kWp")
 
-    c3.metric("Potencia AC", f"{sizing.get('kw_ac')} kW")
+    c3.metric("Potencia AC", f"{sizing.kw_ac} kW")
 
 
 # ==========================================================
@@ -197,16 +174,8 @@ def _mostrar_nec(nec):
         st.info("Sin resultados NEC.")
         return
 
-    # ======================================================
-    # DEBUG
-    # ======================================================
-
     st.subheader("DEBUG NEC")
     st.json(nec)
-
-    # ======================================================
-    # Leer paquete NEC real
-    # ======================================================
 
     paquete = nec.get("paquete_nec", {})
 
@@ -214,23 +183,10 @@ def _mostrar_nec(nec):
     protecciones = paquete.get("protecciones", {})
     conductores = paquete.get("conductores", {}).get("circuitos", [])
 
-    st.subheader("DEBUG CORRIENTES")
-    st.json(corrientes)
-
     dc = corrientes.get("dc_total", {})
     ac = corrientes.get("ac", {})
 
-    st.subheader("DEBUG DC")
-    st.json(dc)
-
-    st.subheader("DEBUG AC")
-    st.json(ac)
-
     tabs = st.tabs(["DC", "AC", "Conductores"])
-
-    # ======================================================
-    # TAB DC
-    # ======================================================
 
     with tabs[0]:
 
@@ -243,10 +199,6 @@ def _mostrar_nec(nec):
             "Corriente DC diseño NEC",
             _fmt(dc.get("i_diseno_a"), "A")
         )
-
-    # ======================================================
-    # TAB AC
-    # ======================================================
 
     with tabs[1]:
 
@@ -268,10 +220,6 @@ def _mostrar_nec(nec):
                 "Breaker AC",
                 _fmt(breaker.get("tamano_a"), "A")
             )
-
-    # ======================================================
-    # TAB CONDUCTORES
-    # ======================================================
 
     with tabs[2]:
 
@@ -296,10 +244,6 @@ def _mostrar_nec(nec):
         df = pd.DataFrame(filas)
 
         st.dataframe(df, use_container_width=True)
-
-
-
-
 
 
 # ==========================================================
@@ -332,16 +276,13 @@ def render(ctx):
 
         resultado = ejecutar_estudio(datos, deps)
 
-        if hasattr(resultado, "__dict__"):
-            resultado = resultado.__dict__
-
         ctx.resultado_proyecto = resultado
 
         st.success("Ingeniería generada correctamente.")
 
-        _mostrar_sizing(resultado.get("sizing", {}))
+        _mostrar_sizing(resultado.sizing)
 
-        _mostrar_nec(resultado.get("nec", {}))
+        _mostrar_nec(resultado.nec)
 
     except Exception as exc:
 
