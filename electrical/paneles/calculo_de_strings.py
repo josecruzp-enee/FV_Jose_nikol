@@ -191,16 +191,11 @@ def _generar_strings(
 
     string_id = 1
 
-    mppt_por_inv = int(inversor.n_mppt)
-
     for r in ramas:
 
-        mppt_global = r["mppt_global"]
-        n_strings = r["n_strings"]
-
-        inversor_id = ceil(mppt_global / mppt_por_inv)
-
-        mppt_local = ((mppt_global - 1) % mppt_por_inv) + 1
+        inversor_id = int(r["inversor"])
+        mppt_local = int(r["mppt"])
+        n_strings = int(r["n_strings"])
 
         for _ in range(n_strings):
 
@@ -222,7 +217,6 @@ def _generar_strings(
             string_id += 1
 
     return strings
-
 
 # ==========================================================
 # ERROR
