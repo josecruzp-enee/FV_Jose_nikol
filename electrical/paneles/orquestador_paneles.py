@@ -100,7 +100,7 @@ def ejecutar_paneles(
     # ------------------------------------------------------
     # CÁLCULO DE STRINGS
     # ------------------------------------------------------
-
+    n_inversores = int(entrada.n_inversores)  
     resultado = calcular_strings_fv(
 
         n_paneles_total=n_paneles_total,
