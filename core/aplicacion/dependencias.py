@@ -1,5 +1,15 @@
 from __future__ import annotations
 
+"""
+CONSTRUCTOR DE DEPENDENCIAS — FV ENGINE
+
+Este módulo construye los adaptadores utilizados por el
+orquestador del estudio FV.
+
+El objetivo es desacoplar el motor del sistema de las
+implementaciones concretas de cada dominio.
+"""
+
 # ==========================================================
 # PUERTOS DEL SISTEMA
 # ==========================================================
@@ -12,19 +22,28 @@ from core.aplicacion.puertos import (
     PuertoFinanzas,
 )
 
+# ==========================================================
+# IMPLEMENTACIONES CONCRETAS
+# ==========================================================
+
+from core.servicios.sizing import calcular_sizing_unificado
+
+from electrical.paneles.orquestador_paneles import ejecutar_paneles
+
 from electrical.nec.orquestador_nec import ejecutar_nec
+
+from electrical.energia.orquestador_energia import ejecutar_motor_energia
+
+from core.servicios.finanzas import ejecutar_finanzas
 
 
 # ==========================================================
-# ADAPTADOR: NEC
+# ADAPTADOR NEC
 # ==========================================================
 
 class NECAdapter(PuertoNEC):
 
     def ejecutar(self, datos, sizing, strings):
-        """
-        Ejecuta el cálculo de ingeniería eléctrica NEC.
-        """
 
         sf = getattr(datos, "sistema_fv", {}) or {}
 
@@ -93,15 +112,58 @@ class NECAdapter(PuertoNEC):
 
 
 # ==========================================================
+# ADAPTADORES SIMPLES
+# ==========================================================
+
+class SizingAdapter(PuertoSizing):
+
+    def ejecutar(self, datos):
+
+        return calcular_sizing_unificado(datos)
+
+
+class PanelesAdapter(PuertoPaneles):
+
+    def ejecutar(self, datos, sizing):
+
+        return ejecutar_paneles(datos, sizing)
+
+
+class EnergiaAdapter(PuertoEnergia):
+
+    def ejecutar(self, datos, sizing, strings):
+
+        return ejecutar_motor_energia(datos, sizing, strings)
+
+
+class FinanzasAdapter(PuertoFinanzas):
+
+    def ejecutar(self, datos, sizing, energia):
+
+        return ejecutar_finanzas(datos, sizing, energia)
+
+
+# ==========================================================
 # CONSTRUCTOR DE DEPENDENCIAS
 # ==========================================================
 
 def construir_dependencias():
+
     """
-    Construye los adaptadores utilizados por el
+    Construye todos los adaptadores utilizados por el
     orquestador del estudio FV.
     """
 
     return {
-        "nec": NECAdapter()
+
+        "sizing": SizingAdapter(),
+
+        "paneles": PanelesAdapter(),
+
+        "nec": NECAdapter(),
+
+        "energia": EnergiaAdapter(),
+
+        "finanzas": FinanzasAdapter(),
+
     }
