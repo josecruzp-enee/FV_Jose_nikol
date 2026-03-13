@@ -43,7 +43,7 @@ from electrical.paneles.potencia_panel import (
     PotenciaPanelInput
 )
 
-from .clima_modelo import ClimaHora
+from .resultado_clima import ClimaHora
 
 
 # ==========================================================
