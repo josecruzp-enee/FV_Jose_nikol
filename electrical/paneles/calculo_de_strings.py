@@ -132,6 +132,72 @@ def _split_por_mppt(
 
 
 # ==========================================================
+# DISTRIBUCION EN MPPT DEL SISTEMA
+# ==========================================================
+
+def _split_por_mppt(
+    n_strings_total: int,
+    mppt_totales: int
+):
+
+    base = n_strings_total // mppt_totales
+    resto = n_strings_total % mppt_totales
+
+    ramas = []
+
+    for i in range(mppt_totales):
+
+        n = base + (1 if i < resto else 0)
+
+        if n > 0:
+
+            ramas.append(
+                {
+                    "mppt_global": i + 1,
+                    "n_strings": n
+                }
+            )
+
+    return ramas
+
+
+# ==========================================================
+# DISTRIBUCION POR INVERSOR (MEJORA DEL MOTOR)
+# ==========================================================
+
+def distribuir_strings_por_inversor(
+    n_strings_total: int,
+    n_inversores: int,
+    mppt_por_inv: int
+):
+
+    asignaciones = []
+
+    s = 0
+
+    for inv in range(1, n_inversores + 1):
+
+        for mppt in range(1, mppt_por_inv + 1):
+
+            if s < n_strings_total:
+
+                asignaciones.append({
+                    "inversor": inv,
+                    "mppt": mppt,
+                    "n_strings": 1
+                })
+
+                s += 1
+
+            else:
+                break
+
+        if s >= n_strings_total:
+            break
+
+    return asignaciones
+
+# ==========================================================
 # GENERACION DE STRINGS
 # ==========================================================
 
