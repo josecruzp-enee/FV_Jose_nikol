@@ -1,35 +1,52 @@
 """
 POSICIÓN SOLAR — FV Engine
 
-Este módulo calcula la posición del sol para una fecha y hora
-específica usando un modelo astronómico simplificado.
+Dominio: solar
 
-Entradas
---------
-lat : float
-    Latitud en grados
+Responsabilidad
+----------------
+Calcular la posición del sol para una fecha y ubicación geográfica.
 
-lon : float
-    Longitud en grados
-
-fecha_hora : datetime
-
-Salidas
--------
-dict:
-
-{
-    "azimuth_deg": float,
-    "elevation_deg": float,
-    "zenith_deg": float
-}
+Este módulo implementa un modelo astronómico simplificado
+adecuado para simulación energética de sistemas FV.
 """
 
-from math import sin, cos, tan, asin, acos, radians, degrees
+from dataclasses import dataclass
 from datetime import datetime
+from math import sin, cos, asin, acos, radians, degrees
 
 
-def posicion_solar(lat: float, lon: float, fecha_hora: datetime):
+# ==========================================================
+# MODELOS DE DATOS
+# ==========================================================
+
+@dataclass
+class SolarInput:
+
+    latitud_deg: float
+    longitud_deg: float
+    fecha_hora: datetime
+
+
+@dataclass
+class SolarPosition:
+
+    azimuth_deg: float
+    elevation_deg: float
+    zenith_deg: float
+
+    declination_deg: float
+    hour_angle_deg: float
+
+
+# ==========================================================
+# MOTOR DE POSICIÓN SOLAR
+# ==========================================================
+
+def calcular_posicion_solar(entrada: SolarInput) -> SolarPosition:
+
+    lat = entrada.latitud_deg
+    fecha_hora = entrada.fecha_hora
 
     dia = fecha_hora.timetuple().tm_yday
     hora = fecha_hora.hour + fecha_hora.minute / 60
@@ -44,13 +61,18 @@ def posicion_solar(lat: float, lon: float, fecha_hora: datetime):
     decl_r = radians(decl)
     h_r = radians(h)
 
+    # elevación solar
     elev = asin(
         sin(lat_r) * sin(decl_r)
         + cos(lat_r) * cos(decl_r) * cos(h_r)
     )
 
-    zenith = 90 - degrees(elev)
+    elev_deg = degrees(elev)
 
+    # zenith
+    zenith = 90 - elev_deg
+
+    # azimut
     az = acos(
         (
             sin(decl_r)
@@ -62,8 +84,10 @@ def posicion_solar(lat: float, lon: float, fecha_hora: datetime):
 
     azimuth = degrees(az)
 
-    return {
-        "azimuth_deg": azimuth,
-        "elevation_deg": degrees(elev),
-        "zenith_deg": zenith
-    }
+    return SolarPosition(
+        azimuth_deg=azimuth,
+        elevation_deg=elev_deg,
+        zenith_deg=zenith,
+        declination_deg=decl,
+        hour_angle_deg=h
+    )
