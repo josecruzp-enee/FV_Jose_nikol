@@ -275,7 +275,7 @@ def render(ctx):
         deps = construir_dependencias()
 
         resultado = ejecutar_estudio(datos, deps)
-
+        import streamlit as st
         st.write("DEBUG TIPO RESULTADO:")
         st.write(type(resultado))
 
