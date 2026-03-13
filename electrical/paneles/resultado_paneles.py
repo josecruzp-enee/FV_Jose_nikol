@@ -1,11 +1,16 @@
 """
-Contrato del dominio PANELES (generador FV DC).
+CONTRATO DEL DOMINIO PANELES — FV ENGINE
 
-Este módulo define la SALIDA OFICIAL del motor de paneles.
+Este módulo define la SALIDA OFICIAL del motor del generador FV DC.
+
+Regla arquitectónica:
+---------------------
 
 Ningún módulo externo debe depender de estructuras internas
-de cálculo. Todos los módulos consumidores deben utilizar
-exclusivamente las clases definidas aquí.
+de cálculo del dominio paneles.
+
+Todos los módulos consumidores deben utilizar exclusivamente
+las clases definidas en este contrato.
 
 Consumidores típicos:
 
@@ -27,46 +32,59 @@ from typing import List, Dict, Any
 
 
 # =========================================================
-# Información eléctrica por MPPT / grupo de strings
+# INFORMACIÓN ELÉCTRICA POR MPPT / GRUPO DE STRINGS
 # =========================================================
 
 @dataclass
 class StringFV:
     """
     Representa un grupo de strings conectado a un MPPT.
+
+    Cada instancia describe el comportamiento eléctrico de
+    un conjunto de strings en paralelo que alimentan un MPPT.
     """
+
+    # -----------------------------------------------------
+    # Identificación
+    # -----------------------------------------------------
 
     mppt: int
 
-    # configuración
+    # -----------------------------------------------------
+    # Configuración física
+    # -----------------------------------------------------
+
     n_series: int
     n_strings: int
 
     # -----------------------------------------------------
-    # Voltajes
+    # Voltajes del string
     # -----------------------------------------------------
 
     vmp_string_v: float
     voc_frio_string_v: float
 
     # -----------------------------------------------------
-    # Corrientes
+    # Corrientes base
     # -----------------------------------------------------
 
-    imp_string_a: float      # corriente MPP del string
-    i_mppt_a: float          # corriente total hacia MPPT
+    imp_string_a: float
+    isc_panel_a: float
+
+    # corriente total hacia el MPPT
+    i_mppt_a: float
 
     # -----------------------------------------------------
     # Corrientes NEC
     # -----------------------------------------------------
 
-    isc_array_a: float       # corriente de cortocircuito total
-    imax_pv_a: float         # corriente máxima permitida
-    idesign_cont_a: float    # corriente de diseño continua NEC
+    isc_mppt_a: float
+    imax_pv_a: float
+    idesign_cont_a: float
 
 
 # =========================================================
-# Recomendación del motor de strings
+# RECOMENDACIÓN DEL MOTOR DE STRINGS
 # =========================================================
 
 @dataclass
@@ -85,7 +103,7 @@ class RecomendacionStrings:
 
 
 # =========================================================
-# Información global del generador FV
+# INFORMACIÓN GLOBAL DEL GENERADOR FV
 # =========================================================
 
 @dataclass
@@ -117,6 +135,13 @@ class ArrayFV:
     n_paneles_total: int
 
     strings_por_mppt: int
+    n_mppt: int
+
+    # -----------------------------------------------------
+    # Información del módulo FV
+    # -----------------------------------------------------
+
+    p_panel_w: float
 
 
 # =========================================================
@@ -159,7 +184,12 @@ class ResultadoPaneles:
 # =========================================================
 
 """
-Este módulo produce:
+Este módulo produce un único objeto:
+
+ResultadoPaneles
+
+
+Estructura:
 
 ResultadoPaneles
     ├─ array: ArrayFV
@@ -169,7 +199,9 @@ ResultadoPaneles
     │      ├─ voc_frio_array_v
     │      ├─ n_strings_total
     │      ├─ n_paneles_total
-    │      └─ strings_por_mppt
+    │      ├─ strings_por_mppt
+    │      ├─ n_mppt
+    │      └─ p_panel_w
     │
     ├─ recomendacion: RecomendacionStrings
     │
@@ -180,8 +212,9 @@ ResultadoPaneles
     │      ├─ vmp_string_v
     │      ├─ voc_frio_string_v
     │      ├─ imp_string_a
+    │      ├─ isc_panel_a
     │      ├─ i_mppt_a
-    │      ├─ isc_array_a
+    │      ├─ isc_mppt_a
     │      ├─ imax_pv_a
     │      └─ idesign_cont_a
     │
