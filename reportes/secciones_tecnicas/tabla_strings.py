@@ -5,6 +5,7 @@ from reportlab.platypus import Table, TableStyle
 def crear_tabla_strings(strings: List[Dict[str, Any]], pal, content_w):
 
     header = [
+        "String",
         "Inv",
         "MPPT",
         "Serie (S)",
@@ -20,6 +21,8 @@ def crear_tabla_strings(strings: List[Dict[str, Any]], pal, content_w):
     for s in strings:
 
         rows.append([
+            str(int(s.get("id", 0))),
+
             str(int(s.get("inversor", 0))),
 
             str(int(s.get("mppt", 0))),
@@ -42,14 +45,15 @@ def crear_tabla_strings(strings: List[Dict[str, Any]], pal, content_w):
         ])
 
     colw = [
-        content_w * 0.08,
-        content_w * 0.08,
-        content_w * 0.10,
-        content_w * 0.12,
-        content_w * 0.15,
-        content_w * 0.17,
-        content_w * 0.15,
-        content_w * 0.15,
+        content_w * 0.08,  # String ID
+        content_w * 0.07,  # Inversor
+        content_w * 0.07,  # MPPT
+        content_w * 0.10,  # Serie
+        content_w * 0.10,  # Paralelo
+        content_w * 0.14,  # Vmp
+        content_w * 0.14,  # Voc
+        content_w * 0.15,  # Imp
+        content_w * 0.15,  # Isc
     ]
 
     tabla = Table(rows, colWidths=colw)
