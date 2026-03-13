@@ -100,12 +100,17 @@ def _chart_horaria(pdc_kw: float, hsp_dia: float, path: Path):
     horas = list(range(24))
     potencia = []
 
+    PR = 0.82
+
     for irr in perfil:
 
+        # convertir energía horaria a fracción del día solar
         if hsp_dia > 0:
-            p = pdc_kw * (irr / hsp_dia)
+            fraccion = irr / hsp_dia
         else:
-            p = 0
+            fraccion = 0
+
+        p = pdc_kw * fraccion * PR
 
         potencia.append(p)
 
@@ -122,7 +127,6 @@ def _chart_horaria(pdc_kw: float, hsp_dia: float, path: Path):
     plt.tight_layout()
     plt.savefig(path, dpi=160)
     plt.close()
-
 
 # ==========================================================
 # Gráfica anual
