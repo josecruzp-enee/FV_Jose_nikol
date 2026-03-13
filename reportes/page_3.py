@@ -7,9 +7,24 @@ from reportlab.platypus import Paragraph, Spacer, PageBreak, TableStyle
 from .helpers_pdf import make_table, table_style_uniform, box_paragraph, get_field, money_L
 
 
-# ==========================================================
-# Fallback — cálculo amortización
-# ==========================================================
+# =========================================================
+# LECTURA SEGURA
+# =========================================================
+
+def leer(obj, campo, default=None):
+
+    if obj is None:
+        return default
+
+    if isinstance(obj, dict):
+        return obj.get(campo, default)
+
+    return getattr(obj, campo, default)
+
+
+# =========================================================
+# FALLBACK — amortización
+# =========================================================
 
 def amortizacion_anual(
     principal: float,
@@ -44,7 +59,7 @@ def amortizacion_anual(
 
             interes_y += interes_m
             principal_y += principal_m
-            pago_y += (interes_m + principal_m)
+            pago_y += interes_m + principal_m
 
         out.append(
             {
@@ -59,9 +74,9 @@ def amortizacion_anual(
     return out
 
 
-# ==========================================================
-# Página 3
-# ==========================================================
+# =========================================================
+# PAGE 3
+# =========================================================
 
 def build_page_3(
     resultado: Dict[str, Any],
@@ -74,11 +89,17 @@ def build_page_3(
 
     story: List[Any] = []
 
-    story.append(Paragraph("Financiamiento — Evolución del Préstamo", styles["Title"]))
+    story.append(
+        Paragraph("Financiamiento — Evolución del Préstamo", styles["Title"])
+    )
+
     story.append(Spacer(1, 10))
 
-    # ===== CONTRATO ROBUSTO =====
-    financiero = resultado.get("financiero", {})
+    # =====================================================
+    # LECTURA CONTRATO
+    # =====================================================
+
+    financiero = leer(resultado, "financiero", {})
 
     capex = float(financiero.get("capex_L", 0.0))
     cuota = float(financiero.get("cuota_mensual", 0.0))
@@ -91,13 +112,23 @@ def build_page_3(
     tasa_anual = float(get_field(datos, "tasa_anual", 0.0))
     plazo_anios = int(get_field(datos, "plazo_anios", 10))
 
-    # ===== usar tabla del motor si existe =====
+    # =====================================================
+    # TABLA DEL MOTOR
+    # =====================================================
+
     anual = financiero.get("tabla_amortizacion")
 
     if not anual:
-        anual = amortizacion_anual(principal, tasa_anual, cuota, plazo_anios)
+        anual = amortizacion_anual(
+            principal,
+            tasa_anual,
+            cuota,
+            plazo_anios
+        )
 
-    # ===== Tabla =====
+    # =====================================================
+    # TABLA PDF
+    # =====================================================
 
     header = [
         "Año",
@@ -151,15 +182,25 @@ def build_page_3(
     story.append(t)
     story.append(Spacer(1, 10))
 
-    # ===== Lectura ejecutiva =====
+    # =====================================================
+    # LECTURA EJECUTIVA
+    # =====================================================
 
-    saldo_ultimo = float(anual[-1]["saldo_fin"]) if anual else float(principal)
+    saldo_ultimo = principal
+
+    if anual:
+        saldo_ultimo = float(anual[-1].get("saldo_fin", principal))
 
     nota = (
+
         "<b>Lectura ejecutiva</b><br/>"
+
         f"• Cuota fija estimada: <b>{money_L(cuota)}/mes</b> por <b>{plazo_anios}</b> años.<br/>"
+
         f"• Monto financiado: <b>{money_L(principal)}</b> (sobre CAPEX).<br/>"
+
         f"• Saldo al cierre del plazo: <b>{money_L(saldo_ultimo)}</b> (≈ 0 por redondeos)."
+
     )
 
     story.append(box_paragraph(nota, pal, content_w, font_size=10))
