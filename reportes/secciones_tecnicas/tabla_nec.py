@@ -1,6 +1,5 @@
 from typing import Dict, Any
 from reportlab.platypus import Table, TableStyle
-from reportlab.lib import colors
 
 
 # ==========================================================
@@ -9,8 +8,8 @@ from reportlab.lib import colors
 
 def crear_tabla_parametros_electricos(resultado, pal, content_w):
 
-    # Leer corrientes directamente del paquete NEC
-    corr = resultado.get("nec", {})
+    # Leer corrientes desde ingeniería eléctrica
+    corr = resultado.get("ingenieria", {}).get("corrientes", {})
 
     def leer(nivel):
         d = corr.get(nivel, {})
@@ -44,17 +43,14 @@ def crear_tabla_parametros_electricos(resultado, pal, content_w):
     tbl = Table(rows, colWidths=colw)
 
     tbl.setStyle(TableStyle([
-
         ("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),
         ("BACKGROUND",(0,0),(-1,0),pal["SOFT"]),
         ("TEXTCOLOR",(0,0),(-1,0),pal["PRIMARY"]),
 
-        ("ALIGN",(1,1),(1,-1),"RIGHT"),
-        ("ALIGN",(2,1),(2,-1),"RIGHT"),
+        ("ALIGN",(1,1),(2,-1),"RIGHT"),
 
         ("GRID",(0,0),(-1,-1),0.3,pal["BORDER"]),
         ("FONTSIZE",(0,0),(-1,-1),10),
-
     ]))
 
     return tbl
@@ -66,9 +62,8 @@ def crear_tabla_parametros_electricos(resultado, pal, content_w):
 
 def crear_tabla_dimensionamiento_nec(resultado, pal, content_w):
 
-    nec = resultado.get("nec", {}).get("protecciones")
+    nec = resultado.get("ingenieria", {}).get("protecciones", {})
 
-    # Evitar tabla vacía
     if not nec:
         return None
 
@@ -76,24 +71,10 @@ def crear_tabla_dimensionamiento_nec(resultado, pal, content_w):
         ["Circuito", "Corriente diseño", "Protección", "Conductor"],
     ]
 
-    # Orden lógico de circuitos
-    orden = [
-        "string_dc",
-        "mppt_dc",
-        "entrada_inversor_dc",
-        "salida_inversor_ac",
-        "alimentador_ac"
-    ]
-
-    for circuito in orden:
-
-        d = nec.get(circuito)
-
-        if not d:
-            continue
+    for circuito, d in nec.items():
 
         rows.append([
-            circuito.replace("_"," ").title(),
+            circuito.replace("_", " ").title(),
             f"{float(d.get('i_diseno_a',0)):.2f} A",
             d.get("proteccion","—"),
             d.get("conductor","—"),
@@ -109,7 +90,6 @@ def crear_tabla_dimensionamiento_nec(resultado, pal, content_w):
     tbl = Table(rows, colWidths=colw)
 
     tbl.setStyle(TableStyle([
-
         ("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),
         ("BACKGROUND",(0,0),(-1,0),pal["SOFT"]),
         ("TEXTCOLOR",(0,0),(-1,0),pal["PRIMARY"]),
@@ -119,7 +99,6 @@ def crear_tabla_dimensionamiento_nec(resultado, pal, content_w):
 
         ("GRID",(0,0),(-1,-1),0.3,pal["BORDER"]),
         ("FONTSIZE",(0,0),(-1,-1),10),
-
     ]))
 
     return tbl
@@ -176,7 +155,6 @@ def crear_tabla_indicadores(resultado, pal, content_w):
     tbl = Table(rows, colWidths=colw)
 
     tbl.setStyle(TableStyle([
-
         ("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),
         ("BACKGROUND",(0,0),(-1,0),pal["SOFT"]),
         ("TEXTCOLOR",(0,0),(-1,0),pal["PRIMARY"]),
@@ -185,7 +163,6 @@ def crear_tabla_indicadores(resultado, pal, content_w):
 
         ("GRID",(0,0),(-1,-1),0.3,pal["BORDER"]),
         ("FONTSIZE",(0,0),(-1,-1),10),
-
     ]))
 
     return tbl
