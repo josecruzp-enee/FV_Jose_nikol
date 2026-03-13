@@ -9,7 +9,7 @@ from reportlab.platypus import Table, TableStyle
 def crear_tabla_parametros_electricos(resultado, pal, content_w):
 
     # Leer corrientes desde ingeniería eléctrica
-    corr = resultado.get("ingenieria", {}).get("corrientes", {})
+    corr = resultado.get("nec", {}).get("paquete_nec", {}).get("corrientes", {})
 
     def leer(nivel):
         d = corr.get(nivel, {})
@@ -62,7 +62,7 @@ def crear_tabla_parametros_electricos(resultado, pal, content_w):
 
 def crear_tabla_dimensionamiento_nec(resultado, pal, content_w):
 
-    nec = resultado.get("ingenieria", {}).get("protecciones", {})
+    nec = resultado.get("nec", {}).get("paquete_nec", {}).get("protecciones", {})
 
     if not nec:
         return None
