@@ -7,7 +7,7 @@ FV Engine
 
 from typing import List, Tuple
 import pandas as pd
-
+import streamlit as st
 
 from core.dominio.modelo import Datosproyecto
 from core.aplicacion.orquestador_estudio import ejecutar_estudio
