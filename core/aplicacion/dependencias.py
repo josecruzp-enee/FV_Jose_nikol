@@ -62,7 +62,10 @@ class PanelesAdapter:
         # --------------------------------------------------
         # CONSTRUIR ENTRADA DEL DOMINIO PANELES
         # --------------------------------------------------
-
+        print("\nDEBUG PANELES ADAPTER")
+        print("modo_dimensionado:", modo)
+        print("n_paneles_total:", n_paneles_total)
+        print("pdc_kw_objetivo:", pdc_kw_objetivo)
         entrada = EntradaPaneles(
 
             panel=panel,
