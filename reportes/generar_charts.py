@@ -84,12 +84,11 @@ def _chart_horaria(pdc_kw: float, hsp_dia: float, path: Path):
 
         if 6 <= h <= 18:
             angulo = (h - 6) / 12 * math.pi
-            irradiancia_rel = math.sin(angulo)   # 0 → 1
+            irradiancia_rel = math.sin(angulo)
         else:
             irradiancia_rel = 0
 
         p = pdc_kw * irradiancia_rel * PR
-
         potencia.append(p)
 
     plt.figure()
