@@ -189,6 +189,10 @@ def _mostrar_sizing(sizing):
 # MOSTRAR NEC
 # ==========================================================
 
+# ==========================================================
+# MOSTRAR NEC
+# ==========================================================
+
 def _mostrar_nec(nec):
 
     st.subheader("Ingeniería eléctrica (NEC)")
@@ -197,26 +201,52 @@ def _mostrar_nec(nec):
         st.info("Sin resultados NEC.")
         return
 
-    dc = nec.get("dc", {})
-    ac = nec.get("ac", {})
-    ocpd = nec.get("ocpd", {})
+    # ------------------------------------------------------
+    # Lectura del contrato actual del dominio eléctrico
+    # ------------------------------------------------------
+
+    corrientes = nec.get("corrientes", {})
+    protecciones = nec.get("protecciones", {})
     conductores = nec.get("conductores", {}).get("circuitos", [])
+
+    dc = corrientes.get("dc_total", {})
+    ac = corrientes.get("ac", {})
 
     tabs = st.tabs(["DC", "AC", "Conductores"])
 
+    # ======================================================
+    # TAB DC
+    # ======================================================
+
     with tabs[0]:
 
-        st.metric("Voltaje DC", _fmt(dc.get("vdc_nom"), "V"))
+        st.metric(
+            "Corriente DC operación",
+            _fmt(dc.get("i_operacion_a"), "A")
+        )
 
-        st.metric("Potencia DC", _fmt(dc.get("potencia_dc_w"), "W"))
+        st.metric(
+            "Corriente DC diseño NEC",
+            _fmt(dc.get("i_diseno_nec_a"), "A")
+        )
+
+    # ======================================================
+    # TAB AC
+    # ======================================================
 
     with tabs[1]:
 
-        st.metric("Voltaje AC", _fmt(ac.get("vac_ll"), "V"))
+        st.metric(
+            "Corriente AC operación",
+            _fmt(ac.get("i_operacion_a"), "A")
+        )
 
-        st.metric("Potencia AC", _fmt(ac.get("potencia_ac_w"), "W"))
+        st.metric(
+            "Corriente AC diseño",
+            _fmt(ac.get("i_diseno_nec_a"), "A")
+        )
 
-        breaker = ocpd.get("breaker_ac", {})
+        breaker = protecciones.get("breaker_ac", {})
 
         if breaker:
 
@@ -224,6 +254,10 @@ def _mostrar_nec(nec):
                 "Breaker AC",
                 _fmt(breaker.get("tamano_a"), "A")
             )
+
+    # ======================================================
+    # TAB CONDUCTORES
+    # ======================================================
 
     with tabs[2]:
 
@@ -252,7 +286,6 @@ def _mostrar_nec(nec):
         df = pd.DataFrame(filas)
 
         st.dataframe(df, use_container_width=True)
-
 
 # ==========================================================
 # RENDER PRINCIPAL
