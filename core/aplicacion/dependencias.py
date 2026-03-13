@@ -135,7 +135,14 @@ class PanelesAdapter:
 class EnergiaAdapter:
 
     def ejecutar(self, datos, sizing, strings):
-        return ejecutar_motor_energia(datos, sizing, strings)
+
+        entrada = {
+            "datos": datos,
+            "sizing": sizing,
+            "strings": strings
+        }
+
+        return ejecutar_motor_energia(entrada)
 
 
 # ==========================================================
