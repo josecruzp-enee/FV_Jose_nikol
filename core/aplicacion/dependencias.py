@@ -240,7 +240,12 @@ class NECAdapter:
 class FinanzasAdapter:
 
     def ejecutar(self, datos, sizing, energia):
-        return ejecutar_finanzas(datos, sizing, energia)
+
+        return ejecutar_finanzas(
+            datos=datos,
+            sizing=sizing,
+            energia=energia,
+        )
 
 
 # ==========================================================
