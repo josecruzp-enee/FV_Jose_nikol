@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import List, Dict, Any
 
 from electrical.energia.contrato import EnergiaResultado
-
+from dataclasses import field
 
 # =========================================================
 # ENERGÍA MENSUAL
@@ -170,4 +170,4 @@ class ResultadoProyecto:
 
     financiero: ResultadoFinanciero
 
-    meta: Dict[str, Any]
+    meta: Dict[str, Any] = field(default_factory=dict)
