@@ -203,7 +203,7 @@ def _render_geometria(sf: Dict[str, Any]) -> None:
 
     if col4.button("O"):
         sf["azimut_deg"] = 270
-
+    st.success("UI solar cargada")
 
     # ----------------------------------
     # CONFIGURACIÓN
