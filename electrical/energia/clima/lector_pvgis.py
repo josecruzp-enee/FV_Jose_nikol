@@ -8,24 +8,20 @@ Responsabilidad
 Descargar datos climáticos horarios desde PVGIS.
 
 Este módulo representa la frontera entre:
-    API PVGIS  →  Motor FV Engine
 
-Datos obtenidos:
-    • GHI  (irradiancia horizontal)
-    • DNI  (irradiancia directa)
-    • DHI  (irradiancia difusa)
-    • Temperatura ambiente
+    API PVGIS
+        ↓
+    Dominio clima de FV Engine
 
-Salida:
-    List[ClimaHora] con 8760 horas climáticas.
-
-Fuente:
-    https://re.jrc.ec.europa.eu/api/
+Salida
+------
+ResultadoClima
 """
 
 from dataclasses import dataclass
-from typing import List
 import requests
+
+from .resultado_clima import ResultadoClima, ClimaHora
 
 
 # ==========================================================
@@ -46,25 +42,6 @@ class EntradaClimaPVGIS:
 
 
 # ==========================================================
-# MODELO DE SALIDA
-# ==========================================================
-
-@dataclass
-class ClimaHora:
-    """
-    Representa las condiciones climáticas de una hora.
-    """
-
-    tiempo: str
-
-    ghi_wm2: float
-    dni_wm2: float
-    dhi_wm2: float
-
-    temp_amb_c: float
-
-
-# ==========================================================
 # URL BASE PVGIS
 # ==========================================================
 
@@ -77,7 +54,7 @@ PVGIS_URL = "https://re.jrc.ec.europa.eu/api/seriescalc"
 
 def descargar_clima_pvgis(
     entrada: EntradaClimaPVGIS
-) -> List[ClimaHora]:
+) -> ResultadoClima:
 
     params = {
 
@@ -97,7 +74,7 @@ def descargar_clima_pvgis(
     }
 
     # ------------------------------------------------------
-    # DESCARGA DATOS
+    # DESCARGA
     # ------------------------------------------------------
 
     try:
@@ -129,36 +106,25 @@ def descargar_clima_pvgis(
 
 
     # ------------------------------------------------------
-    # CONSTRUIR MODELO CLIMÁTICO
+    # CONSTRUIR SERIE CLIMÁTICA
     # ------------------------------------------------------
 
-    clima: List[ClimaHora] = []
+    horas = []
 
     for h in hourly:
 
         ghi = float(h.get("G(h)", 0) or 0)
 
-        dni = float(h.get("Gb(n)", 0) or 0)
-
-        dhi = float(h.get("Gd(h)", 0) or 0)
-
         temp = float(h.get("T2m", 25) or 25)
 
-        tiempo = h.get("time")
-
-        clima.append(
+        horas.append(
 
             ClimaHora(
 
-                tiempo=tiempo,
-
                 ghi_wm2=ghi,
 
-                dni_wm2=dni,
-
-                dhi_wm2=dhi,
-
                 temp_amb_c=temp
+
             )
 
         )
@@ -168,13 +134,34 @@ def descargar_clima_pvgis(
     # VALIDAR 8760 HORAS
     # ------------------------------------------------------
 
-    if len(clima) != 8760:
+    if len(horas) != 8760:
 
         raise RuntimeError(
 
-            f"PVGIS devolvió {len(clima)} horas en lugar de 8760"
+            f"PVGIS devolvió {len(horas)} horas en lugar de 8760"
 
         )
 
 
-    return clima
+    # ------------------------------------------------------
+    # RESULTADO
+    # ------------------------------------------------------
+
+    return ResultadoClima(
+
+        horas=horas,
+
+        latitud=entrada.lat,
+
+        longitud=entrada.lon,
+
+        fuente="PVGIS",
+
+        meta={
+
+            "startyear": entrada.startyear,
+            "endyear": entrada.endyear
+
+        }
+
+    )
