@@ -4,6 +4,9 @@ from dataclasses import dataclass
 from typing import List
 
 
+Vector12 = List[float]
+
+
 # ==========================================================
 # RESULTADO
 # ==========================================================
@@ -14,8 +17,10 @@ class CurtailmentResultado:
     ok: bool
     errores: List[str]
 
-    energia_final_12m_kwh: List[float]
-    energia_recortada_12m_kwh: List[float]
+    energia_final_12m_kwh: Vector12
+    energia_recortada_12m_kwh: Vector12
+
+    energia_recortada_anual_kwh: float
 
 
 # ==========================================================
@@ -24,7 +29,7 @@ class CurtailmentResultado:
 
 def aplicar_curtailment(
     *,
-    energia_12m: List[float],
+    energia_12m: Vector12,
     pdc_kw: float,
     kw_ac: float,
     permitir: bool,
@@ -41,8 +46,8 @@ def aplicar_curtailment(
     if kw_ac < 0:
         errores.append("kw_ac inválido.")
 
-    energia_final: List[float] = []
-    energia_recortada: List[float] = []
+    energia_final: Vector12 = []
+    energia_recortada: Vector12 = []
 
     if not errores:
 
@@ -67,19 +72,23 @@ def aplicar_curtailment(
             else:
 
                 # --------------------------------------------------
-                # Modelo aproximado de clipping mensual
+                # Modelo físico simplificado de clipping
                 # --------------------------------------------------
 
-                exceso_factor = min(1.0, (ratio - 1.0) * 0.25)
+                loss_clip = 0.5 * (ratio - 1.0) ** 2
 
-                energia_recortada = [
-                    float(e) * exceso_factor for e in energia_12m
-                ]
+                loss_clip = max(0.0, min(0.15, loss_clip))
 
-                energia_final = [
-                    max(0.0, float(e) - r)
-                    for e, r in zip(energia_12m, energia_recortada)
-                ]
+                for i in range(12):
+
+                    e = float(energia_12m[i])
+
+                    r = e * loss_clip
+
+                    energia_recortada.append(r)
+                    energia_final.append(max(0.0, e - r))
+
+    energia_recortada_anual = sum(energia_recortada)
 
     ok = len(errores) == 0
 
@@ -88,4 +97,5 @@ def aplicar_curtailment(
         errores=errores,
         energia_final_12m_kwh=energia_final,
         energia_recortada_12m_kwh=energia_recortada,
+        energia_recortada_anual_kwh=energia_recortada_anual,
     )
