@@ -1,7 +1,17 @@
 # ==========================================================
 # ADAPTADOR: NEC
 # ==========================================================
+from __future__ import annotations
 
+from core.aplicacion.puertos import (
+    PuertoSizing,
+    PuertoPaneles,
+    PuertoEnergia,
+    PuertoNEC,
+    PuertoFinanzas,
+)
+
+from electrical.nec.orquestador_nec import ejecutar_nec
 class NECAdapter(PuertoNEC):
 
     def ejecutar(self, datos, sizing, strings):
