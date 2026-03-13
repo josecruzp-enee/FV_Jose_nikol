@@ -3,22 +3,15 @@ from __future__ import annotations
 """
 Cálculo de generación DC bruta del sistema FV.
 
-Este módulo calcula la producción energética mensual del generador
-fotovoltaico antes de aplicar pérdidas físicas o limitaciones de inversor.
-
 Modelo físico:
 
 E_mes = Pdc × HSP × días × factor_orientación
-
-NO aplica:
-- pérdidas
-- clipping
-- degradación
-- limitación de inversor
 """
 
 from dataclasses import dataclass
 from typing import List
+
+Vector12 = List[float]
 
 
 # ==========================================================
@@ -31,7 +24,8 @@ class GeneracionBrutaResultado:
     ok: bool
     errores: List[str]
 
-    energia_mensual_dc_kwh: List[float]
+    energia_mensual_dc_kwh: Vector12
+    energia_anual_dc_kwh: float
 
 
 # ==========================================================
@@ -41,7 +35,7 @@ class GeneracionBrutaResultado:
 def calcular_energia_bruta_dc(
     *,
     pdc_kw: float,
-    hsp_12m: List[float],
+    hsp_12m: Vector12,
     dias_mes: List[int],
     factor_orientacion: float,
 ) -> GeneracionBrutaResultado:
@@ -74,14 +68,20 @@ def calcular_energia_bruta_dc(
     # CÁLCULO DE ENERGÍA
     # ------------------------------------------------------
 
-    energia: List[float] = []
+    energia: Vector12 = []
 
     if not errores:
 
-        energia = [
-            float(pdc_kw) * float(h) * int(d) * float(factor_orientacion)
-            for h, d in zip(hsp_12m, dias_mes)
-        ]
+        for i in range(12):
+
+            h = float(hsp_12m[i])
+            d = int(dias_mes[i])
+
+            e_mes = float(pdc_kw) * h * d * float(factor_orientacion)
+
+            energia.append(e_mes)
+
+    energia_anual = sum(energia)
 
     ok = len(errores) == 0
 
@@ -89,26 +89,5 @@ def calcular_energia_bruta_dc(
         ok=ok,
         errores=errores,
         energia_mensual_dc_kwh=energia,
+        energia_anual_dc_kwh=energia_anual,
     )
-
-
-# ==========================================================
-# SALIDAS DEL ARCHIVO
-# ==========================================================
-#
-# GeneracionBrutaResultado
-#
-# Campos:
-#
-# ok : bool
-# errores : list[str]
-# energia_mensual_dc_kwh : list[float]
-#
-# Descripción:
-# Energía DC mensual producida por el generador FV antes de
-# aplicar pérdidas o clipping.
-#
-# Consumido por:
-# energia.perdidas_fisicas
-#
-# ==========================================================
