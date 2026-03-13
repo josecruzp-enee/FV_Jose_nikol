@@ -154,7 +154,7 @@ def ejecutar_nec(
         strings
     )
 
-    paquete = armar_paquete_nec(entrada_nec)
+    paquete = ejecutar_ingenieria_electrica(entrada_nec)
 
     resultado = {
         "entrada_nec": entrada_nec,
