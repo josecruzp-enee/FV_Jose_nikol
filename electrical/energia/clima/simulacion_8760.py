@@ -1,132 +1,218 @@
 from __future__ import annotations
 
 """
-SIMULACIÓN ENERGÉTICA 8760 — FV Engine
+SIMULADOR ENERGÉTICO 8760 — FV Engine
 
 Responsabilidad
 ---------------
-Simular la producción energética del sistema FV
-durante todas las horas del año.
+Simular la producción energética anual de un sistema FV
+hora por hora (8760).
 
-Este módulo coordina:
+Flujo físico:
 
 clima
-solar
-paneles
+↓
+posición solar
+↓
+irradiancia en plano (POA)
+↓
+modelo térmico
+↓
+potencia panel
+↓
+potencia string
+↓
+potencia AC
+↓
+energía acumulada
+
+Salida
+------
+Producción:
+
+• horaria
+• mensual
+• anual
+• PR
+• yield específico
 """
 
-from datetime import datetime, timedelta
-from typing import List, Dict, Any
+from dataclasses import dataclass
+from typing import List
 
-from solar.entrada_solar import EntradaSolar
-from solar.orquestador_solar import ejecutar_solar
+from solar.posicion_solar import calcular_posicion_solar
+from solar.irradiancia_plano import calcular_irradiancia_plano
+from solar.modelo_termico import calcular_temperatura_celda
 
-from electrical.energia.clima_tmy import generar_clima_base
-from electrical.paneles.potencia_panel import evaluar_panel_en_operacion
+from electrical.paneles.potencia_panel import (
+    calcular_potencia_panel,
+    PotenciaPanelInput
+)
 
-from electrical.modelos.paneles import PanelSpec
-
-
-# ==========================================================
-# GENERADOR DE HORAS DEL AÑO
-# ==========================================================
-
-def generar_horas_anio(anio: int) -> List[datetime]:
-
-    inicio = datetime(anio, 1, 1, 0, 0)
-
-    return [
-        inicio + timedelta(hours=i)
-        for i in range(8760)
-    ]
+from .clima_modelo import ClimaHora
 
 
 # ==========================================================
-# SIMULACIÓN 8760
+# RESULTADO DEL MOTOR
+# ==========================================================
+
+@dataclass
+class ResultadoSimulacion8760:
+
+    energia_horaria_kwh: List[float]
+
+    energia_mensual_kwh: List[float]
+
+    energia_anual_kwh: float
+
+    yield_especifico_kwh_kwp: float
+
+    performance_ratio: float
+
+
+# ==========================================================
+# SIMULADOR
 # ==========================================================
 
 def simular_8760(
-    panel: PanelSpec,
-    n_paneles_total: int,
+
+    clima: List[ClimaHora],
+
     lat: float,
     lon: float,
-    tilt_deg: float,
-    azimuth_panel_deg: float,
-    anio: int = 2024
-) -> Dict[str, Any]:
 
-    horas = generar_horas_anio(anio)
+    tilt: float,
+    azimuth: float,
 
-    clima = generar_clima_base()
+    panel,
 
-    energia_total = 0
+    n_paneles: int,
 
-    produccion_horaria = []
+    eficiencia_inversor: float = 0.96
 
-    for i, fecha in enumerate(horas):
+) -> ResultadoSimulacion8760:
 
-        ghi = clima[i].ghi_wm2
-        temp_amb = clima[i].temp_amb_c
+    energia_horaria = []
 
-        # ------------------------------------------------------
-        # SOLAR
-        # ------------------------------------------------------
+    energia_mensual = [0.0] * 12
 
-        entrada_solar = EntradaSolar(
+    energia_anual = 0.0
+
+    potencia_dc_stc_kw = (panel.pmax_w * n_paneles) / 1000
+
+
+    for h, hora_clima in enumerate(clima):
+
+        # --------------------------------------------------
+        # POSICIÓN SOLAR
+        # --------------------------------------------------
+
+        pos = calcular_posicion_solar(
+            hora_anual=h,
             lat=lat,
-            lon=lon,
-            fecha_hora=fecha,
-            ghi_wm2=ghi,
-            tilt_deg=tilt_deg,
-            azimuth_panel_deg=azimuth_panel_deg
+            lon=lon
         )
 
-        solar = ejecutar_solar(entrada_solar)
+        # --------------------------------------------------
+        # IRRADIANCIA EN PLANO DEL GENERADOR
+        # --------------------------------------------------
 
-        if not solar["ok"]:
-            produccion_horaria.append(0)
-            continue
-
-        poa = solar["poa_wm2"]
-
-        # ------------------------------------------------------
-        # PANEL
-        # ------------------------------------------------------
-
-        panel_real = evaluar_panel_en_operacion(
-            panel=panel,
-            temperatura_amb_c=temp_amb,
-            irradiancia_wm2=poa
+        poa = calcular_irradiancia_plano(
+            ghi=hora_clima.ghi_wm2,
+            zenith=pos.zenith,
+            azimuth_solar=pos.azimuth,
+            tilt=tilt,
+            azimuth_superficie=azimuth
         )
 
-        potencia_panel = panel_real["pmp_w"]
+        # --------------------------------------------------
+        # TEMPERATURA DE CELDA
+        # --------------------------------------------------
 
-        # ------------------------------------------------------
-        # ARRAY FV
-        # ------------------------------------------------------
+        t_cell = calcular_temperatura_celda(
+            irradiancia_wm2=poa,
+            temperatura_amb_c=hora_clima.temp_amb_c
+        )
 
-        potencia_array = potencia_panel * n_paneles_total
+        # --------------------------------------------------
+        # POTENCIA REAL DEL PANEL
+        # --------------------------------------------------
 
-        # ------------------------------------------------------
-        # ENERGÍA DE LA HORA
-        # ------------------------------------------------------
+        panel_real = calcular_potencia_panel(
 
-        energia_hora = potencia_array / 1000  # kWh
+            PotenciaPanelInput(
+                irradiancia_poa_wm2=poa,
+                temperatura_celda_c=t_cell,
+                pmax_stc_w=panel.pmax_w,
+                vmp_stc_v=panel.vmp_v,
+                voc_stc_v=panel.voc_v,
+                coef_pmax_pct_per_c=panel.gamma_p,
+                coef_voc_pct_per_c=panel.beta_voc,
+                coef_vmp_pct_per_c=panel.beta_vmp
+            )
 
-        energia_total += energia_hora
+        )
 
-        produccion_horaria.append(energia_hora)
+        # --------------------------------------------------
+        # POTENCIA DC DEL ARRAY
+        # --------------------------------------------------
 
-    # ==========================================================
-    # RESULTADO FINAL
-    # ==========================================================
+        p_dc = panel_real.pmp_w * n_paneles
 
-    return {
+        # --------------------------------------------------
+        # CONVERSIÓN A AC
+        # --------------------------------------------------
 
-        "energia_anual_kwh": energia_total,
+        p_ac = p_dc * eficiencia_inversor
 
-        "produccion_horaria": produccion_horaria,
+        # --------------------------------------------------
+        # ENERGÍA HORARIA
+        # --------------------------------------------------
 
-        "horas_simuladas": len(produccion_horaria)
+        energia_kwh = p_ac / 1000
 
-    }
+        energia_horaria.append(energia_kwh)
+
+        energia_anual += energia_kwh
+
+        # --------------------------------------------------
+        # ENERGÍA MENSUAL
+        # --------------------------------------------------
+
+        mes = int(h / 730)
+
+        if mes > 11:
+            mes = 11
+
+        energia_mensual[mes] += energia_kwh
+
+
+    # ------------------------------------------------------
+    # YIELD ESPECÍFICO
+    # ------------------------------------------------------
+
+    yield_especifico = energia_anual / potencia_dc_stc_kw
+
+
+    # ------------------------------------------------------
+    # PERFORMANCE RATIO
+    # ------------------------------------------------------
+
+    irradiacion_total = sum(h.ghi_wm2 for h in clima) / 1000
+
+    pr = energia_anual / (potencia_dc_stc_kw * irradiacion_total)
+
+
+    return ResultadoSimulacion8760(
+
+        energia_horaria_kwh=energia_horaria,
+
+        energia_mensual_kwh=energia_mensual,
+
+        energia_anual_kwh=energia_anual,
+
+        yield_especifico_kwh_kwp=yield_especifico,
+
+        performance_ratio=pr
+
+    )
