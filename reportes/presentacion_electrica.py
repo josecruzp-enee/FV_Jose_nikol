@@ -1,495 +1,159 @@
-# reportes/presentacion_electrica.py
+# reportes/generar_pdf_profesional.py
+
 from __future__ import annotations
-from typing import Any, Dict, List, Tuple
 
-# ----------------------------
-# Helpers
-# ----------------------------
+from pathlib import Path
+from typing import Any, Dict, List
 
-def _get(d: Any, path: str, default=None):
-    cur = d
-    for part in path.split("."):
-        if not isinstance(cur, dict) or part not in cur:
-            return default
-        cur = cur[part]
-    return cur
+from reportlab.platypus import SimpleDocTemplate
+from reportlab.lib.pagesizes import letter
 
-def _first_dict(*cands):
-    for x in cands:
-        if isinstance(x, dict) and x:
-            return x
-    return {}
+from .styles import pdf_palette, pdf_styles
 
-def _first_list(*cands):
-    for x in cands:
-        if isinstance(x, list) and x:
-            return x
-    return []
+from .page_1 import build_page_1
+from .page_2 import build_page_2
+from .page_3 import build_page_3
+from .page_4 import build_page_4
+from .page_5 import build_page_5
 
-def _to_float(x: Any):
+
+# ==========================================================
+# VALIDAR RUTA DE PDF
+# ==========================================================
+
+def _ensure_pdf_path(paths: Dict[str, Any]) -> str:
+    """
+    Garantiza que exista una ruta válida para generar el PDF.
+    """
+
+    if not isinstance(paths, dict):
+        raise TypeError("`paths` debe ser dict.")
+
+    pdf_path = paths.get("pdf_path")
+
+    if not pdf_path:
+
+        out_dir = (
+            paths.get("out_dir")
+            or paths.get("base_dir")
+            or "salidas"
+        )
+
+        pdf_path = str(Path(out_dir) / "reporte_evaluacion_fv.pdf")
+
+        paths["pdf_path"] = pdf_path
+
+    p = Path(str(pdf_path))
+
+    p.parent.mkdir(parents=True, exist_ok=True)
+
+    return str(p)
+
+
+# ==========================================================
+# GENERADOR PRINCIPAL DE PDF
+# ==========================================================
+
+def generar_pdf_profesional(
+    resultado_proyecto: Any,
+    datos: Any,
+    paths: Dict[str, Any],
+) -> str:
+
+    """
+    Genera el reporte PDF profesional del estudio FV.
+
+    Parámetros
+    ----------
+    resultado_proyecto :
+        Resultado completo del orquestador (ResultadoProyecto o dict).
+
+    datos :
+        Datos del proyecto / cliente.
+
+    paths :
+        Diccionario de rutas generadas por el pipeline:
+        - pdf_path
+        - charts
+        - layout_paneles
+        - string_fv
+        - etc.
+
+    Retorna
+    -------
+    str
+        Ruta del PDF generado.
+    """
+
+    # ======================================================
+    # CONFIGURACIÓN PDF
+    # ======================================================
+
+    pal = pdf_palette()
+    styles = pdf_styles()
+
+    pdf_path = _ensure_pdf_path(paths)
+
+    doc = SimpleDocTemplate(
+        pdf_path,
+        pagesize=letter,
+    )
+
+    story: List = []
+
+    content_w = doc.width
+
+    # ======================================================
+    # DEBUG OPCIONAL
+    # ======================================================
+
+    nec_debug = None
+
     try:
-        if x is None or x == "":
-            return None
-        return float(x)
+        nec_debug = resultado_proyecto.get("nec")
     except Exception:
-        return None
+        pass
 
-def _fmt_num(x: Any, nd: int = 2) -> str:
-    v = _to_float(x)
-    if v is None:
-        return "—"
-    if nd == 0:
-        return f"{v:,.0f}"
-    return f"{v:,.{nd}f}"
+    if nec_debug:
+        print("\n========== DEBUG NEC ==========")
+        print(nec_debug)
+        print("================================\n")
 
-def _fmt_val(value: Any, unit: str | None = None, nd: int = 2) -> str:
-    s = _fmt_num(value, nd=nd) if isinstance(value, (int, float)) or _to_float(value) is not None else (str(value) if value not in (None, "") else "—")
-    if s == "—":
-        return s
-    return f"{s} {unit}".strip() if unit else s
+    # ======================================================
+    # PÁGINAS DEL REPORTE
+    # ======================================================
 
-# ----------------------------
-# Catálogo de labels bonitos
-# ----------------------------
+    paginas = [
 
-CATALOGO: Dict[str, Dict[str, str]] = {
-    # DC
-    "dc.n_strings": {
-        "label": "Cantidad de strings",
-        "help": "Número de ramales en paralelo del arreglo FV.",
-    },
-    "dc.modulos_por_string": {
-        "label": "Módulos por string",
-        "help": "Cantidad de módulos conectados en serie por string.",
-    },
-    "dc.vmp_string_v": {
-        "label": "Vmp del string",
-        "help": "Voltaje a potencia máxima (Vmp) del string a condiciones de operación.",
-    },
-    "dc.voc_frio_string_v": {
-        "label": "Voc en frío",
-        "help": "Voc corregido por temperatura mínima (condición crítica NEC para tensión).",
-    },
-    "dc.i_string_oper_a": {
-        "label": "Corriente operativa del string",
-        "help": "Corriente típica de operación del string.",
-    },
-    "dc.i_string_max_a": {
-        "label": "Corriente máxima del string",
-        "help": "Corriente máxima considerada para diseño.",
-    },
-    "dc.i_array_isc_a": {
-        "label": "Isc del arreglo",
-        "help": "Corriente de cortocircuito total del arreglo.",
-    },
-    "dc.i_array_design_a": {
-        "label": "Corriente de diseño del arreglo",
-        "help": "Corriente usada para dimensionamiento y protecciones según NEC.",
-    },
+        build_page_1,
+        build_page_2,
+        build_page_3,
+        build_page_4,
+        build_page_5,
 
-    # AC
-    "ac.p_ac_w": {
-        "label": "Potencia AC",
-        "help": "Potencia de salida AC considerada (normalmente potencia nominal del inversor).",
-    },
-    "ac.pf": {
-        "label": "Factor de potencia (PF)",
-        "help": "PF asumido para cálculo de corriente AC.",
-    },
-    "ac.v_ll_v": {
-        "label": "Voltaje línea–línea",
-        "help": "Voltaje L-L del sistema (trifásico) o equivalente según configuración.",
-    },
-    "ac.fases": {
-        "label": "Número de fases",
-        "help": "Monofásico / bifásico / trifásico.",
-    },
-    "ac.i_ac_nom_a": {
-        "label": "Corriente nominal AC",
-        "help": "Corriente calculada a potencia nominal y voltaje del sistema.",
-    },
-    "ac.i_ac_design_a": {
-        "label": "Corriente de diseño AC",
-        "help": "Corriente de diseño para conductor/breaker (criterio NEC).",
-    },
-
-    # Protecciones
-    "prot.breaker_ac": {
-        "label": "Breaker de salida AC",
-        "help": "Tamaño recomendado del interruptor en salida del inversor.",
-    },
-    "prot.fusible_string": {
-        "label": "Fusible por string",
-        "help": "Requerimiento de fusible por string según paralelos/criterios de protección.",
-    },
-
-    # Conductores
-    "cond.dc_string": {
-        "label": "Conductor DC (string)",
-        "help": "Calibre recomendado en el circuito DC del string considerando caída de tensión.",
-    },
-    "cond.ac_out": {
-        "label": "Conductor AC (salida inversor)",
-        "help": "Calibre recomendado en la salida AC considerando caída de tensión.",
-    },
-}
-
-# ----------------------------
-# Normalización
-# ----------------------------
-
-
-def normalizar_electrico(pkg: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Normaliza el paquete eléctrico NEC para consumo UI/PDF.
-
-    Acepta:
-      - paq directo (dict con dc/ac/ocpd/...)
-      - wrapper del adaptador (dict con ok/errores/input/paq)
-
-    Retorna contrato único:
-    {
-      "checks": {...},
-      "dc": {...},
-      "ac": {...},
-      "protecciones": {...},    # OCPD (breaker/fusible)
-      "spd": {...},             # SPD DC/AC
-      "seccionamiento": {...},  # seccionamiento DC/AC
-      "conductores": {...},
-      "warnings": [str, ...]
-    }
-    """
-
-    # ✅ Si viene wrapper {ok/errores/input/paq}, usa el paq interno.
-    base = pkg.get("paq") if isinstance(pkg, dict) and isinstance(pkg.get("paq"), dict) else (pkg or {})
-
-    checks = {
-        "ok_vdc": bool(base.get("ok_vdc", _get(base, "checks.ok_vdc", False))),
-        "ok_mppt": bool(base.get("ok_mppt", _get(base, "checks.ok_mppt", False))),
-        "ok_corriente": bool(base.get("ok_corriente", _get(base, "checks.ok_corriente", False))),
-        "string_valido": bool(base.get("string_valido", _get(base, "checks.string_valido", False))),
-    }
-
-    # DC / AC
-    dc = _first_dict(
-        _get(base, "nec.dc"),
-        _get(base, "corrientes_dc"),
-        _get(base, "dc"),
-        _get(base, "ingenieria.nec.dc"),
-    )
-
-    ac = _first_dict(
-        _get(base, "nec.ac"),
-        _get(base, "corrientes_ac"),
-        _get(base, "ac"),
-        _get(base, "ingenieria.nec.ac"),
-    )
-
-    # Protecciones (OCPD): en tu motor NEC real está en "ocpd"
-    protecciones = _first_dict(
-        _get(base, "protecciones"),   # legacy
-        _get(base, "ocpd"),           # ✅ contrato real motor NEC
-        _get(base, "nec.protecciones"),
-        _get(base, "proteccion"),
-    )
-
-    # SPD y Seccionamiento (motor NEC real)
-    spd = _first_dict(
-        _get(base, "spd"),
-        _get(base, "nec.spd"),
-    )
-
-    seccionamiento = _first_dict(
-        _get(base, "seccionamiento"),
-        _get(base, "nec.seccionamiento"),
-    )
-
-    # Conductores
-    conductores = _first_dict(
-        _get(base, "conductores"),
-        _get(base, "nec.conductores"),
-        _get(base, "cables"),
-    )
-
-    # Warnings (consolidado)
-    warnings: List[str] = []
-    warnings += list(_first_list(base.get("warnings"), _get(base, "texto_ui.checks")))
-    warnings += list(_first_list(_get(dc, "warnings"), _get(ac, "warnings")))
-
-    # Nota del fusible (si existe)
-    fus = _get(protecciones, "fusible_string", {})
-    if isinstance(fus, dict) and fus.get("nota"):
-        warnings.append(str(fus.get("nota")))
-
-    warnings = [str(w) for w in warnings if str(w).strip()]
-
-    return {
-        "checks": checks,
-        "dc": dc or {},
-        "ac": ac or {},
-        "protecciones": protecciones or {},
-        "spd": spd or {},
-        "seccionamiento": seccionamiento or {},
-        "conductores": conductores or {},
-        "warnings": warnings,
-    }
-
-
-
-
-
-def resumen_semáforo(norm: Dict[str, Any]) -> Tuple[str, str]:
-    c = norm.get("checks") or {}
-    ok_all = all(bool(c.get(k)) for k in ["ok_vdc", "ok_mppt", "ok_corriente", "string_valido"])
-    if ok_all:
-        return ("ok", "Validación eléctrica: TODO OK ✅")
-    return ("warn", "Validación eléctrica: REVISAR ⚠️")
-
-# ----------------------------
-# NUEVO: items ricos (UI/PDF)
-# ----------------------------
-
-def items_dc(norm: Dict[str, Any]) -> List[Dict[str, Any]]:
-    dc = norm.get("dc") or {}
-    cfg = dc.get("config_strings") or {}
-    return [
-        _item("dc.n_strings", dc.get("n_strings", cfg.get("n_strings")), unit=None, nd=0),
-        _item("dc.modulos_por_string", cfg.get("modulos_por_string"), unit=None, nd=0),
-        _item("dc.vmp_string_v", dc.get("vmp_string_v"), unit="V", nd=1),
-        _item("dc.voc_frio_string_v", dc.get("voc_frio_string_v"), unit="V", nd=1),
-        _item("dc.i_string_oper_a", dc.get("i_string_oper_a"), unit="A", nd=2),
-        _item("dc.i_string_max_a", dc.get("i_string_max_a"), unit="A", nd=2),
-        _item("dc.i_array_isc_a", dc.get("i_array_isc_a"), unit="A", nd=2),
-        _item("dc.i_array_design_a", dc.get("i_array_design_a"), unit="A", nd=3),
-        {
-            "key": "dc.tipo",
-            "label": "Topología",
-            "value": cfg.get("tipo", "—"),
-            "unit": None,
-            "help": "Tipo/configuración de strings (p. ej., serie/paralelo según tu modelo).",
-        },
     ]
 
-def items_ac(norm: Dict[str, Any]) -> List[Dict[str, Any]]:
-    ac = norm.get("ac") or {}
-    return [
-        _item("ac.p_ac_w", ac.get("p_ac_w"), unit="W", nd=0),
-        _item("ac.pf", ac.get("pf"), unit=None, nd=2),
-        _item("ac.v_ll_v", ac.get("v_ll_v"), unit="V", nd=0),
-        {"key": "ac.fases", "label": CATALOGO["ac.fases"]["label"], "value": ac.get("fases", "—"), "unit": None, "help": CATALOGO["ac.fases"]["help"]},
-        _item("ac.i_ac_nom_a", ac.get("i_ac_nom_a"), unit="A", nd=2),
-        _item("ac.i_ac_design_a", ac.get("i_ac_design_a"), unit="A", nd=2),
-    ]
+    for pagina in paginas:
 
-def items_protecciones(norm: Dict[str, Any]) -> List[Dict[str, Any]]:
-    p = norm.get("protecciones") or {}
-    br = p.get("breaker_ac") or {}
-    fs = p.get("fusible_string") or {}
+        try:
 
-    breaker_txt = "—"
-    if br:
-        breaker_txt = f"{br.get('tamano_a', '—')} A (I diseño { _fmt_num(br.get('i_diseno_a')) } A)"
+            story += pagina(
+                resultado_proyecto,
+                datos,
+                paths,
+                pal,
+                styles,
+                content_w,
+            )
 
-    fusible_txt = "Requerido" if bool(fs.get("requerido")) else "No requerido"
-    nota = fs.get("nota", "—")
+        except Exception as e:
 
-    return [
-        {"key": "prot.breaker_ac", "label": CATALOGO["prot.breaker_ac"]["label"], "value": breaker_txt, "unit": None, "help": CATALOGO["prot.breaker_ac"]["help"]},
-        {"key": "prot.fusible_string", "label": CATALOGO["prot.fusible_string"]["label"], "value": fusible_txt, "unit": None, "help": CATALOGO["prot.fusible_string"]["help"]},
-        {"key": "prot.fusible_nota", "label": "Nota/criterio", "value": nota, "unit": None, "help": "Observación del criterio usado para el fusible."},
-    ]
+            print(f"Error generando página {pagina.__name__}: {e}")
 
-def items_conductores(norm: Dict[str, Any]) -> List[Dict[str, Any]]:
-    c = norm.get("conductores") or {}
-    dc = c.get("dc_string") or {}
-    ac = c.get("ac_out") or {}
-    mat = c.get("material", "—")
+    # ======================================================
+    # CONSTRUIR DOCUMENTO
+    # ======================================================
 
-    items: List[Dict[str, Any]] = []
-    if dc:
-        items.append({
-            "key": "cond.dc_string",
-            "label": CATALOGO["cond.dc_string"]["label"],
-            "value": {
-                "circuito": "DC string",
-                "awg": dc.get("awg", "—"),
-                "i_a": dc.get("i_a"),
-                "l_m": dc.get("l_m"),
-                "vd_pct": dc.get("vd_pct"),
-                "vd_obj_pct": dc.get("vd_obj_pct"),
-                "material": mat,
-                "ok": bool(dc.get("ok", True)),
-            },
-            "unit": None,
-            "help": CATALOGO["cond.dc_string"]["help"],
-        })
-    if ac:
-        items.append({
-            "key": "cond.ac_out",
-            "label": CATALOGO["cond.ac_out"]["label"],
-            "value": {
-                "circuito": "AC salida inversor",
-                "awg": ac.get("awg", "—"),
-                "i_a": ac.get("i_a"),
-                "l_m": ac.get("l_m"),
-                "vd_pct": ac.get("vd_pct"),
-                "vd_obj_pct": ac.get("vd_obj_pct"),
-                "material": mat,
-                "ok": bool(ac.get("ok", True)),
-            },
-            "unit": None,
-            "help": CATALOGO["cond.ac_out"]["help"],
-        })
-    return items
+    doc.build(story)
 
-def _item(key: str, value: Any, unit: str | None, nd: int = 2) -> Dict[str, Any]:
-    meta = CATALOGO.get(key, {})
-    return {
-        "key": key,
-        "label": meta.get("label", key),
-        "value": value,
-        "unit": unit,
-        "help": meta.get("help", ""),
-        "nd": nd,
-        "value_fmt": _fmt_val(value, unit=unit, nd=nd),
-    }
-
-# ----------------------------
-# LEGACY: tus filas planas (para no romper)
-# ----------------------------
-
-def filas_dc(norm: Dict[str, Any]) -> List[List[str]]:
-    return [[it["label"] + (f" ({it['unit']})" if it.get("unit") else ""), it.get("value_fmt", "—")] for it in items_dc(norm)]
-
-def filas_ac(norm: Dict[str, Any]) -> List[List[str]]:
-    return [[it["label"] + (f" ({it['unit']})" if it.get("unit") else ""), it.get("value_fmt", "—")] for it in items_ac(norm)]
-
-# ----------------------------
-# PROTECCIONES (UI)
-# ----------------------------
-
-def items_protecciones(norm: Dict[str, Any]) -> List[Dict[str, Any]]:
-
-    p = norm.get("protecciones") or {}
-    spd = norm.get("spd") or {}
-    sec = norm.get("seccionamiento") or {}
-
-    br = p.get("breaker_ac") or {}
-    fs = p.get("fusible_string") or {}
-
-    breaker_txt = "—"
-    if br:
-        breaker_txt = f"{br.get('tamano_a', '—')} A (I diseño { _fmt_num(br.get('i_diseno_a')) } A)"
-
-    fusible_txt = "Requerido" if bool(fs.get("requerido")) else "No requerido"
-    nota = fs.get("nota", "—")
-
-    items: List[Dict[str, Any]] = [
-        {
-            "key": "prot.breaker_ac",
-            "label": CATALOGO["prot.breaker_ac"]["label"],
-            "value": breaker_txt,
-            "unit": None,
-            "help": CATALOGO["prot.breaker_ac"]["help"],
-        },
-        {
-            "key": "prot.fusible_string",
-            "label": CATALOGO["prot.fusible_string"]["label"],
-            "value": fusible_txt,
-            "unit": None,
-            "help": CATALOGO["prot.fusible_string"]["help"],
-        },
-        {
-            "key": "prot.fusible_nota",
-            "label": "Nota/criterio",
-            "value": nota,
-            "unit": None,
-            "help": "Observación del criterio usado para el fusible.",
-        },
-    ]
-
-    return items
-
-
-# ----------------------------
-# PROTECCIONES (tabla simple PDF)
-# ----------------------------
-
-def filas_protecciones(norm: Dict[str, Any]) -> List[List[str]]:
-
-    p = norm.get("protecciones") or {}
-    spd = norm.get("spd") or {}
-    sec = norm.get("seccionamiento") or {}
-
-    br = p.get("breaker_ac") or {}
-    fs = p.get("fusible_string") or {}
-
-    rows: List[List[str]] = []
-
-    rows.append(["— Protecciones DC —", ""])
-
-    rows.append([
-        "Fusible por string",
-        "Requerido" if bool(fs.get("requerido")) else "No requerido"
-    ])
-
-    if fs.get("nota"):
-        rows.append([
-            "Nota fusible",
-            str(fs.get("nota"))
-        ])
-
-    if spd.get("dc"):
-        rows.append([
-            "SPD DC",
-            str(spd.get("dc"))
-        ])
-
-    if sec.get("dc"):
-        rows.append([
-            "Seccionamiento DC",
-            str(sec.get("dc"))
-        ])
-
-    rows.append(["— Protecciones AC —", ""])
-
-    breaker_txt = "—"
-    if br:
-        breaker_txt = f"{br.get('tamano_a','—')} A (I diseño { _fmt_num(br.get('i_diseno_a')) } A)"
-
-    rows.append([
-        "Breaker AC",
-        breaker_txt
-    ])
-
-    if spd.get("ac"):
-        rows.append([
-            "SPD AC",
-            str(spd.get("ac"))
-        ])
-
-    if sec.get("ac"):
-        rows.append([
-            "Seccionamiento AC",
-            str(sec.get("ac"))
-        ])
-
-    return rows
-
-
-def filas_conductores(norm: Dict[str, Any]) -> List[List[str]]:
-    # mantiene tu tabla ancha
-    rows: List[List[str]] = []
-    for it in items_conductores(norm):
-        v = it["value"] or {}
-        rows.append([
-            v.get("circuito", "—"),
-            str(v.get("awg", "—")),
-            _fmt_val(v.get("i_a"), "A", nd=2),
-            _fmt_val(v.get("l_m"), "m", nd=0),
-            _fmt_val(v.get("vd_pct"), "%", nd=2),
-            _fmt_val(v.get("vd_obj_pct"), "%", nd=2),
-            str(v.get("material", "—")),
-            "OK" if bool(v.get("ok", True)) else "REVISAR",
-        ])
-    return rows
+    return str(pdf_path)
