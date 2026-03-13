@@ -23,74 +23,6 @@ paquete eléctrico consolidado.
 
 Este módulo NO implementa modelos físicos complejos.
 Solo coordina módulos eléctricos especializados.
-
-
-ENTRADA
--------
-entrada : Mapping[str, Any]
-
-Estructura esperada:
-
-entrada = {
-
-    "strings": {
-        "corrientes_input": dict
-    },
-
-    "inversor": {
-        "kw_ac": float,
-        "v_ac_nom_v": float,
-        "fases": int,
-        "fp": float
-    },
-
-    "n_strings": int,
-
-    "isc_mod_a": float | None,
-
-    "vdc_nom": float | None,
-
-    "vac_ll": float | None,
-
-    "dist_dc_m": float | None,
-    "dist_ac_m": float | None,
-
-    "vdrop_obj_dc_pct": float | None,
-    "vdrop_obj_ac_pct": float | None
-}
-
-
-SALIDA
-------
-Dict[str, Any]
-
-resultado = {
-
-    "ok": bool,
-
-    "corrientes": {...},
-
-    "protecciones": {...},
-
-    "conductores": {...},
-
-    "canalizacion": {...},
-
-    "warnings": list[str],
-
-    "resumen_pdf": {
-
-        "i_dc_nom": float | None,
-
-        "i_ac_nom": float | None,
-
-        "breaker_ac": int | None,
-
-        "conductor_dc": str | None,
-
-        "conductor_ac": str | None
-    }
-}
 """
 
 from typing import Mapping, Dict, Any
@@ -115,6 +47,16 @@ def _validar_entrada(entrada: Mapping[str, Any]):
 
     if "strings" not in entrada:
         errores.append("Faltan datos de strings.")
+
+    else:
+
+        strings = entrada["strings"]
+
+        if not isinstance(strings, dict):
+            errores.append("strings debe ser un dict.")
+
+        elif "corrientes_input" not in strings:
+            errores.append("strings.corrientes_input no definido.")
 
     if "inversor" not in entrada:
         errores.append("Faltan datos del inversor.")
@@ -147,7 +89,7 @@ def _resolver_corrientes(entrada):
 # PROTECCIONES
 # ==========================================================
 
-def _resolver_protecciones(entrada, corrientes):
+def _resolver_protecciones(entrada, corrientes, warnings):
 
     try:
 
@@ -159,8 +101,9 @@ def _resolver_protecciones(entrada, corrientes):
             isc_mod_a=entrada.get("isc_mod_a", 0)
         )
 
-    except Exception:
+    except Exception as e:
 
+        warnings.append(f"Error en protecciones: {str(e)}")
         return None
 
 
@@ -168,7 +111,7 @@ def _resolver_protecciones(entrada, corrientes):
 # CONDUCTORES
 # ==========================================================
 
-def _resolver_conductores(entrada, corrientes):
+def _resolver_conductores(entrada, corrientes, warnings):
 
     circuitos = []
 
@@ -202,8 +145,9 @@ def _resolver_conductores(entrada, corrientes):
                 )
             )
 
-    except Exception:
-        pass
+    except Exception as e:
+
+        warnings.append(f"Error en cálculo de conductores: {str(e)}")
 
     return {"circuitos": circuitos}
 
@@ -212,7 +156,7 @@ def _resolver_conductores(entrada, corrientes):
 # CANALIZACIÓN
 # ==========================================================
 
-def _resolver_canalizacion(entrada, corrientes, protecciones, conductores):
+def _resolver_canalizacion(entrada, corrientes, protecciones, conductores, warnings):
 
     if not callable(canalizacion_fv):
         return None
@@ -226,8 +170,9 @@ def _resolver_canalizacion(entrada, corrientes, protecciones, conductores):
             conductores=conductores,
         )
 
-    except Exception:
+    except Exception as e:
 
+        warnings.append(f"Error en canalización: {str(e)}")
         return None
 
 
@@ -290,7 +235,8 @@ def ejecutar_ingenieria_electrica(
 
     protecciones = _resolver_protecciones(
         entrada,
-        corrientes
+        corrientes,
+        warnings
     )
 
     # ------------------------------------------------------
@@ -299,7 +245,8 @@ def ejecutar_ingenieria_electrica(
 
     conductores = _resolver_conductores(
         entrada,
-        corrientes
+        corrientes,
+        warnings
     )
 
     # ------------------------------------------------------
@@ -310,7 +257,8 @@ def ejecutar_ingenieria_electrica(
         entrada,
         corrientes,
         protecciones,
-        conductores
+        conductores,
+        warnings
     )
 
     # ------------------------------------------------------
