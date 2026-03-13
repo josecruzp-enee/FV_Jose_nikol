@@ -192,8 +192,9 @@ def build_page_5(resultado, datos, paths, pal, styles, content_w):
 
     story = []
 
-    strings_block = resultado.get("strings", {})
-    strings = strings_block.get("strings", [])
+    strings_block = getattr(resultado, "strings", None)
+    strings = getattr(strings_block, "strings", []) if strings_block else []
+
 
     # ======================================================
     # RESUMEN TÉCNICO
