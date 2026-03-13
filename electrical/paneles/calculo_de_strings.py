@@ -101,39 +101,8 @@ def _seleccionar_n_series(
     return best_ns
 
 
-
 # ==========================================================
-# DISTRIBUCION EN MPPT DEL SISTEMA
-# ==========================================================
-
-def _split_por_mppt(
-    n_strings_total: int,
-    mppt_totales: int
-):
-
-    base = n_strings_total // mppt_totales
-    resto = n_strings_total % mppt_totales
-
-    ramas = []
-
-    for i in range(mppt_totales):
-
-        n = base + (1 if i < resto else 0)
-
-        if n > 0:
-
-            ramas.append(
-                {
-                    "mppt_global": i + 1,
-                    "n_strings": n
-                }
-            )
-
-    return ramas
-
-
-# ==========================================================
-# DISTRIBUCION POR INVERSOR (MEJORA DEL MOTOR)
+# DISTRIBUCION ROUND ROBIN (INVERSOR / MPPT)
 # ==========================================================
 
 def distribuir_strings_por_inversor(
@@ -148,61 +117,8 @@ def distribuir_strings_por_inversor(
         for inv in range(1, n_inversores + 1):
             posiciones.append((inv, mppt))
 
-    distribucion = []
+    return posiciones[:n_strings_total]
 
-    for i in range(n_strings_total):
-        distribucion.append(posiciones[i])
-
-    return distribucion
-# ==========================================================
-# GENERACION DE STRINGS
-# ==========================================================
-
-def _generar_strings(
-    ramas,
-    n_series,
-    panel: PanelSpec,
-    voc_frio_panel,
-    vmp_hot_panel,
-    inversor: InversorSpec
-):
-
-    strings = []
-
-    vmp_string = float(n_series * vmp_hot_panel)
-    voc_frio_string = float(n_series * voc_frio_panel)
-
-    imp_string = float(panel.imp_a)
-    isc_string = float(panel.isc_a)
-
-    string_id = 1
-
-    for r in ramas:
-
-        inversor_id = int(r["inversor"])
-        mppt_local = int(r["mppt"])
-        n_strings = int(r["n_strings"])
-
-        for _ in range(n_strings):
-
-            strings.append(
-                {
-                    "id": string_id,
-                    "inversor": inversor_id,
-                    "mppt": mppt_local,
-                    "n_series": n_series,
-
-                    "vmp_string_v": vmp_string,
-                    "voc_frio_string_v": voc_frio_string,
-
-                    "imp_string_a": imp_string,
-                    "isc_string_a": isc_string,
-                }
-            )
-
-            string_id += 1
-
-    return strings
 
 # ==========================================================
 # ERROR
@@ -295,10 +211,10 @@ def calcular_strings_fv(
         )
 
     # ----------------------------------------------------------
-    # DISTRIBUCIÓN DE STRINGS EN INVERSORES Y MPPT
+    # DISTRIBUCION DE STRINGS
     # ----------------------------------------------------------
 
-    ramas = distribuir_strings_por_inversor(
+    distribucion = distribuir_strings_por_inversor(
         n_strings_total,
         n_inversores,
         inversor.n_mppt
@@ -308,21 +224,32 @@ def calcular_strings_fv(
     # GENERAR STRINGS
     # ----------------------------------------------------------
 
-    strings = _generar_strings(
-        ramas,
-        n_series,
-        panel,
-        voc_frio_panel,
-        vmp_hot_panel,
-        inversor
-    )
+    strings = []
+
+    vmp_string = float(n_series * vmp_hot_panel)
+    voc_frio_string = float(n_series * voc_frio_panel)
+
+    imp_string = float(panel.imp_a)
+    isc_string = float(panel.isc_a)
+
+    for i, (inv, mppt) in enumerate(distribucion, start=1):
+
+        strings.append(
+            {
+                "id": i,
+                "inversor": inv,
+                "mppt": mppt,
+                "n_series": n_series,
+                "vmp_string_v": vmp_string,
+                "voc_frio_string_v": voc_frio_string,
+                "imp_string_a": imp_string,
+                "isc_string_a": isc_string,
+            }
+        )
 
     # ----------------------------------------------------------
     # RESULTADO
     # ----------------------------------------------------------
-
-    vmp_string = float(vmp_hot_panel * n_series)
-    voc_string = float(voc_frio_panel * n_series)
 
     return {
 
@@ -340,7 +267,7 @@ def calcular_strings_fv(
             "n_strings_total": n_strings_total,
 
             "vmp_string_v": vmp_string,
-            "voc_string_v": voc_string,
+            "voc_string_v": voc_frio_string,
         },
 
         "bounds": {
