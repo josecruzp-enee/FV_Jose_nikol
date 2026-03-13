@@ -212,7 +212,8 @@ def _mostrar_nec(nec):
             _fmt(ac.get("i_diseno_a"), "A")
         )
 
-        breaker = protecciones.get("breaker_ac", {})
+        breaker = getattr(protecciones, "breaker_ac", None)
+
 
         if breaker:
 
