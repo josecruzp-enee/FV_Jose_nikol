@@ -24,47 +24,33 @@ def _section_resumen(story, resultado, pal, styles, content_w):
 
 def _section_distribucion_strings(story, strings, pal, styles, content_w):
 
-    story.append(
-        Paragraph("Distribución de strings por inversor", styles["Heading2"])
-    )
+    story.append(Paragraph("Distribución de strings por inversor", styles["Heading2"]))
     story.append(Spacer(1, 6))
 
     if strings:
-        story.append(
-            crear_tabla_distribucion_inversores(strings, pal, content_w)
-        )
+        story.append(crear_tabla_distribucion_inversores(strings, pal, content_w))
     else:
-        story.append(
-            Paragraph("No hay distribución de strings.", styles["BodyText"])
-        )
+        story.append(Paragraph("No hay distribución de strings.", styles["BodyText"]))
 
     story.append(Spacer(1, 12))
 
 
 def _section_config_strings(story, strings, pal, styles, content_w):
 
-    story.append(
-        Paragraph("Configuración eléctrica (Strings DC)", styles["Heading2"])
-    )
+    story.append(Paragraph("Configuración eléctrica (Strings DC)", styles["Heading2"]))
     story.append(Spacer(1, 6))
 
     if strings:
-        story.append(
-            crear_tabla_strings(strings, pal, content_w)
-        )
+        story.append(crear_tabla_strings(strings, pal, content_w))
     else:
-        story.append(
-            Paragraph("No hay configuración de strings.", styles["BodyText"])
-        )
+        story.append(Paragraph("No hay configuración de strings.", styles["BodyText"]))
 
     story.append(Spacer(1, 12))
 
 
 def _section_parametros_electricos(story, resultado, pal, styles, content_w):
 
-    story.append(
-        Paragraph("Parámetros eléctricos del sistema", styles["Heading2"])
-    )
+    story.append(Paragraph("Parámetros eléctricos del sistema", styles["Heading2"]))
     story.append(Spacer(1, 6))
 
     tabla = crear_tabla_parametros_electricos(resultado, pal, content_w)
@@ -72,18 +58,14 @@ def _section_parametros_electricos(story, resultado, pal, styles, content_w):
     if tabla:
         story.append(tabla)
     else:
-        story.append(
-            Paragraph("No hay datos eléctricos disponibles.", styles["BodyText"])
-        )
+        story.append(Paragraph("No hay datos eléctricos disponibles.", styles["BodyText"]))
 
     story.append(Spacer(1, 12))
 
 
 def _section_nec(story, resultado, pal, styles, content_w):
 
-    story.append(
-        Paragraph("Dimensionamiento eléctrico (NEC)", styles["Heading2"])
-    )
+    story.append(Paragraph("Dimensionamiento eléctrico (NEC)", styles["Heading2"]))
     story.append(Spacer(1, 6))
 
     tabla = crear_tabla_dimensionamiento_nec(resultado, pal, content_w)
@@ -91,18 +73,14 @@ def _section_nec(story, resultado, pal, styles, content_w):
     if tabla:
         story.append(tabla)
     else:
-        story.append(
-            Paragraph("No hay dimensionamiento NEC disponible.", styles["BodyText"])
-        )
+        story.append(Paragraph("No hay dimensionamiento NEC disponible.", styles["BodyText"]))
 
     story.append(Spacer(1, 12))
 
 
 def _section_indicadores(story, resultado, pal, styles, content_w):
 
-    story.append(
-        Paragraph("Indicadores técnicos del sistema", styles["Heading2"])
-    )
+    story.append(Paragraph("Indicadores técnicos del sistema", styles["Heading2"]))
     story.append(Spacer(1, 6))
 
     tabla = crear_tabla_indicadores(resultado, pal, content_w)
@@ -110,9 +88,28 @@ def _section_indicadores(story, resultado, pal, styles, content_w):
     if tabla:
         story.append(tabla)
     else:
-        story.append(
-            Paragraph("No hay indicadores disponibles.", styles["BodyText"])
-        )
+        story.append(Paragraph("No hay indicadores disponibles.", styles["BodyText"]))
+
+    story.append(Spacer(1, 12))
+
+
+# ======================================================
+# UTILIDAD PARA INSERTAR GRÁFICOS
+# ======================================================
+
+def _insert_chart(story, path, styles, content_w, error_msg):
+
+    if path and Path(path).exists():
+
+        img = Image(path)
+        img.drawWidth = content_w
+        img.drawHeight = content_w * 0.45
+
+        story.append(img)
+
+    else:
+
+        story.append(Paragraph(error_msg, styles["BodyText"]))
 
     story.append(Spacer(1, 12))
 
@@ -123,9 +120,7 @@ def _section_indicadores(story, resultado, pal, styles, content_w):
 
 def _section_potencia_horaria(story, paths, styles, content_w):
 
-    story.append(
-        Paragraph("Perfil horario de potencia fotovoltaica", styles["Heading2"])
-    )
+    story.append(Paragraph("Perfil horario de potencia fotovoltaica", styles["Heading2"]))
     story.append(Spacer(1, 6))
 
     chart = None
@@ -133,63 +128,37 @@ def _section_potencia_horaria(story, paths, styles, content_w):
     if isinstance(paths, dict):
         chart = paths.get("chart_potencia_horaria") or paths.get("chart_horaria")
 
-    if chart and Path(chart).exists():
-
-        img = Image(chart)
-        img.drawWidth = content_w
-        img.drawHeight = content_w * 0.45
-
-        story.append(img)
-
-    else:
-
-        story.append(
-            Paragraph(
-                "No se pudo generar la gráfica de potencia horaria.",
-                styles["BodyText"],
-            )
-        )
-
-    story.append(Spacer(1, 12))
+    _insert_chart(
+        story,
+        chart,
+        styles,
+        content_w,
+        "No se pudo generar la gráfica de potencia horaria."
+    )
 
 
 def _section_energia_horaria(story, paths, styles, content_w):
 
-    story.append(
-        Paragraph("Energía generada por hora", styles["Heading2"])
-    )
+    story.append(Paragraph("Energía generada por hora", styles["Heading2"]))
     story.append(Spacer(1, 6))
 
     chart = None
 
     if isinstance(paths, dict):
-        chart = paths.get("chart_energia_horaria")
+        chart = paths.get("chart_energia_horaria") or paths.get("chart_diaria")
 
-    if chart and Path(chart).exists():
-
-        img = Image(chart)
-        img.drawWidth = content_w
-        img.drawHeight = content_w * 0.45
-
-        story.append(img)
-
-    else:
-
-        story.append(
-            Paragraph(
-                "No se pudo generar la gráfica de energía horaria.",
-                styles["BodyText"],
-            )
-        )
-
-    story.append(Spacer(1, 12))
+    _insert_chart(
+        story,
+        chart,
+        styles,
+        content_w,
+        "No se pudo generar la gráfica de energía horaria."
+    )
 
 
 def _section_energia_mensual(story, paths, styles, content_w):
 
-    story.append(
-        Paragraph("Generación fotovoltaica mensual", styles["Heading2"])
-    )
+    story.append(Paragraph("Generación fotovoltaica mensual", styles["Heading2"]))
     story.append(Spacer(1, 6))
 
     chart = None
@@ -197,24 +166,13 @@ def _section_energia_mensual(story, paths, styles, content_w):
     if isinstance(paths, dict):
         chart = paths.get("chart_energia_mensual") or paths.get("chart_mensual")
 
-    if chart and Path(chart).exists():
-
-        img = Image(chart)
-        img.drawWidth = content_w
-        img.drawHeight = content_w * 0.45
-
-        story.append(img)
-
-    else:
-
-        story.append(
-            Paragraph(
-                "No se pudo generar la gráfica de generación mensual.",
-                styles["BodyText"],
-            )
-        )
-
-    story.append(Spacer(1, 12))
+    _insert_chart(
+        story,
+        chart,
+        styles,
+        content_w,
+        "No se pudo generar la gráfica de generación mensual."
+    )
 
 
 # ======================================================
