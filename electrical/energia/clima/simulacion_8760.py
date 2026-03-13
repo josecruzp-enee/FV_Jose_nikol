@@ -71,6 +71,16 @@ class ResultadoSimulacion8760:
 
 
 # ==========================================================
+# HORAS POR MES
+# ==========================================================
+
+HORAS_MES = [
+    744, 672, 744, 720, 744, 720,
+    744, 744, 720, 744, 720, 744
+]
+
+
+# ==========================================================
 # SIMULADOR
 # ==========================================================
 
@@ -92,13 +102,24 @@ def simular_8760(
 
 ) -> ResultadoSimulacion8760:
 
-    energia_horaria = []
+    energia_horaria: List[float] = []
 
     energia_mensual = [0.0] * 12
 
     energia_anual = 0.0
 
+    poa_total_kwh_m2 = 0.0
+
     potencia_dc_stc_kw = (panel.pmax_w * n_paneles) / 1000
+
+
+    # ------------------------------------------------------
+    # CONTROL DE MESES
+    # ------------------------------------------------------
+
+    mes_actual = 0
+    horas_mes = HORAS_MES[0]
+    contador_mes = 0
 
 
     for h, hora_clima in enumerate(clima):
@@ -108,9 +129,13 @@ def simular_8760(
         # --------------------------------------------------
 
         pos = calcular_posicion_solar(
+
             hora_anual=h,
+
             lat=lat,
+
             lon=lon
+
         )
 
         # --------------------------------------------------
@@ -118,21 +143,34 @@ def simular_8760(
         # --------------------------------------------------
 
         poa = calcular_irradiancia_plano(
+
             ghi=hora_clima.ghi_wm2,
+
             zenith=pos.zenith,
+
             azimuth_solar=pos.azimuth,
+
             tilt=tilt,
+
             azimuth_superficie=azimuth
+
         )
+
+        poa_total_kwh_m2 += poa / 1000
+
 
         # --------------------------------------------------
         # TEMPERATURA DE CELDA
         # --------------------------------------------------
 
         t_cell = calcular_temperatura_celda(
+
             irradiancia_wm2=poa,
+
             temperatura_amb_c=hora_clima.temp_amb_c
+
         )
+
 
         # --------------------------------------------------
         # POTENCIA REAL DEL PANEL
@@ -141,17 +179,27 @@ def simular_8760(
         panel_real = calcular_potencia_panel(
 
             PotenciaPanelInput(
+
                 irradiancia_poa_wm2=poa,
+
                 temperatura_celda_c=t_cell,
+
                 pmax_stc_w=panel.pmax_w,
+
                 vmp_stc_v=panel.vmp_v,
+
                 voc_stc_v=panel.voc_v,
+
                 coef_pmax_pct_per_c=panel.gamma_p,
+
                 coef_voc_pct_per_c=panel.beta_voc,
+
                 coef_vmp_pct_per_c=panel.beta_vmp
+
             )
 
         )
+
 
         # --------------------------------------------------
         # POTENCIA DC DEL ARRAY
@@ -159,11 +207,15 @@ def simular_8760(
 
         p_dc = panel_real.pmp_w * n_paneles
 
+        p_dc = max(p_dc, 0)
+
+
         # --------------------------------------------------
         # CONVERSIÓN A AC
         # --------------------------------------------------
 
         p_ac = p_dc * eficiencia_inversor
+
 
         # --------------------------------------------------
         # ENERGÍA HORARIA
@@ -175,16 +227,25 @@ def simular_8760(
 
         energia_anual += energia_kwh
 
+
         # --------------------------------------------------
         # ENERGÍA MENSUAL
         # --------------------------------------------------
 
-        mes = int(h / 730)
+        energia_mensual[mes_actual] += energia_kwh
 
-        if mes > 11:
-            mes = 11
+        contador_mes += 1
 
-        energia_mensual[mes] += energia_kwh
+        if contador_mes >= horas_mes:
+
+            mes_actual += 1
+
+            if mes_actual > 11:
+                mes_actual = 11
+
+            contador_mes = 0
+
+            horas_mes = HORAS_MES[mes_actual]
 
 
     # ------------------------------------------------------
@@ -198,9 +259,13 @@ def simular_8760(
     # PERFORMANCE RATIO
     # ------------------------------------------------------
 
-    irradiacion_total = sum(h.ghi_wm2 for h in clima) / 1000
+    if poa_total_kwh_m2 > 0:
 
-    pr = energia_anual / (potencia_dc_stc_kw * irradiacion_total)
+        pr = energia_anual / (potencia_dc_stc_kw * poa_total_kwh_m2)
+
+    else:
+
+        pr = 0
 
 
     return ResultadoSimulacion8760(
