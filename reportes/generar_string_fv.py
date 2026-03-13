@@ -11,89 +11,132 @@ def generar_string_fv(
     n_series: int,
     out_path,
     *,
-    n_strings: int = 1,
-    panel_w: float = 0.6,
-    panel_h: float = 1.2,
-    gap: float = 0.25,
+    n_strings: int = 1
 ):
+
+    panel_w = 0.5
+    panel_h = 1.0
+    gap = 0.2
+    v_gap = 1.8
 
     width = n_series * (panel_w + gap)
 
-    fig = plt.figure(figsize=(10, 3 if n_strings == 1 else 4), dpi=170)
+    fig = plt.figure(figsize=(12, 3 + n_strings))
     ax = fig.add_subplot(111)
 
-    ax.set_title("Configuración del String Fotovoltaico")
+    # ============================
+    # Dibujar strings
+    # ============================
 
-    ax.set_xlim(-0.5, width + 1)
-    ax.set_ylim(-0.5, 3)
+    for s in range(n_strings):
 
-    def draw_string(y):
+        y_offset = -s * v_gap
 
         for i in range(n_series):
 
             x = i * (panel_w + gap)
 
-            ax.add_patch(
-                Rectangle(
-                    (x, y),
-                    panel_w,
-                    panel_h,
-                    linewidth=0.8,
-                    edgecolor="#0B2E4A",
-                    facecolor="#1F2A37",
-                )
+            rect = Rectangle(
+                (x, y_offset),
+                panel_w,
+                panel_h,
+                edgecolor="#0B2E4A",
+                facecolor="#1F2A37",
+                linewidth=1
             )
 
-            ax.text(x + panel_w * 0.25, y - 0.12, "+", color="red", fontsize=8, ha="center")
-            ax.text(x + panel_w * 0.75, y - 0.12, "-", color="black", fontsize=8, ha="center")
+            ax.add_patch(rect)
 
+            # conexión serie
             if i < n_series - 1:
-                x2 = x + panel_w
-                x3 = (i + 1) * (panel_w + gap)
+
+                x1 = x + panel_w
+                x2 = x + panel_w + gap
 
                 ax.plot(
-                    [x2, x3],
-                    [y + panel_h / 2, y + panel_h / 2],
+                    [x1, x2],
+                    [y_offset + panel_h / 2, y_offset + panel_h / 2],
                     color="black",
-                    linewidth=1.2
+                    linewidth=1
                 )
 
-    # ===== 1 string =====
-    if n_strings == 1:
-
-        draw_string(0.8)
-
-        ax.text(
-            width / 2,
-            2.2,
-            f"String FV representativo\n{n_series} módulos conectados en serie",
-            ha="center",
-            fontsize=10
+        # línea hacia bus
+        ax.plot(
+            [width, width + 1],
+            [y_offset + panel_h / 2, y_offset + panel_h / 2],
+            color="red",
+            linewidth=2
         )
 
-    # ===== paralelo =====
-    else:
+    # ============================
+    # Bus DC
+    # ============================
 
-        y1 = 1.6
-        y2 = 0.4
+    bus_x = width + 1
 
-        draw_string(y1)
-        draw_string(y2)
+    ax.plot(
+        [bus_x, bus_x],
+        [panel_h / 2, -(n_strings - 1) * v_gap + panel_h / 2],
+        color="red",
+        linewidth=3
+    )
 
-        x_bus = width + 0.15
+    # ============================
+    # Inversor
+    # ============================
 
-        ax.plot([x_bus, x_bus], [y2 + panel_h / 2, y1 + panel_h / 2], linewidth=2)
+    inv_x = bus_x + 1.5
+    inv_y = -(n_strings - 1) * v_gap / 2
 
-        ax.text(
-            width / 2,
-            2.6,
-            f"{n_series} módulos por string · {n_strings} strings en paralelo",
-            ha="center",
-            fontsize=10
-        )
+    rect = Rectangle(
+        (inv_x, inv_y),
+        1.2,
+        1.2,
+        edgecolor="black",
+        facecolor="#eeeeee"
+    )
+
+    ax.add_patch(rect)
+
+    ax.text(
+        inv_x + 0.6,
+        inv_y + 0.6,
+        "INV",
+        ha="center",
+        va="center",
+        fontsize=10
+    )
+
+    # conexión bus → inversor
+
+    ax.plot(
+        [bus_x, inv_x],
+        [inv_y + 0.6, inv_y + 0.6],
+        color="red",
+        linewidth=2
+    )
+
+    # ============================
+    # Texto
+    # ============================
+
+    ax.set_title(
+        f"Configuración del String Fotovoltaico\n"
+        f"{n_series} módulos por string • {n_strings} strings en paralelo",
+        fontsize=12
+    )
+
+    # ============================
+    # Ajustes
+    # ============================
 
     ax.axis("off")
 
-    fig.tight_layout()
-    fig.savefig(out_path, dpi=200, bbox_inches="tight")
-    plt.close(fig)
+    ax.set_xlim(-0.5, inv_x + 2)
+    ax.set_ylim(-(n_strings) * v_gap, 2)
+
+    plt.tight_layout()
+
+    plt.savefig(out_path, dpi=200, bbox_inches="tight")
+
+    plt.close()
