@@ -98,15 +98,14 @@ def _resolver_corrientes(entrada):
     strings = entrada["strings"]
     inversor = entrada["inversor"]
 
-    st.write("DEBUG STRINGS QUE LLEGAN A INGENIERIA")
-    st.json(strings)
+    corr_input = strings.get("corrientes_input", {})
+
+    # agregar n_strings_total
+    corr_input["n_strings_total"] = entrada["n_strings"]
 
     return calcular_corrientes(
-        strings=strings.get("corrientes_input"),
-        inv=inversor,
-        cfg_tecnicos={
-            "n_strings_total": entrada["n_strings"]
-        }
+        strings=corr_input,
+        inv=inversor
     )
 # ==========================================================
 # PROTECCIONES
