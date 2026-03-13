@@ -54,25 +54,26 @@ def _get_sf(ctx) -> Dict[str, Any]:
 # DIRECCIÓN CARDINAL
 # ==========================================================
 
-def _direccion_cardinal(az: float) -> str:
+def _direccion_cardinal(az):
 
-    dirs = [
-        (22.5,"N"),
-        (67.5,"NE"),
-        (112.5,"E"),
-        (157.5,"SE"),
-        (202.5,"S"),
-        (247.5,"SO"),
-        (292.5,"O"),
-        (337.5,"NO"),
-        (360,"N")
-    ]
+    az = az % 360
 
-    for lim, d in dirs:
-        if az <= lim:
-            return d
-
-    return "N"
+    if az < 22.5 or az >= 337.5:
+        return "N"
+    elif az < 67.5:
+        return "NE"
+    elif az < 112.5:
+        return "E"
+    elif az < 157.5:
+        return "SE"
+    elif az < 202.5:
+        return "S"
+    elif az < 247.5:
+        return "SO"
+    elif az < 292.5:
+        return "O"
+    else:
+        return "NO"
 
 
 # ==========================================================
