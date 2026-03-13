@@ -239,4 +239,30 @@ def generar_charts(
     _chart_anual(energia_anual, p5)
     paths["chart_anual"] = str(p5)
 
+    from reportes.generar_string_fv import generar_string_fv
+
+    # chart anual
+    _chart_anual(energia_anual, p5)
+    paths["chart_anual"] = str(p5)
+
+
+    # ======================================================
+    # DIAGRAMA STRING FV
+    # ======================================================
+
+    if resultado.strings:
+
+        p6 = out_dir / "string_fv.png"
+
+        generar_string_fv(
+            resultado.strings[0].n_series,
+            p6
+        )
+
+        paths["string_fv"] = str(p6)
+
+
     return paths
+
+
+    
