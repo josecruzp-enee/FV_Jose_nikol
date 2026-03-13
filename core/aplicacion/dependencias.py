@@ -7,7 +7,7 @@ from electrical.paneles.orquestador_paneles import ejecutar_paneles
 from electrical.energia.orquestador_energia import ejecutar_motor_energia
 from electrical.nec.orquestador_nec import ejecutar_nec
 from core.servicios.finanzas import ejecutar_finanzas
-
+from electrical.energia.contrato import EnergiaInput
 from electrical.paneles.entrada_panel import EntradaPaneles
 from electrical.catalogos import get_panel, get_inversor
 
@@ -141,14 +141,19 @@ class EnergiaAdapter:
 
     def ejecutar(self, datos, sizing, strings):
 
-        entrada = {
-            "datos": datos,
-            "sizing": sizing,
-            "strings": strings
-        }
+        entrada = EnergiaInput(
+
+            datos=datos,
+
+            pdc_instalada_kw=sizing.pdc_kw,
+
+            strings=strings,
+
+            n_inversores=sizing.n_inversores,
+
+        )
 
         return ejecutar_motor_energia(entrada)
-
 
 # ==========================================================
 # ADAPTER NEC
