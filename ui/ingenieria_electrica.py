@@ -202,11 +202,11 @@ def _mostrar_nec(nec):
         return
 
     # ------------------------------------------------------
-    # Lectura del contrato actual del dominio eléctrico
+    # Lectura segura del contrato eléctrico
     # ------------------------------------------------------
 
     corrientes = nec.get("corrientes", {})
-    protecciones = nec.get("protecciones", {})
+    protecciones = nec.get("protecciones")
     conductores = nec.get("conductores", {}).get("circuitos", [])
 
     dc = corrientes.get("dc_total", {})
@@ -246,13 +246,17 @@ def _mostrar_nec(nec):
             _fmt(ac.get("i_diseno_a"), "A")
         )
 
-        breaker = protecciones.get("breaker_ac", {})
+        breaker = None
+
+        # protecciones es dataclass
+        if protecciones and hasattr(protecciones, "breaker_ac"):
+            breaker = protecciones.breaker_ac
 
         if breaker:
 
             st.metric(
                 "Breaker AC",
-                _fmt(breaker.get("tamano_a"), "A")
+                _fmt(breaker.tamano_a, "A")
             )
 
     # ======================================================
