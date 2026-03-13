@@ -47,7 +47,7 @@ class EntradaPaneles:
     # ----------------------------------------------
 
     n_paneles_total: int
-    n_inversores=sizing["n_inversores"],
+    
     # ----------------------------------------------
     # Condiciones térmicas
     # ----------------------------------------------
