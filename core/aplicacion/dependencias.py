@@ -44,12 +44,6 @@ class SizingAdapter:
         return calcular_sizing_unificado(datos)
 
 
-class PanelesAdapter:
-    def ejecutar(self, datos, sizing):
-        # Si tu orquestador de paneles espera otra firma, ajústalo aquí
-        return ejecutar_paneles(datos, sizing)
-
-
 class EnergiaAdapter:
     def ejecutar(self, datos, sizing, strings):
         return ejecutar_motor_energia(datos, sizing, strings)
