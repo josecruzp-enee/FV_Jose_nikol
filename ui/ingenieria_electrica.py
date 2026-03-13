@@ -1,5 +1,6 @@
 from __future__ import annotations
-
+import pandas as pd
+import streamlit as st
 """
 PASO 5 — INGENIERÍA ELÉCTRICA
 FV Engine
