@@ -144,7 +144,7 @@ class PanelesAdapter(PuertoPaneles):
         Ejecuta el cálculo de strings y configuración
         del generador FV.
         """
-        return ejecutar_paneles_desde_sizing(datos, sizing)
+        return ejecutar_paneles(datos)
 
 
 # ==========================================================
