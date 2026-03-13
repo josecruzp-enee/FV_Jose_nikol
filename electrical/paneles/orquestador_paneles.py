@@ -3,7 +3,8 @@ from __future__ import annotations
 """
 ORQUESTADOR DEL DOMINIO PANELES
 
-## FRONTERA DEL DOMINIO
+FRONTERA DEL DOMINIO
+--------------------
 
 Este módulo coordina el cálculo del generador fotovoltaico.
 
@@ -27,196 +28,219 @@ from typing import Dict, List
 
 from electrical.modelos.paneles import PanelSpec
 from electrical.modelos.inversor import InversorSpec
+
 from .calculo_de_strings import calcular_strings_fv
 from .dimensionado_paneles import dimensionar_paneles
 from .entrada_panel import EntradaPaneles
+
 from .validacion_strings import (
-validar_panel,
-validar_inversor,
-validar_parametros_generales,
+    validar_panel,
+    validar_inversor,
+    validar_parametros_generales,
 )
 
 # ==========================================================
+# DEBUG STREAMLIT (solo si existe)
+# ==========================================================
 
+try:
+    import streamlit as st
+    DEBUG_UI = True
+except Exception:
+    DEBUG_UI = False
+
+
+# ==========================================================
 # ORQUESTADOR
-
 # ==========================================================
 
 def ejecutar_paneles(
-entrada: EntradaPaneles
+    entrada: EntradaPaneles
 ) -> Dict:
 
+    errores: List[str] = []
+    warnings: List[str] = []
 
-import streamlit as st
+    panel: PanelSpec = entrada.panel
+    inversor: InversorSpec = entrada.inversor
 
-errores: List[str] = []
-warnings: List[str] = []
+    # ------------------------------------------------------
+    # VALIDACIONES
+    # ------------------------------------------------------
 
-panel: PanelSpec = entrada.panel
-inversor: InversorSpec = entrada.inversor
+    e, w = validar_panel(panel)
+    errores += e
+    warnings += w
 
-# ------------------------------------------------------
-# VALIDACIONES
-# ------------------------------------------------------
+    e, w = validar_inversor(inversor)
+    errores += e
+    warnings += w
 
-e, w = validar_panel(panel)
-errores += e
-warnings += w
+    e, w = validar_parametros_generales(
+        entrada.n_paneles_total,
+        entrada.t_min_c,
+        entrada.t_oper_c,
+    )
 
-e, w = validar_inversor(inversor)
-errores += e
-warnings += w
+    errores += e
+    warnings += w
 
-e, w = validar_parametros_generales(
-    entrada.n_paneles_total,
-    entrada.t_min_c,
-    entrada.t_oper_c,
-)
+    if errores:
+        return {
+            "ok": False,
+            "errores": errores,
+            "warnings": warnings,
+        }
 
-errores += e
-warnings += w
+    # ------------------------------------------------------
+    # DIMENSIONADO DE PANELES
+    # ------------------------------------------------------
 
-if errores:
-    return {
-        "ok": False,
-        "errores": errores,
-        "warnings": warnings,
-    }
+    dim = dimensionar_paneles(entrada)
 
-# ------------------------------------------------------
-# DIMENSIONADO DE PANELES
-# ------------------------------------------------------
+    if not dim.ok:
+        return {
+            "ok": False,
+            "errores": dim.errores,
+            "warnings": warnings,
+        }
 
-dim = dimensionar_paneles(entrada)
+    n_paneles_total = dim.n_paneles
 
-if not dim.ok:
-    return {
-        "ok": False,
-        "errores": dim.errores,
-        "warnings": warnings,
-    }
+    if DEBUG_UI:
+        st.write("DEBUG DIMENSIONADO PANELES")
+        st.write({
+            "entrada_paneles": entrada.n_paneles_total,
+            "paneles_dimensionados": dim.n_paneles,
+            "pdc_kw": dim.pdc_kw
+        })
 
-n_paneles_total = dim.n_paneles
+    if n_paneles_total <= 0:
 
-# DEBUG DIMENSIONADO
-st.write("DEBUG DIMENSIONADO PANELES")
-st.write({
-    "entrada_paneles": entrada.n_paneles_total,
-    "paneles_dimensionados": dim.n_paneles,
-    "pdc_kw": dim.pdc_kw
-})
+        return {
+            "ok": False,
+            "errores": ["Número de paneles inválido"],
+            "warnings": warnings,
+        }
 
-# ------------------------------------------------------
-# CÁLCULO DE STRINGS
-# ------------------------------------------------------
+    # ------------------------------------------------------
+    # PARÁMETROS DE CÁLCULO
+    # ------------------------------------------------------
 
-n_inversores = int(entrada.n_inversores or 1)
+    n_inversores = int(entrada.n_inversores or 1)
 
-st.write("DEBUG ANTES DE STRINGS")
-st.write({
-    "n_paneles_total_enviado": n_paneles_total,
-    "n_inversores": n_inversores,
-    "mppt_por_inversor": inversor.n_mppt
-})
+    if DEBUG_UI:
+        st.write("DEBUG DATOS ANTES DE CALCULAR STRINGS")
+        st.write({
+            "n_paneles_total": n_paneles_total,
+            "n_inversores": n_inversores,
+            "mppt_por_inversor": inversor.n_mppt,
+            "voc_panel": panel.voc_v,
+            "vmp_panel": panel.vmp_v
+        })
 
-resultado = calcular_strings_fv(
-    n_paneles_total=n_paneles_total,
-    panel=panel,
-    inversor=inversor,
-    n_inversores=n_inversores,
-    t_min_c=float(entrada.t_min_c),
-    dos_aguas=bool(entrada.dos_aguas),
-    objetivo_dc_ac=entrada.objetivo_dc_ac,
-    pdc_kw_objetivo=entrada.pdc_kw_objetivo,
-    t_oper_c=entrada.t_oper_c,
-)
+    # ------------------------------------------------------
+    # CÁLCULO DE STRINGS
+    # ------------------------------------------------------
 
-# DEBUG RESULTADO
-st.write("DEBUG RESULTADO STRINGS")
-st.write("numero strings:", len(resultado.get("strings", [])))
+    resultado = calcular_strings_fv(
 
-resultado.setdefault("ok", False)
-resultado.setdefault("errores", [])
-resultado.setdefault("warnings", [])
+        n_paneles_total=n_paneles_total,
 
-resultado["warnings"] = warnings + resultado["warnings"]
+        panel=panel,
 
-# ------------------------------------------------------
-# META DEL DIMENSIONADO
-# ------------------------------------------------------
+        inversor=inversor,
 
-resultado.setdefault("meta", {})
+        n_inversores=n_inversores,
 
-resultado["meta"]["n_paneles_total"] = n_paneles_total
-resultado["meta"]["pdc_kw"] = dim.pdc_kw
+        t_min_c=float(entrada.t_min_c),
 
-return resultado
+        dos_aguas=bool(entrada.dos_aguas),
+
+        objetivo_dc_ac=entrada.objetivo_dc_ac,
+
+        pdc_kw_objetivo=entrada.pdc_kw_objetivo,
+
+        t_oper_c=entrada.t_oper_c,
+
+    )
+
+    if DEBUG_UI:
+        st.write("DEBUG RESULTADO STRINGS")
+        st.write("numero strings:", len(resultado.get("strings", [])))
+        st.write(resultado)
+
+    # ------------------------------------------------------
+    # NORMALIZAR RESULTADO
+    # ------------------------------------------------------
+
+    resultado.setdefault("ok", False)
+    resultado.setdefault("errores", [])
+    resultado.setdefault("warnings", [])
+
+    resultado["warnings"] = warnings + resultado["warnings"]
+
+    # ------------------------------------------------------
+    # META DEL DIMENSIONADO
+    # ------------------------------------------------------
+
+    resultado.setdefault("meta", {})
+
+    resultado["meta"]["n_paneles_total"] = n_paneles_total
+    resultado["meta"]["pdc_kw"] = dim.pdc_kw
+    resultado["meta"]["n_inversores"] = n_inversores
+
+    return resultado
 
 
 # ==========================================================
-
 # SALIDAS DEL ARCHIVO
-
 # ==========================================================
 
-#
+"""
+SALIDA DEL DOMINIO PANELES
 
-# ejecutar_paneles(entrada: EntradaPaneles)
+ejecutar_paneles(entrada: EntradaPaneles) -> Dict
 
-#
+Estructura devuelta:
 
-# devuelve:
+{
+    ok : bool
 
-#
+    errores : list[str]
 
-# ok : bool
+    warnings : list[str]
 
-# errores : list[str]
+    strings : list
 
-# warnings : list[str]
+    recomendacion : {
 
-#
+        n_series
+        n_strings_total
+        vmp_string_v
+        voc_string_v
+        imp_array_a
+        isc_array_total_a
 
-# strings : list
+    }
 
-#
+    bounds : {
 
-# recomendacion:
+        n_min
+        n_max
 
-# n_series
+    }
 
-# n_strings_total
+    meta : {
 
-# vmp_string_v
+        n_paneles_total
+        pdc_kw
+        n_inversores
 
-# voc_string_v
+    }
+}
 
-# imp_array_a
+Consumido por:
 
-# isc_array_total_a
-
-#
-
-# bounds:
-
-# n_min
-
-# n_max
-
-#
-
-# meta:
-
-# n_paneles_total
-
-# pdc_kw
-
-#
-
-# Consumido por:
-
-# core
-
-#
-
-# ==========================================================
+core.aplicacion.orquestador_estudio
+"""
