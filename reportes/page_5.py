@@ -219,4 +219,5 @@ def build_page_5(resultado, datos, paths, pal, styles, content_w):
 
     story.append(PageBreak())
 
+    Image(paths["string_fv"], width=420, height=120)
     return story
