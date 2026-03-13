@@ -25,7 +25,7 @@ Datos generados:
 from typing import List
 from math import sin, pi
 
-from .clima_modelo import ClimaHora
+from .resultado_clima import ClimaHora
 
 
 # ==========================================================
