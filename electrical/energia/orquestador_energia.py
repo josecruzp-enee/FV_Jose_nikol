@@ -2,30 +2,6 @@ from __future__ import annotations
 
 """
 ORQUESTADOR DEL DOMINIO ENERGIA — FV Engine
-
-Responsabilidad
----------------
-Coordinar el cálculo energético completo del sistema FV.
-
-FRONTERA DEL DOMINIO
---------------------
-
-Entrada:
-    EnergiaInput
-
-Salida:
-    EnergiaResultado
-
-Flujo interno:
-
-    generacion_bruta
-            ↓
-    perdidas_fisicas
-            ↓
-    limitacion_inversor
-
-Este archivo es la única interfaz pública del dominio energía.
-Core debe interactuar únicamente con este módulo.
 """
 
 from .contrato import EnergiaInput, EnergiaResultado
@@ -54,7 +30,7 @@ def _resultado_error(inp: EnergiaInput, errores: list[str]) -> EnergiaResultado:
         energia_bruta_anual=0.0,
         energia_util_anual=0.0,
         energia_curtailment_anual=0.0,
-        meta={},
+        meta={"estado": "error"},
     )
 
 
@@ -67,16 +43,16 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
     errores: list[str] = []
 
     # ------------------------------------------------------
-    # VALIDACIONES DE ENTRADA
+    # VALIDACIONES
     # ------------------------------------------------------
 
     if inp.pdc_instalada_kw <= 0:
         errores.append("Pdc inválida.")
 
-    if len(inp.hsp_12m) != 12:
+    if inp.hsp_12m and len(inp.hsp_12m) != 12:
         errores.append("HSP debe tener 12 meses.")
 
-    if len(inp.dias_mes) != 12:
+    if inp.dias_mes and len(inp.dias_mes) != 12:
         errores.append("dias_mes debe tener 12 valores.")
 
     if errores:
@@ -99,7 +75,7 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
     energia_bruta = r_bruta.energia_mensual_dc_kwh
 
     # ------------------------------------------------------
-    # 2. APLICAR PÉRDIDAS FÍSICAS
+    # 2. PÉRDIDAS FÍSICAS
     # ------------------------------------------------------
 
     r_perdidas = aplicar_perdidas(
@@ -115,7 +91,7 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
     energia_perdidas = r_perdidas.energia_neta_12m_kwh
 
     # ------------------------------------------------------
-    # 3. CURTAILMENT DEL INVERSOR
+    # 3. LIMITACIÓN DEL INVERSOR
     # ------------------------------------------------------
 
     r_curt = aplicar_curtailment(
@@ -139,14 +115,16 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
     energia_util_anual = sum(energia_util)
     energia_curtailment_anual = sum(energia_recortada)
 
+    pac = inp.pac_nominal_kw or 0
+
     dc_ac_ratio = (
-        inp.pdc_instalada_kw / inp.pac_nominal_kw
-        if inp.pac_nominal_kw > 0
+        inp.pdc_instalada_kw / pac
+        if pac > 0
         else 0.0
     )
 
     # ------------------------------------------------------
-    # RESULTADO FINAL
+    # RESULTADO
     # ------------------------------------------------------
 
     return EnergiaResultado(
@@ -162,28 +140,9 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
         energia_bruta_anual=energia_bruta_anual,
         energia_util_anual=energia_util_anual,
         energia_curtailment_anual=energia_curtailment_anual,
-        meta={},
+        meta={
+            "modelo": "HSP",
+            "meses": 12,
+            "motor": "fv_engine_energy_v1",
+        },
     )
-
-
-# ==========================================================
-# SALIDA DEL ARCHIVO
-# ==========================================================
-#
-# ejecutar_motor_energia()
-#
-# Entrada:
-# EnergiaInput
-#
-# Salida:
-# EnergiaResultado
-#
-# Descripción:
-# Ejecuta el modelo energético completo del sistema FV
-# aplicando generación DC, pérdidas físicas y limitación
-# del inversor.
-#
-# Consumido por:
-# core.orquestador_estudio
-#
-# ==========================================================
