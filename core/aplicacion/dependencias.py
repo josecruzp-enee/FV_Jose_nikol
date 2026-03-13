@@ -137,9 +137,15 @@ class PanelesAdapter:
 # ADAPTER ENERGIA
 # ==========================================================
 
+# ==========================================================
+# ADAPTER ENERGIA
+# ==========================================================
+
 class EnergiaAdapter:
 
     def ejecutar(self, datos, sizing, strings):
+
+        sf = getattr(datos, "sistema_fv", {}) or {}
 
         entrada = EnergiaInput(
 
@@ -147,11 +153,23 @@ class EnergiaAdapter:
             pdc_instalada_kw=sizing.pdc_kw,
             pac_nominal_kw=sizing.kw_ac,
 
-            # Configuración generador
-            n_strings_total=strings.n_strings_total,
-            strings=strings.strings,
-            n_inversores=sizing.n_inversores,
+            # Recurso solar
+            hsp_12m=sf.get("hsp_12m", [5.5]*12),
 
+            # Días por mes
+            dias_mes=[
+                31,28,31,30,31,30,
+                31,31,30,31,30,31
+            ],
+
+            # Factores del sistema
+            factor_orientacion=sf.get("factor_orientacion", 1.0),
+
+            perdidas_dc_pct=sf.get("perdidas_dc_pct", 0.03),
+            perdidas_ac_pct=sf.get("perdidas_ac_pct", 0.02),
+            sombras_pct=sf.get("sombras_pct", 0.0),
+
+            permitir_curtailment=True
         )
 
         return ejecutar_motor_energia(entrada)
