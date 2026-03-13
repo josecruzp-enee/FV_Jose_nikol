@@ -28,11 +28,15 @@ class SizingAdapter:
 # ADAPTER PANELES
 # ==========================================================
 
+from core.dominio.contrato import ResultadoStrings, StringInfo
+
+
 class PanelesAdapter:
 
     def ejecutar(self, datos, sizing):
 
         eq = getattr(datos, "equipos", {}) or {}
+        sf = getattr(datos, "sistema_fv", {}) or {}
 
         panel_id = eq.get("panel_id")
         inversor_id = eq.get("inversor_id")
@@ -41,29 +45,55 @@ class PanelesAdapter:
         inversor = get_inversor(inversor_id)
 
         entrada = EntradaPaneles(
-
             panel=panel,
-
             inversor=inversor,
-
             n_paneles_total=sizing.n_paneles,
-
             n_inversores=sizing.n_inversores,
-
-            t_min_c=datos.sistema_fv.get("t_min_c", 10),
-
-            t_oper_c=datos.sistema_fv.get("t_oper_c", 45),
-
-            dos_aguas=datos.sistema_fv.get("dos_aguas", False),
-
-            objetivo_dc_ac=datos.sistema_fv.get("dc_ac_ratio", 1.2),
-
-            pdc_kw_objetivo=sizing.pdc_kw
-
+            t_min_c=sf.get("t_min_c", 10),
+            t_oper_c=sf.get("t_oper_c", 45),
+            dos_aguas=sf.get("dos_aguas", False),
+            objetivo_dc_ac=sf.get("dc_ac_ratio", 1.2),
+            pdc_kw_objetivo=sizing.pdc_kw,
         )
 
-        return ejecutar_paneles(entrada)
+        res = ejecutar_paneles(entrada)
 
+        # ------------------------------------------
+        # ADAPTAR DICT → ResultadoStrings
+        # ------------------------------------------
+
+        if not res.get("ok", False):
+            raise ValueError(f"Error en dominio paneles: {res.get('errores')}")
+
+        strings_raw = res.get("strings", [])
+
+        strings = []
+
+        for s in strings_raw:
+
+            strings.append(
+                StringInfo(
+                    id=s["id"],
+                    inversor=s["inversor"],
+                    mppt=s["mppt"],
+                    n_series=s["n_series"],
+                    vmp_string_v=s["vmp_string_v"],
+                    voc_frio_string_v=s["voc_frio_string_v"],
+                    imp_string_a=s["imp_string_a"],
+                    isc_string_a=s["isc_string_a"],
+                )
+            )
+
+        rec = res.get("recomendacion", {})
+
+        return ResultadoStrings(
+            ok=True,
+            n_series=rec.get("n_series", 0),
+            n_strings_total=rec.get("n_strings_total", len(strings)),
+            vmp_string_v=rec.get("vmp_string_v", 0),
+            voc_string_v=rec.get("voc_string_v", 0),
+            strings=strings,
+        )
 
 # ==========================================================
 # ADAPTER ENERGIA
