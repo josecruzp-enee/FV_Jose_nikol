@@ -1,4 +1,3 @@
-# reportes/generar_string_fv.py
 from __future__ import annotations
 
 import matplotlib
@@ -16,36 +15,17 @@ def generar_string_fv(
     panel_w: float = 0.6,
     panel_h: float = 1.2,
     gap: float = 0.25,
-    titulo: str = "Configuración del String Fotovoltaico"
 ):
-    """
-    Dibuja:
-      - 1 string si n_strings == 1
-      - 2 strings en paralelo (representativos) si n_strings >= 2
-    """
 
-    n_series = int(n_series)
-    n_strings = int(n_strings)
-
-    if n_series <= 0:
-        raise ValueError("n_series debe ser > 0")
-
-    # tamaño del canvas
     width = n_series * (panel_w + gap)
-    height = panel_h * (2 if n_strings >= 2 else 1) + 2
 
     fig = plt.figure(figsize=(10, 3 if n_strings == 1 else 4), dpi=170)
     ax = fig.add_subplot(111)
 
-    ax.set_title(titulo)
-    ax.set_aspect("equal")
+    ax.set_title("Configuración del String Fotovoltaico")
 
-    ax.set_xlim(-0.5, width + 0.5)
-    ax.set_ylim(-0.5, height)
-
-    # posiciones Y de los strings
-    y_top = panel_h + 0.9
-    y_bottom = 0.6
+    ax.set_xlim(-0.5, width + 1)
+    ax.set_ylim(-0.5, 3)
 
     def draw_string(y):
 
@@ -53,7 +33,6 @@ def generar_string_fv(
 
             x = i * (panel_w + gap)
 
-            # panel
             ax.add_patch(
                 Rectangle(
                     (x, y),
@@ -65,11 +44,9 @@ def generar_string_fv(
                 )
             )
 
-            # polaridad
             ax.text(x + panel_w * 0.25, y - 0.12, "+", color="red", fontsize=8, ha="center")
             ax.text(x + panel_w * 0.75, y - 0.12, "-", color="black", fontsize=8, ha="center")
 
-            # conexión serie
             if i < n_series - 1:
                 x2 = x + panel_w
                 x3 = (i + 1) * (panel_w + gap)
@@ -81,38 +58,35 @@ def generar_string_fv(
                     linewidth=1.2
                 )
 
-    # === dibujar strings ===
-
+    # ===== 1 string =====
     if n_strings == 1:
 
-        draw_string(y_bottom)
+        draw_string(0.8)
 
         ax.text(
             width / 2,
-            y_bottom + panel_h + 0.4,
-            f"{n_series} módulos conectados en serie",
+            2.2,
+            f"String FV representativo\n{n_series} módulos conectados en serie",
             ha="center",
             fontsize=10
         )
 
+    # ===== paralelo =====
     else:
 
-        draw_string(y_top)
-        draw_string(y_bottom)
+        y1 = 1.6
+        y2 = 0.4
 
-        # bus paralelo
-        x_bus = width + 0.1
+        draw_string(y1)
+        draw_string(y2)
 
-        ax.plot(
-            [x_bus, x_bus],
-            [y_bottom + panel_h / 2, y_top + panel_h / 2],
-            color="black",
-            linewidth=1.5
-        )
+        x_bus = width + 0.15
+
+        ax.plot([x_bus, x_bus], [y2 + panel_h / 2, y1 + panel_h / 2], linewidth=2)
 
         ax.text(
             width / 2,
-            y_top + panel_h + 0.4,
+            2.6,
             f"{n_series} módulos por string · {n_strings} strings en paralelo",
             ha="center",
             fontsize=10
