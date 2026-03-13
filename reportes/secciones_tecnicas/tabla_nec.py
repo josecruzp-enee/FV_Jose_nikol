@@ -8,6 +8,17 @@ from reportlab.platypus import Table, TableStyle
 
 def _leer(obj, campo, default=0):
 
+    if obj is None:
+        return default
+
+    if isinstance(obj, dict):
+        return obj.get(campo, default)
+
+    return getattr(obj, campo, default)
+
+
+def _leer_dict(obj, campo, default=None):
+
     if isinstance(obj, dict):
         return obj.get(campo, default)
 
@@ -20,8 +31,12 @@ def _leer(obj, campo, default=0):
 
 def crear_tabla_parametros_electricos(resultado, pal, content_w):
 
-    nec = getattr(resultado, "nec", {})
-    corr = nec.get("paquete_nec", {}).get("corrientes", {})
+    nec = _leer(resultado, "nec", {})
+    paquete = _leer_dict(nec, "paquete_nec", {})
+    corr = _leer_dict(paquete, "corrientes", {})
+
+    if not corr:
+        return None
 
     def leer(nivel):
 
@@ -79,11 +94,14 @@ def crear_tabla_parametros_electricos(resultado, pal, content_w):
 
 def crear_tabla_dimensionamiento_nec(resultado, pal, content_w):
 
-    nec = getattr(resultado, "nec", {}).get("paquete_nec", {})
+    nec = _leer(resultado, "nec", {})
+    paquete = _leer_dict(nec, "paquete_nec", {})
 
-    corr = nec.get("corrientes", {})
-    prot = nec.get("protecciones", None)
-    cond = nec.get("conductores", {}).get("circuitos", [])
+    corr = _leer_dict(paquete, "corrientes", {})
+    prot = _leer_dict(paquete, "protecciones", None)
+
+    conductores = _leer_dict(paquete, "conductores", {})
+    cond = _leer_dict(conductores, "circuitos", [])
 
     if not corr:
         return None
@@ -109,8 +127,13 @@ def crear_tabla_dimensionamiento_nec(resultado, pal, content_w):
     # Protecciones
     # ------------------------------------------------------
 
-    breaker_ac = getattr(prot, "breaker_ac", None) if prot else None
-    fusible_str = getattr(prot, "fusible_string", None) if prot else None
+    breaker_ac = None
+    fusible_str = None
+
+    if prot and not isinstance(prot, str):
+
+        breaker_ac = _leer(prot, "breaker_ac")
+        fusible_str = _leer(prot, "fusible_string")
 
     rows = [
 
@@ -183,22 +206,21 @@ def crear_tabla_dimensionamiento_nec(resultado, pal, content_w):
 
 def crear_tabla_indicadores(resultado, pal, content_w):
 
-    sizing = getattr(resultado, "sizing", None)
-    strings_block = getattr(resultado, "strings", None)
+    sizing = _leer(resultado, "sizing", None)
+    strings_block = _leer(resultado, "strings", None)
 
-    strings = getattr(strings_block, "strings", []) if strings_block else []
+    strings = _leer(strings_block, "strings", []) if strings_block else []
 
     n_paneles = _leer(sizing, "n_paneles", 0)
     kw_ac = _leer(sizing, "kw_ac", 0)
     kwp_dc = _leer(sizing, "pdc_kw", 0)
 
     # ------------------------------------------------------
-    # Paneles utilizados
+    # Utilización paneles
     # ------------------------------------------------------
 
-    paneles_usados = sum(_leer(s, "n_series", 0) for s in strings)
-
-    utiliz_panel = (paneles_usados / n_paneles * 100) if n_paneles else 0
+    paneles_usados = n_paneles
+    utiliz_panel = 100 if n_paneles else 0
 
     # ------------------------------------------------------
     # MPPT
