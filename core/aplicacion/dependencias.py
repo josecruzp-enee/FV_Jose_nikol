@@ -61,11 +61,72 @@ class EnergiaAdapter:
 
 
 class NECAdapter:
+
     def ejecutar(self, datos, sizing, strings):
-        # Ajuste importante: si tu ejecutar_nec espera (entrada_nec, sizing, strings)
-        # entonces aquí deberías construir 'entrada_nec'. Si tu versión ya acepta
-        # (datos, sizing, strings), esto funciona tal cual.
-        return ejecutar_nec(datos, sizing, strings)
+
+        sf = getattr(datos, "sistema_fv", {}) or {}
+
+        vac_ll = sf.get("vac", 240)
+        fases = sf.get("fases", 1)
+        fp = sf.get("fp", 1.0)
+
+        vdc_nom = sf.get("vdc_nom", 600)
+
+        # --------------------------------------------------
+        # EXTRAER STRINGS
+        # --------------------------------------------------
+
+        strings_list = getattr(strings, "strings", [])
+
+        if strings_list:
+
+            s0 = strings_list[0]
+
+            imp_string = getattr(s0, "imp_string_a", 0)
+            isc_string = getattr(s0, "isc_string_a", 0)
+
+            n_strings_total = len(strings_list)
+
+        else:
+
+            imp_string = 0
+            isc_string = 0
+            n_strings_total = 0
+
+        # --------------------------------------------------
+        # ENTRADA NEC
+        # --------------------------------------------------
+
+        entrada_nec = {
+
+            "electrico": {
+                "vac_ll": vac_ll,
+                "vac_ln": None,
+                "fases": fases,
+                "fp": fp,
+            },
+
+            "potencia_dc_kw": sizing.pdc_kw,
+            "potencia_ac_kw": sizing.kw_ac,
+
+            "vdc_nom": vdc_nom,
+
+            "strings": {
+                "imp_string_a": imp_string,
+                "isc_string_a": isc_string,
+                "strings_por_mppt": 1,
+                "n_strings_total": n_strings_total,
+            },
+
+            "inversor": {
+                "kw_ac": sizing.kw_ac,
+                "v_ac_nom_v": vac_ll,
+                "fases": fases,
+                "fp": fp,
+            },
+        }
+
+        return ejecutar_nec(entrada_nec, sizing, strings)
 
 
 class FinanzasAdapter:
