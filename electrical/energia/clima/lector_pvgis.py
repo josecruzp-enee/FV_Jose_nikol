@@ -17,50 +17,47 @@ def descargar_clima_pvgis(
 ) -> List[ClimaHora]:
 
     params = {
-
         "lat": lat,
         "lon": lon,
-
         "outputformat": "json",
-
         "startyear": startyear,
         "endyear": endyear,
-
         "usehorizon": 1,
-
         "pvcalculation": 0,
-
         "browser": 0
     }
 
-    r = requests.get(PVGIS_URL, params=params, timeout=60)
-
-    if r.status_code != 200:
-        raise RuntimeError("Error descargando datos PVGIS")
+    try:
+        r = requests.get(PVGIS_URL, params=params, timeout=60)
+        r.raise_for_status()
+    except requests.RequestException as e:
+        raise RuntimeError(f"Error descargando datos PVGIS: {e}") from e
 
     data = r.json()
 
+    if "outputs" not in data or "hourly" not in data["outputs"]:
+        raise RuntimeError("Formato de respuesta PVGIS inválido")
+
     hourly = data["outputs"]["hourly"]
 
-    clima = []
+    clima: List[ClimaHora] = []
 
     for h in hourly:
 
-        ghi = h.get("G(h)", 0)
-        dni = h.get("Gb(n)", 0)
-        dhi = h.get("Gd(h)", 0)
-
-        temp = h.get("T2m", 25)
+        ghi = float(h.get("G(h)", 0) or 0)
+        dni = float(h.get("Gb(n)", 0) or 0)
+        dhi = float(h.get("Gd(h)", 0) or 0)
+        temp = float(h.get("T2m", 25) or 25)
 
         tiempo = h.get("time")
 
         clima.append(
             ClimaHora(
                 tiempo=tiempo,
-                ghi_wm2=float(ghi),
-                dni_wm2=float(dni),
-                dhi_wm2=float(dhi),
-                temp_amb_c=float(temp)
+                ghi_wm2=ghi,
+                dni_wm2=dni,
+                dhi_wm2=dhi,
+                temp_amb_c=temp
             )
         )
 
