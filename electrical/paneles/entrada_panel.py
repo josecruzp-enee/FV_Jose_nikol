@@ -47,7 +47,7 @@ class EntradaPaneles:
     # ----------------------------------------------
 
     n_paneles_total: int
-    n_inversores: Optional[int] = None
+    
     # ----------------------------------------------
     # Condiciones térmicas
     # ----------------------------------------------
@@ -68,8 +68,8 @@ class EntradaPaneles:
     objetivo_dc_ac: Optional[float] = None
 
     pdc_kw_objetivo: Optional[float] = None
-
-
+    
+    n_inversores: Optional[int] = None
 # ==========================================================
 # SALIDAS DEL ARCHIVO
 # ==========================================================
