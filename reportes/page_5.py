@@ -143,7 +143,7 @@ def _section_generacion_diaria(story, paths, styles, content_w):
     chart = None
 
     if isinstance(paths, dict):
-        chart = paths.get("chart_generacion_horaria")
+        chart = paths.get("chart_horaria")
 
     if chart and Path(chart).exists():
 
