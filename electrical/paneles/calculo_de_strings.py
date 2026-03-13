@@ -101,35 +101,6 @@ def _seleccionar_n_series(
     return best_ns
 
 
-# ==========================================================
-# DISTRIBUCION EN MPPT DEL SISTEMA
-# ==========================================================
-
-def _split_por_mppt(
-    n_strings_total: int,
-    mppt_totales: int
-):
-
-    base = n_strings_total // mppt_totales
-    resto = n_strings_total % mppt_totales
-
-    ramas = []
-
-    for i in range(mppt_totales):
-
-        n = base + (1 if i < resto else 0)
-
-        if n > 0:
-
-            ramas.append(
-                {
-                    "mppt_global": i + 1,
-                    "n_strings": n
-                }
-            )
-
-    return ramas
-
 
 # ==========================================================
 # DISTRIBUCION EN MPPT DEL SISTEMA
