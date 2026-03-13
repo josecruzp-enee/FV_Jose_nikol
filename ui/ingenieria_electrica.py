@@ -193,7 +193,7 @@ def _mostrar_sizing(sizing):
 # MOSTRAR NEC
 # ==========================================================
 
-ddef _mostrar_nec(nec):
+def _mostrar_nec(nec):
 
     st.subheader("Ingeniería eléctrica (NEC)")
 
