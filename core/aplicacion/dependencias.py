@@ -143,17 +143,17 @@ class EnergiaAdapter:
 
         entrada = EnergiaInput(
 
-            datos=datos,
-
             pdc_instalada_kw=sizing.pdc_kw,
 
-            strings=strings,
+            n_strings_total=strings.n_strings_total,
+
+            strings=strings.strings,
 
             n_inversores=sizing.n_inversores,
 
         )
 
-        return ejecutar_motor_energia(entrada)
+        return ejecutar_motor_energia(entrada))
 
 # ==========================================================
 # ADAPTER NEC
