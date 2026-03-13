@@ -110,10 +110,10 @@ def ejecutar_paneles(
     n_inversores = int(entrada.n_inversores or 1)
     st.write("DEBUG ANTES DE STRINGS")
 
-     st.write({
-         "n_paneles_total_enviado": n_paneles_total,
-         "n_inversores": n_inversores,
-         "mppt_por_inversor": inversor.n_mppt
+    st.write({
+        "n_paneles_total_enviado": n_paneles_total,
+        "n_inversores": n_inversores,
+        "mppt_por_inversor": inversor.n_mppt
     })  
     resultado = calcular_strings_fv(
     st.write("DEBUG RESULTADO STRINGS")
