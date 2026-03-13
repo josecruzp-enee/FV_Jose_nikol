@@ -11,7 +11,7 @@ from core.servicios.finanzas import ejecutar_finanzas
 from electrical.paneles.entrada_panel import EntradaPaneles
 from electrical.catalogos import get_panel, get_inversor
 
-from core.dominio.contrato import ResultadoStrings
+from core.dominio.contrato import ResultadoStrings, StringInfo
 
 
 # ==========================================================
@@ -27,8 +27,6 @@ class SizingAdapter:
 # ==========================================================
 # ADAPTER PANELES
 # ==========================================================
-from core.dominio.contrato import ResultadoStrings, StringInfo
-
 
 class PanelesAdapter:
 
@@ -47,16 +45,24 @@ class PanelesAdapter:
         # MODO DE DIMENSIONADO (UI Streamlit)
         # --------------------------------------------------
 
+        modo = sf.get("modo_dimensionado")
+
         n_paneles_total = sizing.n_paneles
         pdc_kw_objetivo = None
-        
+
         # --------------------------------------------------
-        # CONSTRUIR ENTRADA DEL DOMINIO PANELES
+        # DEBUG
         # --------------------------------------------------
+
         print("\nDEBUG PANELES ADAPTER")
         print("modo_dimensionado:", modo)
         print("n_paneles_total:", n_paneles_total)
         print("pdc_kw_objetivo:", pdc_kw_objetivo)
+
+        # --------------------------------------------------
+        # CONSTRUIR ENTRADA DEL DOMINIO PANELES
+        # --------------------------------------------------
+
         entrada = EntradaPaneles(
 
             panel=panel,
@@ -125,7 +131,6 @@ class PanelesAdapter:
 
             strings=strings,
         )
-
 
 
 # ==========================================================
