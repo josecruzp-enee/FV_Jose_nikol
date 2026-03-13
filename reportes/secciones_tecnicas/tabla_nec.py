@@ -62,29 +62,37 @@ def crear_tabla_parametros_electricos(resultado, pal, content_w):
 
 def crear_tabla_dimensionamiento_nec(resultado, pal, content_w):
 
-    nec = resultado.get("nec", {}).get("paquete_nec", {}).get("protecciones", {})
+    corr = resultado.get("nec", {}).get("paquete_nec", {}).get("corrientes", {})
 
-    if not nec:
+    if not corr:
         return None
 
     rows = [
-        ["Circuito", "Corriente diseño", "Protección", "Conductor"],
+        ["Circuito", "Corriente operación", "Corriente diseño NEC"],
     ]
 
-    for circuito, d in nec.items():
+    orden = [
+        ("panel", "Panel"),
+        ("string", "String"),
+        ("mppt", "MPPT"),
+        ("dc_total", "Entrada inversor DC"),
+        ("ac", "Salida inversor AC"),
+    ]
+
+    for key, nombre in orden:
+
+        d = corr.get(key, {})
 
         rows.append([
-            circuito.replace("_", " ").title(),
+            nombre,
+            f"{float(d.get('i_operacion_a',0)):.2f} A",
             f"{float(d.get('i_diseno_a',0)):.2f} A",
-            d.get("proteccion","—"),
-            d.get("conductor","—"),
         ])
 
     colw = [
+        content_w * 0.40,
         content_w * 0.30,
-        content_w * 0.20,
-        content_w * 0.25,
-        content_w * 0.25,
+        content_w * 0.30,
     ]
 
     tbl = Table(rows, colWidths=colw)
@@ -94,8 +102,7 @@ def crear_tabla_dimensionamiento_nec(resultado, pal, content_w):
         ("BACKGROUND",(0,0),(-1,0),pal["SOFT"]),
         ("TEXTCOLOR",(0,0),(-1,0),pal["PRIMARY"]),
 
-        ("ALIGN",(1,1),(1,-1),"RIGHT"),
-        ("ALIGN",(2,1),(-1,-1),"CENTER"),
+        ("ALIGN",(1,1),(2,-1),"RIGHT"),
 
         ("GRID",(0,0),(-1,-1),0.3,pal["BORDER"]),
         ("FONTSIZE",(0,0),(-1,-1),10),
