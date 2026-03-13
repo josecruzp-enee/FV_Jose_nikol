@@ -93,15 +93,6 @@ def calcular_sizing_unificado(
 ) -> ResultadoSizing:
     """
     API pública del servicio de sizing.
-
-    Entrada:
-        p : Datosproyecto
-
-    Salida:
-        ResultadoSizing
-
-    Consumido por:
-        core.aplicacion.orquestador_estudio
     """
 
     # ======================================================
@@ -137,12 +128,14 @@ def calcular_sizing_unificado(
 
     consumo_12m_kwh = [float(x or 0.0) for x in consumo_12m_kwh]
 
+    consumo_anual = consumo_anual_kwh(consumo_12m_kwh)
+
     cobertura_obj = normalizar_cobertura(
         getattr(p, "cobertura_obj", 1.0)
     )
 
     # ======================================================
-    # Modo dimensionamiento
+    # Sistema FV
     # ======================================================
 
     sf = getattr(p, "sistema_fv", {}) or {}
@@ -165,17 +158,31 @@ def calcular_sizing_unificado(
             raise ValueError("n_paneles_manual inválido en modo manual")
 
     # ======================================================
-    # PANEL SIZING
+    # Potencia FV objetivo
     # ======================================================
 
-    panel_sizing = dimensionar_paneles(
+    energia_por_kwp_anual = 1500.0  # aproximación Honduras
 
-        consumo_12m_kwh=consumo_12m_kwh,
-        cobertura_obj=cobertura_obj,
-        panel_w=panel_w,
-        modo=modo_dimensionado,
-        n_paneles_manual=n_paneles_manual,
+    kwp_objetivo = (consumo_anual * cobertura_obj) / energia_por_kwp_anual
+
+    # ======================================================
+    # PANEL SIZING (DOMINIO PANELES)
+    # ======================================================
+
+    from electrical.paneles.entrada_panel import EntradaPaneles
+
+    entrada_panel = EntradaPaneles(
+
+        panel=panel,
+
+        inversor=None,
+
+        pdc_kw_objetivo=kwp_objetivo if modo_dimensionado == "auto" else None,
+
+        n_paneles_total=n_paneles_manual if modo_dimensionado == "manual" else None,
     )
+
+    panel_sizing = dimensionar_paneles(entrada_panel)
 
     if not panel_sizing.ok:
         raise ValueError(f"Panel sizing inválido: {panel_sizing.errores}")
@@ -207,7 +214,7 @@ def calcular_sizing_unificado(
     pac_total_kw = kw_ac * n_inversores
 
     # ======================================================
-    # DIVISIÓN DEL ARREGLO
+    # División arreglo
     # ======================================================
 
     paneles_por_inversor = ceil(
@@ -215,7 +222,7 @@ def calcular_sizing_unificado(
     )
 
     # ======================================================
-    # Energía inicial
+    # Energía (placeholder)
     # ======================================================
 
     energia_12m: List[MesEnergia] = []
@@ -240,7 +247,6 @@ def calcular_sizing_unificado(
 
         energia_12m=energia_12m,
     )
-
 
 # ==========================================================
 # SALIDAS DEL MÓDULO
