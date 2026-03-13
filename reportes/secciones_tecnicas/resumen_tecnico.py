@@ -72,22 +72,27 @@ def calcular_parametros_generales(kwp_dc, kw_ac, n_paneles, n_inversores):
 
 def obtener_configuracion_strings(resultado):
 
-    strings = resultado.get("strings", {}).get("strings", [])
+    strings = resultado.get("strings", [])
 
     if not strings:
         return 0, 0, 0, 0
 
+    # primer string para parámetros eléctricos
     s = strings[0]
 
     n_series = int(s.get("n_series", 0))
-    n_paralelo = int(s.get("n_paralelo", 0))
+
+    # número de strings reales del generador
+    n_paralelo = len(strings)
 
     vmp = float(s.get("vmp_string_v", 0))
-    voc = float(s.get("voc_frio_string_v", 0))
+    voc = float(
+        s.get("voc_frio_string_v")
+        or s.get("voc_string_v")
+        or 0
+    )
 
     return n_series, n_paralelo, vmp, voc
-
-
 # ==========================================================
 # Obtener corrientes del sistema FV
 # ==========================================================
