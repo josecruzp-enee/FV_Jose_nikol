@@ -13,7 +13,6 @@ Este módulo coordina:
 clima
 solar
 paneles
-inversor
 """
 
 from datetime import datetime, timedelta
@@ -23,6 +22,9 @@ from solar.entrada_solar import EntradaSolar
 from solar.orquestador_solar import ejecutar_solar
 
 from electrical.energia.clima_tmy import generar_clima_base
+from electrical.paneles.potencia_panel import evaluar_panel_en_operacion
+
+from electrical.modelos.paneles import PanelSpec
 
 
 # ==========================================================
@@ -44,6 +46,8 @@ def generar_horas_anio(anio: int) -> List[datetime]:
 # ==========================================================
 
 def simular_8760(
+    panel: PanelSpec,
+    n_paneles_total: int,
     lat: float,
     lon: float,
     tilt_deg: float,
@@ -62,6 +66,11 @@ def simular_8760(
     for i, fecha in enumerate(horas):
 
         ghi = clima[i].ghi_wm2
+        temp_amb = clima[i].temp_amb_c
+
+        # ------------------------------------------------------
+        # SOLAR
+        # ------------------------------------------------------
 
         entrada_solar = EntradaSolar(
             lat=lat,
@@ -80,12 +89,37 @@ def simular_8760(
 
         poa = solar["poa_wm2"]
 
-        # energía simplificada (temporal)
-        energia_hora = poa * 0.001
+        # ------------------------------------------------------
+        # PANEL
+        # ------------------------------------------------------
+
+        panel_real = evaluar_panel_en_operacion(
+            panel=panel,
+            temperatura_amb_c=temp_amb,
+            irradiancia_wm2=poa
+        )
+
+        potencia_panel = panel_real["pmp_w"]
+
+        # ------------------------------------------------------
+        # ARRAY FV
+        # ------------------------------------------------------
+
+        potencia_array = potencia_panel * n_paneles_total
+
+        # ------------------------------------------------------
+        # ENERGÍA DE LA HORA
+        # ------------------------------------------------------
+
+        energia_hora = potencia_array / 1000  # kWh
 
         energia_total += energia_hora
 
         produccion_horaria.append(energia_hora)
+
+    # ==========================================================
+    # RESULTADO FINAL
+    # ==========================================================
 
     return {
 
