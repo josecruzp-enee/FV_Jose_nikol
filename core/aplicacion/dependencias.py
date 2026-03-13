@@ -47,22 +47,9 @@ class PanelesAdapter:
         # MODO DE DIMENSIONADO (UI Streamlit)
         # --------------------------------------------------
 
-        modo = sf.get("modo_dimensionado", "auto")
-
-        if modo == "manual":
-
-            n_paneles_total = int(sf.get("n_paneles_manual", sizing.n_paneles))
-            pdc_kw_objetivo = None
-
-        else:
-
-            n_paneles_total = None
-            pdc_kw_objetivo = sizing.pdc_kw
-        import streamlit as st
-
-        st.write("DEBUG modo_dimensionado:", modo)
-        st.write("DEBUG n_paneles_total:", n_paneles_total)
-        st.write("DEBUG pdc_kw_objetivo:", pdc_kw_objetivo)
+        n_paneles_total = sizing.n_paneles
+        pdc_kw_objetivo = None
+        
         # --------------------------------------------------
         # CONSTRUIR ENTRADA DEL DOMINIO PANELES
         # --------------------------------------------------
