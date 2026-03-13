@@ -88,16 +88,7 @@ def _inv_id(eq: Dict[str, Any]) -> Optional[str]:
 # API pública — Servicio de sizing
 # ==========================================================
 
-def calcular_sizing_unificado(
-    p: Datosproyecto,
-) -> ResultadoSizing:
-    """
-    API pública del servicio de sizing.
-    """
-
-    # ======================================================
-    # Equipos
-    # ======================================================
+def _leer_panel_y_config(p: Datosproyecto):
 
     eq = _leer_equipos(p)
 
@@ -117,9 +108,10 @@ def calcular_sizing_unificado(
         2.00,
     )
 
-    # ======================================================
-    # Consumo
-    # ======================================================
+    return panel, dc_ac_obj, eq
+
+
+def _leer_consumo_y_cobertura(p: Datosproyecto):
 
     consumo_12m_kwh = list(getattr(p, "consumo_12m", None) or [])
 
@@ -134,9 +126,10 @@ def calcular_sizing_unificado(
         getattr(p, "cobertura_obj", 1.0)
     )
 
-    # ======================================================
-    # Sistema FV
-    # ======================================================
+    return consumo_anual, cobertura_obj
+
+
+def _leer_modo_dimensionado(p: Datosproyecto):
 
     sf = getattr(p, "sistema_fv", {}) or {}
 
@@ -157,17 +150,14 @@ def calcular_sizing_unificado(
         except Exception:
             raise ValueError("n_paneles_manual inválido en modo manual")
 
-    # ======================================================
-    # Potencia FV objetivo
-    # ======================================================
+    return modo_dimensionado, n_paneles_manual
 
-    energia_por_kwp_anual = 1500.0  # aproximación Honduras
+
+def _dimensionar_generador(panel, modo_dimensionado, n_paneles_manual, consumo_anual, cobertura_obj):
+
+    energia_por_kwp_anual = 1500.0
 
     kwp_objetivo = (consumo_anual * cobertura_obj) / energia_por_kwp_anual
-
-    # ======================================================
-    # PANEL SIZING (DOMINIO PANELES)
-    # ======================================================
 
     from electrical.paneles.entrada_panel import EntradaPaneles
 
@@ -197,9 +187,10 @@ def calcular_sizing_unificado(
     if n_pan <= 0 or pdc <= 0:
         raise ValueError("Sizing resultó en sistema inválido")
 
-    # ======================================================
-    # INVERSOR
-    # ======================================================
+    return kwp_req, n_pan, pdc
+
+
+def _seleccionar_inversor(pdc, dc_ac_obj, eq):
 
     resultado_inv = ejecutar_inversor_desde_sizing(
 
@@ -216,23 +207,66 @@ def calcular_sizing_unificado(
 
     pac_total_kw = kw_ac * n_inversores
 
-    # ======================================================
+    return kw_ac, n_inversores, pac_total_kw
+
+
+def calcular_sizing_unificado(
+    p: Datosproyecto,
+) -> ResultadoSizing:
+
+    # --------------------------------------------------
+    # Equipos
+    # --------------------------------------------------
+
+    panel, dc_ac_obj, eq = _leer_panel_y_config(p)
+
+    # --------------------------------------------------
+    # Consumo
+    # --------------------------------------------------
+
+    consumo_anual, cobertura_obj = _leer_consumo_y_cobertura(p)
+
+    # --------------------------------------------------
+    # Modo dimensionado
+    # --------------------------------------------------
+
+    modo_dimensionado, n_paneles_manual = _leer_modo_dimensionado(p)
+
+    # --------------------------------------------------
+    # Generador FV
+    # --------------------------------------------------
+
+    kwp_req, n_pan, pdc = _dimensionar_generador(
+        panel,
+        modo_dimensionado,
+        n_paneles_manual,
+        consumo_anual,
+        cobertura_obj
+    )
+
+    # --------------------------------------------------
+    # Inversor
+    # --------------------------------------------------
+
+    kw_ac, n_inversores, pac_total_kw = _seleccionar_inversor(
+        pdc,
+        dc_ac_obj,
+        eq
+    )
+
+    # --------------------------------------------------
     # División arreglo
-    # ======================================================
+    # --------------------------------------------------
 
     paneles_por_inversor = ceil(
         n_pan / n_inversores
     )
 
-    # ======================================================
-    # Energía (placeholder)
-    # ======================================================
-
     energia_12m: List[MesEnergia] = []
 
-    # ======================================================
+    # --------------------------------------------------
     # Resultado final
-    # ======================================================
+    # --------------------------------------------------
 
     return ResultadoSizing(
 
@@ -250,6 +284,7 @@ def calcular_sizing_unificado(
 
         energia_12m=energia_12m,
     )
+
 
 # ==========================================================
 # SALIDAS DEL MÓDULO
