@@ -56,7 +56,7 @@ class PanelesAdapter:
 
         else:
 
-            n_paneles_total = sizing.n_paneles
+            n_paneles_total = None
             pdc_kw_objetivo = sizing.pdc_kw
 
         # --------------------------------------------------
