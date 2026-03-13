@@ -59,7 +59,8 @@ def p1_tabla_solucion_unica(datos, sizing, energia, financiero, pal, content_w):
     kwp = float(getattr(sizing, "kwp_dc", getattr(sizing, "pdc_kw", 0.0)))
     capex = float(financiero.get("capex_L", 0.0))
 
-    energia_12m = energia.get("energia_util_12m", [])
+    energia_12m = getattr(energia, "energia_util_12m", [])
+
     prod_anual = sum(energia_12m) if isinstance(energia_12m, list) else 0.0
 
     n_paneles = int(sizing.get("n_paneles", 0))
