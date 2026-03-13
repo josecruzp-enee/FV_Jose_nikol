@@ -300,7 +300,10 @@ def render(ctx):
 
     except Exception as exc:
 
-        st.error(f"No se pudo generar ingeniería: {exc}")
+        import traceback
+
+        st.error("Error en motor FV")
+        st.code(traceback.format_exc())
 
 
 # ==========================================================
