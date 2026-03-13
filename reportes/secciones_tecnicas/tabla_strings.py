@@ -17,10 +17,28 @@ def crear_tabla_strings(strings: List[Any], pal, content_w):
 
     def leer(obj, campo, default=0):
 
+        if obj is None:
+            return default
+
         if isinstance(obj, dict):
             return obj.get(campo, default)
 
         return getattr(obj, campo, default)
+
+    # ------------------------------------------------------
+    # Calcular paralelos por MPPT
+    # ------------------------------------------------------
+
+    conteo_mppt = {}
+
+    for s in strings:
+
+        inv = int(leer(s, "inversor"))
+        mppt = int(leer(s, "mppt"))
+
+        key = (inv, mppt)
+
+        conteo_mppt[key] = conteo_mppt.get(key, 0) + 1
 
     # ------------------------------------------------------
     # Encabezado
@@ -44,13 +62,25 @@ def crear_tabla_strings(strings: List[Any], pal, content_w):
     # Ordenar strings
     # ------------------------------------------------------
 
-    strings = sorted(strings, key=lambda s: leer(s, "id"))
+    strings = sorted(
+        strings,
+        key=lambda s: (
+            leer(s, "inversor"),
+            leer(s, "mppt"),
+            leer(s, "id"),
+        )
+    )
 
     # ------------------------------------------------------
     # Construir filas
     # ------------------------------------------------------
 
     for s in strings:
+
+        inv = int(leer(s, "inversor"))
+        mppt = int(leer(s, "mppt"))
+
+        paralelos = conteo_mppt.get((inv, mppt), 1)
 
         voc = (
             leer(s, "voc_frio_string_v")
@@ -61,12 +91,12 @@ def crear_tabla_strings(strings: List[Any], pal, content_w):
         rows.append([
 
             int(leer(s, "id")),
-            int(leer(s, "inversor")),
-            int(leer(s, "mppt")),
+            inv,
+            mppt,
 
             int(leer(s, "n_series")),
 
-            1,  # strings en paralelo por MPPT
+            paralelos,
 
             f"{float(leer(s,'vmp_string_v')):.0f}",
             f"{float(voc):.0f}",
