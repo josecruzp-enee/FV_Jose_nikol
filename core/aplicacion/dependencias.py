@@ -1,7 +1,8 @@
-# ==========================================================
-# ADAPTADOR: NEC
-# ==========================================================
 from __future__ import annotations
+
+# ==========================================================
+# PUERTOS DEL SISTEMA
+# ==========================================================
 
 from core.aplicacion.puertos import (
     PuertoSizing,
@@ -12,6 +13,12 @@ from core.aplicacion.puertos import (
 )
 
 from electrical.nec.orquestador_nec import ejecutar_nec
+
+
+# ==========================================================
+# ADAPTADOR: NEC
+# ==========================================================
+
 class NECAdapter(PuertoNEC):
 
     def ejecutar(self, datos, sizing, strings):
@@ -27,9 +34,9 @@ class NECAdapter(PuertoNEC):
         fases = sf.get("fases", 3)
         fp = sf.get("fp", 1.0)
 
-        # ======================================================
-        # EXTRAER STRINGS DEL RESULTADO
-        # ======================================================
+        # --------------------------------------------------
+        # EXTRAER STRINGS
+        # --------------------------------------------------
 
         strings_list = getattr(strings, "strings", [])
 
@@ -49,9 +56,9 @@ class NECAdapter(PuertoNEC):
 
         n_strings_total = getattr(strings, "n_strings_total", 0)
 
-        # ======================================================
-        # ENTRADA PARA ORQUESTADOR NEC
-        # ======================================================
+        # --------------------------------------------------
+        # ENTRADA NEC
+        # --------------------------------------------------
 
         entrada_nec = {
 
@@ -83,3 +90,18 @@ class NECAdapter(PuertoNEC):
         }
 
         return ejecutar_nec(entrada_nec, sizing, strings)
+
+
+# ==========================================================
+# CONSTRUCTOR DE DEPENDENCIAS
+# ==========================================================
+
+def construir_dependencias():
+    """
+    Construye los adaptadores utilizados por el
+    orquestador del estudio FV.
+    """
+
+    return {
+        "nec": NECAdapter()
+    }
