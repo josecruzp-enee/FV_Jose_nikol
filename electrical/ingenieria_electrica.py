@@ -99,7 +99,7 @@ def _resolver_corrientes(entrada):
     inversor = entrada["inversor"]
 
     return calcular_corrientes(
-        strings=strings.get("corrientes_input"),
+        strings=strings,
         inv=inversor,
         cfg_tecnicos={
             "n_strings_total": entrada["n_strings"]
