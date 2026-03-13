@@ -16,21 +16,25 @@ def generar_string_fv(
 
     panel_w = 0.5
     panel_h = 1.0
+
     gap = 0.2
     v_gap = 1.8
 
     width = n_series * (panel_w + gap)
 
-    fig = plt.figure(figsize=(12, 3 + n_strings))
+    fig = plt.figure(figsize=(12, 3 + n_strings * 0.5))
     ax = fig.add_subplot(111)
 
     # ============================
     # Dibujar strings
     # ============================
 
+    y_strings = []
+
     for s in range(n_strings):
 
         y_offset = -s * v_gap
+        y_strings.append(y_offset + panel_h / 2)
 
         for i in range(n_series):
 
@@ -60,7 +64,8 @@ def generar_string_fv(
                     linewidth=1
                 )
 
-        # línea hacia bus
+        # conexión string → bus
+
         ax.plot(
             [width, width + 1],
             [y_offset + panel_h / 2, y_offset + panel_h / 2],
@@ -76,7 +81,7 @@ def generar_string_fv(
 
     ax.plot(
         [bus_x, bus_x],
-        [panel_h / 2, -(n_strings - 1) * v_gap + panel_h / 2],
+        [min(y_strings), max(y_strings)],
         color="red",
         linewidth=3
     )
@@ -86,7 +91,7 @@ def generar_string_fv(
     # ============================
 
     inv_x = bus_x + 1.5
-    inv_y = -(n_strings - 1) * v_gap / 2
+    inv_y = (min(y_strings) + max(y_strings)) / 2 - 0.6
 
     rect = Rectangle(
         (inv_x, inv_y),
@@ -111,7 +116,8 @@ def generar_string_fv(
 
     ax.plot(
         [bus_x, inv_x],
-        [inv_y + 0.6, inv_y + 0.6],
+        [(min(y_strings) + max(y_strings)) / 2,
+         (min(y_strings) + max(y_strings)) / 2],
         color="red",
         linewidth=2
     )
@@ -121,7 +127,7 @@ def generar_string_fv(
     # ============================
 
     ax.set_title(
-        f"Configuración del String Fotovoltaico\n"
+        f"Configuración del Generador Fotovoltaico\n"
         f"{n_series} módulos por string • {n_strings} strings en paralelo",
         fontsize=12
     )
@@ -133,7 +139,7 @@ def generar_string_fv(
     ax.axis("off")
 
     ax.set_xlim(-0.5, inv_x + 2)
-    ax.set_ylim(-(n_strings) * v_gap, 2)
+    ax.set_ylim(min(y_strings) - 1, max(y_strings) + 2)
 
     plt.tight_layout()
 
