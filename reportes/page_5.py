@@ -204,7 +204,10 @@ def build_page_5(resultado, datos, paths, pal, styles, content_w):
     _section_indicadores(
         story, resultado, pal, styles, content_w
     )
-
+    import streamlit as st
+    st.subheader("DEBUG PATHS PAGE 5")
+    st.json(paths)
+    
     _section_generacion_diaria(
         story, paths, styles, content_w
     )
