@@ -73,17 +73,27 @@ class NECAdapter:
         vdc_nom = sf.get("vdc_nom", 600)
 
         # --------------------------------------------------
-        # EXTRAER STRINGS
+        # EXTRAER STRINGS (dict proveniente de paneles)
         # --------------------------------------------------
 
-        strings_list = getattr(strings, "strings", [])
+        strings_list = []
+
+        if isinstance(strings, dict):
+            strings_list = strings.get("strings", [])
+
+        elif hasattr(strings, "strings"):
+            strings_list = getattr(strings, "strings", [])
 
         if strings_list:
 
             s0 = strings_list[0]
 
-            imp_string = getattr(s0, "imp_string_a", 0)
-            isc_string = getattr(s0, "isc_string_a", 0)
+            if isinstance(s0, dict):
+                imp_string = s0.get("imp_string_a", 0)
+                isc_string = s0.get("isc_string_a", 0)
+            else:
+                imp_string = getattr(s0, "imp_string_a", 0)
+                isc_string = getattr(s0, "isc_string_a", 0)
 
             n_strings_total = len(strings_list)
 
@@ -127,7 +137,6 @@ class NECAdapter:
         }
 
         return ejecutar_nec(entrada_nec, sizing, strings)
-
 
 class FinanzasAdapter:
     def ejecutar(self, datos, sizing, energia):
