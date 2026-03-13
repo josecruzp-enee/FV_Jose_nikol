@@ -36,8 +36,7 @@ def ejecutar_estudio(
     datos: Any,
     deps: DependenciasEstudio,
 ):
-    st.write("DEBUG TIPO RESULTADO:")
-    st.write(type(resultado))
+   
 
     if isinstance(resultado, dict):
         st.error("⚠️ ERROR: resultado es dict")
