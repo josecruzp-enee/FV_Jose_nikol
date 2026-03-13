@@ -76,26 +76,38 @@ def _bounds_por_voltaje(
 # SELECCION DE SERIES
 # ==========================================================
 
+# ==========================================================
+# SELECCION DE SERIES (MEJORADA)
+# ==========================================================
+
 def _seleccionar_n_series(
     n_min: int,
     n_max: int,
     vmp_hot_panel: float,
-    inversor: InversorSpec
+    inversor: InversorSpec,
+    n_paneles_total: int
 ):
 
     mid = (inversor.mppt_min_v + inversor.mppt_max_v) / 2
 
     best_ns = None
-    best_error = float("inf")
+    best_score = float("inf")
 
     for n in range(n_min, n_max + 1):
 
         vmp_string = n * vmp_hot_panel
-        err = abs(vmp_string - mid)
+        error_v = abs(vmp_string - mid)
 
-        if err < best_error:
+        strings = n_paneles_total // n
+        paneles_usados = strings * n
+        sobrantes = n_paneles_total - paneles_usados
 
-            best_error = err
+        # ponderación
+        score = error_v + (sobrantes * 50)
+
+        if score < best_score:
+
+            best_score = score
             best_ns = n
 
     return best_ns
@@ -187,7 +199,8 @@ def calcular_strings_fv(
         n_min,
         n_max,
         vmp_hot_panel,
-        inversor
+        inversor,
+        n_paneles_total
     )
 
     if not n_series:
