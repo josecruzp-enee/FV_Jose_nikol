@@ -1,4 +1,4 @@
-# reportes/page_5_tecnico.py
+# reportes/page_5.py
 
 from reportlab.platypus import Paragraph, Spacer, PageBreak
 
