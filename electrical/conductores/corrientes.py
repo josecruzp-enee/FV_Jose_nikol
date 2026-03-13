@@ -173,7 +173,11 @@ def calcular_corrientes(
     # ======================================================
     # RESULTADO TIPADO
     # ======================================================
-
+    print("DEBUG CORRIENTES RESULTADO")
+    print("I string:", i_string_operacion)
+    print("I mppt:", i_mppt_operacion)
+    print("I dc:", i_dc_total_operacion)
+    print("I ac:", i_ac)
     return ResultadoCorrientes(
 
         panel=NivelCorriente(
