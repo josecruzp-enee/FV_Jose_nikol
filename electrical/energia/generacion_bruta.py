@@ -1,4 +1,4 @@
-# electrical/energia/generacion_bruta.py
+from __future__ import annotations
 
 """
 Cálculo de generación DC bruta del sistema FV.
@@ -16,8 +16,6 @@ NO aplica:
 - degradación
 - limitación de inversor
 """
-
-from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import List
@@ -50,6 +48,10 @@ def calcular_energia_bruta_dc(
 
     errores: List[str] = []
 
+    # ------------------------------------------------------
+    # VALIDACIONES
+    # ------------------------------------------------------
+
     if pdc_kw <= 0:
         errores.append("pdc_kw inválido (<=0).")
 
@@ -61,6 +63,16 @@ def calcular_energia_bruta_dc(
 
     if factor_orientacion <= 0:
         errores.append("factor_orientacion inválido.")
+
+    if any(h < 0 for h in hsp_12m):
+        errores.append("hsp_12m contiene valores negativos.")
+
+    if any(d <= 0 for d in dias_mes):
+        errores.append("dias_mes contiene valores inválidos.")
+
+    # ------------------------------------------------------
+    # CÁLCULO DE ENERGÍA
+    # ------------------------------------------------------
 
     energia: List[float] = []
 
