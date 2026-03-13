@@ -37,7 +37,7 @@ def _leer_pdc_kw(res):
 
     sizing = (res or {}).get("sizing") or {}
 
-    kwp = sizing.get("kwp_dc")
+    kwp = getattr(sizing, "kwp_dc", None)
     if kwp:
         return float(kwp)
 
