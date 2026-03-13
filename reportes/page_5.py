@@ -14,10 +14,6 @@ def build_page_5(resultado, datos, paths, pal, styles, content_w):
 
     story = []
 
-    # ======================================================
-    # Bloques del resultado
-    # ======================================================
-
     sizing = resultado.get("sizing", {})
     strings_block = resultado.get("strings", {})
 
@@ -41,13 +37,10 @@ def build_page_5(resultado, datos, paths, pal, styles, content_w):
     story.append(Spacer(1, 6))
 
     if strings:
-
         story.append(
             crear_tabla_distribucion_inversores(strings, pal, content_w)
         )
-
     else:
-
         story.append(
             Paragraph("No hay distribución de strings.", styles["BodyText"])
         )
@@ -64,13 +57,10 @@ def build_page_5(resultado, datos, paths, pal, styles, content_w):
     story.append(Spacer(1, 6))
 
     if strings:
-
         story.append(
             crear_tabla_strings(strings, pal, content_w)
         )
-
     else:
-
         story.append(
             Paragraph("No hay configuración de strings.", styles["BodyText"])
         )
@@ -86,9 +76,14 @@ def build_page_5(resultado, datos, paths, pal, styles, content_w):
     )
     story.append(Spacer(1, 6))
 
-    story.append(
-        crear_tabla_parametros_electricos(resultado, pal, content_w)
-    )
+    tabla_corr = crear_tabla_parametros_electricos(resultado, pal, content_w)
+
+    if tabla_corr:
+        story.append(tabla_corr)
+    else:
+        story.append(
+            Paragraph("No hay datos eléctricos disponibles.", styles["BodyText"])
+        )
 
     story.append(Spacer(1, 12))
 
@@ -101,9 +96,14 @@ def build_page_5(resultado, datos, paths, pal, styles, content_w):
     )
     story.append(Spacer(1, 6))
 
-    story.append(
-        crear_tabla_diseno_nec(paq, pal, content_w)
-    )
+    tabla_nec = crear_tabla_diseno_nec(paq, pal, content_w)
+
+    if tabla_nec:
+        story.append(tabla_nec)
+    else:
+        story.append(
+            Paragraph("No hay dimensionamiento NEC disponible.", styles["BodyText"])
+        )
 
     story.append(Spacer(1, 12))
 
