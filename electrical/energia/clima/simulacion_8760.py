@@ -36,7 +36,7 @@ from typing import List
 
 from solar.posicion_solar import calcular_posicion_solar
 from solar.irradiancia_plano import calcular_irradiancia_plano
-from solar.modelo_termico import calcular_temperatura_celda
+from electrical.paneles.modelo_termico import calcular_temperatura_celda
 
 from electrical.paneles.potencia_panel import (
     calcular_potencia_panel,
