@@ -48,16 +48,17 @@ from typing import List
 
 from solar.posicion_solar import calcular_posicion_solar
 from solar.irradiancia_plano import calcular_irradiancia_plano
+
 from electrical.paneles.modelo_termico import calcular_temperatura_celda
 
-from .resultado_clima import ClimaHora
+from .resultado_clima import ResultadoClima, ClimaHora, validar_clima_8760
 
 
 # ==========================================================
-# MODELO DE SALIDA
+# ESTADO SOLAR POR HORA
 # ==========================================================
 
-@dataclass
+@dataclass(frozen=True)
 class EstadoSolarHora:
     """
     Estado solar del sistema para una hora específica.
@@ -78,7 +79,7 @@ class EstadoSolarHora:
 # RESULTADO DE SIMULACIÓN
 # ==========================================================
 
-@dataclass
+@dataclass(frozen=True)
 class ResultadoClima8760:
     """
     Serie completa de condiciones solares del año.
@@ -94,23 +95,20 @@ class ResultadoClima8760:
 # ==========================================================
 
 def simular_clima_8760(
-
-    clima: List[ClimaHora],
-
-    lat: float,
-    lon: float,
-
+    clima: ResultadoClima,
     tilt: float,
     azimuth: float
-
 ) -> ResultadoClima8760:
     """
     Genera la serie horaria de condiciones solares
-    para el plano del generador FV.
+    para el plano del generador fotovoltaico.
     """
 
-    if len(clima) != 8760:
-        raise ValueError("La serie climática debe tener 8760 horas.")
+    # ------------------------------------------------------
+    # VALIDAR CLIMA
+    # ------------------------------------------------------
+
+    validar_clima_8760(clima)
 
     horas: List[EstadoSolarHora] = []
 
@@ -121,7 +119,7 @@ def simular_clima_8760(
     # SIMULACIÓN HORARIA
     # ======================================================
 
-    for h, hora_clima in enumerate(clima):
+    for hora_clima in clima.horas:
 
         # --------------------------------------------------
         # POSICIÓN SOLAR
@@ -129,17 +127,16 @@ def simular_clima_8760(
 
         pos = calcular_posicion_solar(
 
-            hora_anual=h,
+            timestamp=hora_clima.timestamp,
 
-            lat=lat,
+            lat=clima.latitud,
 
-            lon=lon
-
+            lon=clima.longitud
         )
 
 
         # --------------------------------------------------
-        # IRRADIANCIA EN PLANO DEL GENERADOR
+        # IRRADIANCIA EN PLANO DEL GENERADOR (POA)
         # --------------------------------------------------
 
         poa = calcular_irradiancia_plano(
@@ -153,7 +150,6 @@ def simular_clima_8760(
             tilt=tilt,
 
             azimuth_superficie=azimuth
-
         )
 
 
@@ -161,22 +157,26 @@ def simular_clima_8760(
         # TEMPERATURA DE CELDA
         # --------------------------------------------------
 
-        t_cell = calcular_temperatura_celda(
+        temp_celda = calcular_temperatura_celda(
 
             irradiancia_wm2=poa,
 
             temperatura_amb_c=hora_clima.temp_amb_c
-
         )
 
 
         # --------------------------------------------------
-        # ACUMULAR POA
+        # ACUMULAR IRRADIANCIA ANUAL
         # --------------------------------------------------
 
         if poa > 0:
+
             poa_total_kwh_m2 += poa / 1000
 
+
+        # --------------------------------------------------
+        # GUARDAR ESTADO HORARIO
+        # --------------------------------------------------
 
         horas.append(
 
@@ -186,7 +186,7 @@ def simular_clima_8760(
 
                 temp_amb_c=hora_clima.temp_amb_c,
 
-                temp_celda_c=t_cell,
+                temp_celda_c=temp_celda,
 
                 zenith=pos.zenith,
 
@@ -196,6 +196,10 @@ def simular_clima_8760(
 
         )
 
+
+    # ======================================================
+    # RESULTADO
+    # ======================================================
 
     return ResultadoClima8760(
 
