@@ -12,33 +12,29 @@ Pipeline energético (modelo HSP):
             ↓
     generación DC bruta
             ↓
-    pérdidas físicas del sistema
+    pérdidas DC + sombras
             ↓
     modelo energético del inversor
             ↓
+    pérdidas AC
+            ↓
     energía AC útil
-
 
 Pipeline energético (modelo 8760):
 
-    simulación horaria
+    simulación horaria completa
             ↓
     agregación mensual
             ↓
     energía AC útil
-
-
-Salida del dominio:
-
-    EnergiaResultado
 """
 
 from .contrato import EnergiaInput, EnergiaResultado
 
 from .orientacion import factor_orientacion_total
-
 from .generacion_bruta import calcular_energia_bruta_dc
 from .perdidas_fisicas import aplicar_perdidas
+from .perdidas_ac import aplicar_perdidas_ac
 from .modelo_energetico_inversor import aplicar_modelo_inversor
 
 from .clima.simulacion_8760 import simular_8760
@@ -83,27 +79,21 @@ def _resultado_error(inp: EnergiaInput, errores: list[str]) -> EnergiaResultado:
 def _modelo_hsp(inp: EnergiaInput):
 
     # ------------------------------------------------------
-    # Factor de orientación del sistema
+    # ORIENTACIÓN
     # ------------------------------------------------------
 
     factor_orientacion = factor_orientacion_total(
 
         tipo_superficie=inp.tipo_superficie,
-
         azimut_deg=inp.azimut_deg,
-
         azimut_a_deg=inp.azimut_a_deg,
-
         azimut_b_deg=inp.azimut_b_deg,
-
         reparto_pct_a=inp.reparto_pct_a,
-
         hemisferio=inp.hemisferio,
     )
 
-
     # ------------------------------------------------------
-    # Generación DC bruta
+    # GENERACIÓN DC BRUTA
     # ------------------------------------------------------
 
     r_bruta = calcular_energia_bruta_dc(
@@ -118,34 +108,33 @@ def _modelo_hsp(inp: EnergiaInput):
 
     energia_bruta = r_bruta.energia_mensual_dc_kwh
 
-
     # ------------------------------------------------------
-    # Aplicar pérdidas físicas
+    # PÉRDIDAS DC + SOMBRAS
     # ------------------------------------------------------
 
     r_perdidas = aplicar_perdidas(
         energia_dc_12m=energia_bruta,
         perdidas_dc_pct=inp.perdidas_dc_pct,
-        perdidas_ac_pct=inp.perdidas_ac_pct,
+        perdidas_ac_pct=0.0,  # AC se aplica después
         sombras_pct=inp.sombras_pct,
     )
 
     if not r_perdidas.ok:
         return None, r_perdidas.errores
 
-    energia_despues_perdidas = r_perdidas.energia_neta_12m_kwh
+    energia_despues_perdidas_dc = r_perdidas.energia_neta_12m_kwh
 
+    # pérdidas DC
     energia_perdidas = [
-        b - d for b, d in zip(energia_bruta, energia_despues_perdidas)
+        b - d for b, d in zip(energia_bruta, energia_despues_perdidas_dc)
     ]
 
-
     # ------------------------------------------------------
-    # Modelo energético del inversor
+    # INVERSOR
     # ------------------------------------------------------
 
     r_inv = aplicar_modelo_inversor(
-        energia_dc_12m=energia_despues_perdidas,
+        energia_dc_12m=energia_despues_perdidas_dc,
         pdc_kw=inp.pdc_instalada_kw,
         pac_kw=inp.pac_nominal_kw,
         eficiencia_inv=inp.eficiencia_inversor,
@@ -155,14 +144,35 @@ def _modelo_hsp(inp: EnergiaInput):
     if not r_inv.ok:
         return None, r_inv.errores
 
-    energia_util = r_inv.energia_ac_12m_kwh
+    energia_ac_pre = r_inv.energia_ac_12m_kwh
     energia_clipping = r_inv.energia_clipping_12m_kwh
 
+    # ------------------------------------------------------
+    # PÉRDIDAS AC
+    # ------------------------------------------------------
+
+    r_ac = aplicar_perdidas_ac(
+        energia_ac_12m=energia_ac_pre,
+        perdidas_ac_pct=inp.perdidas_ac_pct,
+    )
+
+    if not r_ac.ok:
+        return None, r_ac.errores
+
+    energia_util = r_ac.energia_ac_neta_12m_kwh
+
+    energia_perdidas_ac = [
+        a - b for a, b in zip(energia_ac_pre, energia_util)
+    ]
+
+    energia_perdidas = [
+        dc + ac for dc, ac in zip(energia_perdidas, energia_perdidas_ac)
+    ]
 
     return (
         energia_bruta,
         energia_perdidas,
-        energia_despues_perdidas,
+        energia_despues_perdidas_dc,
         energia_util,
         energia_clipping,
         factor_orientacion,
@@ -207,10 +217,6 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
 
     errores: list[str] = []
 
-    # ------------------------------------------------------
-    # Validación básica
-    # ------------------------------------------------------
-
     if inp.pdc_instalada_kw <= 0:
         errores.append("Potencia DC inválida")
 
@@ -220,9 +226,8 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
     if errores:
         return _resultado_error(inp, errores)
 
-
     # ------------------------------------------------------
-    # Selección del motor
+    # SELECCIÓN MOTOR
     # ------------------------------------------------------
 
     modo = getattr(inp, "modo_simulacion", "HSP")
@@ -235,7 +240,6 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
     if errores:
         return _resultado_error(inp, errores)
 
-
     (
         energia_bruta,
         energia_perdidas,
@@ -245,9 +249,8 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
         factor_orientacion,
     ) = resultado
 
-
     # ------------------------------------------------------
-    # Agregación anual
+    # AGREGACIÓN ANUAL
     # ------------------------------------------------------
 
     energia_bruta_anual = sum(energia_bruta)
@@ -256,19 +259,9 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
     energia_util_anual = sum(energia_util)
     energia_clipping_anual = sum(energia_clipping)
 
-
-    # ------------------------------------------------------
-    # DC / AC ratio
-    # ------------------------------------------------------
-
     pac = inp.pac_nominal_kw
 
     dc_ac_ratio = inp.pdc_instalada_kw / pac if pac > 0 else 0.0
-
-
-    # ------------------------------------------------------
-    # Resultado final
-    # ------------------------------------------------------
 
     return EnergiaResultado(
 
