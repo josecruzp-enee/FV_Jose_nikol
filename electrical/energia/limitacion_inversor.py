@@ -1,101 +1,154 @@
 from __future__ import annotations
 
+"""
+MODELO ELÉCTRICO DEL INVERSOR — FV Engine
+
+Dominio: electrical.energia.inversor
+
+Responsabilidad
+---------------
+Simular el comportamiento eléctrico instantáneo del inversor
+fotovoltaico durante la conversión DC → AC.
+
+Este modelo representa el límite físico del inversor cuando
+la potencia DC del generador supera la capacidad AC del equipo.
+
+Conceptos físicos modelados
+---------------------------
+
+1) Conversión DC → AC
+
+    P_AC = P_DC × eficiencia
+
+2) Límite de potencia del inversor
+
+    Cuando:
+
+        P_AC_teórica > P_AC_nominal
+
+    el inversor limita su salida a su potencia nominal.
+
+    Esto se conoce como:
+
+        CLIPPING
+
+3) Energía recortada
+
+    Es la potencia que el inversor no puede entregar
+    debido a su límite AC.
+
+Relación en el motor FV
+-----------------------
+
+    potencia_arreglo
+            ↓
+    modelo_inversor   ← ESTE MÓDULO
+            ↓
+    modelo energético del inversor
+            ↓
+    producción energética final
+"""
+
 from dataclasses import dataclass
-from typing import List
 
 
-Vector12 = List[float]
+# ==========================================================
+# ENTRADA DEL MODELO
+# ==========================================================
+
+@dataclass
+class InversorInput:
+    """
+    Parámetros eléctricos de entrada del inversor.
+    """
+
+    # Potencia DC entregada por el generador FV
+    pdc_w: float
+
+    # Potencia nominal AC del inversor
+    kw_ac_nominal: float
+
+    # Eficiencia nominal del inversor (0–1)
+    eficiencia_nominal: float
 
 
 # ==========================================================
 # RESULTADO
 # ==========================================================
 
-@dataclass(frozen=True)
-class CurtailmentResultado:
+@dataclass
+class InversorResultado:
+    """
+    Resultado del modelo eléctrico del inversor.
+    """
 
-    ok: bool
-    errores: List[str]
+    # potencia AC entregada por el inversor
+    pac_w: float
 
-    energia_final_12m_kwh: Vector12
-    energia_recortada_12m_kwh: Vector12
+    # eficiencia aplicada
+    eficiencia: float
 
-    energia_recortada_anual_kwh: float
+    # potencia recortada por clipping
+    clipping_w: float
 
 
 # ==========================================================
-# API PUBLICA
+# MOTOR DEL INVERSOR
 # ==========================================================
 
-def aplicar_curtailment(
-    *,
-    energia_12m: Vector12,
-    pdc_kw: float,
-    kw_ac: float,
-    permitir: bool,
-) -> CurtailmentResultado:
+def calcular_operacion_inversor(inp: InversorInput) -> InversorResultado:
+    """
+    Calcula la potencia AC entregada por el inversor
+    a partir de la potencia DC del generador.
 
-    errores: List[str] = []
+    Parámetros
+    ----------
+    inp : InversorInput
+        Condiciones eléctricas del inversor.
 
-    if len(energia_12m) != 12:
-        errores.append("energia_12m debe tener 12 valores.")
+    Retorna
+    -------
+    InversorResultado
+        Estado eléctrico del inversor.
+    """
 
-    if pdc_kw < 0:
-        errores.append("pdc_kw inválido.")
+    # ------------------------------------------------------
+    # Validación básica
+    # ------------------------------------------------------
 
-    if kw_ac < 0:
-        errores.append("kw_ac inválido.")
+    if inp.pdc_w < 0:
+        raise ValueError("pdc_w inválido")
 
-    energia_final: Vector12 = []
-    energia_recortada: Vector12 = []
+    # potencia máxima AC del inversor
+    pac_max = inp.kw_ac_nominal * 1000
 
-    if not errores:
+    # ------------------------------------------------------
+    # Conversión DC → AC
+    # ------------------------------------------------------
 
-        # --------------------------------------------------
-        # Sin limitación
-        # --------------------------------------------------
+    pac_teorica = inp.pdc_w * inp.eficiencia_nominal
 
-        if not permitir or kw_ac <= 0:
+    # ------------------------------------------------------
+    # Verificación de clipping
+    # ------------------------------------------------------
 
-            energia_final = list(energia_12m)
-            energia_recortada = [0.0] * 12
+    if pac_teorica <= pac_max:
 
-        else:
+        pac = pac_teorica
+        clipping = 0.0
 
-            ratio = float(pdc_kw) / float(kw_ac)
+    else:
 
-            if ratio <= 1.0:
+        pac = pac_max
+        clipping = pac_teorica - pac_max
 
-                energia_final = list(energia_12m)
-                energia_recortada = [0.0] * 12
+    # ------------------------------------------------------
+    # Resultado
+    # ------------------------------------------------------
 
-            else:
+    return InversorResultado(
 
-                # --------------------------------------------------
-                # Modelo físico simplificado de clipping
-                # --------------------------------------------------
-
-                loss_clip = 0.5 * (ratio - 1.0) ** 2
-
-                loss_clip = max(0.0, min(0.15, loss_clip))
-
-                for i in range(12):
-
-                    e = float(energia_12m[i])
-
-                    r = e * loss_clip
-
-                    energia_recortada.append(r)
-                    energia_final.append(max(0.0, e - r))
-
-    energia_recortada_anual = sum(energia_recortada)
-
-    ok = len(errores) == 0
-
-    return CurtailmentResultado(
-        ok=ok,
-        errores=errores,
-        energia_final_12m_kwh=energia_final,
-        energia_recortada_12m_kwh=energia_recortada,
-        energia_recortada_anual_kwh=energia_recortada_anual,
+        pac_w=pac,
+        eficiencia=inp.eficiencia_nominal,
+        clipping_w=clipping,
     )
