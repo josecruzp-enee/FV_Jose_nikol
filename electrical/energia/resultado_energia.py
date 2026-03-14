@@ -7,6 +7,7 @@ from typing import List, Dict, Any
 # ==========================================================
 """
 CONTRATO DE RESULTADO — DOMINIO ENERGÍA
+=======================================
 
 Define la estructura oficial de salida del cálculo energético
 del sistema fotovoltaico dentro de FV Engine.
@@ -107,6 +108,43 @@ class EnergiaResultado:
 
 
     # ------------------------------------------------------
+    # Indicadores energéticos
+    # ------------------------------------------------------
+
+    produccion_especifica_kwh_kwp: float
+    # Producción específica del sistema FV.
+    #
+    # Energía AC anual producida por cada kWp instalado.
+    #
+    # Fórmula:
+    #
+    #     energia_util_anual / pdc_instalada_kw
+    #
+    # Unidad:
+    #
+    #     kWh/kWp
+    #
+    # Permite comparar el rendimiento energético del sistema
+    # independientemente del tamaño de la planta.
+
+
+    performance_ratio: float
+    # Performance Ratio (PR) del sistema fotovoltaico.
+    #
+    # Representa la eficiencia global del sistema considerando
+    # pérdidas térmicas, eléctricas, conversión del inversor
+    # y clipping.
+    #
+    # Fórmula aproximada usada en el motor:
+    #
+    #     PR = energia_util_anual / energia_bruta_anual
+    #
+    # Valores típicos:
+    #
+    #     0.70 – 0.85
+
+
+    # ------------------------------------------------------
     # Metadata del cálculo
     # ------------------------------------------------------
 
@@ -117,5 +155,6 @@ class EnergiaResultado:
     #
     # {
     #     "motor": "HSP" | "8760",
-    #     "meses": 12
+    #     "meses": 12,
+    #     "factor_orientacion": 0.94
     # }
