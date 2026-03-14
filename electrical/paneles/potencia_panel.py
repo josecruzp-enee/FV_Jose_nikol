@@ -1,7 +1,7 @@
 """
 MODELO DE POTENCIA DEL PANEL FV — FV Engine
 
-Dominio: panel
+Dominio: paneles / energía
 
 Responsabilidad
 ---------------
@@ -10,20 +10,62 @@ en condiciones reales de operación.
 
 Este módulo ajusta:
 
-• Voc
-• Vmp
-• Potencia del módulo
+• potencia máxima del módulo
+• voltaje en punto de máxima potencia (Vmp)
+• voltaje en circuito abierto (Voc)
 
 en función de:
 
 • irradiancia incidente (POA)
 • temperatura de celda
-• coeficientes del panel
+• coeficientes térmicos del panel
 
 Modelo utilizado
 ----------------
 Modelo simplificado basado en coeficientes térmicos.
 """
+"""
+RELACIÓN DEL MÓDULO EN EL MOTOR FV — FV Engine
+
+Este módulo calcula el comportamiento eléctrico de un módulo
+fotovoltaico bajo condiciones reales de operación.
+
+Recibe información de:
+
+    modelo_termico.py
+        → temperatura de celda del módulo
+
+    modelo_clima / irradiancia_poa
+        → irradiancia incidente en el plano del generador (POA)
+
+    catálogo de paneles
+        → parámetros eléctricos del módulo en STC
+           (Pmax, Vmp, Voc y coeficientes térmicos)
+
+Entrega resultados a:
+
+    potencia_string.py
+        → cálculo del comportamiento eléctrico del string FV
+           (paneles conectados en serie)
+
+Rol en el flujo energético del sistema:
+
+    clima / irradiancia
+            ↓
+    modelo_termico
+            ↓
+    potencia_panel
+            ↓
+    potencia_string
+            ↓
+    potencia_arreglo
+            ↓
+    producción energética del sistema FV
+
+Este módulo representa el nivel físico más bajo del modelo
+energético del generador fotovoltaico.
+"""
+
 
 from dataclasses import dataclass
 
@@ -67,16 +109,31 @@ class PotenciaPanelResultado:
 
 def calcular_potencia_panel(inp: PotenciaPanelInput) -> PotenciaPanelResultado:
     """
-    Calcula potencia y voltajes del panel en condiciones reales.
+    Calcula potencia y voltajes del panel bajo condiciones
+    reales de irradiancia y temperatura.
     """
 
-    g = inp.irradiancia_poa_wm2
+    poa = inp.irradiancia_poa_wm2
     t_cell = inp.temperatura_celda_c
 
-    # irradiancia relativa
-    g_rel = g / 1000
+    # ------------------------------------------------------
+    # Sin irradiancia no hay generación
+    # ------------------------------------------------------
 
-    # diferencia respecto a STC
+    if poa <= 0:
+        return PotenciaPanelResultado(
+            pmp_w=0.0,
+            vmp_v=0.0,
+            voc_v=0.0
+        )
+
+    # ------------------------------------------------------
+    # irradiancia relativa respecto a STC
+    # ------------------------------------------------------
+
+    g_rel = poa / 1000
+
+    # diferencia de temperatura respecto a STC
     delta_t = t_cell - 25
 
     # ------------------------------------------------------
