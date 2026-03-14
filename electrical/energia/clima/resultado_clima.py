@@ -3,33 +3,13 @@ from __future__ import annotations
 """
 CONTRATO DEL DOMINIO CLIMA — FV Engine
 
-Este módulo define las estructuras oficiales de datos
-climáticos utilizadas por el motor energético del sistema.
-
-Regla arquitectónica
---------------------
-Este archivo representa la frontera del dominio clima.
-
-Ningún módulo externo debe depender de implementaciones
-internas como:
-
-    lector_pvgis
-    clima_tmy
-    generador_clima_base
-
-Todos los módulos consumidores deben utilizar únicamente
-las estructuras definidas aquí.
-
-Consumidores típicos
---------------------
-
-    simulacion_8760
-    orquestador_energia
+Define las estructuras oficiales de datos climáticos
+utilizadas por el motor energético del sistema.
 """
-
 
 from dataclasses import dataclass
 from typing import List
+from datetime import datetime
 
 
 # ==========================================================
@@ -42,10 +22,13 @@ class ClimaHora:
     Datos climáticos de una hora específica.
     """
 
-    # Irradiancia global horizontal
+    # timestamp real necesario para posición solar
+    timestamp: datetime
+
+    # irradiancia global horizontal
     ghi_wm2: float
 
-    # Temperatura ambiente
+    # temperatura ambiente
     temp_amb_c: float
 
 
@@ -57,8 +40,6 @@ class ClimaHora:
 class ResultadoClima:
     """
     Serie climática anual utilizada por el simulador 8760.
-
-    Contiene 8760 registros horarios.
     """
 
     horas: List[ClimaHora]
