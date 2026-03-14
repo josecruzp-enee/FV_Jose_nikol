@@ -8,41 +8,40 @@ Responsabilidad
 Generar un clima sintético de 8760 horas cuando
 no se dispone de datos reales (PVGIS / TMY).
 
-Este modelo sirve para:
-
+Uso
+---
 • pruebas del motor energético
 • desarrollo offline
 • validación de algoritmos
-
-Datos generados:
-
-• GHI
-• DNI
-• DHI
-• temperatura ambiente
 """
 
+from datetime import datetime, timedelta
 from typing import List
 from math import sin, pi
 
-from .resultado_clima import ClimaHora
+from .resultado_clima import ResultadoClima, ClimaHora
 
 
 # ==========================================================
 # GENERADOR DE CLIMA SINTÉTICO
 # ==========================================================
 
-def generar_clima_base() -> List[ClimaHora]:
+def generar_clima_base() -> ResultadoClima:
 
-    clima: List[ClimaHora] = []
+    horas: List[ClimaHora] = []
+
+    inicio = datetime(2020, 1, 1, 0, 0)
 
     for h in range(8760):
 
-        hora_dia = h % 24
-        dia_anio = h // 24
+        timestamp = inicio + timedelta(hours=h)
+
+        hora_dia = timestamp.hour
+        dia_anio = timestamp.timetuple().tm_yday
+
 
         # --------------------------------------------------
-        # IRRADIANCIA DIARIA (forma solar aproximada)
+        # IRRADIANCIA DIARIA
         # --------------------------------------------------
 
         if 6 <= hora_dia <= 18:
@@ -62,12 +61,11 @@ def generar_clima_base() -> List[ClimaHora]:
         factor_estacional = 0.75 + 0.25 * sin(2 * pi * dia_anio / 365)
 
         ghi *= factor_estacional
-
         ghi = max(0.0, ghi)
 
 
         # --------------------------------------------------
-        # COMPONENTES DIRECTA Y DIFUSA (aproximadas)
+        # COMPONENTES DIRECTA Y DIFUSA
         # --------------------------------------------------
 
         dni = ghi * 0.7
@@ -84,18 +82,11 @@ def generar_clima_base() -> List[ClimaHora]:
         temp = temp_base + temp_variacion
 
 
-        # --------------------------------------------------
-        # TIMESTAMP SINTÉTICO
-        # --------------------------------------------------
-
-        tiempo = f"h{h}"
-
-
-        clima.append(
+        horas.append(
 
             ClimaHora(
 
-                tiempo=tiempo,
+                timestamp=timestamp,
 
                 ghi_wm2=ghi,
                 dni_wm2=dni,
@@ -108,4 +99,15 @@ def generar_clima_base() -> List[ClimaHora]:
         )
 
 
-    return clima
+    return ResultadoClima(
+
+        horas=horas,
+
+        latitud=0.0,
+        longitud=0.0,
+
+        fuente="sintetico",
+
+        meta={"modelo": "clima_base"}
+
+    )
