@@ -19,6 +19,7 @@ ResultadoClima
 """
 
 from dataclasses import dataclass
+from datetime import datetime
 import requests
 
 from .resultado_clima import ResultadoClima, ClimaHora
@@ -113,13 +114,22 @@ def descargar_clima_pvgis(
 
     for h in hourly:
 
-        ghi = float(h.get("G(h)", 0) or 0)
+        # tiempo PVGIS
+        timestamp = datetime.strptime(
+            h["time"],
+            "%Y%m%d:%H%M"
+        )
 
-        temp = float(h.get("T2m", 25) or 25)
+        ghi = float(h.get("G(h)", 0))
+
+        temp = float(h.get("T2m", 25))
+
 
         horas.append(
 
             ClimaHora(
+
+                timestamp=timestamp,
 
                 ghi_wm2=ghi,
 
