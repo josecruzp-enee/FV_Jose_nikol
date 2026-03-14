@@ -5,15 +5,10 @@ MODELO ENERGÉTICO DEL INVERSOR — FV Engine
 
 Dominio: electrical.energia
 
-Responsabilidad
----------------
-Calcular la producción energética AC del sistema FV considerando:
+Modelo energético basado en:
 
-• eficiencia del inversor
-• eficiencia parcial por carga
-• pérdidas por clipping DC/AC
-
-Este modelo opera a nivel energético mensual.
+• eficiencia variable del inversor
+• clipping energético DC/AC
 """
 
 from dataclasses import dataclass
@@ -29,19 +24,16 @@ Vector12 = List[float]
 
 @dataclass
 class EnergiaInversorInput:
-    """
-    Parámetros energéticos del sistema FV.
-    """
 
     energia_dc_12m_kwh: Vector12
 
     # potencia DC instalada
     pdc_kw: float
 
-    # potencia nominal AC del inversor
+    # potencia nominal AC
     kw_ac: float
 
-    # eficiencia nominal del inversor (0–1)
+    # eficiencia nominal
     eficiencia_nominal: float
 
 
@@ -51,9 +43,6 @@ class EnergiaInversorInput:
 
 @dataclass
 class EnergiaInversorResultado:
-    """
-    Resultado energético del inversor.
-    """
 
     energia_ac_12m_kwh: Vector12
     energia_clipping_12m_kwh: Vector12
@@ -63,18 +52,12 @@ class EnergiaInversorResultado:
 
 
 # ==========================================================
-# MOTOR DEL INVERSOR
+# MOTOR
 # ==========================================================
 
-def calcular_energia_inversor(inp: EnergiaInversorInput) -> EnergiaInversorResultado:
-    """
-    Calcula la producción energética AC del inversor
-    considerando eficiencia y clipping energético.
-    """
-
-    # ------------------------------------------------------
-    # VALIDACIONES
-    # ------------------------------------------------------
+def calcular_energia_inversor(
+    inp: EnergiaInversorInput
+) -> EnergiaInversorResultado:
 
     if len(inp.energia_dc_12m_kwh) != 12:
         raise ValueError("energia_dc_12m_kwh debe tener 12 valores")
@@ -83,24 +66,23 @@ def calcular_energia_inversor(inp: EnergiaInversorInput) -> EnergiaInversorResul
         raise ValueError("kw_ac inválido")
 
     if not (0 < inp.eficiencia_nominal <= 1):
-        raise ValueError("eficiencia_nominal fuera de rango")
+        raise ValueError("eficiencia_nominal inválida")
 
     # ------------------------------------------------------
-    # DC/AC ratio
+    # carga relativa del inversor
     # ------------------------------------------------------
 
-    ratio = inp.pdc_kw / inp.kw_ac
+    carga_rel = min(1.5, inp.pdc_kw / inp.kw_ac)
 
     # ------------------------------------------------------
-    # modelo simplificado de eficiencia parcial
+    # modelo de eficiencia variable
     # ------------------------------------------------------
-
-    # inversores son menos eficientes con baja carga
-    carga_relativa = min(1.0, ratio)
 
     eficiencia_real = inp.eficiencia_nominal * (
-        0.9 + 0.1 * carga_relativa
+        0.92 + 0.08 * min(1.0, carga_rel)
     )
+
+    eficiencia_real = max(0.85, min(0.99, eficiencia_real))
 
     # ------------------------------------------------------
     # modelo de clipping energético
@@ -108,11 +90,12 @@ def calcular_energia_inversor(inp: EnergiaInversorInput) -> EnergiaInversorResul
 
     loss_clip = 0.0
 
-    if ratio > 1:
-        loss_clip = min(0.15, 0.5 * (ratio - 1) ** 2)
+    if carga_rel > 1:
 
-    energia_ac: Vector12 = []
-    energia_clip: Vector12 = []
+        loss_clip = min(0.15, 0.5 * (carga_rel - 1) ** 2)
+
+    energia_ac = []
+    energia_clip = []
 
     # ------------------------------------------------------
     # cálculo mensual
@@ -120,22 +103,13 @@ def calcular_energia_inversor(inp: EnergiaInversorInput) -> EnergiaInversorResul
 
     for e_dc in inp.energia_dc_12m_kwh:
 
-        if e_dc < 0:
-            raise ValueError("energía DC negativa")
-
-        # conversión DC → AC
         e_ac = e_dc * eficiencia_real
 
-        # pérdidas por clipping
         recorte = e_ac * loss_clip
 
         energia_clip.append(recorte)
 
         energia_ac.append(max(0.0, e_ac - recorte))
-
-    # ------------------------------------------------------
-    # resultado
-    # ------------------------------------------------------
 
     return EnergiaInversorResultado(
 
