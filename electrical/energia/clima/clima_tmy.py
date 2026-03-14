@@ -1,34 +1,203 @@
 from __future__ import annotations
 
 """
-MODELO CLIMÁTICO — FV Engine
+LECTOR PVGIS — FV Engine
 
 Responsabilidad
 ---------------
-Definir la estructura de datos climáticos horarios
-utilizados por el motor energético.
+Descargar datos climáticos horarios desde la API de PVGIS
+y convertirlos al modelo interno del dominio clima.
 
-Este módulo NO genera datos climáticos.
+Este módulo representa la frontera entre:
 
-Los datos pueden provenir de:
+    API PVGIS
+        ↓
+    Dominio clima de FV Engine
 
-• PVGIS
-• TMY
-• clima sintético
+Salida
+------
+ResultadoClima con 8760 horas climáticas.
+
+Variables capturadas
+--------------------
+
+GHI  → irradiancia global horizontal
+DNI  → irradiancia directa normal
+DHI  → irradiancia difusa horizontal
+T2m  → temperatura ambiente
+WS10m → velocidad del viento
+
+Estas variables permiten posteriormente modelar:
+
+• irradiancia en plano (POA)
+• modelo térmico del panel
+• potencia FV
 """
 
 from dataclasses import dataclass
+import requests
+
+from .resultado_clima import ResultadoClima, ClimaHora
 
 
 # ==========================================================
-# ESTRUCTURA DE DATOS CLIMÁTICOS
+# MODELO DE ENTRADA
 # ==========================================================
 
 @dataclass
-class ClimaHora:
+class EntradaClimaPVGIS:
     """
-    Representa las condiciones climáticas de una hora.
+    Parámetros necesarios para descargar clima desde PVGIS.
     """
 
-    ghi_wm2: float
-    temp_amb_c: float
+    lat: float
+    lon: float
+
+    startyear: int = 2020
+    endyear: int = 2020
+
+
+# ==========================================================
+# URL BASE PVGIS
+# ==========================================================
+
+PVGIS_URL = "https://re.jrc.ec.europa.eu/api/seriescalc"
+
+
+# ==========================================================
+# DESCARGA CLIMA PVGIS
+# ==========================================================
+
+def descargar_clima_pvgis(
+    entrada: EntradaClimaPVGIS
+) -> ResultadoClima:
+
+    params = {
+
+        "lat": entrada.lat,
+        "lon": entrada.lon,
+
+        "outputformat": "json",
+
+        "startyear": entrada.startyear,
+        "endyear": entrada.endyear,
+
+        "usehorizon": 1,
+
+        # Importante: solo datos climáticos
+        "pvcalculation": 0,
+
+        "browser": 0
+    }
+
+    # ------------------------------------------------------
+    # DESCARGA
+    # ------------------------------------------------------
+
+    try:
+
+        r = requests.get(PVGIS_URL, params=params, timeout=60)
+
+        r.raise_for_status()
+
+    except requests.RequestException as e:
+
+        raise RuntimeError(
+            f"Error descargando datos PVGIS: {e}"
+        ) from e
+
+
+    # ------------------------------------------------------
+    # VALIDAR RESPUESTA
+    # ------------------------------------------------------
+
+    data = r.json()
+
+    if "outputs" not in data or "hourly" not in data["outputs"]:
+
+        raise RuntimeError(
+            "Formato de respuesta PVGIS inválido"
+        )
+
+    hourly = data["outputs"]["hourly"]
+
+
+    # ------------------------------------------------------
+    # CONSTRUIR SERIE CLIMÁTICA
+    # ------------------------------------------------------
+
+    horas: list[ClimaHora] = []
+
+    for h in hourly:
+
+        # Irradiancia
+        ghi = float(h.get("G(h)", 0) or 0)
+        dni = float(h.get("Gb(n)", 0) or 0)
+        dhi = float(h.get("Gd(h)", 0) or 0)
+
+        # Temperatura ambiente
+        temp = float(h.get("T2m", 25) or 25)
+
+        # Velocidad viento
+        wind = float(h.get("WS10m", 1) or 1)
+
+        horas.append(
+
+            ClimaHora(
+
+                ghi_wm2=ghi,
+                dni_wm2=dni,
+                dhi_wm2=dhi,
+
+                temp_amb_c=temp,
+                wind_ms=wind
+
+            )
+
+        )
+
+
+    # ------------------------------------------------------
+    # VALIDAR 8760 HORAS
+    # ------------------------------------------------------
+
+    if len(horas) != 8760:
+
+        raise RuntimeError(
+
+            f"PVGIS devolvió {len(horas)} horas en lugar de 8760"
+
+        )
+
+
+    # ------------------------------------------------------
+    # RESULTADO DEL DOMINIO
+    # ------------------------------------------------------
+
+    return ResultadoClima(
+
+        horas=horas,
+
+        latitud=entrada.lat,
+        longitud=entrada.lon,
+
+        fuente="PVGIS",
+
+        meta={
+
+            "startyear": entrada.startyear,
+            "endyear": entrada.endyear,
+
+            "variables": [
+
+                "GHI",
+                "DNI",
+                "DHI",
+                "Temperatura",
+                "Viento"
+
+            ]
+
+        }
+
+    )
