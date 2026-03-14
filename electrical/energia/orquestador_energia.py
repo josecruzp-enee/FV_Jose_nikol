@@ -1,54 +1,50 @@
+```python
 from __future__ import annotations
 
 """
 ORQUESTADOR DEL DOMINIO ENERGÍA — FV Engine
 ===========================================
 
-Este módulo coordina el cálculo energético del sistema FV.
+Coordina el cálculo energético del sistema fotovoltaico.
 
-Responsabilidad
----------------
-
-Ejecutar el motor energético seleccionando entre:
+Motores disponibles
+-------------------
 
 • Modelo HSP mensual (rápido)
-• Simulación 8760 (detallada)
+• Simulación horaria 8760 (detallada)
 
-Pipeline del modelo HSP
------------------------
+Pipeline energético (HSP)
+-------------------------
 
     generación DC bruta
             ↓
     pérdidas físicas
             ↓
-    limitación del inversor (curtailment)
+    modelo energético del inversor
             ↓
-    energía útil
+    energía AC útil
 
-Pipeline del modelo 8760
-------------------------
+Pipeline energético (8760)
+--------------------------
 
-    simulación horaria del sistema
+    simulación horaria
             ↓
     agregación mensual
             ↓
-    energía útil
+    energía AC útil
 
 Salida del dominio
 ------------------
 
-Este módulo produce un único objeto:
-
-    EnergiaResultado
+EnergiaResultado
 """
 
 from .contrato import EnergiaInput, EnergiaResultado
 
 from .generacion_bruta import calcular_energia_bruta_dc
 from .perdidas_fisicas import aplicar_perdidas
-from .limitacion_inversor import aplicar_curtailment
+from .modelo_inversor import aplicar_modelo_inversor
 
-# motor avanzado
 from .clima.simulacion_8760 import simular_8760
 from .clima.agregacion_8760 import agregar_energia_por_mes
 
@@ -121,24 +117,28 @@ def _modelo_hsp(inp: EnergiaInput):
     energia_perdidas = r_perdidas.energia_neta_12m_kwh
 
     # ------------------------------------------------------
-    # Limitación del inversor
+    # Modelo energético del inversor
     # ------------------------------------------------------
 
-    r_curt = aplicar_curtailment(
-        energia_12m=energia_perdidas,
+    r_inv = aplicar_modelo_inversor(
+        energia_dc_12m=energia_perdidas,
         pdc_kw=inp.pdc_instalada_kw,
-        kw_ac=inp.pac_nominal_kw,
-        permitir=inp.permitir_curtailment,
+        pac_kw=inp.pac_nominal_kw,
+        eficiencia_inv=inp.eficiencia_inversor,
+        permitir_curtailment=inp.permitir_curtailment,
     )
 
-    if not r_curt.ok:
-        return None, r_curt.errores
+    if not r_inv.ok:
+        return None, r_inv.errores
+
+    energia_ac = r_inv.energia_ac_12m_kwh
+    energia_curtailment = r_inv.energia_curtailment_12m_kwh
 
     return (
         energia_bruta,
         energia_perdidas,
-        r_curt.energia_final_12m_kwh,
-        r_curt.energia_recortada_12m_kwh,
+        energia_ac,
+        energia_curtailment,
     ), []
 
 
@@ -160,12 +160,14 @@ def _modelo_8760(inp: EnergiaInput):
 
     energia_mensual = agregar_energia_por_mes(energia_horas)
 
-    # En simulación 8760 la energía ya incluye pérdidas
+    # En el modelo 8760 ya se incluye pérdidas e inversor
+    energia_util = energia_mensual
+
     return (
-        energia_mensual,
-        energia_mensual,
-        energia_mensual,
-        [0.0] * 12,
+        energia_util,      # bruta (placeholder)
+        energia_util,      # después pérdidas
+        energia_util,      # energía útil
+        [0.0] * 12,        # curtailment estimado
     ), []
 
 
@@ -187,21 +189,21 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
     if inp.pdc_instalada_kw <= 0:
         errores.append("Pdc inválida.")
 
+    if inp.pac_nominal_kw <= 0:
+        errores.append("Pac inválida.")
+
     if errores:
         return _resultado_error(inp, errores)
 
     # ------------------------------------------------------
-    # Selección del motor de simulación
+    # Selección del motor
     # ------------------------------------------------------
 
     modo = getattr(inp, "modo_simulacion", "mensual")
 
     if modo == "8760":
-
         resultado, errores = _modelo_8760(inp)
-
     else:
-
         resultado, errores = _modelo_hsp(inp)
 
     if errores:
@@ -218,10 +220,10 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
     energia_curtailment_anual = sum(energia_recortada)
 
     # ------------------------------------------------------
-    # Cálculo del DC/AC ratio
+    # DC / AC ratio
     # ------------------------------------------------------
 
-    pac = inp.pac_nominal_kw or 0
+    pac = inp.pac_nominal_kw
     dc_ac_ratio = inp.pdc_instalada_kw / pac if pac > 0 else 0.0
 
     # ------------------------------------------------------
@@ -246,3 +248,4 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
             "meses": 12,
         },
     )
+
