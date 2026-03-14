@@ -1,5 +1,47 @@
 from __future__ import annotations
 
+"""
+ORQUESTADOR DEL DOMINIO ENERGÍA — FV Engine
+===========================================
+
+Este módulo coordina el cálculo energético del sistema FV.
+
+Responsabilidad
+---------------
+
+Ejecutar el motor energético seleccionando entre:
+
+• Modelo HSP mensual (rápido)
+• Simulación 8760 (detallada)
+
+Pipeline del modelo HSP
+-----------------------
+
+    generación DC bruta
+            ↓
+    pérdidas físicas
+            ↓
+    limitación del inversor (curtailment)
+            ↓
+    energía útil
+
+Pipeline del modelo 8760
+------------------------
+
+    simulación horaria del sistema
+            ↓
+    agregación mensual
+            ↓
+    energía útil
+
+Salida del dominio
+------------------
+
+Este módulo produce un único objeto:
+
+    EnergiaResultado
+"""
+
 from .contrato import EnergiaInput, EnergiaResultado
 
 from .generacion_bruta import calcular_energia_bruta_dc
@@ -12,10 +54,13 @@ from .clima.agregacion_8760 import agregar_energia_por_mes
 
 
 # ==========================================================
-# ERROR
+# RESULTADO DE ERROR
 # ==========================================================
 
 def _resultado_error(inp: EnergiaInput, errores: list[str]) -> EnergiaResultado:
+    """
+    Construye un resultado consistente cuando ocurre un error.
+    """
 
     return EnergiaResultado(
         ok=False,
@@ -35,10 +80,17 @@ def _resultado_error(inp: EnergiaInput, errores: list[str]) -> EnergiaResultado:
 
 
 # ==========================================================
-# MODELO HSP (ACTUAL)
+# MODELO HSP (MENSUAL)
 # ==========================================================
 
 def _modelo_hsp(inp: EnergiaInput):
+    """
+    Ejecuta el modelo energético mensual basado en HSP.
+    """
+
+    # ------------------------------------------------------
+    # Generación DC bruta
+    # ------------------------------------------------------
 
     r_bruta = calcular_energia_bruta_dc(
         pdc_kw=inp.pdc_instalada_kw,
@@ -52,6 +104,10 @@ def _modelo_hsp(inp: EnergiaInput):
 
     energia_bruta = r_bruta.energia_mensual_dc_kwh
 
+    # ------------------------------------------------------
+    # Aplicar pérdidas físicas
+    # ------------------------------------------------------
+
     r_perdidas = aplicar_perdidas(
         energia_dc_12m=energia_bruta,
         perdidas_dc_pct=inp.perdidas_dc_pct,
@@ -63,6 +119,10 @@ def _modelo_hsp(inp: EnergiaInput):
         return None, r_perdidas.errores
 
     energia_perdidas = r_perdidas.energia_neta_12m_kwh
+
+    # ------------------------------------------------------
+    # Limitación del inversor
+    # ------------------------------------------------------
 
     r_curt = aplicar_curtailment(
         energia_12m=energia_perdidas,
@@ -87,8 +147,11 @@ def _modelo_hsp(inp: EnergiaInput):
 # ==========================================================
 
 def _modelo_8760(inp: EnergiaInput):
+    """
+    Ejecuta la simulación energética horaria (8760).
+    """
 
-    sim = ejecutar_simulacion_8760(inp)
+    sim = simular_8760(inp)
 
     if not sim.ok:
         return None, sim.errores
@@ -97,21 +160,29 @@ def _modelo_8760(inp: EnergiaInput):
 
     energia_mensual = agregar_energia_por_mes(energia_horas)
 
+    # En simulación 8760 la energía ya incluye pérdidas
     return (
         energia_mensual,
         energia_mensual,
         energia_mensual,
-        [0]*12,
+        [0.0] * 12,
     ), []
 
 
 # ==========================================================
-# MOTOR ENERGÉTICO
+# MOTOR ENERGÉTICO PRINCIPAL
 # ==========================================================
 
 def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
+    """
+    Ejecuta el cálculo energético completo del sistema FV.
+    """
 
     errores: list[str] = []
+
+    # ------------------------------------------------------
+    # Validación básica
+    # ------------------------------------------------------
 
     if inp.pdc_instalada_kw <= 0:
         errores.append("Pdc inválida.")
@@ -120,10 +191,11 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
         return _resultado_error(inp, errores)
 
     # ------------------------------------------------------
-    # SELECCIÓN DE MOTOR
+    # Selección del motor de simulación
     # ------------------------------------------------------
 
     modo = getattr(inp, "modo_simulacion", "mensual")
+
     if modo == "8760":
 
         resultado, errores = _modelo_8760(inp)
@@ -137,13 +209,24 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
 
     energia_bruta, energia_perdidas, energia_util, energia_recortada = resultado
 
+    # ------------------------------------------------------
+    # Agregación anual
+    # ------------------------------------------------------
+
     energia_bruta_anual = sum(energia_bruta)
     energia_util_anual = sum(energia_util)
     energia_curtailment_anual = sum(energia_recortada)
 
-    pac = inp.pac_nominal_kw or 0
+    # ------------------------------------------------------
+    # Cálculo del DC/AC ratio
+    # ------------------------------------------------------
 
+    pac = inp.pac_nominal_kw or 0
     dc_ac_ratio = inp.pdc_instalada_kw / pac if pac > 0 else 0.0
+
+    # ------------------------------------------------------
+    # Resultado final
+    # ------------------------------------------------------
 
     return EnergiaResultado(
         ok=True,
@@ -159,7 +242,7 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
         energia_util_anual=energia_util_anual,
         energia_curtailment_anual=energia_curtailment_anual,
         meta={
-            "motor": "8760" if inp.modo_simulacion == "8760" else "HSP",
+            "motor": "8760" if modo == "8760" else "HSP",
             "meses": 12,
         },
     )
