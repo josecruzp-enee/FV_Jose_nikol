@@ -1,16 +1,78 @@
 """
-Dimensionado de paneles FV.
+DIMENSIONADO DE PANELES FV
+==========================================================
 
-Convierte potencia DC objetivo en número de paneles y potencia DC instalada.
+Este módulo convierte una potencia DC objetivo en el
+número de paneles necesarios y la potencia DC instalada.
 
-Este módulo NO calcula:
+NO calcula:
     - HSP
     - PR
     - consumo energético
     - strings
+    - distribución MPPT
 
 Solo determina:
-    cantidad de paneles necesaria para alcanzar una potencia DC objetivo.
+
+    potencia DC objetivo → cantidad de paneles.
+
+----------------------------------------------------------
+ENTRADAS
+
+Origen:
+    electrical.paneles.entrada_panel.EntradaPaneles
+
+Variables utilizadas:
+
+    entrada.panel.pmax_w
+        Potencia nominal del panel (W), dada por catálogos. 
+
+    entrada.n_paneles_total
+        Número total de paneles definido por el usuario. Esta si se hace de modo manual. 
+
+    entrada.pdc_kw_objetivo
+        Potencia DC objetivo del sistema (kW). Esta si se hace de modo automático para alcanzar una cobertura de demanda (80% predefinido).
+
+----------------------------------------------------------
+SALIDAS
+
+Tipo retornado:
+    PanelSizingResultado
+
+Campos:
+
+    ok
+        Indica si el cálculo fue válido
+
+    errores
+        Lista de errores detectados
+
+    kwp_req
+        Potencia DC objetivo solicitada (kW)
+
+    n_paneles
+        Número final de paneles del sistema
+
+    pdc_kw
+        Potencia DC instalada del sistema (kW)
+
+----------------------------------------------------------
+CONSUMIDO POR
+
+Archivo:
+    electrical.paneles.orquestador_paneles
+
+Flujo del dominio paneles:
+
+    EntradaPaneles
+        ↓
+    dimensionar_paneles()
+        ↓
+    PanelSizingResultado
+        ↓
+    calculo_de_strings()
+
+==========================================================
 """
 
 from __future__ import annotations
@@ -45,7 +107,7 @@ def _safe_float(x, default: float = 0.0) -> float:
     try:
         return float(x)
     except Exception:
-        return float(default)
+        return default
 
 
 def _n_paneles(kwp_req: float, panel_w: float) -> int:
@@ -76,11 +138,19 @@ def dimensionar_paneles(
 
     panel = entrada.panel
 
+    # ------------------------------------------------------
+    # POTENCIA DEL PANEL
+    # ------------------------------------------------------
+
     try:
         panel_w = float(panel.pmax_w)
     except Exception:
         panel_w = 0.0
         errores.append("Panel inválido: pmax_w no numérica.")
+
+    # ------------------------------------------------------
+    # POTENCIA OBJETIVO
+    # ------------------------------------------------------
 
     kwp_req = _safe_float(entrada.pdc_kw_objetivo, 0.0)
 
@@ -93,6 +163,10 @@ def dimensionar_paneles(
         errores.append(
             "Definir solo uno: n_paneles_total o pdc_kw_objetivo"
         )
+
+    # ------------------------------------------------------
+    # RESULTADOS
+    # ------------------------------------------------------
 
     n_pan = 0
     pdc = 0.0
@@ -126,7 +200,7 @@ def dimensionar_paneles(
                 n_pan = _n_paneles(kwp_req, panel_w)
 
             # --------------------------------------------------
-            # POTENCIA INSTALADA
+            # POTENCIA DC INSTALADA
             # --------------------------------------------------
 
             pdc = _pdc_kw(n_pan, panel_w)
@@ -134,6 +208,10 @@ def dimensionar_paneles(
         except Exception as e:
 
             errores.append(str(e))
+
+    # ------------------------------------------------------
+    # RESULTADO FINAL
+    # ------------------------------------------------------
 
     ok = len(errores) == 0
 
@@ -151,16 +229,8 @@ def dimensionar_paneles(
 # ==========================================================
 #
 # PanelSizingResultado
-#
-# Campos:
-#
-# ok : bool
-# errores : list[str]
-# kwp_req : float
-# n_paneles : int
-# pdc_kw : float
-#
+# Campos: ok : bool  ; errores : list[str]   ; kwp_req : float   ; n_paneles : int   ; pdc_kw : float; 
 # Consumido por:
 # electrical.paneles.orquestador_paneles
-#
+##########################################
 # ==========================================================
