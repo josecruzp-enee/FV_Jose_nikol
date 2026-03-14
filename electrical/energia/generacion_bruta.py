@@ -1,11 +1,36 @@
 from __future__ import annotations
 
 """
-Cálculo de generación DC bruta del sistema FV.
+CÁLCULO DE GENERACIÓN DC BRUTA — FV Engine
 
-Modelo físico:
+Dominio: electrical.energia
+
+Responsabilidad
+---------------
+Calcular la energía DC bruta generada por el sistema FV
+antes de considerar pérdidas o limitaciones del inversor.
+
+Modelo físico utilizado
+-----------------------
 
 E_mes = Pdc × HSP × días × factor_orientación
+
+Donde:
+
+    Pdc                potencia DC instalada (kW)
+    HSP                horas solares pico del mes (kWh/m²/día)
+    días               número de días del mes
+    factor_orientación factor de ajuste por orientación e inclinación
+
+La energía calculada corresponde a:
+
+    generación DC bruta del sistema FV
+
+Esta energía será posteriormente ajustada por:
+
+    • pérdidas físicas
+    • eficiencia del inversor
+    • clipping DC/AC
 """
 
 from dataclasses import dataclass
@@ -20,6 +45,9 @@ Vector12 = List[float]
 
 @dataclass(frozen=True)
 class GeneracionBrutaResultado:
+    """
+    Resultado del cálculo de generación DC bruta.
+    """
 
     ok: bool
     errores: List[str]
@@ -39,6 +67,29 @@ def calcular_energia_bruta_dc(
     dias_mes: List[int],
     factor_orientacion: float,
 ) -> GeneracionBrutaResultado:
+    """
+    Calcula la generación DC bruta del sistema FV.
+
+    Parámetros
+    ----------
+    pdc_kw : float
+        Potencia DC instalada del sistema.
+
+    hsp_12m : List[float]
+        Horas solares pico promedio para cada mes.
+
+    dias_mes : List[int]
+        Número de días de cada mes.
+
+    factor_orientacion : float
+        Factor de corrección por orientación e inclinación
+        del generador FV.
+
+    Retorna
+    -------
+    GeneracionBrutaResultado
+        Energía DC mensual y anual generada por el sistema.
+    """
 
     errores: List[str] = []
 
@@ -65,7 +116,7 @@ def calcular_energia_bruta_dc(
         errores.append("dias_mes contiene valores inválidos.")
 
     # ------------------------------------------------------
-    # CÁLCULO DE ENERGÍA
+    # CÁLCULO DE ENERGÍA MENSUAL
     # ------------------------------------------------------
 
     energia: Vector12 = []
@@ -77,9 +128,14 @@ def calcular_energia_bruta_dc(
             h = float(hsp_12m[i])
             d = int(dias_mes[i])
 
+            # fórmula del modelo HSP
             e_mes = float(pdc_kw) * h * d * float(factor_orientacion)
 
             energia.append(e_mes)
+
+    # ------------------------------------------------------
+    # ENERGÍA ANUAL
+    # ------------------------------------------------------
 
     energia_anual = sum(energia)
 
