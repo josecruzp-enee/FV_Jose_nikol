@@ -1,10 +1,13 @@
+from __future__ import annotations
+
 """
 CONTRATO DEL DOMINIO PANELES — FV ENGINE
+========================================
 
 Este módulo define la SALIDA OFICIAL del motor del generador FV DC.
 
-Regla arquitectónica:
----------------------
+Regla arquitectónica
+--------------------
 
 Ningún módulo externo debe depender de estructuras internas
 de cálculo del dominio paneles.
@@ -12,7 +15,7 @@ de cálculo del dominio paneles.
 Todos los módulos consumidores deben utilizar exclusivamente
 las clases definidas en este contrato.
 
-Consumidores típicos:
+Consumidores típicos del dominio paneles:
 
     energia
     corrientes
@@ -25,8 +28,6 @@ Consumidores típicos:
 Este contrato representa el estado final del generador FV DC.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from typing import List, Dict, Any
 
@@ -35,7 +36,7 @@ from typing import List, Dict, Any
 # INFORMACIÓN ELÉCTRICA POR MPPT / GRUPO DE STRINGS
 # =========================================================
 
-@dataclass
+@dataclass(frozen=True)
 class StringFV:
     """
     Representa un grupo de strings conectado a un MPPT.
@@ -65,13 +66,14 @@ class StringFV:
     voc_frio_string_v: float
 
     # -----------------------------------------------------
-    # Corrientes base
+    # Corrientes base del string
     # -----------------------------------------------------
 
     imp_string_a: float
-    isc_panel_a: float
+    isc_string_a: float
 
-    # corriente total hacia el MPPT
+    # Corriente total hacia el MPPT
+    # i_mppt_a = imp_string_a * n_strings
     i_mppt_a: float
 
     # -----------------------------------------------------
@@ -87,7 +89,7 @@ class StringFV:
 # RECOMENDACIÓN DEL MOTOR DE STRINGS
 # =========================================================
 
-@dataclass
+@dataclass(frozen=True)
 class RecomendacionStrings:
     """
     Recomendación óptima calculada por el motor de strings.
@@ -106,7 +108,7 @@ class RecomendacionStrings:
 # INFORMACIÓN GLOBAL DEL GENERADOR FV
 # =========================================================
 
-@dataclass
+@dataclass(frozen=True)
 class ArrayFV:
     """
     Representa el generador FV completo.
@@ -148,7 +150,7 @@ class ArrayFV:
 # SALIDA OFICIAL DEL DOMINIO PANELES
 # =========================================================
 
-@dataclass
+@dataclass(frozen=True)
 class ResultadoPaneles:
     """
     Resultado final del dominio paneles.
@@ -212,7 +214,7 @@ ResultadoPaneles
     │      ├─ vmp_string_v
     │      ├─ voc_frio_string_v
     │      ├─ imp_string_a
-    │      ├─ isc_panel_a
+    │      ├─ isc_string_a
     │      ├─ i_mppt_a
     │      ├─ isc_mppt_a
     │      ├─ imax_pv_a
