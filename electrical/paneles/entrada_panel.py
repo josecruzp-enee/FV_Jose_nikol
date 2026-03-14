@@ -30,46 +30,25 @@ from electrical.modelos.inversor import InversorSpec
 
 @dataclass
 class EntradaPaneles:
-    """
-    Parámetros de entrada requeridos para calcular
-    la configuración de strings del generador FV.
-    """
 
-    # ----------------------------------------------
     # Equipos
-    # ----------------------------------------------
-
     panel: PanelSpec
     inversor: InversorSpec
 
-    # ----------------------------------------------
-    # Sistema FV
-    # ----------------------------------------------
-
+    # Sistema
     n_paneles_total: int
-    
-    # ----------------------------------------------
+    n_inversores: Optional[int] = None
+
     # Condiciones térmicas
-    # ----------------------------------------------
+    t_min_c: float = -5
+    t_oper_c: float = 45
 
-    t_min_c: float
-    t_oper_c: float
-
-    # ----------------------------------------------
-    # Configuración de instalación
-    # ----------------------------------------------
-
+    # Instalación
     dos_aguas: bool = False
 
-    # ----------------------------------------------
-    # Objetivo de diseño
-    # ----------------------------------------------
-
+    # Objetivos de diseño
     objetivo_dc_ac: Optional[float] = None
-
     pdc_kw_objetivo: Optional[float] = None
-    
-    n_inversores: Optional[int] = None
 # ==========================================================
 # SALIDAS DEL ARCHIVO
 # ==========================================================
