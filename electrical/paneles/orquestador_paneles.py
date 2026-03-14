@@ -2,26 +2,79 @@ from __future__ import annotations
 
 """
 ORQUESTADOR DEL DOMINIO PANELES
+=====================================================
 
-FRONTERA DEL DOMINIO
---------------------
+Este módulo coordina el cálculo completo del generador
+fotovoltaico.
 
-Este módulo coordina el cálculo del generador fotovoltaico.
+Responsabilidad:
+    Coordinar motores del dominio paneles.
 
-Flujo del dominio:
+Este módulo NO implementa cálculos eléctricos complejos.
+
+---------------------------------------------------------
+FLUJO DEL DOMINIO
+---------------------------------------------------------
 
 EntradaPaneles
-↓
+    ↓
 validaciones
-↓
+    ↓
 dimensionado de paneles
-↓
+    ↓
 cálculo de strings
-↓
-resultado del dominio
+    ↓
+resultado final del dominio
 
-Este módulo NO implementa cálculos físicos complejos.
-Solo coordina los motores del dominio.
+
+---------------------------------------------------------
+ENTRADA
+---------------------------------------------------------
+
+entrada : EntradaPaneles
+
+Contiene:
+
+    panel : PanelSpec
+    inversor : InversorSpec
+
+    n_paneles_total : int
+    n_inversores : int | None
+
+    t_min_c : float
+    t_oper_c : float
+
+    dos_aguas : bool
+
+    objetivo_dc_ac : float | None
+    pdc_kw_objetivo : float | None
+
+
+---------------------------------------------------------
+SALIDA
+---------------------------------------------------------
+
+dict
+
+{
+    ok : bool
+
+    errores : list[str]
+
+    warnings : list[str]
+
+    strings : list
+
+    recomendacion : {...}
+
+    bounds : {...}
+
+    meta : {
+        n_paneles_total
+        pdc_kw
+        n_inversores
+    }
+}
 """
 
 from typing import Dict, List
@@ -51,7 +104,7 @@ except Exception:
 
 
 # ==========================================================
-# ORQUESTADOR
+# ORQUESTADOR PRINCIPAL
 # ==========================================================
 
 def ejecutar_paneles(
@@ -107,8 +160,6 @@ def ejecutar_paneles(
 
     n_paneles_total = dim.n_paneles
 
-    
-
     if n_paneles_total <= 0:
 
         return {
@@ -121,9 +172,9 @@ def ejecutar_paneles(
     # PARÁMETROS DE CÁLCULO
     # ------------------------------------------------------
 
-    n_inversores = int(entrada.n_inversores or 1)
+    # mínimo 1 inversor
+    n_inversores = max(1, int(entrada.n_inversores or 1))
 
-   
     # ------------------------------------------------------
     # CÁLCULO DE STRINGS
     # ------------------------------------------------------
@@ -150,8 +201,6 @@ def ejecutar_paneles(
 
     )
 
-    
-
     # ------------------------------------------------------
     # NORMALIZAR RESULTADO
     # ------------------------------------------------------
@@ -160,7 +209,7 @@ def ejecutar_paneles(
     resultado.setdefault("errores", [])
     resultado.setdefault("warnings", [])
 
-    resultado["warnings"] = warnings + resultado["warnings"]
+    resultado["warnings"] = warnings + list(resultado.get("warnings", []))
 
     # ------------------------------------------------------
     # META DEL DIMENSIONADO
@@ -176,53 +225,13 @@ def ejecutar_paneles(
 
 
 # ==========================================================
-# SALIDAS DEL ARCHIVO
+# SALIDA DEL DOMINIO
 # ==========================================================
 
 """
-SALIDA DEL DOMINIO PANELES
-
 ejecutar_paneles(entrada: EntradaPaneles) -> Dict
-
-Estructura devuelta:
-
-{
-    ok : bool
-
-    errores : list[str]
-
-    warnings : list[str]
-
-    strings : list
-
-    recomendacion : {
-
-        n_series
-        n_strings_total
-        vmp_string_v
-        voc_string_v
-        imp_array_a
-        isc_array_total_a
-
-    }
-
-    bounds : {
-
-        n_min
-        n_max
-
-    }
-
-    meta : {
-
-        n_paneles_total
-        pdc_kw
-        n_inversores
-
-    }
-}
 
 Consumido por:
 
-core.aplicacion.orquestador_estudio
+    core.aplicacion.orquestador_estudio
 """
