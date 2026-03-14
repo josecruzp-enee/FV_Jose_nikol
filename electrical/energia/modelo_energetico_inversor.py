@@ -3,40 +3,17 @@ from __future__ import annotations
 """
 MODELO ENERGÉTICO DEL INVERSOR — FV Engine
 
-Dominio: electrical.energia.inversor
+Dominio: electrical.energia
 
 Responsabilidad
 ---------------
-Calcular la producción energética AC del sistema FV
-considerando:
+Calcular la producción energética AC del sistema FV considerando:
 
 • eficiencia del inversor
+• eficiencia parcial por carga
 • pérdidas por clipping DC/AC
 
-Este modelo opera a nivel energético (mensual o anual),
-no a nivel eléctrico instantáneo.
-
-Conceptos físicos modelados
----------------------------
-
-1) Conversión energética
-
-    E_AC = E_DC × eficiencia
-
-2) Clipping energético
-
-    Cuando el generador DC es mayor que la capacidad AC
-    del inversor (DC/AC ratio > 1), parte de la energía
-    generada no puede ser convertida.
-
-Relación en el motor FV
------------------------
-
-    producción DC del sistema
-            ↓
-    modelo inversor energético   ← ESTE MÓDULO
-            ↓
-    producción AC final
+Este modelo opera a nivel energético mensual.
 """
 
 from dataclasses import dataclass
@@ -53,15 +30,19 @@ Vector12 = List[float]
 @dataclass
 class EnergiaInversorInput:
     """
-    Parámetros energéticos del sistema.
+    Parámetros energéticos del sistema FV.
     """
 
     energia_dc_12m_kwh: Vector12
 
+    # potencia DC instalada
     pdc_kw: float
+
+    # potencia nominal AC del inversor
     kw_ac: float
 
-    eficiencia: float
+    # eficiencia nominal del inversor (0–1)
+    eficiencia_nominal: float
 
 
 # ==========================================================
@@ -82,41 +63,70 @@ class EnergiaInversorResultado:
 
 
 # ==========================================================
-# MOTOR
+# MOTOR DEL INVERSOR
 # ==========================================================
 
 def calcular_energia_inversor(inp: EnergiaInversorInput) -> EnergiaInversorResultado:
     """
-    Calcula la energía AC final considerando eficiencia
-    y pérdidas por clipping.
+    Calcula la producción energética AC del inversor
+    considerando eficiencia y clipping energético.
     """
 
-    energia_ac: Vector12 = []
-    energia_clip: Vector12 = []
+    # ------------------------------------------------------
+    # VALIDACIONES
+    # ------------------------------------------------------
+
+    if len(inp.energia_dc_12m_kwh) != 12:
+        raise ValueError("energia_dc_12m_kwh debe tener 12 valores")
+
+    if inp.kw_ac <= 0:
+        raise ValueError("kw_ac inválido")
+
+    if not (0 < inp.eficiencia_nominal <= 1):
+        raise ValueError("eficiencia_nominal fuera de rango")
 
     # ------------------------------------------------------
     # DC/AC ratio
     # ------------------------------------------------------
 
-    ratio = inp.pdc_kw / inp.kw_ac if inp.kw_ac > 0 else 1
+    ratio = inp.pdc_kw / inp.kw_ac
+
+    # ------------------------------------------------------
+    # modelo simplificado de eficiencia parcial
+    # ------------------------------------------------------
+
+    # inversores son menos eficientes con baja carga
+    carga_relativa = min(1.0, ratio)
+
+    eficiencia_real = inp.eficiencia_nominal * (
+        0.9 + 0.1 * carga_relativa
+    )
+
+    # ------------------------------------------------------
+    # modelo de clipping energético
+    # ------------------------------------------------------
 
     loss_clip = 0.0
 
     if ratio > 1:
-
-        # modelo simplificado de clipping energético
         loss_clip = min(0.15, 0.5 * (ratio - 1) ** 2)
 
+    energia_ac: Vector12 = []
+    energia_clip: Vector12 = []
+
     # ------------------------------------------------------
-    # Cálculo mensual
+    # cálculo mensual
     # ------------------------------------------------------
 
-    for e in inp.energia_dc_12m_kwh:
+    for e_dc in inp.energia_dc_12m_kwh:
 
-        # aplicar eficiencia del inversor
-        e_ac = e * inp.eficiencia
+        if e_dc < 0:
+            raise ValueError("energía DC negativa")
 
-        # energía recortada por clipping
+        # conversión DC → AC
+        e_ac = e_dc * eficiencia_real
+
+        # pérdidas por clipping
         recorte = e_ac * loss_clip
 
         energia_clip.append(recorte)
@@ -124,7 +134,7 @@ def calcular_energia_inversor(inp: EnergiaInversorInput) -> EnergiaInversorResul
         energia_ac.append(max(0.0, e_ac - recorte))
 
     # ------------------------------------------------------
-    # Resultado
+    # resultado
     # ------------------------------------------------------
 
     return EnergiaInversorResultado(
