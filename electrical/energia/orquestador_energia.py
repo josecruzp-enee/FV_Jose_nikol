@@ -2,11 +2,14 @@ from __future__ import annotations
 
 """
 ORQUESTADOR DEL DOMINIO ENERGÍA — FV Engine
+==========================================
 
 Coordina el cálculo energético del sistema fotovoltaico.
 
 Pipeline energético (modelo HSP):
 
+    orientación del sistema
+            ↓
     generación DC bruta
             ↓
     pérdidas físicas del sistema
@@ -14,6 +17,7 @@ Pipeline energético (modelo HSP):
     modelo energético del inversor
             ↓
     energía AC útil
+
 
 Pipeline energético (modelo 8760):
 
@@ -23,12 +27,15 @@ Pipeline energético (modelo 8760):
             ↓
     energía AC útil
 
+
 Salida del dominio:
 
     EnergiaResultado
 """
 
 from .contrato import EnergiaInput, EnergiaResultado
+
+from .orientacion import factor_orientacion_total
 
 from .generacion_bruta import calcular_energia_bruta_dc
 from .perdidas_fisicas import aplicar_perdidas
@@ -76,6 +83,26 @@ def _resultado_error(inp: EnergiaInput, errores: list[str]) -> EnergiaResultado:
 def _modelo_hsp(inp: EnergiaInput):
 
     # ------------------------------------------------------
+    # Factor de orientación del sistema
+    # ------------------------------------------------------
+
+    factor_orientacion = factor_orientacion_total(
+
+        tipo_superficie=inp.tipo_superficie,
+
+        azimut_deg=inp.azimut_deg,
+
+        azimut_a_deg=inp.azimut_a_deg,
+
+        azimut_b_deg=inp.azimut_b_deg,
+
+        reparto_pct_a=inp.reparto_pct_a,
+
+        hemisferio=inp.hemisferio,
+    )
+
+
+    # ------------------------------------------------------
     # Generación DC bruta
     # ------------------------------------------------------
 
@@ -83,7 +110,7 @@ def _modelo_hsp(inp: EnergiaInput):
         pdc_kw=inp.pdc_instalada_kw,
         hsp_12m=inp.hsp_12m,
         dias_mes=inp.dias_mes,
-        factor_orientacion=inp.factor_orientacion,
+        factor_orientacion=factor_orientacion,
     )
 
     if not r_bruta.ok:
@@ -138,6 +165,7 @@ def _modelo_hsp(inp: EnergiaInput):
         energia_despues_perdidas,
         energia_util,
         energia_clipping,
+        factor_orientacion,
     ), []
 
 
@@ -156,8 +184,6 @@ def _modelo_8760(inp: EnergiaInput):
 
     energia_util = agregar_energia_por_mes(energia_horas)
 
-    # aproximaciones para consistencia del contrato
-
     energia_bruta = energia_util
     energia_despues_perdidas = energia_util
     energia_perdidas = [0.0] * 12
@@ -169,6 +195,7 @@ def _modelo_8760(inp: EnergiaInput):
         energia_despues_perdidas,
         energia_util,
         energia_clipping,
+        None,
     ), []
 
 
@@ -215,6 +242,7 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
         energia_despues_perdidas,
         energia_util,
         energia_clipping,
+        factor_orientacion,
     ) = resultado
 
 
@@ -267,5 +295,6 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
         meta={
             "motor": modo,
             "meses": 12,
+            "factor_orientacion": factor_orientacion,
         },
     )
