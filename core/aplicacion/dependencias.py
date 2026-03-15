@@ -9,6 +9,7 @@ from core.servicios.finanzas import ejecutar_finanzas
 from electrical.paneles.entrada_panel import EntradaPaneles
 from electrical.catalogos.catalogos import get_panel
 from electrical.catalogos.catalogos import get_inversor
+from electrical.paneles.contrato import StringInfo
 # ==========================================================
 # ADAPTER SIZING
 # ==========================================================
