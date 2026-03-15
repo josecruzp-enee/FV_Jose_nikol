@@ -88,14 +88,18 @@ def factor_orientacion(
     hemisferio: str = "norte"
 ) -> float:
 
-    # protección contra valores nulos o tipos inesperados
+    # proteger hemisferio
     hem = str(hemisferio or "norte").lower()
+
+    # proteger azimut (si UI aún no lo envía)
+    az = float(az_deg or 180.0)
 
     # orientación óptima según hemisferio
     ref = 0.0 if hem == "sur" else 180.0
 
-    delta = delta_azimut_deg(az_deg, ref)
+    delta = delta_azimut_deg(az, ref)
 
+    # modelo coseno suavizado
     f = (1.0 + math.cos(math.radians(delta))) / 2.0
 
     return max(0.35, min(1.0, f))
