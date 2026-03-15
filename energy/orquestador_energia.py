@@ -16,8 +16,8 @@ from .sistema.perdidas_ac import aplicar_perdidas_ac
 from .sistema.modelo_energetico_inversor import calcular_energia_inversor
 
 # solo para modo 8760
-from .sistema.modelo_array_8760 import simular_8760
-from .sistema.agregacion_8760 import agregar_energia_por_mes
+#from .sistema.modelo_array_8760 import simular_8760
+#from .sistema.agregacion_8760 import agregar_energia_por_mes
 
 
 # ==========================================================
