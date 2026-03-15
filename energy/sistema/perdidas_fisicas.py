@@ -134,7 +134,6 @@ def aplicar_perdidas(
         # conversión a factores multiplicativos
         f_total = (
             (1.0 - perdidas_dc_pct / 100.0)
-            * (1.0 - perdidas_ac_pct / 100.0)
             * (1.0 - sombras_pct / 100.0)
         )
 
