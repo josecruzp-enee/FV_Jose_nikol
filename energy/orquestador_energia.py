@@ -1,23 +1,16 @@
 from __future__ import annotations
 
-"""
-ORQUESTADOR DEL DOMINIO ENERGÍA — FV Engine
-==========================================
-
-Coordina el cálculo energético del sistema fotovoltaico.
-"""
-
 from .contrato import EnergiaInput, EnergiaResultado
 
 from .sistema.orientacion import factor_orientacion_total
 from .sistema.generacion_bruta import calcular_energia_bruta_dc
 from .sistema.perdidas_fisicas import aplicar_perdidas
 from .sistema.perdidas_ac import aplicar_perdidas_ac
-from .sistema.modelo_energetico_inversor import calcular_energia_inversor
 
-# solo para modo 8760
-#from .sistema.modelo_array_8760 import simular_8760
-#from .sistema.agregacion_8760 import agregar_energia_por_mes
+from .sistema.modelo_energetico_inversor import (
+    calcular_energia_inversor,
+    EnergiaInversorInput
+)
 
 
 # ==========================================================
@@ -52,33 +45,14 @@ def _resultado_error(inp: EnergiaInput, errores: list[str]) -> EnergiaResultado:
 
 
 # ==========================================================
-# VALIDACIÓN HSP
-# ==========================================================
-
-def _validar_hsp(inp: EnergiaInput) -> list[str]:
-
-    errores = []
-
-    if inp.hsp_12m is None:
-        errores.append("hsp_12m requerido para modelo mensual")
-
-    if inp.dias_mes is None:
-        errores.append("dias_mes requerido para modelo mensual")
-
-    if inp.azimut_deg is None:
-        errores.append("azimut_deg requerido")
-
-    if inp.hemisferio is None:
-        errores.append("hemisferio requerido")
-
-    return errores
-
-
-# ==========================================================
 # MODELO HSP
 # ==========================================================
 
 def _modelo_hsp(inp: EnergiaInput):
+
+    # ------------------------------------------------------
+    # ORIENTACIÓN
+    # ------------------------------------------------------
 
     factor_orientacion = factor_orientacion_total(
 
@@ -89,6 +63,10 @@ def _modelo_hsp(inp: EnergiaInput):
         reparto_pct_a=inp.reparto_pct_a,
         hemisferio=inp.hemisferio,
     )
+
+    # ------------------------------------------------------
+    # GENERACIÓN DC BRUTA
+    # ------------------------------------------------------
 
     r_bruta = calcular_energia_bruta_dc(
         pdc_kw=inp.pdc_instalada_kw,
@@ -101,6 +79,10 @@ def _modelo_hsp(inp: EnergiaInput):
         return None, r_bruta.errores
 
     energia_bruta = r_bruta.energia_mensual_dc_kwh
+
+    # ------------------------------------------------------
+    # PÉRDIDAS DC + SOMBRAS
+    # ------------------------------------------------------
 
     r_perdidas = aplicar_perdidas(
         energia_dc_12m=energia_bruta,
@@ -118,19 +100,29 @@ def _modelo_hsp(inp: EnergiaInput):
         b - d for b, d in zip(energia_bruta, energia_despues_perdidas_dc)
     ]
 
-    r_inv = calcular_energia_inversor(
-        energia_dc_12m=energia_despues_perdidas_dc,
+    # ------------------------------------------------------
+    # INVERSOR
+    # ------------------------------------------------------
+
+    inv_input = EnergiaInversorInput(
+
+        energia_dc_12m_kwh=energia_despues_perdidas_dc,
+
+        kw_ac=inp.pac_nominal_kw,
+
         pdc_kw=inp.pdc_instalada_kw,
-        pac_kw=inp.pac_nominal_kw,
-        eficiencia_inv=inp.eficiencia_inversor,
-        permitir_clipping=inp.permitir_clipping,
+
+        eficiencia_nominal=inp.eficiencia_inversor,
     )
 
-    if not r_inv.ok:
-        return None, r_inv.errores
+    r_inv = calcular_energia_inversor(inv_input)
 
     energia_ac_pre = r_inv.energia_ac_12m_kwh
     energia_clipping = r_inv.energia_clipping_12m_kwh
+
+    # ------------------------------------------------------
+    # PÉRDIDAS AC
+    # ------------------------------------------------------
 
     r_ac = aplicar_perdidas_ac(
         energia_ac_12m=energia_ac_pre,
@@ -161,36 +153,6 @@ def _modelo_hsp(inp: EnergiaInput):
 
 
 # ==========================================================
-# MODELO 8760
-# ==========================================================
-
-def _modelo_8760(inp: EnergiaInput):
-
-    sim = simular_8760(inp)
-
-    if not sim.ok:
-        return None, sim.errores
-
-    energia_horas = sim.potencia_ac_horaria_kw
-
-    energia_util = agregar_energia_por_mes(energia_horas)
-
-    energia_bruta = energia_util
-    energia_despues_perdidas = energia_util
-    energia_perdidas = [0.0] * 12
-    energia_clipping = [0.0] * 12
-
-    return (
-        energia_bruta,
-        energia_perdidas,
-        energia_despues_perdidas,
-        energia_util,
-        energia_clipping,
-        None,
-    ), []
-
-
-# ==========================================================
 # MOTOR PRINCIPAL
 # ==========================================================
 
@@ -204,18 +166,10 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
     if inp.pac_nominal_kw <= 0:
         errores.append("Potencia AC inválida")
 
-    modo = getattr(inp, "modo_simulacion", "mensual")
-
-    if modo == "mensual":
-        errores += _validar_hsp(inp)
-
     if errores:
         return _resultado_error(inp, errores)
 
-    if modo == "8760":
-        resultado, errores = _modelo_8760(inp)
-    else:
-        resultado, errores = _modelo_hsp(inp)
+    resultado, errores = _modelo_hsp(inp)
 
     if errores:
         return _resultado_error(inp, errores)
@@ -236,6 +190,7 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
     energia_clipping_anual = sum(energia_clipping)
 
     pac = inp.pac_nominal_kw
+
     dc_ac_ratio = inp.pdc_instalada_kw / pac if pac > 0 else 0.0
 
     return EnergiaResultado(
@@ -261,7 +216,7 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
         energia_util_anual=energia_util_anual,
 
         meta={
-            "motor": modo,
+            "motor": "mensual",
             "meses": 12,
             "factor_orientacion": factor_orientacion,
         },
