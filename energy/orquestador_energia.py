@@ -132,7 +132,7 @@ def _modelo_hsp(inp: EnergiaInput):
     if not r_ac.ok:
         return None, r_ac.errores
 
-    energia_util = r_ac.energia_ac_neta_12m_kwh
+    energia_util = r_ac.energia_final_12m_kwh
 
     energia_perdidas_ac = [
         a - b for a, b in zip(energia_ac_pre, energia_util)
