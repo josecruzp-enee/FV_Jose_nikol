@@ -17,7 +17,7 @@ from typing import List
 
 from solar.posicion_solar import calcular_posicion_solar
 from solar.irradiancia_plano import calcular_irradiancia_plano
-from electrical.paneles.modelo_termico import calcular_temperatura_celda
+from energy.modelo_termico import calcular_temperatura_celda
 
 from .resultado_clima import ResultadoClima, validar_clima_8760
 
