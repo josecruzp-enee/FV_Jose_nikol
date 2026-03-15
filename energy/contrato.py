@@ -3,13 +3,20 @@ from __future__ import annotations
 """
 CONTRATO DEL DOMINIO ENERGIA — FV Engine
 
-Define las estructuras formales de entrada y salida
-del motor energético del sistema FV.
+Define las estructuras formales de entrada y salida del
+motor energético fotovoltaico.
 
 Este módulo NO contiene lógica de cálculo.
 
-Responsabilidad:
-    definir contratos de datos para el dominio energía.
+Responsabilidad
+---------------
+Definir los contratos de datos utilizados por el dominio
+energía para ejecutar los modelos energéticos del sistema FV.
+
+El motor energético soporta dos modos de simulación:
+
+    1) Modelo energético mensual (HSP)
+    2) Simulación física horaria (8760)
 
 Consumido por:
     core.orquestador_estudio
@@ -28,50 +35,84 @@ from typing import List, Dict, Any
 @dataclass(frozen=True)
 class EnergiaInput:
     """
-    Entrada formal del motor energético.
+    Entrada formal del motor energético FV.
 
-    Este modelo contiene únicamente variables físicas
-    necesarias para calcular la producción energética.
+    Este modelo agrupa todos los parámetros físicos
+    necesarios para ejecutar cualquiera de los dos
+    modelos energéticos disponibles:
 
-    No depende de UI ni de finanzas.
+        • modelo mensual (HSP)
+        • simulación horaria 8760
+
+    El orquestador energético decidirá qué modelo
+    ejecutar dependiendo del modo de simulación.
     """
 
     # ------------------------------------------------------
-    # Potencias del sistema
+    # Potencias del sistema FV
     # ------------------------------------------------------
 
+    # potencia DC total instalada (kW)
     pdc_instalada_kw: float
+
+    # potencia AC nominal del inversor (kW)
     pac_nominal_kw: float
 
     # ------------------------------------------------------
-    # Recurso solar
+    # Modo de simulación energética
+    # ------------------------------------------------------
+
+    # opciones típicas:
+    # "mensual" → modelo HSP
+    # "8760"    → simulación horaria
+    modo_simulacion: str = "mensual"
+
+    # ------------------------------------------------------
+    # Recurso solar mensual (modelo HSP)
     # ------------------------------------------------------
 
     # irradiancia mensual promedio
-    # unidad: kWh/m²/día
-    hsp_12m: List[float]
+    # unidades: kWh/m²/día
+    hsp_12m: List[float] | None = None
+
+    # número de días por mes
+    dias_mes: List[int] | None = None
 
     # ------------------------------------------------------
-    # Parámetros físicos
+    # Parámetros geográficos (modelo 8760)
     # ------------------------------------------------------
 
-    dias_mes: List[int]
+    latitud: float | None = None
+    longitud: float | None = None
 
     # ------------------------------------------------------
-    # Factores del sistema
+    # Factores del sistema FV
     # ------------------------------------------------------
 
-    factor_orientacion: float
+    # factor energético por orientación del generador
+    factor_orientacion: float = 1.0
 
-    perdidas_dc_pct: float
-    perdidas_ac_pct: float
-    sombras_pct: float
+    # pérdidas DC del sistema (cables, mismatch, etc.)
+    perdidas_dc_pct: float = 0.0
+
+    # pérdidas AC del sistema
+    perdidas_ac_pct: float = 0.0
+
+    # pérdidas por sombras
+    sombras_pct: float = 0.0
 
     # ------------------------------------------------------
-    # Control de clipping
+    # Control de clipping del inversor
     # ------------------------------------------------------
 
     permitir_curtailment: bool = True
+
+    # ------------------------------------------------------
+    # Parámetros térmicos simplificados
+    # ------------------------------------------------------
+
+    # temperatura ambiente promedio (usada en modelos simplificados)
+    temp_ambiente_c: float = 25.0
 
 
 # ==========================================================
@@ -82,9 +123,15 @@ class EnergiaInput:
 class EnergiaResultado:
     """
     Resultado formal del motor energético FV.
+
+    Contiene la producción energética del sistema
+    tanto a nivel mensual como anual.
     """
 
+    # ------------------------------------------------------
     # estado del cálculo
+    # ------------------------------------------------------
+
     ok: bool
     errores: List[str]
 
@@ -95,6 +142,7 @@ class EnergiaResultado:
     pdc_instalada_kw: float
     pac_nominal_kw: float
 
+    # relación DC/AC del sistema
     dc_ac_ratio: float
 
     # ------------------------------------------------------
