@@ -2,46 +2,6 @@ from __future__ import annotations
 
 """
 MODELO DEL ARREGLO FV (SIMULACIÓN 8760) — FV Engine
-
-Dominio
--------
-electrical.paneles
-
-Responsabilidad
----------------
-Calcular la potencia DC del generador fotovoltaico
-para cada hora del año a partir de:
-
-• condiciones solares (POA)
-• temperatura de celda
-• configuración eléctrica del generador
-
-Este módulo NO calcula:
-
-• posición solar
-• irradiancia
-• temperatura de celda
-• clipping del inversor
-• pérdidas AC
-
-Esas responsabilidades pertenecen a otros módulos.
-
-Flujo dentro del motor energético
----------------------------------
-
-EstadoSolarHora (simulación 8760)
-        ↓
-potencia_panel
-        ↓
-potencia_string
-        ↓
-potencia_arreglo   ← ESTE MÓDULO
-        ↓
-potencia DC horaria del sistema
-
-Salida
-------
-Serie horaria de potencia DC del arreglo FV.
 """
 
 from dataclasses import dataclass
@@ -56,22 +16,19 @@ from energy.clima.simulacion_8760 import EstadoSolarHora
 
 
 # ==========================================================
-# ENTRADA DEL MODELO
+# ENTRADA
 # ==========================================================
 
 @dataclass
 class Array8760Input:
-    """
-    Parámetros necesarios para simular el arreglo FV.
-    """
 
     estado_solar: List[EstadoSolarHora]
 
-    # Configuración eléctrica
+    # configuración del generador
     paneles_por_string: int
     strings_totales: int
 
-    # Parámetros eléctricos del panel (STC)
+    # parámetros eléctricos STC
     pmax_stc_w: float
     vmp_stc_v: float
     voc_stc_v: float
@@ -88,34 +45,50 @@ class Array8760Input:
 
 @dataclass
 class Array8760Resultado:
-    """
-    Potencia DC horaria del generador FV.
-    """
 
     potencia_dc_kw: List[float]
 
 
 # ==========================================================
-# MOTOR DEL ARREGLO
+# MOTOR
 # ==========================================================
 
 def calcular_array_8760(inp: Array8760Input) -> Array8760Resultado:
-    """
-    Calcula la potencia DC del arreglo fotovoltaico
-    para cada hora del año (8760).
-    """
 
-    potencia_dc_kw: List[float] = []
+    # ------------------------------------------------------
+    # VALIDACIÓN
+    # ------------------------------------------------------
 
-    # ======================================================
+    if len(inp.estado_solar) == 0:
+        raise ValueError("estado_solar está vacío")
+
+    # Si es TMY debería ser 8760
+    if len(inp.estado_solar) not in (8760, 8784):
+        raise ValueError(
+            f"Serie climática inválida: {len(inp.estado_solar)} horas"
+        )
+
+    # ------------------------------------------------------
+    # PREASIGNACIÓN (más eficiente)
+    # ------------------------------------------------------
+
+    n = len(inp.estado_solar)
+    potencia_dc_kw = [0.0] * n
+
+    # ------------------------------------------------------
     # SIMULACIÓN HORARIA
-    # ======================================================
+    # ------------------------------------------------------
 
-    for hora in inp.estado_solar:
+    for i, hora in enumerate(inp.estado_solar):
 
-        # --------------------------------------------------
-        # MODELO DEL PANEL
-        # --------------------------------------------------
+        # si no hay irradiancia → potencia 0
+        if hora.poa_wm2 <= 0:
+            potencia_dc_kw[i] = 0.0
+            continue
+
+        # ---------------------------------------------
+        # POTENCIA DEL PANEL
+        # ---------------------------------------------
 
         panel = calcular_potencia_panel(
 
@@ -135,27 +108,30 @@ def calcular_array_8760(inp: Array8760Input) -> Array8760Resultado:
 
         )
 
-        # --------------------------------------------------
-        # POTENCIA DEL STRING
-        # --------------------------------------------------
+        # ---------------------------------------------
+        # POTENCIA STRING
+        # ---------------------------------------------
 
         potencia_string_w = panel.pmp_w * inp.paneles_por_string
 
-        # --------------------------------------------------
-        # POTENCIA DEL ARREGLO
-        # --------------------------------------------------
+        # ---------------------------------------------
+        # POTENCIA ARREGLO
+        # ---------------------------------------------
 
         potencia_array_w = potencia_string_w * inp.strings_totales
 
-        # --------------------------------------------------
-        # CONVERTIR A kW
-        # --------------------------------------------------
+        # protección contra negativos
+        potencia_array_w = max(0.0, potencia_array_w)
 
-        potencia_dc_kw.append(potencia_array_w / 1000)
+        # ---------------------------------------------
+        # CONVERSIÓN A kW
+        # ---------------------------------------------
 
-    # ======================================================
+        potencia_dc_kw[i] = potencia_array_w / 1000.0
+
+    # ------------------------------------------------------
     # RESULTADO
-    # ======================================================
+    # ------------------------------------------------------
 
     return Array8760Resultado(
 
