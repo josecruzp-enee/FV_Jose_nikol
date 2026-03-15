@@ -1,137 +1,83 @@
 from __future__ import annotations
 
 """
-SIMULACIÓN SOLAR 8760 — FV Engine
+RESULTADO DEL DOMINIO CLIMA — FV Engine
 
 Responsabilidad
 ---------------
-Transformar datos climáticos horarios en condiciones
-solares del plano del generador FV.
+Representar el estado climático horario utilizado por el
+motor energético fotovoltaico.
 
-Este módulo NO calcula:
+Este resultado es producido por:
 
-• potencia FV
-• energía generada
-• pérdidas
-• inversor
+    lector_pvgis
+    clima_tmy
+    generador_clima_base
 
-Solo produce el estado solar horario del sistema.
+y consumido por:
 
-Pipeline
---------
+    solar.simulacion_8760
 
-ResultadoClima
-      ↓
-posición solar
-      ↓
-irradiancia en plano (POA)
-      ↓
-temperatura de celda
-      ↓
-EstadoSolarHora[8760]
+Contiene el clima horario del año (8760 registros).
 """
 
 from dataclasses import dataclass
 from typing import List
-
-from solar.posicion_solar import calcular_posicion_solar
-from solar.irradiancia_plano import calcular_irradiancia_plano
-from electrical.paneles.modelo_termico import calcular_temperatura_celda
-
-from .resultado_clima import ResultadoClima, validar_clima_8760
+from datetime import datetime
 
 
 # ==========================================================
-# ESTADO SOLAR POR HORA
+# ESTADO CLIMÁTICO DE UNA HORA
 # ==========================================================
 
 @dataclass(frozen=True)
-class EstadoSolarHora:
+class ClimaHora:
     """
-    Condición solar del sistema en una hora específica.
+    Condiciones climáticas en una hora específica.
     """
 
-    poa_wm2: float
+    timestamp: datetime
+
+    ghi_wm2: float
+    dni_wm2: float
+    dhi_wm2: float
+
     temp_amb_c: float
-    temp_celda_c: float
-
-    zenith: float
-    azimuth: float
+    viento_ms: float
 
 
 # ==========================================================
-# RESULTADO DEL MODELO 8760
+# RESULTADO COMPLETO DEL CLIMA
 # ==========================================================
 
 @dataclass(frozen=True)
-class ResultadoSolar8760:
+class ResultadoClima:
+    """
+    Resultado completo del dominio clima.
 
-    horas: List[EstadoSolarHora]
+    Contiene los datos climáticos horarios necesarios
+    para la simulación solar del sistema FV.
+    """
 
-    poa_total_kwh_m2: float
+    latitud: float
+    longitud: float
+
+    horas: List[ClimaHora]
 
 
 # ==========================================================
-# MOTOR DE SIMULACIÓN
+# VALIDADOR
 # ==========================================================
 
-def simular_clima_8760(
-    clima: ResultadoClima,
-    tilt: float,
-    azimuth: float
-) -> ResultadoSolar8760:
+def validar_clima_8760(clima: ResultadoClima) -> None:
+    """
+    Verifica que el clima tenga 8760 registros horarios.
+    """
 
-    validar_clima_8760(clima)
+    if not clima.horas:
+        raise ValueError("ResultadoClima no contiene horas")
 
-    horas: List[EstadoSolarHora] = []
-
-    poa_total = 0.0
-
-
-    # recorrer las 8760 horas
-    for h in clima.horas:
-
-        # posición solar
-        pos = calcular_posicion_solar(
-            timestamp=h.timestamp,
-            lat=clima.latitud,
-            lon=clima.longitud
+    if len(clima.horas) != 8760:
+        raise ValueError(
+            f"Se esperaban 8760 horas de clima, pero se recibieron {len(clima.horas)}"
         )
-
-        # irradiancia en plano del generador
-        poa = calcular_irradiancia_plano(
-            ghi=h.ghi_wm2,
-            zenith=pos.zenith,
-            azimuth_solar=pos.azimuth,
-            tilt=tilt,
-            azimuth_superficie=azimuth
-        )
-
-        poa = max(0.0, poa)
-
-        # temperatura de celda
-        temp_celda = calcular_temperatura_celda(
-            irradiancia_wm2=poa,
-            temperatura_amb_c=h.temp_amb_c
-        )
-
-        poa_total += poa / 1000
-
-        horas.append(
-            EstadoSolarHora(
-                poa_wm2=poa,
-                temp_amb_c=h.temp_amb_c,
-                temp_celda_c=temp_celda,
-                zenith=pos.zenith,
-                azimuth=pos.azimuth
-            )
-        )
-
-
-    return ResultadoSolar8760(
-
-        horas=horas,
-
-        poa_total_kwh_m2=poa_total
-
-    )
