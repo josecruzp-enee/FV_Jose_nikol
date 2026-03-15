@@ -33,7 +33,7 @@ from .sistema.orientacion import factor_orientacion_total
 from .sistema.generacion_bruta import calcular_energia_bruta_dc
 from .sistema.perdidas_fisicas import aplicar_perdidas
 from .sistema.perdidas_ac import aplicar_perdidas_ac
-from .sistema.modelo_energetico_inversor import aplicar_modelo_inversor
+from .sistema.modelo_energetico_inversor import calcular_energia_inversor
 
 
 # ==========================================================
