@@ -29,16 +29,11 @@ Pipeline energético (modelo 8760):
     energía AC útil
 """
 
-from .contrato import EnergiaInput, EnergiaResultado
-
-from .orientacion import factor_orientacion_total
-from .generacion_bruta import calcular_energia_bruta_dc
-from .perdidas_fisicas import aplicar_perdidas
-from .perdidas_ac import aplicar_perdidas_ac
-from .modelo_energetico_inversor import aplicar_modelo_inversor
-
-from .clima.simulacion_8760 import simular_8760
-from .clima.agregacion_8760 import agregar_energia_por_mes
+from .sistema.orientacion import factor_orientacion_total
+from .sistema.generacion_bruta import calcular_energia_bruta_dc
+from .sistema.perdidas_fisicas import aplicar_perdidas
+from .sistema.perdidas_ac import aplicar_perdidas_ac
+from .sistema.modelo_energetico_inversor import aplicar_modelo_inversor
 
 
 # ==========================================================
