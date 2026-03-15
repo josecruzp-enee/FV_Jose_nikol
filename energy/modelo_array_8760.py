@@ -52,7 +52,7 @@ from electrical.paneles.potencia_panel import (
     PotenciaPanelInput,
 )
 
-from electrical.energia.clima.simulacion_8760 import EstadoSolarHora
+from energy.clima.simulacion_8760 import EstadoSolarHora
 
 
 # ==========================================================
