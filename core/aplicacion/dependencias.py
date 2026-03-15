@@ -5,9 +5,9 @@ from electrical.nec.orquestador_nec import ejecutar_nec
 from core.aplicacion.orquestador_estudio import DependenciasEstudio
 from energy.orquestador_energia import ejecutar_motor_energia
 from energy.contrato import EnergiaInput
-from electrical.paneles.catalogos_paneles import get_panel
 from core.servicios.finanzas import ejecutar_finanzas
 from electrical.paneles.entrada_panel import EntradaPaneles
+from electrical.catalogos.catalogos import get_panel
 # ==========================================================
 # ADAPTER SIZING
 # ==========================================================
