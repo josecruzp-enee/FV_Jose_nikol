@@ -128,7 +128,7 @@ def _modelo_hsp(inp: EnergiaInput):
     # INVERSOR
     # ------------------------------------------------------
 
-    r_inv = aplicar_modelo_inversor(
+    r_inv = calcular_energia_inversor(
         energia_dc_12m=energia_despues_perdidas_dc,
         pdc_kw=inp.pdc_instalada_kw,
         pac_kw=inp.pac_nominal_kw,
