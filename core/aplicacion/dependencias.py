@@ -3,7 +3,7 @@ from core.servicios.sizing import calcular_sizing_unificado
 from electrical.paneles.orquestador_paneles import ejecutar_paneles
 from electrical.nec.orquestador_nec import ejecutar_nec
 
-from energy.orquestador_energia import ejecutar_motor_ener
+from energy.orquestador_energia import ejecutar_motor_energia
 from energy.contrato import EnergiaInput
 
 from core.servicios.finanzas import ejecutar_finanzas
