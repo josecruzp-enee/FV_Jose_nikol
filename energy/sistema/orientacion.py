@@ -104,8 +104,11 @@ def factor_orientacion(
         Factor entre 0.35 y 1.0
     """
 
+    # protección contra valores nulos
+    hem = (hemisferio or "norte").lower()
+
     # orientación óptima según hemisferio
-    ref = 0.0 if hemisferio.lower() == "sur" else 180.0
+    ref = 0.0 if hem == "sur" else 180.0
 
     delta = delta_azimut_deg(az_deg, ref)
 
