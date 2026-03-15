@@ -1,15 +1,21 @@
+from core.aplicacion.orquestador_estudio import DependenciasEstudio
+
+from core.dominio.contrato import StringInfo
+from core.dominio.contrato import ResultadoStrings
+
 from core.servicios.sizing import calcular_sizing_unificado
 
 from electrical.paneles.orquestador_paneles import ejecutar_paneles
-from electrical.nec.orquestador_nec import ejecutar_nec
-from core.aplicacion.orquestador_estudio import DependenciasEstudio
-from energy.orquestador_energia import ejecutar_motor_energia
-from energy.contrato import EnergiaInput
-from core.servicios.finanzas import ejecutar_finanzas
 from electrical.paneles.entrada_panel import EntradaPaneles
+from electrical.nec.orquestador_nec import ejecutar_nec
+
 from electrical.catalogos.catalogos import get_panel
 from electrical.catalogos.catalogos import get_inversor
-from core.dominio.contrato import StringInfo
+
+from energy.orquestador_energia import ejecutar_motor_energia
+from energy.contrato import EnergiaInput
+
+from core.servicios.finanzas import ejecutar_finanzas
 # ==========================================================
 # ADAPTER SIZING
 # ==========================================================
