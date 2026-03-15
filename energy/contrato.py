@@ -9,17 +9,13 @@ motor energético fotovoltaico.
 
 Este módulo NO contiene lógica de cálculo.
 
-Responsabilidad
----------------
-Definir los contratos de datos utilizados por el dominio
-energía para ejecutar los modelos energéticos del sistema FV.
+El motor energético soporta dos modelos:
 
-El motor energético soporta dos modos de simulación:
-
-    1) Modelo energético mensual basado en HSP
+    1) Modelo mensual basado en HSP
     2) Simulación física horaria (8760)
 
 Consumido por:
+
     core.aplicacion.orquestador_estudio
     reportes
     finanzas
@@ -36,29 +32,20 @@ from typing import List, Dict, Any, Literal
 @dataclass(frozen=True)
 class EnergiaInput:
     """
-    Entrada formal del motor energético FV.
+    Entrada del motor energético FV.
 
-    Este modelo agrupa todos los parámetros necesarios
-    para ejecutar cualquiera de los modelos energéticos
-    disponibles en FV Engine.
-
-    Modelos soportados:
-
-        • "mensual" → modelo energético basado en HSP
-        • "8760"    → simulación física horaria completa
-
-    El orquestador energético seleccionará el modelo
-    dependiendo del campo `modo_simulacion`.
+    Contiene todos los parámetros necesarios para ejecutar
+    cualquiera de los modelos energéticos disponibles.
     """
 
     # ------------------------------------------------------
-    # POTENCIAS DEL SISTEMA FV
+    # POTENCIA DEL SISTEMA
     # ------------------------------------------------------
 
-    # Potencia DC total instalada del generador FV (kW)
+    # potencia DC total instalada (kW)
     pdc_instalada_kw: float
 
-    # Potencia AC nominal total de los inversores (kW)
+    # potencia AC nominal del inversor (kW)
     pac_nominal_kw: float
 
 
@@ -66,65 +53,48 @@ class EnergiaInput:
     # MODO DE SIMULACIÓN
     # ------------------------------------------------------
 
-    # Tipo de modelo energético a ejecutar
-    #
-    # "mensual" → modelo simplificado HSP
+    # "mensual" → modelo HSP
     # "8760"    → simulación física horaria
     modo_simulacion: Literal["mensual", "8760"] = "mensual"
 
 
     # ------------------------------------------------------
-    # RECURSO SOLAR — MODELO HSP
+    # RECURSO SOLAR (MODELO HSP)
     # ------------------------------------------------------
 
-    # Peak Sun Hours promedio mensual
-    #
-    # unidades:
-    # kWh/m²/día
-    #
-    # longitud esperada: 12 valores (enero → diciembre)
+    # Peak Sun Hours mensual
+    # unidades: kWh/m²/día
     hsp_12m: List[float] | None = None
 
-    # número de días de cada mes
-    #
-    # longitud esperada: 12 valores
+    # días de cada mes
     dias_mes: List[int] | None = None
 
 
     # ------------------------------------------------------
-    # PARÁMETROS GEOGRÁFICOS — MODELO 8760
+    # PARÁMETROS DE ORIENTACIÓN
     # ------------------------------------------------------
 
-    # latitud del sitio (grados)
-    latitud: float | None = None
+    tipo_superficie: str | None = None
 
-    # longitud del sitio (grados)
-    longitud: float | None = None
+    azimut_deg: float | None = None
+
+    azimut_a_deg: float | None = None
+
+    azimut_b_deg: float | None = None
+
+    reparto_pct_a: float | None = None
+
+    hemisferio: str | None = None
 
 
     # ------------------------------------------------------
-    # FACTORES DEL SISTEMA FV
+    # PÉRDIDAS DEL SISTEMA
     # ------------------------------------------------------
 
-    # factor energético por orientación del generador
-    #
-    # típicamente entre:
-    # 0.85 – 1.0
-    factor_orientacion: float = 1.0
-
-    # pérdidas DC del sistema (%)
-    #
-    # incluye:
-    # mismatch
-    # cables DC
-    # tolerancias de módulo
+    # pérdidas DC (%)
     perdidas_dc_pct: float = 0.0
 
-    # pérdidas AC del sistema (%)
-    #
-    # incluye:
-    # cables AC
-    # transformadores
+    # pérdidas AC (%)
     perdidas_ac_pct: float = 0.0
 
     # pérdidas por sombras (%)
@@ -132,21 +102,24 @@ class EnergiaInput:
 
 
     # ------------------------------------------------------
-    # CONTROL DE CURTAILMENT
+    # INVERSOR
     # ------------------------------------------------------
 
-    # permite pérdidas por clipping DC/AC
-    permitir_curtailment: bool = True
+    # eficiencia del inversor
+    eficiencia_inversor: float = 0.97
+
+    # permitir clipping DC/AC
+    permitir_clipping: bool = True
 
 
     # ------------------------------------------------------
-    # PARÁMETROS TÉRMICOS (MODELOS FÍSICOS)
+    # PARÁMETROS PARA MODELOS FÍSICOS
     # ------------------------------------------------------
 
-    # temperatura ambiente promedio (°C)
-    #
-    # usado únicamente en modelos físicos
-    # como el simulador 8760
+    latitud: float | None = None
+
+    longitud: float | None = None
+
     temp_ambiente_c: float = 25.0
 
 
@@ -158,16 +131,9 @@ class EnergiaInput:
 @dataclass(frozen=True)
 class EnergiaResultado:
     """
-    Resultado formal del motor energético FV.
+    Resultado del cálculo energético del sistema FV.
 
-    Contiene la producción energética del sistema
-    tanto a nivel mensual como anual.
-
-    Este resultado es consumido por:
-
-        • módulo financiero
-        • generador de reportes
-        • visualización en UI
+    Contiene resultados mensuales y agregados anuales.
     """
 
     # ------------------------------------------------------
@@ -176,7 +142,6 @@ class EnergiaResultado:
 
     ok: bool
 
-    # lista de errores ocurridos durante la simulación
     errores: List[str]
 
 
@@ -184,13 +149,10 @@ class EnergiaResultado:
     # POTENCIAS DEL SISTEMA
     # ------------------------------------------------------
 
-    # potencia DC total instalada (kW)
     pdc_instalada_kw: float
 
-    # potencia AC nominal del inversor (kW)
     pac_nominal_kw: float
 
-    # relación DC/AC del sistema
     dc_ac_ratio: float
 
 
@@ -201,13 +163,16 @@ class EnergiaResultado:
     # energía DC generada antes de pérdidas
     energia_bruta_12m: List[float]
 
-    # energía después de pérdidas físicas
+    # pérdidas totales del sistema
+    energia_perdidas_12m: List[float]
+
+    # energía después de pérdidas DC
     energia_despues_perdidas_12m: List[float]
 
     # energía perdida por clipping del inversor
-    energia_curtailment_12m: List[float]
+    energia_clipping_12m: List[float]
 
-    # energía AC final entregada por el sistema
+    # energía AC final entregada
     energia_util_12m: List[float]
 
 
@@ -215,24 +180,19 @@ class EnergiaResultado:
     # ENERGÍA ANUAL
     # ------------------------------------------------------
 
-    # energía anual bruta (kWh)
     energia_bruta_anual: float
 
-    # energía anual útil entregada (kWh)
+    energia_perdidas_anual: float
+
+    energia_despues_perdidas_anual: float
+
+    energia_clipping_anual: float
+
     energia_util_anual: float
 
-    # energía anual perdida por clipping
-    energia_curtailment_anual: float
-
 
     # ------------------------------------------------------
-    # METADATA DEL CÁLCULO
+    # METADATA
     # ------------------------------------------------------
 
-    # información adicional del modelo energético
-    #
-    # ejemplos:
-    # modelo usado
-    # factores aplicados
-    # métricas internas
     meta: Dict[str, Any] = field(default_factory=dict)
