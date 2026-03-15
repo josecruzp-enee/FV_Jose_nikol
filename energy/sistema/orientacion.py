@@ -87,35 +87,17 @@ def factor_orientacion(
     az_deg: float,
     hemisferio: str = "norte"
 ) -> float:
-    """
-    Calcula el factor anual simplificado por orientación.
 
-    Parámetros
-    ----------
-    az_deg : float
-        Azimut del generador FV (°)
-
-    hemisferio : str
-        "norte" o "sur"
-
-    Retorna
-    -------
-    float
-        Factor entre 0.35 y 1.0
-    """
-
-    # protección contra valores nulos
-    hem = (hemisferio or "norte").lower()
+    # protección contra valores nulos o tipos inesperados
+    hem = str(hemisferio or "norte").lower()
 
     # orientación óptima según hemisferio
     ref = 0.0 if hem == "sur" else 180.0
 
     delta = delta_azimut_deg(az_deg, ref)
 
-    # modelo coseno suavizado
     f = (1.0 + math.cos(math.radians(delta))) / 2.0
 
-    # límites físicos del modelo simplificado
     return max(0.35, min(1.0, f))
 
 
