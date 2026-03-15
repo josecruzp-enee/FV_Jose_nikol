@@ -8,7 +8,6 @@ from energy.contrato import EnergiaInput
 
 from core.servicios.finanzas import ejecutar_finanzas
 from electrical.paneles.entrada_panel import EntradaPaneles
-
 # ==========================================================
 # ADAPTER SIZING
 # ==========================================================
