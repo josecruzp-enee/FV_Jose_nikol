@@ -219,7 +219,7 @@ def _mostrar_nec(nec):
 
             st.metric(
                 "Breaker AC",
-                _fmt(breaker.get("tamano_a"), "A")
+                _fmt(breaker.tamano_a, "A")
             )
 
     with tabs[2]:
