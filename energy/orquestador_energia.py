@@ -156,68 +156,217 @@ def _modelo_hsp(inp: EnergiaInput):
 # MOTOR PRINCIPAL
 # ==========================================================
 
-def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
+def ejecutar_motor_energia(inp):
 
-    errores: list[str] = []
+    """
+    Orquestador del motor energético FV.
 
-    if inp.pdc_instalada_kw <= 0:
-        errores.append("Potencia DC inválida")
+    Permite ejecutar dos modos:
 
-    if inp.pac_nominal_kw <= 0:
-        errores.append("Potencia AC inválida")
+        • HSP mensual (rápido)
+        • simulación 8760 (preciso)
+    """
 
-    if errores:
-        return _resultado_error(inp, errores)
+    errores = []
 
-    resultado, errores = _modelo_hsp(inp)
+    try:
 
-    if errores:
-        return _resultado_error(inp, errores)
+        # ==================================================
+        # SELECCIÓN DEL MOTOR
+        # ==================================================
 
-    (
-        energia_bruta,
-        energia_perdidas,
-        energia_despues_perdidas,
-        energia_util,
-        energia_clipping,
-        factor_orientacion,
-    ) = resultado
+        modo = getattr(inp, "modo_motor", "mensual")
 
-    energia_bruta_anual = sum(energia_bruta)
-    energia_perdidas_anual = sum(energia_perdidas)
-    energia_despues_perdidas_anual = sum(energia_despues_perdidas)
-    energia_util_anual = sum(energia_util)
-    energia_clipping_anual = sum(energia_clipping)
 
-    pac = inp.pac_nominal_kw
+        # ==================================================
+        # MOTOR HSP MENSUAL
+        # ==================================================
 
-    dc_ac_ratio = inp.pdc_instalada_kw / pac if pac > 0 else 0.0
+        if modo == "mensual":
 
-    return EnergiaResultado(
+            resultado, errores = _modelo_hsp(inp)
 
-        ok=True,
-        errores=[],
+            # metadatos del motor
+            resultado.meta = {
 
-        pdc_instalada_kw=inp.pdc_instalada_kw,
-        pac_nominal_kw=inp.pac_nominal_kw,
+                "motor": "mensual",
+                "meses": 12,
+                "factor_orientacion": getattr(inp, "factor_orientacion", 1.0)
 
-        dc_ac_ratio=dc_ac_ratio,
+            }
 
-        energia_bruta_12m=energia_bruta,
-        energia_perdidas_12m=energia_perdidas,
-        energia_despues_perdidas_12m=energia_despues_perdidas,
-        energia_clipping_12m=energia_clipping,
-        energia_util_12m=energia_util,
+            return resultado
 
-        energia_bruta_anual=energia_bruta_anual,
-        energia_perdidas_anual=energia_perdidas_anual,
-        energia_despues_perdidas_anual=energia_despues_perdidas_anual,
-        energia_clipping_anual=energia_clipping_anual,
-        energia_util_anual=energia_util_anual,
 
-        meta={
-            "motor": "mensual",
-            "meses": 12,
-            "factor_orientacion": factor_orientacion,
-        },
-    )
+        # ==================================================
+        # MOTOR 8760 HORARIO
+        # ==================================================
+
+        elif modo == "8760":
+
+            from energy.clima.pvgis import (
+                descargar_clima_pvgis,
+                EntradaClimaPVGIS
+            )
+
+            from energy.solar.irradiancia_plano import (
+                calcular_irradiancia_plano,
+                IrradianciaInput
+            )
+
+            from energy.panel_energia.modelo_termico import (
+                calcular_temperatura_celda,
+                ModeloTermicoInput
+            )
+
+            from electrical.paneles.array_8760 import (
+                calcular_array_8760,
+                Array8760Input
+            )
+
+            from energy.sistema.inversor import (
+                calcular_inversor_8760
+            )
+
+
+            # ----------------------------------------------
+            # CLIMA 8760
+            # ----------------------------------------------
+
+            clima = descargar_clima_pvgis(
+
+                EntradaClimaPVGIS(
+
+                    lat=inp.lat,
+                    lon=inp.lon
+
+                )
+
+            )
+
+
+            # ----------------------------------------------
+            # IRRADIANCIA + TEMPERATURA
+            # ----------------------------------------------
+
+            estados = []
+
+            for hora in clima.horas:
+
+                irr = calcular_irradiancia_plano(
+
+                    IrradianciaInput(
+
+                        dni=hora.dni_wm2,
+                        dhi=hora.dhi_wm2,
+                        ghi=hora.ghi_wm2,
+
+                        solar_zenith_deg=hora.solar_zenith_deg,
+                        solar_azimuth_deg=hora.solar_azimuth_deg,
+
+                        panel_tilt_deg=inp.tilt,
+                        panel_azimuth_deg=inp.azimut
+
+                    )
+
+                )
+
+                temp = calcular_temperatura_celda(
+
+                    ModeloTermicoInput(
+
+                        irradiancia_poa_wm2=irr.poa_total,
+                        temperatura_ambiente_c=hora.temp_amb_c,
+                        noct_c=inp.noct
+
+                    )
+
+                )
+
+                estados.append({
+
+                    "poa_wm2": irr.poa_total,
+                    "temp_celda_c": temp.temperatura_celda_c
+
+                })
+
+
+            # ----------------------------------------------
+            # ARRAY FV
+            # ----------------------------------------------
+
+            array = calcular_array_8760(
+
+                Array8760Input(
+
+                    estado_solar=estados,
+
+                    paneles_por_string=inp.paneles_por_string,
+                    strings_totales=inp.n_strings,
+
+                    pmax_stc_w=inp.pmax_panel_w,
+                    vmp_stc_v=inp.vmp_panel_v,
+                    voc_stc_v=inp.voc_panel_v,
+
+                    coef_pmax_pct_per_c=inp.coef_pmax,
+                    coef_voc_pct_per_c=inp.coef_voc,
+                    coef_vmp_pct_per_c=inp.coef_vmp
+
+                )
+
+            )
+
+
+            # ----------------------------------------------
+            # INVERSOR
+            # ----------------------------------------------
+
+            inv = calcular_inversor_8760(
+
+                potencia_dc_kw_8760=array.potencia_dc_kw,
+
+                p_ac_nominal_kw=inp.kw_ac,
+
+                eficiencia_nominal=inp.eficiencia_inversor
+
+            )
+
+
+            energia_anual = inv["energia_ac_anual_kwh"]
+
+
+            # ----------------------------------------------
+            # RESULTADO
+            # ----------------------------------------------
+
+            resultado, _ = _modelo_hsp(inp)
+
+            resultado.energia_util_anual = energia_anual
+
+            resultado.meta = {
+
+                "motor": "8760",
+                "horas": 8760
+
+            }
+
+            return resultado
+
+
+        else:
+
+            raise ValueError(
+                f"modo_motor inválido: {modo}"
+            )
+
+
+    except Exception as e:
+
+        errores.append(str(e))
+
+        return EnergiaResultado(
+
+            ok=False,
+            errores=errores
+
+        )
