@@ -155,10 +155,9 @@ def _modelo_hsp(inp: EnergiaInput):
 # ==========================================================
 # MOTOR PRINCIPAL
 # ==========================================================
+def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
 
-def ejecutar_motor_energia(inp):
-
-    errores = []
+    errores: list[str] = []
 
     try:
 
@@ -166,7 +165,7 @@ def ejecutar_motor_energia(inp):
         # SELECCIÓN DEL MOTOR
         # ==================================================
 
-        modo = getattr(inp, "modo_simulacion", "mensual")
+        modo = inp.modo_simulacion
 
         # ==================================================
         # MOTOR HSP
@@ -174,14 +173,48 @@ def ejecutar_motor_energia(inp):
 
         if modo == "mensual":
 
-            resultado, errores = _modelo_hsp(inp)
+            data, errores = _modelo_hsp(inp)
 
-            resultado.meta = {
-                "motor": "mensual",
-                "meses": 12
-            }
+            if errores:
+                return _resultado_error(inp, errores)
 
-            return resultado
+            (
+                energia_bruta,
+                energia_perdidas,
+                energia_despues_perdidas,
+                energia_util,
+                energia_clipping,
+                factor_orientacion,
+            ) = data
+
+            return EnergiaResultado(
+
+                ok=True,
+                errores=[],
+
+                pdc_instalada_kw=inp.pdc_instalada_kw,
+                pac_nominal_kw=inp.pac_nominal_kw,
+
+                dc_ac_ratio=inp.pdc_instalada_kw / inp.pac_nominal_kw,
+
+                energia_bruta_12m=energia_bruta,
+                energia_perdidas_12m=energia_perdidas,
+                energia_despues_perdidas_12m=energia_despues_perdidas,
+                energia_clipping_12m=energia_clipping,
+                energia_util_12m=energia_util,
+
+                energia_bruta_anual=sum(energia_bruta),
+                energia_perdidas_anual=sum(energia_perdidas),
+                energia_despues_perdidas_anual=sum(energia_despues_perdidas),
+                energia_clipping_anual=sum(energia_clipping),
+                energia_util_anual=sum(energia_util),
+
+                meta={
+                    "motor": "mensual",
+                    "meses": 12,
+                    "factor_orientacion": factor_orientacion,
+                },
+            )
 
         # ==================================================
         # MOTOR 8760
@@ -189,7 +222,7 @@ def ejecutar_motor_energia(inp):
 
         if modo == "8760":
 
-            resultado, errores = _modelo_8760(inp)
+            resultado = _modelo_8760(inp)
 
             resultado.meta = {
                 "motor": "8760",
@@ -201,4 +234,5 @@ def ejecutar_motor_energia(inp):
         raise ValueError(f"Modo de simulación desconocido: {modo}")
 
     except Exception as e:
-        ...
+
+        return _resultado_error(inp, [str(e)])
