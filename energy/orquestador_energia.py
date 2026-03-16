@@ -175,7 +175,8 @@ def ejecutar_motor_energia(inp):
         # SELECCIÓN DEL MOTOR
         # ==================================================
 
-        modo = getattr(inp, "modo_motor", "mensual")
+        # FORZAMOS 8760 PARA PRUEBA
+        modo = "8760"
 
         # ==================================================
         # MOTOR HSP MENSUAL
@@ -211,10 +212,6 @@ def ejecutar_motor_energia(inp):
             }
 
             return resultado
-
-        # ==================================================
-        # MOTOR DESCONOCIDO
-        # ==================================================
 
         raise ValueError(f"Modo de simulación desconocido: {modo}")
 
