@@ -3,32 +3,6 @@ from __future__ import annotations
 """
 PASO 6 — RESULTADOS Y PROPUESTA
 FV Engine
-
-CAPA
-----
-UI / Presentación
-
-FRONTERA
---------
-Entrada:
-    ctx : WizardCtx
-
-Variables internas:
-    resultado_proyecto
-    sizing
-    financiero
-    nec
-
-Salida:
-    PDF profesional
-    descarga PDF
-    visualización KPIs
-    visualización ingeniería NEC
-
-Este módulo NO realiza cálculos técnicos.
-Solo muestra resultados ya calculados por:
-
-    core.aplicacion.orquestador_estudio
 """
 
 import copy
@@ -38,6 +12,7 @@ import streamlit as st
 
 from ui.state_helpers import is_result_stale
 from ui.rutas import money_L, num, preparar_salida
+
 from reportes.generar_pdf_profesional import generar_pdf_profesional
 from reportes.imagenes import generar_artefactos
 
@@ -101,9 +76,7 @@ def _render_kpis(resultado_proyecto: dict) -> None:
     if not sizing or not financiero:
 
         st.error("Estructura de resultado_proyecto incompleta")
-
         st.json(resultado_proyecto)
-
         return
 
     pdc_kw = float(getattr(sizing, "pdc_kw", 0.0))
@@ -143,7 +116,6 @@ def _render_nec_resumen(resultado_proyecto: dict) -> None:
     if not paq:
 
         st.info("Sin paquete NEC disponible")
-
         return
 
     resumen = paq.get("resumen_pdf") or {}
@@ -151,13 +123,11 @@ def _render_nec_resumen(resultado_proyecto: dict) -> None:
 
     c1, c2, c3, c4 = st.columns(4)
 
-    # Strings
     c1.metric(
         "Strings",
         len(strings.get("strings", []))
     )
 
-    # Corrientes
     idc = resumen.get("idc_nom")
     iac = resumen.get("iac_nom")
 
@@ -171,7 +141,6 @@ def _render_nec_resumen(resultado_proyecto: dict) -> None:
         f"{float(iac):.2f} A" if isinstance(iac, (int, float)) else "—"
     )
 
-    # Breaker
     breaker = ocpd.get("breaker_ac") if isinstance(ocpd, dict) else None
     tam = breaker.get("tamano_a") if isinstance(breaker, dict) else None
 
@@ -182,6 +151,50 @@ def _render_nec_resumen(resultado_proyecto: dict) -> None:
 
     with st.expander("Ver paquete NEC (crudo)"):
         st.json(paq)
+
+
+# ==========================================================
+# DEBUG MOTOR ENERGÍA
+# ==========================================================
+
+def _render_debug_energia(resultado_proyecto: dict) -> None:
+
+    st.subheader("🔎 DEBUG MOTOR ENERGÍA")
+
+    energia = resultado_proyecto.get("energia")
+
+    if energia is None:
+
+        st.info("El motor energético no retornó datos")
+        return
+
+    if hasattr(energia, "__dict__"):
+        energia = energia.__dict__
+
+    meta = energia.get("meta", {})
+
+    hsp = meta.get("hsp")
+    sim8760 = meta.get("sim_8760")
+
+    c1, c2 = st.columns(2)
+
+    with c1:
+
+        st.markdown("#### Modelo HSP")
+
+        if hsp:
+            st.json(hsp)
+        else:
+            st.caption("Modelo HSP no disponible")
+
+    with c2:
+
+        st.markdown("#### Simulación 8760")
+
+        if sim8760:
+            st.json(sim8760)
+        else:
+            st.caption("Simulación 8760 no disponible")
 
 
 # ==========================================================
@@ -226,12 +239,11 @@ def _ejecutar_pipeline_pdf(ctx, resultado_proyecto: dict) -> None:
         or "salidas"
     )
 
-    # Generar artefactos gráficos
     try:
-        import streamlit as st
 
         st.write("DEBUG RESULTADO_PROYECTO")
         st.write(resultado_proyecto)
+
         arte = generar_artefactos(
             res=resultado_proyecto,
             out_dir=out_dir,
@@ -250,7 +262,6 @@ def _ejecutar_pipeline_pdf(ctx, resultado_proyecto: dict) -> None:
             "(charts/layout)."
         )
 
-    # Generar PDF
     try:
 
         datos_pdf = dict(
@@ -299,6 +310,10 @@ def render(ctx) -> None:
     st.divider()
 
     _render_nec_resumen(resultado_proyecto)
+
+    st.divider()
+
+    _render_debug_energia(resultado_proyecto)
 
     st.divider()
 
