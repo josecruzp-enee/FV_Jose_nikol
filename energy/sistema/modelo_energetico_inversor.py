@@ -179,3 +179,52 @@ def calcular_energia_inversor(
         energia_ac_anual_kwh=energia_ac_anual,
         energia_clipping_anual_kwh=energia_clip_anual,
     )
+
+
+def calcular_inversor_8760(
+    potencia_dc_kw_8760: list[float],
+    p_ac_nominal_kw: float,
+    eficiencia_nominal: float = 0.97
+):
+    """
+    Modelo horario del inversor FV (8760).
+    """
+
+    if p_ac_nominal_kw <= 0:
+        raise ValueError("p_ac_nominal_kw inválido")
+
+    if not (0 < eficiencia_nominal <= 1):
+        raise ValueError("eficiencia_nominal inválida")
+
+    potencia_ac_kw = []
+    clipping_kw = []
+
+    for p_dc in potencia_dc_kw_8760:
+
+        p_ac = p_dc * eficiencia_nominal
+
+        if p_ac > p_ac_nominal_kw:
+
+            clip = p_ac - p_ac_nominal_kw
+            p_ac = p_ac_nominal_kw
+
+        else:
+
+            clip = 0.0
+
+        potencia_ac_kw.append(p_ac)
+        clipping_kw.append(clip)
+
+    energia_ac_anual = sum(potencia_ac_kw)
+    energia_clipping_anual = sum(clipping_kw)
+
+    return {
+
+        "potencia_ac_kw_8760": potencia_ac_kw,
+        "clipping_kw_8760": clipping_kw,
+
+        "energia_ac_anual_kwh": energia_ac_anual,
+        "energia_clipping_anual_kwh": energia_clipping_anual,
+
+        "horas": len(potencia_ac_kw)
+    }
