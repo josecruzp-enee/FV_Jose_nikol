@@ -55,7 +55,7 @@ class EnergiaInput:
 
     # "mensual" → modelo HSP
     # "8760"    → simulación física horaria
-    modo_simulacion: Literal["mensual", "8760"] = "mensual"
+    modo_simulacion: Literal["mensual", "8760"] = "8760"
 
 
     # ------------------------------------------------------
