@@ -158,15 +158,6 @@ def _modelo_hsp(inp: EnergiaInput):
 
 def ejecutar_motor_energia(inp):
 
-    """
-    Orquestador del motor energético FV.
-
-    Permite ejecutar dos modos:
-
-        • HSP mensual (rápido)
-        • simulación 8760 (preciso)
-    """
-
     errores = []
 
     try:
@@ -175,11 +166,10 @@ def ejecutar_motor_energia(inp):
         # SELECCIÓN DEL MOTOR
         # ==================================================
 
-        # FORZAMOS 8760 PARA PRUEBA
-        modo = "8760"
+        modo = getattr(inp, "modo_simulacion", "mensual")
 
         # ==================================================
-        # MOTOR HSP MENSUAL
+        # MOTOR HSP
         # ==================================================
 
         if modo == "mensual":
@@ -187,17 +177,14 @@ def ejecutar_motor_energia(inp):
             resultado, errores = _modelo_hsp(inp)
 
             resultado.meta = {
-
                 "motor": "mensual",
-                "meses": 12,
-                "factor_orientacion": getattr(inp, "factor_orientacion", 1.0)
-
+                "meses": 12
             }
 
             return resultado
 
         # ==================================================
-        # MOTOR 8760 HORARIO
+        # MOTOR 8760
         # ==================================================
 
         if modo == "8760":
@@ -205,10 +192,8 @@ def ejecutar_motor_energia(inp):
             resultado, errores = _modelo_8760(inp)
 
             resultado.meta = {
-
                 "motor": "8760",
                 "horas": 8760
-
             }
 
             return resultado
@@ -216,30 +201,4 @@ def ejecutar_motor_energia(inp):
         raise ValueError(f"Modo de simulación desconocido: {modo}")
 
     except Exception as e:
-
-        errores.append(str(e))
-
-        from energy.contrato import EnergiaResultado
-
-        return EnergiaResultado(
-
-            ok=False,
-            errores=errores,
-            pdc_instalada_kw=0,
-            pac_nominal_kw=0,
-            dc_ac_ratio=0,
-
-            energia_bruta_12m=[],
-            energia_perdidas_12m=[],
-            energia_despues_perdidas_12m=[],
-            energia_clipping_12m=[],
-            energia_util_12m=[],
-
-            energia_bruta_anual=0,
-            energia_perdidas_anual=0,
-            energia_despues_perdidas_anual=0,
-            energia_clipping_anual=0,
-            energia_util_anual=0,
-
-            meta={}
-        )
+        ...
