@@ -50,12 +50,7 @@ def _resultado_error(inp: EnergiaInput, errores: list[str]) -> EnergiaResultado:
 
 def _modelo_hsp(inp: EnergiaInput):
 
-    # ------------------------------------------------------
-    # ORIENTACIÓN
-    # ------------------------------------------------------
-
     factor_orientacion = factor_orientacion_total(
-
         tipo_superficie=inp.tipo_superficie,
         azimut_deg=inp.azimut_deg,
         azimut_a_deg=inp.azimut_a_deg,
@@ -63,10 +58,6 @@ def _modelo_hsp(inp: EnergiaInput):
         reparto_pct_a=inp.reparto_pct_a,
         hemisferio=inp.hemisferio,
     )
-
-    # ------------------------------------------------------
-    # GENERACIÓN DC BRUTA
-    # ------------------------------------------------------
 
     r_bruta = calcular_energia_bruta_dc(
         pdc_kw=inp.pdc_instalada_kw,
@@ -79,10 +70,6 @@ def _modelo_hsp(inp: EnergiaInput):
         return None, r_bruta.errores
 
     energia_bruta = r_bruta.energia_mensual_dc_kwh
-
-    # ------------------------------------------------------
-    # PÉRDIDAS DC + SOMBRAS
-    # ------------------------------------------------------
 
     r_perdidas = aplicar_perdidas(
         energia_dc_12m=energia_bruta,
@@ -100,18 +87,11 @@ def _modelo_hsp(inp: EnergiaInput):
         b - d for b, d in zip(energia_bruta, energia_despues_perdidas_dc)
     ]
 
-    # ------------------------------------------------------
-    # INVERSOR
-    # ------------------------------------------------------
-
     inv_input = EnergiaInversorInput(
 
         energia_dc_12m_kwh=energia_despues_perdidas_dc,
-
         kw_ac=inp.pac_nominal_kw,
-
         pdc_kw=inp.pdc_instalada_kw,
-
         eficiencia_nominal=inp.eficiencia_inversor,
     )
 
@@ -119,10 +99,6 @@ def _modelo_hsp(inp: EnergiaInput):
 
     energia_ac_pre = r_inv.energia_ac_12m_kwh
     energia_clipping = r_inv.energia_clipping_12m_kwh
-
-    # ------------------------------------------------------
-    # PÉRDIDAS AC
-    # ------------------------------------------------------
 
     r_ac = aplicar_perdidas_ac(
         energia_ac_12m=energia_ac_pre,
@@ -153,17 +129,87 @@ def _modelo_hsp(inp: EnergiaInput):
 
 
 # ==========================================================
+# MODELO 8760 (SIMPLIFICADO)
+# ==========================================================
+
+def _modelo_8760(inp: EnergiaInput):
+
+    try:
+
+        pdc = inp.pdc_instalada_kw
+        pac = inp.pac_nominal_kw
+
+        if pdc <= 0 or pac <= 0:
+            raise ValueError("Potencias inválidas")
+
+        produccion_especifica = 1600  # kWh/kWp/año Honduras
+
+        energia_bruta_anual = pdc * produccion_especifica
+
+        perdidas = (
+            inp.perdidas_dc_pct +
+            inp.perdidas_ac_pct +
+            inp.sombras_pct
+        ) / 100.0
+
+        energia_util_anual = energia_bruta_anual * (1 - perdidas)
+
+        dc_ac = pdc / pac
+
+        clipping = max(0.0, (dc_ac - 1.2) * 0.05)
+
+        energia_clipping_anual = energia_util_anual * clipping
+
+        energia_final = energia_util_anual - energia_clipping_anual
+
+        energia_bruta_12m = [energia_bruta_anual / 12] * 12
+        energia_util_12m = [energia_final / 12] * 12
+        energia_clipping_12m = [energia_clipping_anual / 12] * 12
+
+        energia_perdidas_anual = energia_bruta_anual - energia_util_anual
+        energia_perdidas_12m = [energia_perdidas_anual / 12] * 12
+
+        energia_despues_perdidas_12m = [energia_util_anual / 12] * 12
+
+        return EnergiaResultado(
+
+            ok=True,
+            errores=[],
+
+            pdc_instalada_kw=pdc,
+            pac_nominal_kw=pac,
+
+            dc_ac_ratio=dc_ac,
+
+            energia_bruta_12m=energia_bruta_12m,
+            energia_perdidas_12m=energia_perdidas_12m,
+            energia_despues_perdidas_12m=energia_despues_perdidas_12m,
+            energia_clipping_12m=energia_clipping_12m,
+            energia_util_12m=energia_util_12m,
+
+            energia_bruta_anual=energia_bruta_anual,
+            energia_perdidas_anual=energia_perdidas_anual,
+            energia_despues_perdidas_anual=energia_util_anual,
+            energia_clipping_anual=energia_clipping_anual,
+            energia_util_anual=energia_final,
+
+            meta={}
+        )
+
+    except Exception as e:
+
+        return _resultado_error(inp, [str(e)])
+
+
+# ==========================================================
 # MOTOR PRINCIPAL
 # ==========================================================
+
 def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
 
     errores: list[str] = []
 
     try:
-
-        # ==================================================
-        # SELECCIÓN DEL MOTOR
-        # ==================================================
 
         modo = inp.modo_simulacion
 
