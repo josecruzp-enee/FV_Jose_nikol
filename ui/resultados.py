@@ -157,46 +157,101 @@ def _render_nec_resumen(resultado_proyecto: dict) -> None:
 # DEBUG MOTOR ENERGÍA
 # ==========================================================
 
-def _render_debug_energia(resultado_proyecto: dict) -> None:
+# ==========================================================
+# DEBUG MOTOR ENERGÍA
+# ==========================================================
 
-    st.subheader("🔎 DEBUG MOTOR ENERGÍA")
+def _render_debug_energia(resultado_proyecto: dict) -> None:
+    """
+    Muestra información de depuración del motor energético.
+
+    Detecta automáticamente el tipo de motor usado:
+        • HSP mensual
+        • simulación 8760
+    """
+
+    st.markdown("### 🔎 DEBUG MOTOR ENERGÍA")
 
     energia = resultado_proyecto.get("energia")
 
     if energia is None:
-
-        st.info("El motor energético no retornó datos")
+        st.info("El motor energético no retornó datos.")
         return
 
+    # si es dataclass convertir a dict
     if hasattr(energia, "__dict__"):
         energia = energia.__dict__
 
     meta = energia.get("meta", {})
 
-    hsp = meta.get("hsp")
-    sim8760 = meta.get("sim_8760")
+    if not meta:
+        st.warning("No hay metadatos del motor energético.")
+        return
 
-    c1, c2 = st.columns(2)
+    motor = meta.get("motor")
 
-    with c1:
+    # ======================================================
+    # MOTOR HSP MENSUAL
+    # ======================================================
 
-        st.markdown("#### Modelo HSP")
+    if motor == "mensual":
 
-        if hsp:
-            st.json(hsp)
-        else:
-            st.caption("Modelo HSP no disponible")
+        st.success("Motor energético activo: HSP mensual")
 
-    with c2:
+        meses = meta.get("meses")
 
-        st.markdown("#### Simulación 8760")
+        if meses:
+            st.write("Meses simulados:", meses)
 
-        if sim8760:
-            st.json(sim8760)
-        else:
-            st.caption("Simulación 8760 no disponible")
+        energia_anual = energia.get("energia_util_anual")
 
+        if energia_anual:
+            st.metric(
+                "Energía anual FV",
+                f"{energia_anual:,.0f} kWh"
+            )
 
+        energia_12m = energia.get("energia_util_12m")
+
+        if energia_12m:
+            with st.expander("Producción mensual"):
+                for i, v in enumerate(energia_12m, 1):
+                    st.write(f"Mes {i}: {v:,.0f} kWh")
+
+    # ======================================================
+    # MOTOR 8760
+    # ======================================================
+
+    elif motor == "8760":
+
+        st.success("Motor energético activo: Simulación 8760")
+
+        energia_anual = energia.get("energia_util_anual")
+
+        if energia_anual:
+            st.metric(
+                "Energía anual FV",
+                f"{energia_anual:,.0f} kWh"
+            )
+
+        horas = meta.get("horas")
+
+        if horas:
+            st.write("Horas simuladas:", horas)
+
+        with st.expander("Metadatos del motor"):
+            st.json(meta)
+
+    # ======================================================
+    # MOTOR DESCONOCIDO
+    # ======================================================
+
+    else:
+
+        st.warning("Motor energético no identificado")
+
+        st.write("Metadatos recibidos:")
+        st.json(meta)
 # ==========================================================
 # UI BOTÓN PDF
 # ==========================================================
