@@ -206,6 +206,12 @@ def _modelo_8760(inp: EnergiaInput):
 # ==========================================================
 
 def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
+    import streamlit as st
+
+    st.warning("DEBUG MOTOR ENERGÍA")
+    st.write("Modo solicitado:", inp.modo_simulacion)
+    st.write("PDC:", inp.pdc_instalada_kw)
+    st.write("PAC:", inp.pac_nominal_kw)
 
     errores: list[str] = []
 
