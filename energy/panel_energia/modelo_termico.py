@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 MODELO TÉRMICO DEL MÓDULO FV — FV Engine
 
@@ -13,21 +15,11 @@ Calcular la temperatura de la celda fotovoltaica a partir de:
 
 Modelo utilizado
 ----------------
-Modelo térmico basado en NOCT.
-
-Ecuación:
+Modelo térmico basado en NOCT:
 
     T_cell = T_ambient + (NOCT - 20) / 800 * G_POA
 
-Donde:
-
-    T_cell      = temperatura de la celda (°C)
-    T_ambient   = temperatura ambiente (°C)
-    NOCT        = temperatura nominal de operación del módulo (°C)
-    G_POA       = irradiancia en el plano del panel (W/m²)
-
-Este modelo es ampliamente utilizado en simulaciones
-energéticas preliminares de sistemas fotovoltaicos.
+Este modelo es estándar en simulaciones FV de nivel ingeniería.
 """
 
 from dataclasses import dataclass
@@ -37,7 +29,7 @@ from dataclasses import dataclass
 # MODELOS DE DATOS
 # ==========================================================
 
-@dataclass
+@dataclass(frozen=True)
 class ModeloTermicoInput:
     """
     Parámetros de entrada del modelo térmico.
@@ -48,7 +40,7 @@ class ModeloTermicoInput:
     noct_c: float
 
 
-@dataclass
+@dataclass(frozen=True)
 class ModeloTermicoResultado:
     """
     Resultado del cálculo térmico del módulo FV.
@@ -66,20 +58,17 @@ def calcular_temperatura_celda(inp: ModeloTermicoInput) -> ModeloTermicoResultad
     Calcula la temperatura de la celda fotovoltaica
     usando el modelo térmico basado en NOCT.
 
-    Parámetros
-    ----------
-    inp : ModeloTermicoInput
-        Datos de irradiancia, temperatura ambiente
-        y parámetro NOCT del módulo.
+    Modelo:
 
-    Retorna
-    -------
-    ModeloTermicoResultado
-        Temperatura estimada de la celda FV.
+        T_cell = T_amb + (NOCT - 20)/800 * POA
+
+    Consideraciones:
+        - POA = 0 → T_cell ≈ T_amb
+        - Modelo válido para simulación 8760 simplificada
     """
 
     # ------------------------------------------------------
-    # Lectura de parámetros de entrada
+    # LECTURA DE ENTRADA
     # ------------------------------------------------------
 
     poa = inp.irradiancia_poa_wm2
@@ -87,7 +76,7 @@ def calcular_temperatura_celda(inp: ModeloTermicoInput) -> ModeloTermicoResultad
     noct = inp.noct_c
 
     # ------------------------------------------------------
-    # Validaciones básicas de seguridad
+    # VALIDACIONES
     # ------------------------------------------------------
 
     if poa < 0:
@@ -97,15 +86,22 @@ def calcular_temperatura_celda(inp: ModeloTermicoInput) -> ModeloTermicoResultad
         raise ValueError("noct_c inválido")
 
     # ------------------------------------------------------
-    # Modelo térmico NOCT
-    # ------------------------------------------------------
-    # T_cell = Tamb + (NOCT - 20)/800 * G_POA
+    # SIN IRRADIANCIA → SIN CALENTAMIENTO
     # ------------------------------------------------------
 
-    t_cell = tamb + ((noct - 20) / 800) * poa
+    if poa == 0:
+        return ModeloTermicoResultado(
+            temperatura_celda_c=tamb
+        )
 
     # ------------------------------------------------------
-    # Resultado
+    # MODELO TÉRMICO NOCT
+    # ------------------------------------------------------
+
+    t_cell = tamb + ((noct - 20.0) / 800.0) * poa
+
+    # ------------------------------------------------------
+    # RESULTADO
     # ------------------------------------------------------
 
     return ModeloTermicoResultado(
