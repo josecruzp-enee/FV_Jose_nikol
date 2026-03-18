@@ -1,6 +1,39 @@
 from __future__ import annotations
 
-from .contrato import EnergiaInput, EnergiaResultado
+"""
+ORQUESTADOR DEL DOMINIO ENERGÍA — FV Engine
+===========================================
+
+Responsabilidad
+---------------
+
+Coordinar el cálculo energético del sistema FV en modo 8760.
+
+Flujo del proceso
+-----------------
+
+    1) Validación de entrada
+    2) Simulación clima + POA
+    3) Cálculo potencia DC
+    4) Aplicación pérdidas DC
+    5) Modelo de inversor
+    6) Aplicación pérdidas AC
+    7) Agregación mensual/anual
+    8) Construcción del resultado
+
+Regla arquitectónica
+--------------------
+
+Este módulo:
+
+    ✔ CONSUME ResultadoPaneles
+    ❌ NO reconstruye parámetros eléctricos
+
+Este módulo NO contiene lógica física detallada,
+solo orquesta módulos especializados.
+"""
+
+from .contrato import EnergiaInput, EnergiaResultado, EstadoEnergiaHora
 from energy.sistema.agregacion_8760 import agregar_energia_por_mes
 
 import streamlit as st
@@ -11,32 +44,77 @@ import streamlit as st
 # ==========================================================
 
 def _resultado_error(inp: EnergiaInput, errores: list[str]) -> EnergiaResultado:
+    """
+    Construye un resultado estándar cuando ocurre un error.
+    """
+
+    pdc_kw = inp.paneles.array.potencia_dc_w / 1000 if inp.paneles else 0.0
 
     return EnergiaResultado(
         ok=False,
         errores=errores,
-        pdc_instalada_kw=inp.pdc_instalada_kw,
+
+        pdc_instalada_kw=pdc_kw,
         pac_nominal_kw=inp.pac_nominal_kw,
         dc_ac_ratio=0.0,
+
+        energia_horaria=[],
+
         energia_bruta_12m=[],
         energia_perdidas_12m=[],
         energia_despues_perdidas_12m=[],
         energia_clipping_12m=[],
         energia_util_12m=[],
+
         energia_bruta_anual=0.0,
         energia_perdidas_anual=0.0,
         energia_despues_perdidas_anual=0.0,
         energia_clipping_anual=0.0,
         energia_util_anual=0.0,
+
         meta={"estado": "error"},
     )
 
 
 # ==========================================================
-# DC 8760
+# 1. CLIMA + POA
 # ==========================================================
 
-def _calcular_dc_8760(inp: EnergiaInput, estado):
+def _simular_estado_8760(inp: EnergiaInput):
+    """
+    Genera el estado solar horario.
+
+    Salida:
+        Lista de objetos con:
+            • irradiancia POA
+            • temperatura ambiente
+            • otros parámetros solares
+    """
+
+    from energy.clima.simulacion_8760 import simular_clima_8760
+
+    resultado = simular_clima_8760(
+        clima=inp.clima,
+        tilt=inp.tilt_deg,
+        azimuth=inp.azimut_deg,
+    )
+
+    return resultado.horas
+
+
+# ==========================================================
+# 2. POTENCIA DC
+# ==========================================================
+
+def _calcular_dc(inp: EnergiaInput, estado):
+    """
+    Calcula la potencia DC del sistema en cada hora.
+
+    Fuente de verdad:
+        inp.paneles (ResultadoPaneles)
+
+    No se reconstruyen parámetros eléctricos.
+    """
 
     from energy.panel_energia.modelo_termico import (
         calcular_temperatura_celda, ModeloTermicoInput
@@ -44,19 +122,17 @@ def _calcular_dc_8760(inp: EnergiaInput, estado):
     from energy.panel_energia.potencia_panel import (
         calcular_potencia_panel, PotenciaPanelInput
     )
-    from energy.panel_energia.potencia_string import (
-        calcular_potencia_string, PotenciaStringInput
-    )
-    from energy.panel_energia.potencia_arreglo import (
-        calcular_potencia_arreglo, PotenciaArregloInput
-    )
 
-    potencia_dc = []
+    paneles = inp.paneles
+    array = paneles.array
+
+    potencia_dc_kw = []
 
     for hora in estado:
 
+        # Sin irradiancia → sin producción
         if hora.poa_wm2 <= 0:
-            potencia_dc.append(0.0)
+            potencia_dc_kw.append(0.0)
             continue
 
         # ---------------- TÉRMICO ----------------
@@ -64,7 +140,7 @@ def _calcular_dc_8760(inp: EnergiaInput, estado):
             ModeloTermicoInput(
                 irradiancia_poa_wm2=hora.poa_wm2,
                 temperatura_ambiente_c=hora.temp_amb_c,
-                noct_c=inp.temp_ambiente_c,  # fallback simple
+                noct_c=45.0,  # valor típico (puedes parametrizar luego)
             )
         ).temperatura_celda_c
 
@@ -74,111 +150,146 @@ def _calcular_dc_8760(inp: EnergiaInput, estado):
                 irradiancia_poa_wm2=hora.poa_wm2,
                 temperatura_celda_c=t_cell,
 
-                p_panel_w=inp.pmax_stc_w,
-                vmp_panel_v=inp.vmp_stc_v,
-                voc_panel_v=inp.voc_stc_v,
+                # 👉 tomado desde paneles (NO desde energia)
+                p_panel_w=array.p_panel_w,
+                vmp_panel_v=paneles.strings[0].vmp_string_v / paneles.strings[0].n_series,
+                voc_panel_v=paneles.strings[0].voc_frio_string_v / paneles.strings[0].n_series,
 
-                imp_panel_a=None,
-                isc_panel_a=None,
+                imp_panel_a=paneles.strings[0].imp_string_a,
+                isc_panel_a=paneles.strings[0].isc_string_a,
 
-                coef_potencia=inp.coef_pmax_pct_per_c,
-                coef_vmp=inp.coef_vmp_pct_per_c,
-                coef_voc=inp.coef_voc_pct_per_c,
+                coef_potencia=None,
+                coef_vmp=None,
+                coef_voc=None,
             )
         )
 
-        # ---------------- STRING ----------------
-        string = calcular_potencia_string(
-            PotenciaStringInput(
-                n_series=inp.paneles_por_string,
+        # ---------------- ESCALADO A ARRAY ----------------
+        p_array_w = panel.pmp_w * array.n_paneles_total
 
-                p_panel_w=panel.pmp_w,
-                vmp_panel_v=panel.vmp_v,
-                voc_panel_v=panel.voc_v,
+        potencia_dc_kw.append(max(0.0, p_array_w / 1000.0))
 
-                imp_panel_a=panel.imp_a,
-                isc_panel_a=panel.isc_a,
-            )
-        )
-
-        # ---------------- ARRAY ----------------
-        array = calcular_potencia_arreglo(
-            PotenciaArregloInput(
-                n_strings_total=inp.n_strings_total,
-
-                vmp_string_v=string.vmp_string_v,
-                voc_string_v=string.voc_string_v,
-
-                imp_string_a=string.imp_string_a,
-                isc_string_a=string.isc_string_a,
-
-                potencia_string_w=string.potencia_string_w,
-            )
-        )
-
-        potencia_dc.append(max(0.0, array.potencia_array_w / 1000.0))
-
-    return potencia_dc
+    return potencia_dc_kw
 
 
 # ==========================================================
-# PÉRDIDAS DC
+# 3. PÉRDIDAS DC
 # ==========================================================
 
-def _aplicar_perdidas_dc(inp, potencia_dc):
+def _aplicar_perdidas_dc(inp: EnergiaInput, potencia_dc_kw):
+    """
+    Aplica pérdidas en el lado DC.
+    """
 
     from energy.sistema.perdidas_fisicas import (
         aplicar_perdidas_fisicas, PerdidasInput
     )
 
-    r = aplicar_perdidas_fisicas(
+    return aplicar_perdidas_fisicas(
         PerdidasInput(
-            potencia_kw=potencia_dc,
+            potencia_kw=potencia_dc_kw,
             perdidas_dc_pct=inp.perdidas_dc_pct,
             sombras_pct=inp.sombras_pct,
         )
     )
 
-    return r
-
 
 # ==========================================================
-# INVERSOR
+# 4. INVERSOR
 # ==========================================================
 
-def _aplicar_inversor(inp, potencia_dc_corr):
+def _aplicar_inversor(inp: EnergiaInput, potencia_dc_kw):
+    """
+    Convierte potencia DC a AC considerando:
+
+        • eficiencia
+        • límite del inversor
+        • clipping
+    """
 
     from energy.sistema.modelo_energetico_inversor import (
         calcular_inversor_8760
     )
 
-    inv = calcular_inversor_8760(
-        potencia_dc_kw_8760=potencia_dc_corr,
+    return calcular_inversor_8760(
+        potencia_dc_kw_8760=potencia_dc_kw,
         p_ac_nominal_kw=inp.pac_nominal_kw,
         eficiencia_nominal=inp.eficiencia_inversor,
     )
 
-    return inv
-
 
 # ==========================================================
-# PÉRDIDAS AC
+# 5. PÉRDIDAS AC
 # ==========================================================
 
-def _aplicar_perdidas_ac(inp, potencia_ac):
+def _aplicar_perdidas_ac(inp: EnergiaInput, potencia_ac_kw):
+    """
+    Aplica pérdidas en el lado AC.
+    """
 
     from energy.sistema.perdidas_ac import (
         aplicar_perdidas_ac, PerdidasACInput
     )
 
-    r = aplicar_perdidas_ac(
+    return aplicar_perdidas_ac(
         PerdidasACInput(
-            potencia_kw=potencia_ac,
+            potencia_kw=potencia_ac_kw,
             perdidas_ac_pct=inp.perdidas_ac_pct,
         )
     )
 
-    return r
+
+# ==========================================================
+# 6. CONSTRUCCIÓN RESULTADO
+# ==========================================================
+
+def _construir_resultado(
+    inp: EnergiaInput,
+    potencia_dc_kw,
+    potencia_ac_kw,
+    clipping_kw,
+):
+    """
+    Consolida resultados horarios, mensuales y anuales.
+    """
+
+    energia_bruta_12m = agregar_energia_por_mes(potencia_dc_kw)
+    energia_final_12m = agregar_energia_por_mes(potencia_ac_kw)
+    energia_clipping_12m = agregar_energia_por_mes(clipping_kw)
+
+    energia_bruta_anual = sum(potencia_dc_kw)
+    energia_final_anual = sum(potencia_ac_kw)
+    energia_clipping_anual = sum(clipping_kw)
+
+    pdc_kw = inp.paneles.array.potencia_dc_w / 1000
+
+    return EnergiaResultado(
+        ok=True,
+        errores=[],
+
+        pdc_instalada_kw=pdc_kw,
+        pac_nominal_kw=inp.pac_nominal_kw,
+        dc_ac_ratio=pdc_kw / inp.pac_nominal_kw,
+
+        energia_horaria=[],  # opcional: puedes llenar luego
+
+        energia_bruta_12m=energia_bruta_12m,
+        energia_perdidas_12m=[b - f for b, f in zip(energia_bruta_12m, energia_final_12m)],
+        energia_despues_perdidas_12m=energia_final_12m,
+        energia_clipping_12m=energia_clipping_12m,
+        energia_util_12m=energia_final_12m,
+
+        energia_bruta_anual=energia_bruta_anual,
+        energia_perdidas_anual=energia_bruta_anual - energia_final_anual,
+        energia_despues_perdidas_anual=energia_final_anual,
+        energia_clipping_anual=energia_clipping_anual,
+        energia_util_anual=energia_final_anual,
+
+        meta={
+            "motor": "8760",
+            "horas": 8760,
+        }
+    )
 
 
 # ==========================================================
@@ -186,120 +297,42 @@ def _aplicar_perdidas_ac(inp, potencia_ac):
 # ==========================================================
 
 def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
+    """
+    Punto de entrada del dominio energía.
+    """
 
     errores = inp.validar()
     if errores:
         return _resultado_error(inp, errores)
 
-    if inp.clima is None:
-        return _resultado_error(inp, ["Se requiere clima para 8760"])
-
-    if inp.tilt_deg is None:
-        return _resultado_error(inp, ["Se requiere tilt_deg"])
-
     try:
 
         st.success("Ejecutando modelo 8760")
 
-        # ======================================================
-        # 1. CLIMA + SOLAR
-        # ======================================================
+        # 1. clima
+        estado = _simular_estado_8760(inp)
 
-        from energy.clima.simulacion_8760 import simular_clima_8760
-
-        resultado_solar = simular_clima_8760(
-            clima=inp.clima,
-            tilt=inp.tilt_deg,
-            azimuth=180
-        )
-
-        estado = resultado_solar.horas
-
-        # ======================================================
         # 2. DC
-        # ======================================================
+        potencia_dc = _calcular_dc(inp, estado)
 
-        potencia_dc = _calcular_dc_8760(inp, estado)
-
-        # ======================================================
-        # 3. PÉRDIDAS DC
-        # ======================================================
-
+        # 3. pérdidas DC
         r_dc = _aplicar_perdidas_dc(inp, potencia_dc)
-        potencia_dc_corr = r_dc.potencia_kw
 
-        # ======================================================
-        # 4. INVERSOR
-        # ======================================================
+        # 4. inversor
+        inv = _aplicar_inversor(inp, r_dc.potencia_kw)
 
-        inv = _aplicar_inversor(inp, potencia_dc_corr)
+        # 5. pérdidas AC
+        r_ac = _aplicar_perdidas_ac(inp, inv["potencia_ac_kw_8760"])
 
-        potencia_ac = inv["potencia_ac_kw_8760"]
-        clipping_kw = inv["clipping_kw_8760"]
-
-        # ======================================================
-        # 5. PÉRDIDAS AC
-        # ======================================================
-
-        r_ac = _aplicar_perdidas_ac(inp, potencia_ac)
-        potencia_ac_final = r_ac.potencia_kw
-
-        # ======================================================
-        # 6. NORMALIZAR
-        # ======================================================
-
-        if len(potencia_ac_final) == 8784:
-            potencia_ac_final = potencia_ac_final[:8760]
-            clipping_kw = clipping_kw[:8760]
-
-        # ======================================================
-        # 7. AGREGACIÓN
-        # ======================================================
-
-        energia_bruta_12m = agregar_energia_por_mes(potencia_dc)
-        energia_final_12m = agregar_energia_por_mes(potencia_ac_final)
-
-        energia_bruta_anual = sum(potencia_dc)
-        energia_final_anual = sum(potencia_ac_final)
-
-        energia_clipping_12m = agregar_energia_por_mes(clipping_kw)
-        energia_clipping_anual = sum(clipping_kw)
-
-        # ======================================================
-        # 8. SALIDA
-        # ======================================================
-
-        return EnergiaResultado(
-            ok=True,
-            errores=[],
-
-            pdc_instalada_kw=inp.pdc_instalada_kw,
-            pac_nominal_kw=inp.pac_nominal_kw,
-            dc_ac_ratio=inp.pdc_instalada_kw / inp.pac_nominal_kw,
-
-            energia_bruta_12m=energia_bruta_12m,
-            energia_perdidas_12m=[b - f for b, f in zip(energia_bruta_12m, energia_final_12m)],
-            energia_despues_perdidas_12m=energia_final_12m,
-            energia_clipping_12m=energia_clipping_12m,
-            energia_util_12m=energia_final_12m,
-
-            energia_bruta_anual=energia_bruta_anual,
-            energia_perdidas_anual=energia_bruta_anual - energia_final_anual,
-            energia_despues_perdidas_anual=energia_final_anual,
-            energia_clipping_anual=energia_clipping_anual,
-            energia_util_anual=energia_final_anual,
-
-            meta={
-                "motor": "8760",
-                "horas": 8760,
-                "factor_perdidas_dc": r_dc.factor_total,
-                "factor_perdidas_ac": r_ac.factor_ac,
-            }
+        # 6. resultado
+        return _construir_resultado(
+            inp,
+            potencia_dc,
+            r_ac.potencia_kw,
+            inv["clipping_kw_8760"],
         )
 
     except Exception as e:
 
-        print("🔥 ERROR REAL MOTOR ENERGIA:", str(e))
+        print("🔥 ERROR MOTOR ENERGIA:", str(e))
         raise
-
-        return _resultado_error(inp, [str(e)])
