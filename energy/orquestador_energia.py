@@ -63,7 +63,7 @@ def _calcular_dc_8760(inp: EnergiaInput, estado):
         t_cell = calcular_temperatura_celda(
             ModeloTermicoInput(
                 irradiancia_poa_wm2=hora.poa_wm2,
-                temperatura_ambiente_c=hora.temp_ambiente_c,
+                temperatura_ambiente_c=getattr(hora, "temp_ambiente_c", inp.temp_ambiente_c),
                 noct_c=inp.temp_ambiente_c,  # fallback simple
             )
         ).temperatura_celda_c
