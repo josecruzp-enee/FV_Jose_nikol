@@ -1,3 +1,4 @@
+from typing import List
 def agregar_energia_por_mes(potencia_horaria_kw: List[float]) -> List[float]:
 
     if len(potencia_horaria_kw) not in (8760, 8784):
