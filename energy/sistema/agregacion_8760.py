@@ -1,35 +1,11 @@
-from __future__ import annotations
-
-from typing import List
-
-
-# ==========================================================
-# DIAS POR MES (AÑO NORMAL)
-# ==========================================================
-
-DIAS_MES = [31,28,31,30,31,30,31,31,30,31,30,31]
-
-
-# ==========================================================
-# AGREGACIÓN HORARIA → MENSUAL
-# ==========================================================
-
 def agregar_energia_por_mes(potencia_horaria_kw: List[float]) -> List[float]:
-    """
-    Convierte serie horaria (8760) en energía mensual.
 
-    Entrada:
-        potencia_horaria_kw : lista de 8760 valores
+    if len(potencia_horaria_kw) not in (8760, 8784):
+        raise ValueError("Serie inválida")
 
-    Salida:
-        energia_mensual_kwh : lista de 12 valores
-    """
-
-    if len(potencia_horaria_kw) != 8760:
-        raise ValueError("Serie horaria debe tener 8760 valores.")
+    DIAS_MES = [31,28,31,30,31,30,31,31,30,31,30,31]
 
     energia_mensual = []
-
     idx = 0
 
     for dias in DIAS_MES:
@@ -38,9 +14,7 @@ def agregar_energia_por_mes(potencia_horaria_kw: List[float]) -> List[float]:
 
         bloque = potencia_horaria_kw[idx : idx + horas_mes]
 
-        energia_mes = sum(bloque)
-
-        energia_mensual.append(energia_mes)
+        energia_mensual.append(sum(bloque))
 
         idx += horas_mes
 
