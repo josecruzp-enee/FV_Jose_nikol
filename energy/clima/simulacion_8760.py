@@ -106,10 +106,17 @@ def simular_clima_8760(
         # 3. TEMPERATURA DE CELDA
         # ======================================================
 
-        temp_celda = calcular_temperatura_celda(
-            poa,
-            hora.temp_amb_c
+        from energy.panel_energia.modelo_termico import ModeloTermicoInput
+
+        r_termico = calcular_temperatura_celda(
+            ModeloTermicoInput(
+                irradiancia_poa_wm2=poa,
+                temperatura_ambiente_c=hora.temp_amb_c,
+                noct_c=45  # ⚠️ puedes parametrizar después
+            )
         )
+
+        temp_celda = r_termico.temperatura_celda_c
 
         # ======================================================
         # 4. ACUMULACIÓN ENERGÍA
