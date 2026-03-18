@@ -4,31 +4,34 @@ from __future__ import annotations
 CONTRATO DEL DOMINIO ENERGÍA — FV Engine
 ========================================
 
-Este módulo define la SALIDA OFICIAL del motor energético FV.
+Este módulo define las estructuras formales del dominio energía.
 
-Regla arquitectónica
---------------------
+IMPORTANTE
+----------
 
 El dominio energía NO define el sistema FV.
-El sistema FV ya está completamente definido en:
+El sistema FV es responsabilidad del dominio:
 
-    electrical.paneles → ResultadoPaneles
+    electrical.paneles
 
-Por lo tanto:
+Sin embargo, en la implementación actual:
 
-    ✔ energía CONSUME ResultadoPaneles
-    ❌ energía NO reconstruye parámetros eléctricos
+    ✔ energía recibe paneles como dict estructurado
+    ✔ energía valida fuertemente ese dict
+    ❌ energía NO reconstruye el sistema
+
+Esto es una adaptación controlada (no es solución final).
 
 Responsabilidad del dominio energía
 -----------------------------------
 
 Calcular la producción energética del sistema a partir de:
 
-    • el generador FV (ResultadoPaneles)
+    • generador FV (paneles)
     • clima horario (8760)
-    • orientación
+    • geometría
     • pérdidas
-    • comportamiento del inversor
+    • inversor
 
 Modelo soportado
 ----------------
@@ -38,17 +41,20 @@ Modelo soportado
 Este módulo NO contiene lógica de cálculo.
 """
 
-from dataclasses import dataclass, field
-from typing import List, Dict, Optional
 
-# 👉 Fuente única del generador FV
-from electrical.paneles.resultado_paneles import ResultadoPaneles
+# ==========================================================
+# IMPORTS
+# ==========================================================
+
+from dataclasses import dataclass, field
+from typing import List, Dict, Any
 
 
 # ==========================================================
 # (TEMPORAL) TIPO DE CLIMA
 # ==========================================================
 
+# ⚠️ Reemplazar por contrato real cuando exista
 ResultadoClima = object
 
 
@@ -59,19 +65,24 @@ ResultadoClima = object
 @dataclass(frozen=True)
 class EstadoEnergiaHora:
     """
-    Estado energético del sistema en una hora específica.
+    Estado energético en una hora específica.
 
-    Representa el resultado físico del sistema FV en una
-    condición climática dada.
+    Representa el resultado físico del sistema FV bajo
+    condiciones climáticas puntuales.
     """
 
+    # Irradiancia en plano del arreglo
     poa_wm2: float
+
+    # Temperaturas
     temp_amb_c: float
     temp_celda_c: float
 
+    # Potencias instantáneas
     p_dc_w: float
     p_ac_w: float
 
+    # Energía generada en la hora
     energia_dc_wh: float
     energia_ac_wh: float
 
@@ -80,19 +91,20 @@ class EstadoEnergiaHora:
 # ENTRADA DEL MOTOR ENERGÉTICO
 # ==========================================================
 
-from dataclasses import dataclass, field
-from typing import List
-
-from dataclasses import dataclass, field
-from typing import List, Dict, Any
-
-
 @dataclass(frozen=True)
 class EnergiaInput:
+    """
+    Entrada del motor energético FV.
+
+    Representa todos los datos necesarios para ejecutar
+    la simulación física 8760.
+    """
 
     # ------------------------------------------------------
-    # GENERADOR FV (AHORA dict)
+    # GENERADOR FV
     # ------------------------------------------------------
+    # ⚠️ Actualmente se recibe como dict estructurado
+    # proveniente de electrical.paneles
     paneles: Dict[str, Any]
 
     # ------------------------------------------------------
@@ -112,7 +124,7 @@ class EnergiaInput:
     clima: Any
 
     # ------------------------------------------------------
-    # PÉRDIDAS
+    # PARÁMETROS DEL SISTEMA
     # ------------------------------------------------------
     eficiencia_inversor: float = 0.97
     permitir_clipping: bool = True
@@ -122,21 +134,27 @@ class EnergiaInput:
     sombras_pct: float = 0.0
 
     # ======================================================
-    # VALIDACIÓN FUERTE
+    # VALIDACIÓN DEL CONTRATO
     # ======================================================
 
     def validar(self) -> List[str]:
+        """
+        Valida consistencia de la entrada.
+
+        Regla:
+            Si algo falta → se reporta error
+        """
 
         errores: List[str] = []
 
         # -------------------------------
-        # PANELes
+        # PANELes (CRÍTICO)
         # -------------------------------
-
         if not isinstance(self.paneles, dict):
             errores.append("paneles debe ser dict")
 
         else:
+
             if not self.paneles.get("ok", False):
                 errores.append("paneles no válido")
 
@@ -149,14 +167,12 @@ class EnergiaInput:
         # -------------------------------
         # POTENCIA
         # -------------------------------
-
         if self.pac_nominal_kw <= 0:
             errores.append("pac_nominal_kw inválido")
 
         # -------------------------------
         # GEOMETRÍA
         # -------------------------------
-
         if self.tilt_deg is None:
             errores.append("tilt_deg requerido")
 
@@ -166,41 +182,11 @@ class EnergiaInput:
         # -------------------------------
         # CLIMA
         # -------------------------------
-
         if self.clima is None:
             errores.append("clima requerido")
 
         return errores
-    # ======================================================
-    # VALIDACIÓN
-    # ======================================================
 
-    def validar(self) -> List[str]:
-
-        errores: List[str] = []
-
-        if self.paneles is None:
-            errores.append("ResultadoPaneles requerido")
-
-        elif not self.paneles.ok:
-            errores.append("ResultadoPaneles no válido")
-
-        elif not self.paneles.strings:
-            errores.append("No hay strings definidos")
-
-        if self.pac_nominal_kw <= 0:
-            errores.append("pac_nominal_kw debe ser > 0")
-
-        if self.tilt_deg is None:
-            errores.append("tilt_deg requerido")
-
-        if self.azimut_deg is None:
-            errores.append("azimut_deg requerido")
-
-        if self.clima is None:
-            errores.append("clima requerido (8760)")
-
-        return errores
 
 # ==========================================================
 # RESULTADO DEL MOTOR ENERGÉTICO
@@ -211,20 +197,19 @@ class EnergiaResultado:
     """
     Resultado final del motor energético.
 
-    Representa la producción completa del sistema FV.
+    Contiene toda la producción del sistema FV:
+    horaria, mensual y anual.
     """
 
     # ------------------------------------------------------
     # ESTADO
     # ------------------------------------------------------
-
     ok: bool
     errores: List[str]
 
     # ------------------------------------------------------
     # POTENCIA
     # ------------------------------------------------------
-
     pdc_instalada_kw: float
     pac_nominal_kw: float
     dc_ac_ratio: float
@@ -232,13 +217,11 @@ class EnergiaResultado:
     # ------------------------------------------------------
     # ENERGÍA HORARIA (8760)
     # ------------------------------------------------------
-
     energia_horaria: List[EstadoEnergiaHora]
 
     # ------------------------------------------------------
     # ENERGÍA MENSUAL
     # ------------------------------------------------------
-
     energia_bruta_12m: List[float]
     energia_perdidas_12m: List[float]
     energia_despues_perdidas_12m: List[float]
@@ -248,7 +231,6 @@ class EnergiaResultado:
     # ------------------------------------------------------
     # ENERGÍA ANUAL
     # ------------------------------------------------------
-
     energia_bruta_anual: float
     energia_perdidas_anual: float
     energia_despues_perdidas_anual: float
@@ -258,48 +240,4 @@ class EnergiaResultado:
     # ------------------------------------------------------
     # METADATA
     # ------------------------------------------------------
-
     meta: Dict[str, object] = field(default_factory=dict)
-
-
-# ==========================================================
-# SALIDA DEL DOMINIO
-# ==========================================================
-
-"""
-Este módulo produce un único objeto:
-
-EnergiaResultado
-
-
-Estructura:
-
-EnergiaResultado
-    ├─ pdc_instalada_kw
-    ├─ pac_nominal_kw
-    ├─ dc_ac_ratio
-    │
-    ├─ energia_horaria: List[EstadoEnergiaHora]
-    │      ├─ poa_wm2
-    │      ├─ temp_amb_c
-    │      ├─ temp_celda_c
-    │      ├─ p_dc_w
-    │      ├─ p_ac_w
-    │      ├─ energia_dc_wh
-    │      └─ energia_ac_wh
-    │
-    ├─ energia_bruta_12m
-    ├─ energia_perdidas_12m
-    ├─ energia_despues_perdidas_12m
-    ├─ energia_clipping_12m
-    ├─ energia_util_12m
-    │
-    ├─ energia_bruta_anual
-    ├─ energia_perdidas_anual
-    ├─ energia_despues_perdidas_anual
-    ├─ energia_clipping_anual
-    ├─ energia_util_anual
-    │
-    ├─ errores
-    └─ meta
-"""
