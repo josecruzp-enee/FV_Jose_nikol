@@ -92,5 +92,5 @@ def validar_clima_8760(clima: ResultadoClima) -> None:
     if ghi_total <= 0:
         raise ValueError("Clima inválido: GHI total = 0")
 
-    if dni_total <= 0:
-        raise ValueError("Clima inválido: DNI total = 0")
+    if dni_total == 0:
+        print("⚠️ DNI = 0, se usará solo GHI (válido en PVGIS)")
