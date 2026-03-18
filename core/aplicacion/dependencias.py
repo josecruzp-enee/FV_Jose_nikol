@@ -211,9 +211,9 @@ class EnergiaAdapter:
             paneles_por_string=getattr(strings, "n_series", None),
             n_strings_total=getattr(strings, "n_strings_total", None),
 
-            pmax_stc_w=panel.pmax_stc_w,
-            vmp_stc_v=panel.vmp_stc_v,
-            voc_stc_v=panel.voc_stc_v,
+            pmax_stc_w=getattr(panel, "pmax_w", None),
+            vmp_stc_v=getattr(panel, "vmp_v", None),
+            voc_stc_v=getattr(panel, "voc_v", None),
 
             coef_pmax_pct_per_c=getattr(panel, "coef_pmax_pct_per_c", None),
             coef_voc_pct_per_c=getattr(panel, "coef_voc_pct_per_c", None),
