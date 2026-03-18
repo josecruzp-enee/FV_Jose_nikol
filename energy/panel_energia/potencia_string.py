@@ -1,15 +1,16 @@
+from __future__ import annotations
+
 """
 MODELO DE STRING FV — FV Engine
 
-Dominio: electrical.paneles.energia
+Dominio: paneles / energía
 
 Responsabilidad
 ---------------
-Calcular los parámetros eléctricos de un string fotovoltaico
-a partir de las características eléctricas de un panel.
+Calcular los parámetros eléctricos de UN string fotovoltaico
+(paneles conectados en serie).
 
-Este módulo representa el siguiente nivel físico del sistema
-fotovoltaico después del modelo del panel.
+Este módulo NO considera conexiones en paralelo ni MPPT.
 
 Relación en el motor FV
 -----------------------
@@ -20,36 +21,9 @@ Relación en el motor FV
             ↓
     potencia_panel
             ↓
-    potencia_string      ← ESTE MÓDULO
+    potencia_string   ← ESTE MÓDULO (solo serie)
             ↓
-    potencia_arreglo
-            ↓
-    producción energética del sistema
-
-Conceptos eléctricos utilizados
--------------------------------
-
-Paneles conectados en SERIE:
-
-    • el voltaje se suma
-    • la corriente permanece igual
-
-Por lo tanto:
-
-    V_string = V_panel × N_series
-    I_string = I_panel
-
-Strings conectados en PARALELO hacia el MPPT:
-
-    • el voltaje permanece igual
-    • la corriente se suma
-
-Por lo tanto:
-
-    I_mppt = I_string × N_strings
-
-Este módulo sirve como puente entre el modelo físico del panel
-y el contrato oficial del dominio paneles (StringFV).
+    potencia_arreglo  (paralelo)
 """
 
 from dataclasses import dataclass
@@ -59,24 +33,24 @@ from dataclasses import dataclass
 # ENTRADA
 # =========================================================
 
-@dataclass
+@dataclass(frozen=True)
 class PotenciaStringInput:
     """
     Parámetros de entrada del modelo del string FV.
     """
 
     # -----------------------------------------------------
-    # Configuración física del string
+    # CONFIGURACIÓN (SERIE)
     # -----------------------------------------------------
 
     n_series: int
-    n_strings: int
 
     # -----------------------------------------------------
-    # Parámetros eléctricos del panel
+    # PARÁMETROS DEL PANEL
     # -----------------------------------------------------
 
     p_panel_w: float
+
     vmp_panel_v: float
     voc_panel_v: float
 
@@ -88,10 +62,10 @@ class PotenciaStringInput:
 # SALIDA
 # =========================================================
 
-@dataclass
+@dataclass(frozen=True)
 class PotenciaStringResultado:
     """
-    Resultado del modelo eléctrico del string FV.
+    Resultado eléctrico de UN string FV.
     """
 
     vmp_string_v: float
@@ -102,8 +76,6 @@ class PotenciaStringResultado:
 
     potencia_string_w: float
 
-    i_mppt_a: float
-
 
 # =========================================================
 # MOTOR
@@ -111,69 +83,49 @@ class PotenciaStringResultado:
 
 def calcular_potencia_string(inp: PotenciaStringInput) -> PotenciaStringResultado:
     """
-    Calcula los parámetros eléctricos del string FV
-    a partir de las características del panel.
+    Calcula los parámetros eléctricos de un string FV
+    (paneles en serie).
 
-    Parámetros
-    ----------
-    inp : PotenciaStringInput
-        Configuración física del string y parámetros eléctricos
-        del panel fotovoltaico.
+    Modelo:
 
-    Retorna
-    -------
-    PotenciaStringResultado
-        Parámetros eléctricos del string y corriente hacia MPPT.
+        V_string = V_panel * N_series
+        I_string = I_panel
+        P_string = P_panel * N_series
     """
 
     # -----------------------------------------------------
-    # Validaciones básicas
+    # VALIDACIONES
     # -----------------------------------------------------
 
     if inp.n_series <= 0:
         raise ValueError("n_series inválido")
 
-    if inp.n_strings <= 0:
-        raise ValueError("n_strings inválido")
-
     # -----------------------------------------------------
-    # Voltajes del string (paneles en serie)
+    # VOLTAJES (serie)
     # -----------------------------------------------------
 
     vmp_string = inp.vmp_panel_v * inp.n_series
     voc_string = inp.voc_panel_v * inp.n_series
 
     # -----------------------------------------------------
-    # Corrientes del string
-    # -----------------------------------------------------
-    # En serie la corriente no cambia
+    # CORRIENTES (serie → no cambian)
     # -----------------------------------------------------
 
     imp_string = inp.imp_panel_a
     isc_string = inp.isc_panel_a
 
     # -----------------------------------------------------
-    # Potencia del string
-    # -----------------------------------------------------
-    # Potencia eléctrica aproximada en MPP
+    # POTENCIA
     # -----------------------------------------------------
 
-    potencia_string = vmp_string * imp_string
+    # opción consistente con tu modelo panel:
+    potencia_string = inp.p_panel_w * inp.n_series
 
     # -----------------------------------------------------
-    # Corriente total hacia el MPPT
-    # -----------------------------------------------------
-    # Strings en paralelo suman corriente
-    # -----------------------------------------------------
-
-    i_mppt = imp_string * inp.n_strings
-
-    # -----------------------------------------------------
-    # Resultado
+    # RESULTADO
     # -----------------------------------------------------
 
     return PotenciaStringResultado(
-
         vmp_string_v=vmp_string,
         voc_string_v=voc_string,
 
@@ -181,6 +133,4 @@ def calcular_potencia_string(inp: PotenciaStringInput) -> PotenciaStringResultad
         isc_string_a=isc_string,
 
         potencia_string_w=potencia_string,
-
-        i_mppt_a=i_mppt
     )
