@@ -2,6 +2,9 @@ from core.aplicacion.orquestador_estudio import DependenciasEstudio
 
 from core.dominio.contrato import StringInfo
 from core.dominio.contrato import ResultadoStrings
+from energy.clima.lector_pvgis import (descargar_clima_pvgis, EntradaClimaPVGIS)
+
+from electrical.catalogos.catalogos import get_panel
 
 from core.servicios.sizing import calcular_sizing_unificado
 
@@ -144,15 +147,34 @@ class EnergiaAdapter:
     def ejecutar(self, datos, sizing, strings):
 
         sf = getattr(datos, "sistema_fv", {}) or {}
+        eq = getattr(datos, "equipos", {}) or {}
 
         # --------------------------------------------------
-        # MODO DE SIMULACIÓN (CORRECTO)
+        # MODO DE SIMULACIÓN
         # --------------------------------------------------
 
         modo = sf.get("modo_simulacion", "8760")
 
         # --------------------------------------------------
-        # CONSTRUIR ENTRADA DEL DOMINIO ENERGÍA
+        # PANEL (OBLIGATORIO PARA 8760)
+        # --------------------------------------------------
+
+        panel_id = eq.get("panel_id")
+        panel = get_panel(panel_id)
+
+        # --------------------------------------------------
+        # CLIMA PVGIS (8760)
+        # --------------------------------------------------
+
+        clima = descargar_clima_pvgis(
+            EntradaClimaPVGIS(
+                lat=sf.get("latitud"),
+                lon=sf.get("longitud")
+            )
+        )
+
+        # --------------------------------------------------
+        # CONSTRUIR ENTRADA
         # --------------------------------------------------
 
         entrada = EnergiaInput(
@@ -165,35 +187,35 @@ class EnergiaAdapter:
             pac_nominal_kw=sizing.kw_ac,
 
             # -------------------------------
-            # MODO (CLAVE)
+            # MODO
             # -------------------------------
 
             modo_simulacion=modo,
 
             # -------------------------------
-            # HSP (solo si aplica)
+            # HSP
             # -------------------------------
 
             hsp_12m=sf.get("hsp_12m", [5.5]*12),
             dias_mes=[31,28,31,30,31,30,31,31,30,31,30,31],
 
             # -------------------------------
-            # 8760 (mínimos necesarios)
+            # 8760 (CLAVE)
             # -------------------------------
 
-            clima=sf.get("clima"),              # ← importante
-            tilt_deg=sf.get("tilt_deg"),        # ← importante
+            clima=clima,
+            tilt_deg=sf.get("inclinacion_deg"),  # ← CORREGIDO
 
             paneles_por_string=getattr(strings, "n_series", None),
             n_strings_total=getattr(strings, "n_strings_total", None),
 
-            pmax_stc_w=sf.get("pmax_stc_w"),
-            vmp_stc_v=sf.get("vmp_stc_v"),
-            voc_stc_v=sf.get("voc_stc_v"),
+            pmax_stc_w=panel.pmax_stc_w,
+            vmp_stc_v=panel.vmp_stc_v,
+            voc_stc_v=panel.voc_stc_v,
 
-            coef_pmax_pct_per_c=sf.get("coef_pmax_pct_per_c"),
-            coef_voc_pct_per_c=sf.get("coef_voc_pct_per_c"),
-            coef_vmp_pct_per_c=sf.get("coef_vmp_pct_per_c"),
+            coef_pmax_pct_per_c=getattr(panel, "coef_pmax_pct_per_c", None),
+            coef_voc_pct_per_c=getattr(panel, "coef_voc_pct_per_c", None),
+            coef_vmp_pct_per_c=getattr(panel, "coef_vmp_pct_per_c", None),
 
             # -------------------------------
             # PÉRDIDAS
@@ -224,11 +246,12 @@ class EnergiaAdapter:
 
         print("\nDEBUG ENERGIA ADAPTER")
         print("modo_simulacion:", modo)
-        print("clima:", "OK" if entrada.clima else "None")
+        print("clima horas:", len(entrada.clima.horas))
         print("tilt:", entrada.tilt_deg)
+        print("panel Pmax:", entrada.pmax_stc_w)
 
         # --------------------------------------------------
-        # EJECUTAR MOTOR ENERGÍA
+        # EJECUTAR MOTOR
         # --------------------------------------------------
 
         return ejecutar_motor_energia(entrada)
