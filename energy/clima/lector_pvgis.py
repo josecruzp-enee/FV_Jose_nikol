@@ -61,6 +61,8 @@ def descargar_clima_pvgis(
         "endyear": entrada.endyear,
         "usehorizon": 1,
         "pvcalculation": 0,
+        "angle": 0, 
+        "aspect": 0,  
     }
 
     st.write("📡 Enviando request a PVGIS...")
