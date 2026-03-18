@@ -6,7 +6,7 @@ from .sistema.orientacion import factor_orientacion_total
 from .sistema.generacion_bruta import calcular_energia_bruta_dc
 from .sistema.perdidas_fisicas import aplicar_perdidas
 from .sistema.perdidas_ac import aplicar_perdidas_ac
-
+from energy.sistema.agregacion_8760 import agregar_energia_por_mes
 from .sistema.modelo_energetico_inversor import (
     calcular_energia_inversor,
     EnergiaInversorInput
