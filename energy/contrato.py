@@ -83,24 +83,37 @@ class EstadoEnergiaHora:
 from dataclasses import dataclass, field
 from typing import List
 
+from dataclasses import dataclass, field
+from typing import List, Dict, Any
+
+
 @dataclass(frozen=True)
 class EnergiaInput:
 
     # ------------------------------------------------------
-    # 🔹 SIN DEFAULT (PRIMERO)
+    # GENERADOR FV (AHORA dict)
     # ------------------------------------------------------
+    paneles: Dict[str, Any]
 
-    paneles: ResultadoPaneles
+    # ------------------------------------------------------
+    # INVERSOR
+    # ------------------------------------------------------
     pac_nominal_kw: float
 
+    # ------------------------------------------------------
+    # GEOMETRÍA
+    # ------------------------------------------------------
     tilt_deg: float
     azimut_deg: float
-    clima: ResultadoClima
 
     # ------------------------------------------------------
-    # 🔹 CON DEFAULT (DESPUÉS)
+    # CLIMA
     # ------------------------------------------------------
+    clima: Any
 
+    # ------------------------------------------------------
+    # PÉRDIDAS
+    # ------------------------------------------------------
     eficiencia_inversor: float = 0.97
     permitir_clipping: bool = True
 
@@ -108,6 +121,56 @@ class EnergiaInput:
     perdidas_ac_pct: float = 0.0
     sombras_pct: float = 0.0
 
+    # ======================================================
+    # VALIDACIÓN FUERTE
+    # ======================================================
+
+    def validar(self) -> List[str]:
+
+        errores: List[str] = []
+
+        # -------------------------------
+        # PANELes
+        # -------------------------------
+
+        if not isinstance(self.paneles, dict):
+            errores.append("paneles debe ser dict")
+
+        else:
+            if not self.paneles.get("ok", False):
+                errores.append("paneles no válido")
+
+            if "strings" not in self.paneles:
+                errores.append("paneles sin strings")
+
+            if "n_strings_total" not in self.paneles:
+                errores.append("paneles sin n_strings_total")
+
+        # -------------------------------
+        # POTENCIA
+        # -------------------------------
+
+        if self.pac_nominal_kw <= 0:
+            errores.append("pac_nominal_kw inválido")
+
+        # -------------------------------
+        # GEOMETRÍA
+        # -------------------------------
+
+        if self.tilt_deg is None:
+            errores.append("tilt_deg requerido")
+
+        if self.azimut_deg is None:
+            errores.append("azimut_deg requerido")
+
+        # -------------------------------
+        # CLIMA
+        # -------------------------------
+
+        if self.clima is None:
+            errores.append("clima requerido")
+
+        return errores
     # ======================================================
     # VALIDACIÓN
     # ======================================================
