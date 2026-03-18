@@ -184,7 +184,7 @@ def descargar_clima_pvgis(
         raise RuntimeError("PVGIS devolvió GHI total = 0")
 
     if dni_total <= 0:
-        raise RuntimeError("PVGIS devolvió DNI total = 0")
+        st.warning("⚠️ PVGIS sin DNI → se continuará usando solo GHI")
 
     st.success("✅ Clima PVGIS válido")
 
