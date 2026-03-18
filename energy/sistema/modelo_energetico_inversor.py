@@ -33,7 +33,6 @@ class Inversor8760Resultado:
 # ==========================================================
 # MOTOR
 # ==========================================================
-
 def calcular_inversor_8760(inp: Inversor8760Input) -> Inversor8760Resultado:
 
     if len(inp.potencia_dc_kw) not in (8760, 8784):
@@ -51,21 +50,21 @@ def calcular_inversor_8760(inp: Inversor8760Input) -> Inversor8760Resultado:
     for p_dc in inp.potencia_dc_kw:
 
         # ---------------------------------------------
-        # CLIPPING (ANTES de eficiencia)
+        # EFICIENCIA (DC → AC)
         # ---------------------------------------------
 
-        if p_dc > inp.p_ac_nominal_kw:
-            p_dc_limited = inp.p_ac_nominal_kw
-            clip = p_dc - inp.p_ac_nominal_kw
+        p_ac_raw = p_dc * inp.eficiencia_nominal
+
+        # ---------------------------------------------
+        # CLIPPING EN AC
+        # ---------------------------------------------
+
+        if p_ac_raw > inp.p_ac_nominal_kw:
+            p_ac = inp.p_ac_nominal_kw
+            clip = p_ac_raw - inp.p_ac_nominal_kw
         else:
-            p_dc_limited = p_dc
+            p_ac = p_ac_raw
             clip = 0.0
-
-        # ---------------------------------------------
-        # EFICIENCIA
-        # ---------------------------------------------
-
-        p_ac = p_dc_limited * inp.eficiencia_nominal
 
         potencia_ac.append(p_ac)
         clipping.append(clip)
