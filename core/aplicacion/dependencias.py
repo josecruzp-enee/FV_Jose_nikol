@@ -139,33 +139,97 @@ class PanelesAdapter:
 # ADAPTER ENERGIA
 # ==========================================================
 
-# ==========================================================
-# ADAPTER ENERGIA
-# ==========================================================
-
 class EnergiaAdapter:
 
     def ejecutar(self, datos, sizing, strings):
 
         sf = getattr(datos, "sistema_fv", {}) or {}
 
+        # --------------------------------------------------
+        # MODO DE SIMULACIÓN (CORRECTO)
+        # --------------------------------------------------
+
+        modo = sf.get("modo_simulacion", "8760")
+
+        # --------------------------------------------------
+        # CONSTRUIR ENTRADA DEL DOMINIO ENERGÍA
+        # --------------------------------------------------
+
         entrada = EnergiaInput(
+
+            # -------------------------------
+            # POTENCIA
+            # -------------------------------
+
             pdc_instalada_kw=sizing.pdc_kw,
             pac_nominal_kw=sizing.kw_ac,
+
+            # -------------------------------
+            # MODO (CLAVE)
+            # -------------------------------
+
+            modo_simulacion=modo,
+
+            # -------------------------------
+            # HSP (solo si aplica)
+            # -------------------------------
+
             hsp_12m=sf.get("hsp_12m", [5.5]*12),
             dias_mes=[31,28,31,30,31,30,31,31,30,31,30,31],
+
+            # -------------------------------
+            # 8760 (mínimos necesarios)
+            # -------------------------------
+
+            clima=sf.get("clima"),              # ← importante
+            tilt_deg=sf.get("tilt_deg"),        # ← importante
+
+            paneles_por_string=getattr(strings, "n_series", None),
+            n_strings_total=getattr(strings, "n_strings_total", None),
+
+            pmax_stc_w=sf.get("pmax_stc_w"),
+            vmp_stc_v=sf.get("vmp_stc_v"),
+            voc_stc_v=sf.get("voc_stc_v"),
+
+            coef_pmax_pct_per_c=sf.get("coef_pmax_pct_per_c"),
+            coef_voc_pct_per_c=sf.get("coef_voc_pct_per_c"),
+            coef_vmp_pct_per_c=sf.get("coef_vmp_pct_per_c"),
+
+            # -------------------------------
+            # PÉRDIDAS
+            # -------------------------------
+
             perdidas_dc_pct=sf.get("perdidas_dc_pct", 0.03),
             perdidas_ac_pct=sf.get("perdidas_ac_pct", 0.02),
             sombras_pct=sf.get("sombras_pct", 0.0),
+
+            # -------------------------------
+            # INVERSOR
+            # -------------------------------
+
+            eficiencia_inversor=sf.get("eficiencia_inversor", 0.97),
+            permitir_clipping=True,
+
+            # -------------------------------
+            # UBICACIÓN
+            # -------------------------------
+
+            latitud=sf.get("latitud"),
+            longitud=sf.get("longitud"),
         )
 
-        modo = sf.get("modo_simulacion", "mensual")
+        # --------------------------------------------------
+        # DEBUG
+        # --------------------------------------------------
 
-        object.__setattr__(entrada, "modo_simulacion", modo)
+        print("\nDEBUG ENERGIA ADAPTER")
+        print("modo_simulacion:", modo)
+        print("clima:", "OK" if entrada.clima else "None")
+        print("tilt:", entrada.tilt_deg)
 
-
-        permitir_curtailment=True
-        
+        # --------------------------------------------------
+        # EJECUTAR MOTOR ENERGÍA
+        # --------------------------------------------------
 
         return ejecutar_motor_energia(entrada)
 
