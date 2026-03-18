@@ -12,22 +12,23 @@ CONTRATO DE RESULTADO — DOMINIO ENERGÍA
 Define la estructura oficial de salida del cálculo energético
 del sistema fotovoltaico dentro de FV Engine.
 
-Este contrato transporta la información energética producida
-por el orquestador energético.
-
 Pipeline energético representado:
 
     generación DC bruta
             ↓
     pérdidas del sistema
             ↓
-    energía disponible después de pérdidas
+    energía después de pérdidas
             ↓
     clipping del inversor
             ↓
     energía AC útil
 
 Todas las energías se expresan en kWh.
+
+Modelo soportado:
+
+    ✔ Simulación física horaria (8760)
 """
 
 
@@ -38,123 +39,139 @@ class EnergiaResultado:
     """
 
     # ------------------------------------------------------
-    # Estado del cálculo
+    # ESTADO DEL CÁLCULO
     # ------------------------------------------------------
 
     ok: bool
-    # Indica si el cálculo energético se ejecutó correctamente.
-
     errores: List[str]
-    # Lista de errores ocurridos durante la ejecución del motor.
 
 
     # ------------------------------------------------------
-    # Potencias nominales del sistema
+    # POTENCIA DEL SISTEMA
     # ------------------------------------------------------
 
     pdc_instalada_kw: float
-    # Potencia DC total instalada del generador FV.
-
     pac_nominal_kw: float
-    # Potencia AC nominal total del inversor.
 
 
     # ------------------------------------------------------
-    # Relación DC / AC
+    # RELACIÓN DC / AC
     # ------------------------------------------------------
 
     dc_ac_ratio: float
-    # Relación entre potencia DC instalada y potencia AC del inversor.
 
 
     # ------------------------------------------------------
-    # Energía mensual (12 meses)
+    # ENERGÍA HORARIA (8760)
+    # ------------------------------------------------------
+
+    energia_horaria_kwh: List[float]
+    """
+    Energía AC producida por hora.
+
+    Longitud esperada:
+        8760 valores
+
+    Unidad:
+        kWh
+    """
+
+
+    # ------------------------------------------------------
+    # ENERGÍA MENSUAL (12 MESES)
     # ------------------------------------------------------
 
     energia_bruta_12m: List[float]
-    # Energía DC generada antes de pérdidas del sistema.
-
     energia_perdidas_12m: List[float]
-    # Energía perdida por efectos físicos del sistema.
-
     energia_despues_perdidas_12m: List[float]
-    # Energía disponible después de aplicar pérdidas.
-
     energia_clipping_12m: List[float]
-    # Energía recortada por limitación del inversor (DC/AC clipping).
-
     energia_util_12m: List[float]
-    # Energía AC final disponible del sistema.
 
 
     # ------------------------------------------------------
-    # Energía anual agregada
+    # ENERGÍA ANUAL
     # ------------------------------------------------------
 
     energia_bruta_anual: float
-    # Energía DC anual generada antes de pérdidas.
-
     energia_perdidas_anual: float
-    # Energía anual perdida por efectos físicos del sistema.
-
     energia_despues_perdidas_anual: float
-    # Energía anual disponible después de pérdidas.
-
     energia_clipping_anual: float
-    # Energía anual perdida por clipping del inversor.
-
     energia_util_anual: float
-    # Energía AC anual final disponible.
 
 
     # ------------------------------------------------------
-    # Indicadores energéticos
+    # INDICADORES ENERGÉTICOS
     # ------------------------------------------------------
 
     produccion_especifica_kwh_kwp: float
-    # Producción específica del sistema FV.
-    #
-    # Energía AC anual producida por cada kWp instalado.
-    #
-    # Fórmula:
-    #
-    #     energia_util_anual / pdc_instalada_kw
-    #
-    # Unidad:
-    #
-    #     kWh/kWp
-    #
-    # Permite comparar el rendimiento energético del sistema
-    # independientemente del tamaño de la planta.
+    """
+    Producción específica:
 
+        energia_util_anual / pdc_instalada_kw
+    """
 
     performance_ratio: float
-    # Performance Ratio (PR) del sistema fotovoltaico.
-    #
-    # Representa la eficiencia global del sistema considerando
-    # pérdidas térmicas, eléctricas, conversión del inversor
-    # y clipping.
-    #
-    # Fórmula aproximada usada en el motor:
-    #
-    #     PR = energia_util_anual / energia_bruta_anual
-    #
-    # Valores típicos:
-    #
-    #     0.70 – 0.85
+    """
+    Performance Ratio:
+
+        energia_util_anual / energia_bruta_anual
+    """
 
 
     # ------------------------------------------------------
-    # Metadata del cálculo
+    # METADATA
     # ------------------------------------------------------
 
     meta: Dict[str, Any]
-    # Información adicional del motor energético.
-    #
-    # Ejemplo:
-    #
-    # {
-    #     "motor": "HSP" | "8760",
-    #     "meses": 12,
-    #     "factor_orientacion": 0.94
-    # }
+    """
+    Información de trazabilidad del cálculo.
+
+    Ejemplo:
+
+    {
+        "motor": "8760",
+        "horas": 8760,
+        "fuente_clima": "PVGIS",
+        "tilt": 15,
+        "azimut": 180
+    }
+    """
+
+
+# ==========================================================
+# ESTRUCTURA DEL RESULTADO
+# ==========================================================
+
+"""
+Este módulo produce un único objeto:
+
+EnergiaResultado
+
+
+Estructura:
+
+EnergiaResultado
+    ├─ pdc_instalada_kw
+    ├─ pac_nominal_kw
+    ├─ dc_ac_ratio
+    │
+    ├─ energia_horaria_kwh (8760)
+    │
+    ├─ energia_bruta_12m
+    ├─ energia_perdidas_12m
+    ├─ energia_despues_perdidas_12m
+    ├─ energia_clipping_12m
+    ├─ energia_util_12m
+    │
+    ├─ energia_bruta_anual
+    ├─ energia_perdidas_anual
+    ├─ energia_despues_perdidas_anual
+    ├─ energia_clipping_anual
+    ├─ energia_util_anual
+    │
+    ├─ produccion_especifica_kwh_kwp
+    ├─ performance_ratio
+    │
+    ├─ errores
+    └─ meta
+"""
