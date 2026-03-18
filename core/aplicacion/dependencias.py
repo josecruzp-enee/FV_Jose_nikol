@@ -36,7 +36,7 @@ class SizingAdapter:
 
 class PanelesAdapter:
 
-   def ejecutar(self, datos, sizing, strings):
+   def ejecutar(self, datos, sizing, *_):
 
     sf = getattr(datos, "sistema_fv", {}) or {}
     eq = getattr(datos, "equipos", {}) or {}
