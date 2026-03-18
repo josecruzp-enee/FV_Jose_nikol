@@ -130,6 +130,7 @@ def _modelo_hsp(inp: EnergiaInput):
 # ==========================================================
 # ORQUESTADOR PRINCIPAL
 # ==========================================================
+def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
 
 import streamlit as st
 
