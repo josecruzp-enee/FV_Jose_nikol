@@ -150,9 +150,9 @@ class EnergiaAdapter:
             imp_panel_a=panel.imp_a,
             isc_panel_a=panel.isc_a,
 
-            coef_potencia=panel.coef_pmax,
-            coef_vmp=panel.coef_vmp,
-            coef_voc=panel.coef_voc,
+            coef_potencia=getattr(panel, "coef_pmax", -0.004),
+            coef_vmp=getattr(panel, "coef_vmp", -0.003),
+            coef_voc=getattr(panel, "coef_voc", -0.002),
 
             noct_c=getattr(panel, "noct_c", 45.0),
 
