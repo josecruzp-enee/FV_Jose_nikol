@@ -15,7 +15,11 @@ NO calcula:
 from dataclasses import dataclass
 from typing import List
 
-from energy.solar.posicion_solar import calcular_posicion_solar
+from energy.solar.posicion_solar import (
+    calcular_posicion_solar,
+    SolarInput,
+)
+
 from energy.solar.irradiancia_plano import calcular_irradiancia_plano
 from energy.panel_energia.modelo_termico import calcular_temperatura_celda
 
@@ -61,48 +65,69 @@ def simular_clima_8760(
     validar_clima_8760(clima)
 
     horas: List[EstadoSolarHora] = []
-
     poa_total_kwh_m2 = 0.0
 
     # recorrer las 8760 horas del año
     for hora in clima.horas:
 
-        # posición solar
+        # ======================================================
+        # 1. POSICIÓN SOLAR (CORRECTO)
+        # ======================================================
+
         pos = calcular_posicion_solar(
-            timestamp=hora.timestamp,
-            lat=clima.latitud,
-            lon=clima.longitud
+            SolarInput(
+                latitud_deg=clima.latitud,
+                longitud_deg=clima.longitud,
+                fecha_hora=hora.timestamp  # ✔ datetime correcto
+            )
         )
 
-        # irradiancia en plano del generador
+        # ======================================================
+        # 2. IRRADIANCIA EN PLANO DEL GENERADOR
+        # ======================================================
+
         poa = calcular_irradiancia_plano(
-            ghi=hora.ghi_wm2,
-            zenith=pos.zenith,
-            azimuth_solar=pos.azimuth,
-            tilt=tilt,
-            azimuth_superficie=azimuth
+            ghi_wm2=hora.ghi_wm2,
+            zenith_deg=pos.zenith_deg,
+            azimuth_sol_deg=pos.azimuth_deg,
+            tilt_deg=tilt,
+            azimuth_panel_deg=azimuth
         )
 
         poa = max(0.0, poa)
 
-        # temperatura de celda
+        # ======================================================
+        # 3. TEMPERATURA DE CELDA
+        # ======================================================
+
         temp_celda = calcular_temperatura_celda(
             irradiancia_wm2=poa,
             temperatura_amb_c=hora.temp_amb_c
         )
 
-        # acumular irradiancia anual
-        poa_total_kwh_m2 += poa / 1000
+        # ======================================================
+        # 4. ACUMULACIÓN ENERGÍA
+        # ======================================================
+
+        poa_total_kwh_m2 += poa / 1000  # Wh → kWh
+
+        # ======================================================
+        # 5. ESTADO HORARIO
+        # ======================================================
 
         horas.append(
             EstadoSolarHora(
                 poa_wm2=poa,
                 temp_amb_c=hora.temp_amb_c,
                 temp_celda_c=temp_celda,
-                zenith=pos.zenith,
-                azimuth=pos.azimuth
+                zenith=pos.zenith_deg,
+                azimuth=pos.azimuth_deg
             )
         )
+
+    # ======================================================
+    # RESULTADO FINAL
+    # ======================================================
 
     return ResultadoClima8760(
         horas=horas,
