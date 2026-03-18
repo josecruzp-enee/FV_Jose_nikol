@@ -248,7 +248,7 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
                 potencia_ac = potencia_ac[:8760]
 
             # 5. ENERGÍA
-            from energy.sistema.agregacion_energia import agregar_energia_por_mes
+            
 
             energia_mensual = agregar_energia_por_mes(potencia_ac)
             energia_anual = sum(potencia_ac)
