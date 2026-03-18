@@ -5,7 +5,7 @@ from core.aplicacion.orquestador_estudio import DependenciasEstudio
 from core.dominio.contrato import StringInfo, ResultadoStrings
 
 from core.servicios.sizing import calcular_sizing_unificado
-
+from energy.clima.lector_pvgis import EntradaClimaPVGIS
 from electrical.paneles.orquestador_paneles import ejecutar_paneles
 from electrical.paneles.entrada_panel import EntradaPaneles
 from electrical.nec.orquestador_nec import ejecutar_nec
@@ -15,7 +15,7 @@ from electrical.catalogos.catalogos import get_panel, get_inversor
 from energy.orquestador_energia import ejecutar_motor_energia
 from energy.contrato import EnergiaInput
 
-from energy.clima.generador_clima_base import generar_clima_base
+from energy.clima.lector_pvgis import descargar_clima_pvgis
 
 from core.servicios.finanzas import ejecutar_finanzas
 
@@ -126,7 +126,14 @@ class EnergiaAdapter:
         # CLIMA 8760
         # --------------------------------------------------
 
-        clima = generar_clima_base()
+        clima = descargar_clima_pvgis(
+            EntradaClimaPVGIS(
+                lat=datos.lat,
+                lon=datos.lon,
+                startyear=2019,
+                endyear=2019
+            )
+        )
 
         # --------------------------------------------------
         # INPUT ENERGÍA (LIMPIO)
