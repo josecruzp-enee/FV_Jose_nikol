@@ -1,9 +1,55 @@
 from __future__ import annotations
 
+"""
+LECTOR PVGIS — DOMINIO CLIMA (FV Engine)
+========================================
+
+Responsabilidad
+---------------
+
+Descargar datos climáticos horarios desde PVGIS y convertirlos
+al contrato interno del dominio clima (ResultadoClima).
+
+Pipeline representado:
+
+    PVGIS API
+        ↓
+    parsing JSON
+        ↓
+    normalización de variables
+        ↓
+    construcción de ClimaHora
+        ↓
+    ResultadoClima
+
+Frontera del módulo
+-------------------
+
+Entrada:
+    EntradaClimaPVGIS
+
+Salida:
+    ResultadoClima
+
+Dependencias:
+    • requests (infraestructura)
+    • resultado_clima (dominio)
+
+Reglas arquitectónicas
+----------------------
+
+    ✔ Este módulo pertenece a infraestructura de clima
+    ✔ Devuelve objetos del dominio (ResultadoClima)
+    ❌ No contiene lógica solar
+    ❌ No contiene lógica energética
+    ❌ No depende de UI (streamlit)
+"""
+
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Tuple, List
+
 import requests
-import streamlit as st
 
 from .resultado_clima import ResultadoClima, ClimaHora
 
@@ -14,37 +60,55 @@ from .resultado_clima import ResultadoClima, ClimaHora
 
 @dataclass
 class EntradaClimaPVGIS:
+    """
+    Parámetros de consulta a PVGIS.
+    """
+
     lat: float
     lon: float
-    startyear: int = 2019   # ✔ año no bisiesto
+    startyear: int = 2019   # año no bisiesto recomendado
     endyear: int = 2019
 
 
 # ==========================================================
-# URL BASE
+# CONFIGURACIÓN
 # ==========================================================
 
 PVGIS_URL = "https://re.jrc.ec.europa.eu/api/seriescalc"
 
 
 # ==========================================================
-# MAPEO ROBUSTO
+# MAPEO DE RADIACIÓN
 # ==========================================================
 
-def _mapear_radiacion(h: dict) -> tuple[float, float, float]:
+def _mapear_radiacion(h: dict) -> Tuple[float, float, float]:
+    """
+    Normaliza variables de irradiancia desde PVGIS.
 
-    # --- GHI ---
+    Maneja diferencias de nomenclatura y valores faltantes.
+    """
+
+    # -------------------------------
+    # GHI
+    # -------------------------------
     ghi = h.get("G(h)")
     if ghi is None:
         ghi = h.get("G(i)", 0.0)
 
-    # --- DNI ---
+    # -------------------------------
+    # DNI
+    # -------------------------------
     dni = h.get("Gb(n)", 0.0)
 
-    # --- DHI ---
+    # -------------------------------
+    # DHI
+    # -------------------------------
     dhi = h.get("Gd(h)", 0.0)
 
-    # --- fallback mínimo ---
+    # -------------------------------
+    # FALLBACKS
+    # -------------------------------
+
     if ghi == 0 and dni > 0:
         ghi = dni * 0.7
 
@@ -61,13 +125,21 @@ def _mapear_radiacion(h: dict) -> tuple[float, float, float]:
 def descargar_clima_pvgis(
     entrada: EntradaClimaPVGIS
 ) -> ResultadoClima:
+    """
+    Descarga y construye un ResultadoClima desde PVGIS.
 
-    st.write("🌍 Descargando clima desde PVGIS...")
-    st.write(f"📍 Lat: {entrada.lat}, Lon: {entrada.lon}")
-    st.write(f"📅 Año: {entrada.startyear}")
+    Parámetros
+    ----------
+    entrada:
+        Coordenadas y rango temporal
+
+    Retorna
+    -------
+    ResultadoClima validado estructuralmente
+    """
 
     # ------------------------------------------------------
-    # VALIDACIÓN ENTRADA
+    # VALIDACIÓN DE ENTRADA
     # ------------------------------------------------------
 
     if not (-90 <= entrada.lat <= 90):
@@ -77,7 +149,7 @@ def descargar_clima_pvgis(
         raise ValueError(f"Longitud inválida: {entrada.lon}")
 
     # ------------------------------------------------------
-    # PARAMS
+    # PARAMETROS PVGIS
     # ------------------------------------------------------
 
     params = {
@@ -92,9 +164,6 @@ def descargar_clima_pvgis(
         "aspect": 0,
     }
 
-    st.write("📡 Enviando request a PVGIS...")
-    st.json(params)
-
     # ------------------------------------------------------
     # REQUEST
     # ------------------------------------------------------
@@ -102,49 +171,39 @@ def descargar_clima_pvgis(
     try:
         r = requests.get(PVGIS_URL, params=params, timeout=60)
 
-        st.write("📥 Status code:", r.status_code)
-
         if r.status_code != 200:
-            st.error("❌ Error en PVGIS")
-            st.text(r.text)
-            r.raise_for_status()
+            raise RuntimeError(f"Error PVGIS: {r.status_code} - {r.text}")
 
     except requests.RequestException as e:
-        raise RuntimeError(f"Error descargando datos PVGIS: {e}") from e
+        raise RuntimeError(f"Error descargando PVGIS: {e}") from e
 
     data = r.json()
 
     # ------------------------------------------------------
-    # VALIDAR RESPUESTA
+    # VALIDACIÓN RESPUESTA
     # ------------------------------------------------------
 
     if "outputs" not in data or "hourly" not in data["outputs"]:
-        st.error("❌ Respuesta inválida de PVGIS")
-        st.json(data)
         raise RuntimeError("Formato de respuesta PVGIS inválido")
 
     hourly = data["outputs"]["hourly"]
-
-    st.write("📊 Primer registro PVGIS:")
-    st.json(hourly[0])
 
     if not hourly:
         raise RuntimeError("PVGIS devolvió lista vacía")
 
     # ------------------------------------------------------
-    # CONSTRUIR CLIMA
+    # CONSTRUCCIÓN DEL CLIMA
     # ------------------------------------------------------
 
-    horas: list[ClimaHora] = []
+    horas: List[ClimaHora] = []
 
     for h in hourly:
 
         try:
             timestamp = datetime.strptime(h["time"], "%Y%m%d:%H%M")
         except Exception:
-            raise RuntimeError(f"Error parseando timestamp: {h.get('time')}")
+            raise RuntimeError(f"Timestamp inválido: {h.get('time')}")
 
-        # 🔥 CORRECCIÓN CLAVE
         ghi, dni, dhi = _mapear_radiacion(h)
 
         if ghi < 0 or dni < 0 or dhi < 0:
@@ -170,26 +229,15 @@ def descargar_clima_pvgis(
 
     n = len(horas)
     ghi_total = sum(h.ghi_wm2 for h in horas)
-    dni_total = sum(h.dni_wm2 for h in horas)
-
-    st.write("📈 VALIDACIÓN GLOBAL")
-    st.write(f"Horas: {n}")
-    st.write(f"GHI total: {round(ghi_total, 2)}")
-    st.write(f"DNI total: {round(dni_total, 2)}")
 
     if n != 8760:
-        raise RuntimeError(f"PVGIS devolvió {n} horas en lugar de 8760")
+        raise RuntimeError(f"Se esperaban 8760 horas, se obtuvieron {n}")
 
     if ghi_total <= 0:
-        raise RuntimeError("PVGIS devolvió GHI total = 0")
-
-    if dni_total == 0:
-        print("⚠️ DNI no disponible, usando solo GHI")
-
-    st.success("✅ Clima PVGIS válido")
+        raise RuntimeError("Clima inválido: GHI total = 0")
 
     # ------------------------------------------------------
-    # RESULTADO FINAL
+    # SALIDA
     # ------------------------------------------------------
 
     return ResultadoClima(
@@ -203,3 +251,21 @@ def descargar_clima_pvgis(
             "n_horas": n,
         }
     )
+
+'''
+ResultadoClima
+    ├─ latitud
+    ├─ longitud
+    │
+    ├─ horas (8760)
+    │      ├─ timestamp
+    │      ├─ ghi_wm2
+    │      ├─ dni_wm2
+    │      ├─ dhi_wm2
+    │      ├─ temp_amb_c
+    │      └─ viento_ms
+    │
+    ├─ fuente
+    └─ meta
+
+    '''
