@@ -1,3 +1,4 @@
+```python
 from __future__ import annotations
 
 from .contrato import EnergiaInput, EnergiaResultado
@@ -88,7 +89,6 @@ def _modelo_hsp(inp: EnergiaInput):
     ]
 
     inv_input = EnergiaInversorInput(
-
         energia_dc_12m_kwh=energia_despues_perdidas_dc,
         kw_ac=inp.pac_nominal_kw,
         pdc_kw=inp.pdc_instalada_kw,
@@ -129,29 +129,12 @@ def _modelo_hsp(inp: EnergiaInput):
 
 
 # ==========================================================
-# MODELO 8760 (SIMPLIFICADO)
+# MODELO 8760 (FÍSICO REAL)
 # ==========================================================
 
 def _modelo_8760(inp: EnergiaInput) -> EnergiaResultado:
 
     try:
-
-        # --------------------------------------------------
-        # VALIDACIONES
-        # --------------------------------------------------
-
-        pdc = inp.pdc_instalada_kw
-        pac = inp.pac_nominal_kw
-
-        if pdc <= 0 or pac <= 0:
-            raise ValueError("Potencias inválidas")
-
-        if inp.clima is None:
-            raise ValueError("No se proporcionó clima para simulación 8760")
-
-        # --------------------------------------------------
-        # IMPORTS (tus módulos reales)
-        # --------------------------------------------------
 
         from energy.clima.simulador_8760 import simular_clima_8760
         from energy.sistema.agregacion_8760 import agregar_8760
@@ -163,62 +146,53 @@ def _modelo_8760(inp: EnergiaInput) -> EnergiaResultado:
             calcular_energia_inversor_horario
         )
 
-        # --------------------------------------------------
-        # 1. CLIMA 8760
-        # --------------------------------------------------
+        # VALIDACIONES
+        if inp.clima is None:
+            raise ValueError("Clima no definido para 8760")
 
+        if inp.tilt_deg is None:
+            raise ValueError("tilt_deg requerido para 8760")
+
+        if inp.paneles_por_string is None or inp.n_strings_total is None:
+            raise ValueError("Configuración de strings incompleta")
+
+        # CLIMA
         clima_8760 = simular_clima_8760(
             clima=inp.clima,
             tilt=inp.tilt_deg,
             azimuth=inp.azimut_deg
         )
 
-        # --------------------------------------------------
-        # 2. ARRAY DC (REAL)
-        # --------------------------------------------------
-
+        # ARRAY
         array = calcular_array_8760(
-
             Array8760Input(
                 estado_solar=clima_8760.horas,
-
                 paneles_por_string=inp.paneles_por_string,
                 strings_totales=inp.n_strings_total,
-
                 pmax_stc_w=inp.pmax_stc_w,
                 vmp_stc_v=inp.vmp_stc_v,
                 voc_stc_v=inp.voc_stc_v,
-
                 coef_pmax_pct_per_c=inp.coef_pmax_pct_per_c,
                 coef_voc_pct_per_c=inp.coef_voc_pct_per_c,
                 coef_vmp_pct_per_c=inp.coef_vmp_pct_per_c,
             )
         )
 
-        potencia_dc = array.potencia_dc_kw
-
         energia_horaria = []
         clipping_horaria = []
 
-        # --------------------------------------------------
-        # 3. INVERSOR (HORARIO)
-        # --------------------------------------------------
-
-        for p_dc in potencia_dc:
+        for p_dc in array.potencia_dc_kw:
 
             p_ac, clipping = calcular_energia_inversor_horario(
                 p_dc_kw=p_dc,
-                pac_kw=pac,
+                pac_kw=inp.pac_nominal_kw,
                 eficiencia=inp.eficiencia_inversor
             )
 
             energia_horaria.append(p_ac)
             clipping_horaria.append(clipping)
 
-        # --------------------------------------------------
-        # 4. AGREGACIÓN
-        # --------------------------------------------------
-
+        # AGREGACIÓN
         agg = agregar_8760(
             energia_horaria=energia_horaria,
             clipping_horaria=clipping_horaria
@@ -229,10 +203,7 @@ def _modelo_8760(inp: EnergiaInput) -> EnergiaResultado:
         energia_anual = agg["energia_anual"]
         clipping_anual = agg["clipping_anual"]
 
-        # --------------------------------------------------
-        # 5. PÉRDIDAS
-        # --------------------------------------------------
-
+        # PÉRDIDAS
         perdidas_pct = (
             inp.perdidas_dc_pct +
             inp.perdidas_ac_pct +
@@ -247,19 +218,15 @@ def _modelo_8760(inp: EnergiaInput) -> EnergiaResultado:
         ]
         energia_perdidas_anual = energia_anual - energia_util_anual
 
-        # --------------------------------------------------
-        # RESULTADO FINAL
-        # --------------------------------------------------
-
         return EnergiaResultado(
 
             ok=True,
             errores=[],
 
-            pdc_instalada_kw=pdc,
-            pac_nominal_kw=pac,
+            pdc_instalada_kw=inp.pdc_instalada_kw,
+            pac_nominal_kw=inp.pac_nominal_kw,
 
-            dc_ac_ratio=pdc / pac,
+            dc_ac_ratio=inp.pdc_instalada_kw / inp.pac_nominal_kw,
 
             energia_bruta_12m=energia_12m,
             energia_perdidas_12m=energia_perdidas_12m,
@@ -273,44 +240,39 @@ def _modelo_8760(inp: EnergiaInput) -> EnergiaResultado:
             energia_clipping_anual=clipping_anual,
             energia_util_anual=energia_util_anual,
 
-            meta={
-                "motor": "8760",
-                "horas": 8760
-            }
+            meta={"motor": "8760", "horas": 8760}
         )
 
     except Exception as e:
-
         return _resultado_error(inp, [str(e)])
 
 
 # ==========================================================
-# MOTOR PRINCIPAL
+# ORQUESTADOR PRINCIPAL
 # ==========================================================
 
 def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
+
     import streamlit as st
 
     st.warning("DEBUG MOTOR ENERGÍA")
-    st.write("Modo solicitado:", inp.modo_simulacion)
+    st.write("Modo:", inp.modo_simulacion)
     st.write("PDC:", inp.pdc_instalada_kw)
     st.write("PAC:", inp.pac_nominal_kw)
-
-    errores: list[str] = []
+    st.write("Tiene clima:", inp.clima is not None)
 
     try:
 
-        modo = inp.modo_simulacion
-
-        # ==================================================
-        # MOTOR HSP
-        # ==================================================
+        modo = str(inp.modo_simulacion).strip().lower()
 
         if modo == "mensual":
+
+            st.info("→ Ejecutando HSP")
 
             data, errores = _modelo_hsp(inp)
 
             if errores:
+                st.error("Error en HSP")
                 return _resultado_error(inp, errores)
 
             (
@@ -323,7 +285,6 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
             ) = data
 
             return EnergiaResultado(
-
                 ok=True,
                 errores=[],
 
@@ -344,31 +305,30 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
                 energia_clipping_anual=sum(energia_clipping),
                 energia_util_anual=sum(energia_util),
 
-                meta={
-                    "motor": "mensual",
-                    "meses": 12,
-                    "factor_orientacion": factor_orientacion,
-                },
+                meta={"motor": "mensual", "meses": 12}
             )
 
-        # ==================================================
-        # MOTOR 8760
-        # ==================================================
-
         if modo == "8760":
-            st.success("ENTRÓ A 8760")
-            st.write("Modo solicitado:", inp.modo_simulacion)
+
+            st.success("→ Ejecutando 8760")
+
             resultado = _modelo_8760(inp)
 
-            resultado.meta = {
-                "motor": "8760",
-                "horas": 8760
-            }
+            if not resultado.ok:
+                st.error("Fallo en 8760")
+                st.write(resultado.errores)
+                return resultado
+
+            st.success("8760 OK")
 
             return resultado
 
-        raise ValueError(f"Modo de simulación desconocido: {modo}")
+        raise ValueError(f"Modo inválido: {modo}")
 
     except Exception as e:
 
+        st.error("ERROR GLOBAL")
+        st.write(str(e))
+
         return _resultado_error(inp, [str(e)])
+```
