@@ -4,25 +4,25 @@ from __future__ import annotations
 CONTRATO DEL DOMINIO ENERGÍA — FV Engine
 ========================================
 
-Define las estructuras formales de entrada y salida del
-motor energético fotovoltaico.
+Define las estructuras de entrada y salida del motor energético.
+
+Soporta:
+
+    1) Modelo mensual (HSP)
+    2) Modelo físico horario (8760)
 
 Este módulo NO contiene lógica de cálculo.
-
-El motor energético soporta dos modelos:
-
-    1) Modelo mensual basado en HSP
-    2) Simulación física horaria (8760)
-
-Consumido por:
-
-    core.aplicacion.orquestador_estudio
-    reportes
-    finanzas
 """
 
 from dataclasses import dataclass, field
-from typing import List, Dict, Any, Literal
+from typing import List, Dict, Literal, Optional
+
+
+# ==========================================================
+# (OPCIONAL) TIPO FUERTE PARA CLIMA
+# ==========================================================
+# 👉 Reemplaza esto cuando tengas contrato real de clima
+ResultadoClima = object
 
 
 # ==========================================================
@@ -33,7 +33,7 @@ from typing import List, Dict, Any, Literal
 class EnergiaInput:
 
     # ------------------------------------------------------
-    # POTENCIA DEL SISTEMA
+    # POTENCIA
     # ------------------------------------------------------
 
     pdc_instalada_kw: float
@@ -46,46 +46,44 @@ class EnergiaInput:
     modo_simulacion: Literal["mensual", "8760"] = "8760"
 
     # ------------------------------------------------------
-    # HSP
+    # HSP (MODELO MENSUAL)
     # ------------------------------------------------------
 
-    hsp_12m: List[float] | None = None
-    dias_mes: List[int] | None = None
+    hsp_12m: Optional[List[float]] = None
+    dias_mes: Optional[List[int]] = None
 
     # ------------------------------------------------------
     # ORIENTACIÓN
     # ------------------------------------------------------
 
-    tipo_superficie: str | None = None
-    azimut_deg: float | None = None
-    azimut_a_deg: float | None = None
-    azimut_b_deg: float | None = None
-    reparto_pct_a: float | None = None
-    hemisferio: str | None = None
-
-    # 🔴 NUEVO (8760 REAL)
-    tilt_deg: float | None = None
+    tipo_superficie: Optional[str] = None
+    azimut_deg: Optional[float] = None
+    azimut_a_deg: Optional[float] = None
+    azimut_b_deg: Optional[float] = None
+    reparto_pct_a: Optional[float] = None
+    hemisferio: Optional[str] = None
 
     # ------------------------------------------------------
-    # CLIMA 8760
+    # 8760 (MODELO FÍSICO)
     # ------------------------------------------------------
 
-    clima: Any | None = None   # ResultadoClima
+    tilt_deg: Optional[float] = None
+    clima: Optional[ResultadoClima] = None
 
     # ------------------------------------------------------
     # ARREGLO FV (8760)
     # ------------------------------------------------------
 
-    paneles_por_string: int | None = None
-    n_strings_total: int | None = None
+    paneles_por_string: Optional[int] = None
+    n_strings_total: Optional[int] = None
 
-    pmax_stc_w: float | None = None
-    vmp_stc_v: float | None = None
-    voc_stc_v: float | None = None
+    pmax_stc_w: Optional[float] = None
+    vmp_stc_v: Optional[float] = None
+    voc_stc_v: Optional[float] = None
 
-    coef_pmax_pct_per_c: float | None = None
-    coef_voc_pct_per_c: float | None = None
-    coef_vmp_pct_per_c: float | None = None
+    coef_pmax_pct_per_c: Optional[float] = None
+    coef_voc_pct_per_c: Optional[float] = None
+    coef_vmp_pct_per_c: Optional[float] = None
 
     # ------------------------------------------------------
     # PÉRDIDAS
@@ -106,9 +104,77 @@ class EnergiaInput:
     # AMBIENTE
     # ------------------------------------------------------
 
-    latitud: float | None = None
-    longitud: float | None = None
+    latitud: Optional[float] = None
+    longitud: Optional[float] = None
     temp_ambiente_c: float = 25.0
+
+    # ======================================================
+    # VALIDACIÓN DEL CONTRATO
+    # ======================================================
+
+    def validar(self) -> List[str]:
+
+        errores: List[str] = []
+
+        modo = str(self.modo_simulacion).strip().lower()
+
+        # -------------------------------
+        # VALIDACIONES GENERALES
+        # -------------------------------
+
+        if self.pdc_instalada_kw <= 0:
+            errores.append("pdc_instalada_kw debe ser > 0")
+
+        if self.pac_nominal_kw <= 0:
+            errores.append("pac_nominal_kw debe ser > 0")
+
+        # -------------------------------
+        # MODO MENSUAL (HSP)
+        # -------------------------------
+
+        if modo == "mensual":
+
+            if not self.hsp_12m:
+                errores.append("hsp_12m requerido para modo mensual")
+
+            if not self.dias_mes:
+                errores.append("dias_mes requerido para modo mensual")
+
+        # -------------------------------
+        # MODO 8760
+        # -------------------------------
+
+        if modo == "8760":
+
+            if self.clima is None:
+                errores.append("clima requerido para 8760")
+
+            if self.tilt_deg is None:
+                errores.append("tilt_deg requerido para 8760")
+
+            if self.paneles_por_string is None:
+                errores.append("paneles_por_string requerido")
+
+            if self.n_strings_total is None:
+                errores.append("n_strings_total requerido")
+
+            if self.pmax_stc_w is None:
+                errores.append("pmax_stc_w requerido")
+
+            if self.vmp_stc_v is None:
+                errores.append("vmp_stc_v requerido")
+
+            if self.voc_stc_v is None:
+                errores.append("voc_stc_v requerido")
+
+        # -------------------------------
+        # MODO INVÁLIDO
+        # -------------------------------
+
+        if modo not in ("mensual", "8760"):
+            errores.append(f"modo_simulacion inválido: {modo}")
+
+        return errores
 
 
 # ==========================================================
@@ -117,69 +183,45 @@ class EnergiaInput:
 
 @dataclass(frozen=True)
 class EnergiaResultado:
-    """
-    Resultado del cálculo energético del sistema FV.
-
-    Contiene resultados mensuales y agregados anuales.
-    """
 
     # ------------------------------------------------------
-    # ESTADO DEL CÁLCULO
+    # ESTADO
     # ------------------------------------------------------
 
     ok: bool
-
     errores: List[str]
 
-
     # ------------------------------------------------------
-    # POTENCIAS DEL SISTEMA
+    # POTENCIA
     # ------------------------------------------------------
 
     pdc_instalada_kw: float
-
     pac_nominal_kw: float
-
     dc_ac_ratio: float
-
 
     # ------------------------------------------------------
     # ENERGÍA MENSUAL
     # ------------------------------------------------------
 
-    # energía DC generada antes de pérdidas
     energia_bruta_12m: List[float]
-
-    # pérdidas totales del sistema
     energia_perdidas_12m: List[float]
-
-    # energía después de pérdidas DC
     energia_despues_perdidas_12m: List[float]
-
-    # energía perdida por clipping del inversor
     energia_clipping_12m: List[float]
-
-    # energía AC final entregada
     energia_util_12m: List[float]
-
 
     # ------------------------------------------------------
     # ENERGÍA ANUAL
     # ------------------------------------------------------
 
     energia_bruta_anual: float
-
     energia_perdidas_anual: float
-
     energia_despues_perdidas_anual: float
-
     energia_clipping_anual: float
-
     energia_util_anual: float
-
 
     # ------------------------------------------------------
     # METADATA
     # ------------------------------------------------------
 
-    meta: Dict[str, Any] = field(default_factory=dict)
+    meta: Dict[str, object] = field(default_factory=dict)
+
