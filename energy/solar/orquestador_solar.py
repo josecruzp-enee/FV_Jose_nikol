@@ -1,133 +1,91 @@
 from __future__ import annotations
 
-"""
-ORQUESTADOR DEL DOMINIO SOLAR — FV Engine
-
-Responsabilidad
----------------
-Coordinar los modelos solares del sistema:
-
-• posición del sol
-• irradiancia en plano del arreglo (POA)
-
-Entrada:
-    EntradaSolar
-
-Salida:
-    dict con posición solar y POA
-"""
-
-from typing import Dict, Any
+from dataclasses import dataclass
+from typing import List
 
 from .entrada_solar import EntradaSolar
-from .posicion_solar import calcular_posicion_solar
-from .irradiancia_plano import calcular_irradiancia_plano
+from .posicion_solar import (
+    calcular_posicion_solar,
+    SolarInput
+)
+from .irradiancia_plano import (
+    calcular_irradiancia_plano,
+    IrradianciaInput
+)
 
 
 # ==========================================================
-# VALIDACIÓN DE ENTRADA
+# SALIDA
 # ==========================================================
 
-def _validar_entrada(e: EntradaSolar):
+@dataclass(frozen=True)
+class SolarResultado:
+    poa_wm2: float
+    zenith_deg: float
+    azimuth_deg: float
 
-    errores = []
+
+# ==========================================================
+# VALIDACIÓN
+# ==========================================================
+
+def _validar(e: EntradaSolar):
 
     if e.lat is None or e.lon is None:
-        errores.append("Latitud/longitud no definidas.")
+        raise ValueError("Lat/lon inválidos")
 
     if e.fecha_hora is None:
-        errores.append("fecha_hora no definida.")
+        raise ValueError("fecha_hora requerida")
 
-    if e.ghi_wm2 is None:
-        errores.append("ghi_wm2 no definido.")
+    if e.dni_wm2 < 0 or e.dhi_wm2 < 0 or e.ghi_wm2 < 0:
+        raise ValueError("Irradiancia negativa")
 
-    if e.tilt_deg is None:
-        errores.append("tilt_deg no definido.")
-
-    if e.azimuth_panel_deg is None:
-        errores.append("azimuth_panel_deg no definido.")
-
-    return errores
+    if e.tilt_deg is None or e.azimuth_panel_deg is None:
+        raise ValueError("Geometría inválida")
 
 
 # ==========================================================
 # ORQUESTADOR
 # ==========================================================
 
-def ejecutar_solar(
-    entrada: EntradaSolar
-) -> Dict[str, Any]:
+def ejecutar_solar(entrada: EntradaSolar) -> SolarResultado:
 
-    errores = _validar_entrada(entrada)
-
-    if errores:
-        return {
-            "ok": False,
-            "errores": errores,
-            "warnings": []
-        }
-
-    warnings = []
+    _validar(entrada)
 
     # ------------------------------------------------------
     # POSICIÓN SOLAR
     # ------------------------------------------------------
 
-    try:
-
-        pos = calcular_posicion_solar(
-            lat=entrada.lat,
-            lon=entrada.lon,
+    pos = calcular_posicion_solar(
+        SolarInput(
+            latitud_deg=entrada.lat,
+            longitud_deg=entrada.lon,
             fecha_hora=entrada.fecha_hora
         )
-
-    except Exception as e:
-
-        return {
-            "ok": False,
-            "errores": [f"Error en posición solar: {str(e)}"],
-            "warnings": warnings
-        }
+    )
 
     # ------------------------------------------------------
-    # IRRADIANCIA EN PLANO DEL ARREGLO
+    # IRRADIANCIA EN PLANO
     # ------------------------------------------------------
 
-    try:
-
-        poa = calcular_irradiancia_plano(
-            ghi_wm2=entrada.ghi_wm2,
-            zenith_deg=pos["zenith_deg"],
-            azimuth_sol_deg=pos["azimuth_deg"],
-            tilt_deg=entrada.tilt_deg,
-            azimuth_panel_deg=entrada.azimuth_panel_deg
+    irr = calcular_irradiancia_plano(
+        IrradianciaInput(
+            dni=entrada.dni_wm2,
+            dhi=entrada.dhi_wm2,
+            ghi=entrada.ghi_wm2,
+            solar_zenith_deg=pos.zenith_deg,
+            solar_azimuth_deg=pos.azimuth_deg,
+            panel_tilt_deg=entrada.tilt_deg,
+            panel_azimuth_deg=entrada.azimuth_panel_deg
         )
-
-    except Exception as e:
-
-        return {
-            "ok": False,
-            "errores": [f"Error en irradiancia POA: {str(e)}"],
-            "warnings": warnings
-        }
+    )
 
     # ------------------------------------------------------
-    # RESULTADO CONSOLIDADO
+    # RESULTADO
     # ------------------------------------------------------
 
-    return {
-
-        "ok": True,
-
-        "solar_position": pos,
-
-        "poa_wm2": poa,
-
-        "warnings": warnings,
-
-        "meta": {
-            "lat": entrada.lat,
-            "lon": entrada.lon
-        }
-
-    }
+    return SolarResultado(
+        poa_wm2=irr.poa_total,
+        zenith_deg=pos.zenith_deg,
+        azimuth_deg=pos.azimuth_deg
+    )
