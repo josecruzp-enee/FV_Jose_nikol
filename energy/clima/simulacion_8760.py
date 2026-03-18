@@ -1,17 +1,5 @@
 from __future__ import annotations
 
-"""
-SIMULADOR CLIMÁTICO 8760 — FV Engine
-
-Genera las condiciones solares horarias del año.
-
-NO calcula:
-- potencia FV
-- energía generada
-- pérdidas
-- inversor
-"""
-
 from dataclasses import dataclass
 from typing import List
 
@@ -54,28 +42,24 @@ class ResultadoClima8760:
 # ==========================================================
 # SIMULACIÓN
 # ==========================================================
+
 def simular_clima_8760(
     clima: ResultadoClima,
     tilt: float,
     azimuth: float
 ) -> ResultadoClima8760:
 
-    from energy.solar.posicion_solar import SolarInput
     from energy.solar.irradiancia_plano import IrradianciaInput
+    from energy.panel_energia.modelo_termico import ModeloTermicoInput
 
-    # validar que existan 8760 registros
     validar_clima_8760(clima)
 
     horas: List[EstadoSolarHora] = []
     poa_total_kwh_m2 = 0.0
 
-    # recorrer las 8760 horas del año
     for hora in clima.horas:
 
-        # ======================================================
         # 1. POSICIÓN SOLAR
-        # ======================================================
-
         pos = calcular_posicion_solar(
             SolarInput(
                 latitud_deg=clima.latitud,
@@ -84,10 +68,7 @@ def simular_clima_8760(
             )
         )
 
-        # ======================================================
         # 2. IRRADIANCIA EN PLANO (POA)
-        # ======================================================
-
         irr = calcular_irradiancia_plano(
             IrradianciaInput(
                 dni=hora.dni_wm2,
@@ -102,32 +83,21 @@ def simular_clima_8760(
 
         poa = max(0.0, irr.poa_total)
 
-        # ======================================================
         # 3. TEMPERATURA DE CELDA
-        # ======================================================
-
-        from energy.panel_energia.modelo_termico import ModeloTermicoInput
-
         r_termico = calcular_temperatura_celda(
             ModeloTermicoInput(
                 irradiancia_poa_wm2=poa,
                 temperatura_ambiente_c=hora.temp_amb_c,
-                noct_c=45  # ⚠️ puedes parametrizar después
+                noct_c=45
             )
         )
 
         temp_celda = r_termico.temperatura_celda_c
 
-        # ======================================================
         # 4. ACUMULACIÓN ENERGÍA
-        # ======================================================
+        poa_total_kwh_m2 += poa / 1000
 
-        poa_total_kwh_m2 += poa / 1000  # Wh → kWh
-
-        # ======================================================
         # 5. ESTADO HORARIO
-        # ======================================================
-
         horas.append(
             EstadoSolarHora(
                 poa_wm2=poa,
@@ -138,13 +108,12 @@ def simular_clima_8760(
             )
         )
 
-    # ======================================================
-    # RESULTADO FINAL
-    # ======================================================
+    # DEBUG
     print("DEBUG CLIMA:")
-    print("Horas:", len(inp.clima.horas))
-    print("DNI total:", sum(h.dni for h in inp.clima.horas))
-    print("Ejemplo:", inp.clima.horas[0])
+    print("Horas:", len(clima.horas))
+    print("DNI total:", sum(h.dni_wm2 for h in clima.horas))
+    print("Ejemplo:", clima.horas[0])
+
     return ResultadoClima8760(
         horas=horas,
         poa_total_kwh_m2=poa_total_kwh_m2
