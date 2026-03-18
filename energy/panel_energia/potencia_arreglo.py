@@ -1,51 +1,25 @@
+from __future__ import annotations
+
 """
 MODELO DE ARREGLO FV (ARRAY) — FV Engine
 
-Dominio: electrical.paneles.energia
+Dominio: paneles / energía
 
 Responsabilidad
 ---------------
-Calcular los parámetros eléctricos del generador fotovoltaico
-completo a partir de los parámetros eléctricos de un string.
+Calcular el comportamiento eléctrico del generador FV completo
+a partir de un string fotovoltaico.
 
 Este módulo representa el nivel superior del generador DC
 antes del inversor.
 
-Relación en el motor FV
------------------------
+Modelo físico:
 
-    irradiancia / clima
-            ↓
-    modelo_termico
-            ↓
-    potencia_panel
-            ↓
-    potencia_string
-            ↓
-    potencia_arreglo      ← ESTE MÓDULO
-            ↓
-    modelo_inversor
-            ↓
-    producción energética
+    Strings en paralelo:
 
-Conceptos eléctricos utilizados
--------------------------------
-
-Strings conectados en paralelo forman el generador FV.
-
-Reglas:
-
-    Voltaje del arreglo ≈ voltaje del string
-    Corriente del arreglo = suma de corrientes de strings
-
-Por lo tanto:
-
-    V_array ≈ V_string
-    I_array = I_string × N_strings
-
-La potencia total del arreglo es:
-
-    P_array = V_array × I_array
+        V_array ≈ V_string
+        I_array = I_string × N_strings
+        P_array = P_string × N_strings
 """
 
 from dataclasses import dataclass
@@ -55,16 +29,22 @@ from dataclasses import dataclass
 # ENTRADA
 # =========================================================
 
-@dataclass
+@dataclass(frozen=True)
 class PotenciaArregloInput:
     """
     Parámetros de entrada del modelo del arreglo FV.
     """
 
-    # configuración física
+    # -----------------------------------------------------
+    # CONFIGURACIÓN (PARALELO)
+    # -----------------------------------------------------
+
     n_strings_total: int
 
-    # parámetros del string
+    # -----------------------------------------------------
+    # PARÁMETROS DEL STRING
+    # -----------------------------------------------------
+
     vmp_string_v: float
     voc_string_v: float
 
@@ -78,10 +58,10 @@ class PotenciaArregloInput:
 # SALIDA
 # =========================================================
 
-@dataclass
+@dataclass(frozen=True)
 class PotenciaArregloResultado:
     """
-    Resultado del comportamiento eléctrico del generador FV.
+    Resultado eléctrico del generador FV completo.
     """
 
     vdc_array_v: float
@@ -101,59 +81,50 @@ def calcular_potencia_arreglo(inp: PotenciaArregloInput) -> PotenciaArregloResul
     """
     Calcula los parámetros eléctricos del generador FV completo.
 
-    Parámetros
-    ----------
-    inp : PotenciaArregloInput
-        Parámetros eléctricos del string y número total de strings.
+    Modelo:
 
-    Retorna
-    -------
-    PotenciaArregloResultado
-        Parámetros eléctricos del generador FV.
+        V_array = V_string
+        I_array = I_string × N_strings
+        P_array = P_string × N_strings
     """
 
     # -----------------------------------------------------
-    # Validación básica
+    # VALIDACIÓN
     # -----------------------------------------------------
 
     if inp.n_strings_total <= 0:
         raise ValueError("n_strings_total inválido")
 
     # -----------------------------------------------------
-    # Voltajes del arreglo
-    # -----------------------------------------------------
-    # En paralelo el voltaje se mantiene
+    # VOLTAJE (paralelo → no cambia)
     # -----------------------------------------------------
 
     vdc_array = inp.vmp_string_v
     voc_array = inp.voc_string_v
 
     # -----------------------------------------------------
-    # Corrientes del arreglo
-    # -----------------------------------------------------
-    # En paralelo las corrientes se suman
+    # CORRIENTE (paralelo → suma)
     # -----------------------------------------------------
 
     idc_array = inp.imp_string_a * inp.n_strings_total
     isc_array = inp.isc_string_a * inp.n_strings_total
 
     # -----------------------------------------------------
-    # Potencia del arreglo
+    # POTENCIA (consistente con modelo previo)
     # -----------------------------------------------------
 
     potencia_array = inp.potencia_string_w * inp.n_strings_total
 
     # -----------------------------------------------------
-    # Resultado
+    # RESULTADO
     # -----------------------------------------------------
 
     return PotenciaArregloResultado(
-
         vdc_array_v=vdc_array,
         voc_array_v=voc_array,
 
         idc_array_a=idc_array,
         isc_array_a=isc_array,
 
-        potencia_array_w=potencia_array
+        potencia_array_w=potencia_array,
     )
