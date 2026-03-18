@@ -177,24 +177,62 @@ class ResultadoFinanciero:
 # =========================================================
 # RESULTADO FINAL DEL PROYECTO
 # =========================================================
+@dataclass
+class Datosproyecto:
 
-@dataclass(frozen=True)
-class ResultadoProyecto:
-    """
-    Resultado consolidado del estudio FV.
+    # ------------------------------------------------------
+    # Información general del cliente
+    # ------------------------------------------------------
 
-    Unifica todos los dominios del motor.
-    """
+    cliente: str
+    ubicacion: str
 
-    sizing: ResultadoSizing
-    strings: ResultadoStrings
-    energia: EnergiaResultado
-    nec: ResultadoNEC
-    financiero: ResultadoFinanciero
+    # 🔴 NUEVO — UBICACIÓN GEOGRÁFICA (OBLIGATORIO)
+    lat: float
+    lon: float
 
-    # estado global del estudio
-    ok: bool = True
-    errores: List[str] = field(default_factory=list)
+    # ------------------------------------------------------
+    # Consumo energético
+    # ------------------------------------------------------
 
-    # metadata adicional
-    meta: Dict[str, Any] = field(default_factory=dict)
+    consumo_12m: List[float]
+
+    tarifa_energia: float
+    cargos_fijos: float
+
+    # ------------------------------------------------------
+    # Producción FV
+    # ------------------------------------------------------
+
+    prod_base_kwh_kwp_mes: float
+    factores_fv_12m: List[float]
+
+    cobertura_objetivo: float
+
+    # ------------------------------------------------------
+    # Costos del sistema
+    # ------------------------------------------------------
+
+    costo_usd_kwp: float
+    tcambio: float
+
+    # ------------------------------------------------------
+    # Financiamiento
+    # ------------------------------------------------------
+
+    tasa_anual: float
+    plazo_anios: int
+
+    porcentaje_financiado: float
+
+    # ------------------------------------------------------
+    # O&M
+    # ------------------------------------------------------
+
+    om_anual_pct: float = 0.0
+
+    # ------------------------------------------------------
+    # Configuración eléctrica opcional
+    # ------------------------------------------------------
+
+    instalacion_electrica: dict | None = None
