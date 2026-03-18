@@ -169,7 +169,9 @@ class EnergiaAdapter:
         clima = descargar_clima_pvgis(
             EntradaClimaPVGIS(
                 lat=sf.get("latitud"),
-                lon=sf.get("longitud")
+                lon=sf.get("longitud"),
+                startyear=2019,
+                endyear=2019
             )
         )
 
