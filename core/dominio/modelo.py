@@ -96,62 +96,55 @@ from typing import List
 # DATOS DEL PROYECTO FV
 # =========================================================
 
+from dataclasses import dataclass
+from typing import List
+
 @dataclass
 class Datosproyecto:
-    """
-    Representa la información completa del proyecto fotovoltaico
-    que será analizado por FV Engine.
-    """
 
-    # ------------------------------------------------------
-    # Información general del cliente
-    # ------------------------------------------------------
-
+    # -------------------------------
+    # Información general
+    # -------------------------------
     cliente: str
     ubicacion: str
 
-    # ------------------------------------------------------
-    # Consumo energético
-    # ------------------------------------------------------
+    # 🔴 FIX OBLIGATORIO
+    lat: float
+    lon: float
 
-    consumo_12m: List[float]          # consumo mensual en kWh (12 valores)
+    # -------------------------------
+    # Consumo
+    # -------------------------------
+    consumo_12m: List[float]
+    tarifa_energia: float
+    cargos_fijos: float
 
-    tarifa_energia: float             # L/kWh (solo componente energía)
-    cargos_fijos: float               # L/mes
-
-    # ------------------------------------------------------
+    # -------------------------------
     # Producción FV
-    # ------------------------------------------------------
+    # -------------------------------
+    prod_base_kwh_kwp_mes: float
+    factores_fv_12m: List[float]
+    cobertura_objetivo: float
 
-    prod_base_kwh_kwp_mes: float      # producción base (kWh/kWp/mes)
-    factores_fv_12m: List[float]      # factores mensuales (~1.0)
+    # -------------------------------
+    # Costos
+    # -------------------------------
+    costo_usd_kwp: float
+    tcambio: float
 
-    cobertura_objetivo: float         # fracción del consumo a cubrir (0..1)
-
-    # ------------------------------------------------------
-    # Costos del sistema
-    # ------------------------------------------------------
-
-    costo_usd_kwp: float              # costo del sistema USD/kWp
-    tcambio: float                    # tipo de cambio USD → L
-
-    # ------------------------------------------------------
+    # -------------------------------
     # Financiamiento
-    # ------------------------------------------------------
+    # -------------------------------
+    tasa_anual: float
+    plazo_anios: int
+    porcentaje_financiado: float
 
-    tasa_anual: float                 # tasa anual del financiamiento
-    plazo_anios: int                  # plazo del crédito
+    # -------------------------------
+    # O&M
+    # -------------------------------
+    om_anual_pct: float = 0.0
 
-    porcentaje_financiado: float      # fracción financiada (0..1)
-
-    # ------------------------------------------------------
-    # Operación y mantenimiento
-    # ------------------------------------------------------
-
-    om_anual_pct: float = 0.0         # porcentaje anual del CAPEX
-
-    # ------------------------------------------------------
-    # Configuración eléctrica opcional
-    # ------------------------------------------------------
-
+    # -------------------------------
+    # Eléctrico opcional
+    # -------------------------------
     instalacion_electrica: dict | None = None
