@@ -64,7 +64,7 @@ def _calcular_dc_8760(inp: EnergiaInput, estado):
             ModeloTermicoInput(
                 irradiancia_poa_wm2=hora.poa_wm2,
                 temperatura_ambiente_c=hora.temp_ambiente_c,
-                noct_c=inp.noct_c,
+                noct_c=inp.temp_ambiente_c,  # fallback simple
             )
         ).temperatura_celda_c
 
@@ -74,16 +74,16 @@ def _calcular_dc_8760(inp: EnergiaInput, estado):
                 irradiancia_poa_wm2=hora.poa_wm2,
                 temperatura_celda_c=t_cell,
 
-                p_panel_w=inp.p_panel_w,
-                vmp_panel_v=inp.vmp_panel_v,
-                voc_panel_v=inp.voc_panel_v,
+                p_panel_w=inp.pmax_stc_w,
+                vmp_panel_v=inp.vmp_stc_v,
+                voc_panel_v=inp.voc_stc_v,
 
-                imp_panel_a=inp.imp_panel_a,
-                isc_panel_a=inp.isc_panel_a,
+                imp_panel_a=None,
+                isc_panel_a=None,
 
-                coef_potencia=inp.coef_potencia,
-                coef_vmp=inp.coef_vmp,
-                coef_voc=inp.coef_voc,
+                coef_potencia=inp.coef_pmax_pct_per_c,
+                coef_vmp=inp.coef_vmp_pct_per_c,
+                coef_voc=inp.coef_voc_pct_per_c,
             )
         )
 
@@ -256,8 +256,11 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
         # 7. AGREGACIÓN
         # ======================================================
 
-        energia_mensual = agregar_energia_por_mes(potencia_ac_final)
-        energia_anual = sum(potencia_ac_final)
+        energia_bruta_12m = agregar_energia_por_mes(potencia_dc)
+        energia_final_12m = agregar_energia_por_mes(potencia_ac_final)
+
+        energia_bruta_anual = sum(potencia_dc)
+        energia_final_anual = sum(potencia_ac_final)
 
         energia_clipping_12m = agregar_energia_por_mes(clipping_kw)
         energia_clipping_anual = sum(clipping_kw)
@@ -274,17 +277,17 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
             pac_nominal_kw=inp.pac_nominal_kw,
             dc_ac_ratio=inp.pdc_instalada_kw / inp.pac_nominal_kw,
 
-            energia_bruta_12m=energia_mensual,
-            energia_perdidas_12m=[0.0]*12,
-            energia_despues_perdidas_12m=energia_mensual,
+            energia_bruta_12m=energia_bruta_12m,
+            energia_perdidas_12m=[b - f for b, f in zip(energia_bruta_12m, energia_final_12m)],
+            energia_despues_perdidas_12m=energia_final_12m,
             energia_clipping_12m=energia_clipping_12m,
-            energia_util_12m=energia_mensual,
+            energia_util_12m=energia_final_12m,
 
-            energia_bruta_anual=energia_anual,
-            energia_perdidas_anual=0.0,
-            energia_despues_perdidas_anual=energia_anual,
+            energia_bruta_anual=energia_bruta_anual,
+            energia_perdidas_anual=energia_bruta_anual - energia_final_anual,
+            energia_despues_perdidas_anual=energia_final_anual,
             energia_clipping_anual=energia_clipping_anual,
-            energia_util_anual=energia_anual,
+            energia_util_anual=energia_final_anual,
 
             meta={
                 "motor": "8760",
