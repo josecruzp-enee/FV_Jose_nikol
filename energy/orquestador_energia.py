@@ -69,42 +69,113 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
 
 
         # ======================================================
-        # 2. DC (USANDO panel_energia)
-        # ======================================================
+# 2. DC (USANDO panel_energia COMPLETO)
+# ======================================================
 
-        from energy.panel_energia.potencia_panel import (
-            calcular_potencia_panel,
-            PotenciaPanelInput,
+from energy.panel_energia.modelo_termico import (
+    calcular_temperatura_celda,
+    ModeloTermicoInput,
+)
+
+from energy.panel_energia.potencia_panel import (
+    calcular_potencia_panel,
+    PotenciaPanelInput,
+)
+
+from energy.panel_energia.potencia_string import (
+    calcular_potencia_string,
+    PotenciaStringInput,
+)
+
+from energy.panel_energia.potencia_arreglo import (
+    calcular_potencia_arreglo,
+    PotenciaArregloInput,
+)
+
+potencia_dc = []
+
+for hora in estado:
+
+    if hora.poa_wm2 <= 0:
+        potencia_dc.append(0.0)
+        continue
+
+    # --------------------------------------------------
+    # 1. TEMPERATURA DE CELDA
+    # --------------------------------------------------
+
+    t_cell = calcular_temperatura_celda(
+        ModeloTermicoInput(
+            irradiancia_poa_wm2=hora.poa_wm2,
+            temperatura_ambiente_c=hora.temp_ambiente_c,
+            noct_c=inp.noct_c,
         )
+    ).temperatura_celda_c
 
-        potencia_dc = []
+    # --------------------------------------------------
+    # 2. PANEL
+    # --------------------------------------------------
 
-        for hora in estado:
+    panel = calcular_potencia_panel(
+        PotenciaPanelInput(
+            irradiancia_poa_wm2=hora.poa_wm2,
+            temperatura_celda_c=t_cell,
 
-            if hora.poa_wm2 <= 0:
-                potencia_dc.append(0.0)
-                continue
+            p_panel_w=inp.p_panel_w,
 
-            panel = calcular_potencia_panel(
-                PotenciaPanelInput(
-                    irradiancia_poa_wm2=hora.poa_wm2,
-                    temperatura_celda_c=hora.temp_celda_c,
+            vmp_panel_v=inp.vmp_panel_v,
+            voc_panel_v=inp.voc_panel_v,
 
-                    pmax_stc_w=inp.pmax_stc_w,
-                    vmp_stc_v=inp.vmp_stc_v,
-                    voc_stc_v=inp.voc_stc_v,
+            imp_panel_a=inp.imp_panel_a,
+            isc_panel_a=inp.isc_panel_a,
 
-                    coef_pmax_pct_per_c=inp.coef_pmax_pct_per_c,
-                    coef_voc_pct_per_c=inp.coef_voc_pct_per_c,
-                    coef_vmp_pct_per_c=inp.coef_vmp_pct_per_c,
-                )
-            )
+            coef_potencia=inp.coef_potencia,
+            coef_vmp=inp.coef_vmp,
+            coef_voc=inp.coef_voc,
+        )
+    )
 
-            potencia_string_w = panel.pmp_w * inp.paneles_por_string
-            potencia_array_w = potencia_string_w * inp.n_strings_total
+    # --------------------------------------------------
+    # 3. STRING (SERIE)
+    # --------------------------------------------------
 
-            potencia_dc.append(max(0.0, potencia_array_w / 1000.0))
+    string = calcular_potencia_string(
+        PotenciaStringInput(
+            n_series=inp.paneles_por_string,
 
+            p_panel_w=panel.pmp_w,
+
+            vmp_panel_v=panel.vmp_v,
+            voc_panel_v=panel.voc_v,
+
+            imp_panel_a=panel.imp_a,
+            isc_panel_a=panel.isc_a,
+        )
+    )
+
+    # --------------------------------------------------
+    # 4. ARREGLO (PARALELO)
+    # --------------------------------------------------
+
+    array = calcular_potencia_arreglo(
+        PotenciaArregloInput(
+            n_strings_total=inp.n_strings_total,
+
+            vmp_string_v=string.vmp_string_v,
+            voc_string_v=string.voc_string_v,
+
+            imp_string_a=string.imp_string_a,
+            isc_string_a=string.isc_string_a,
+
+            potencia_string_w=string.potencia_string_w,
+        )
+    )
+
+    # --------------------------------------------------
+    # 5. RESULTADO kW
+    # --------------------------------------------------
+
+    potencia_dc.append(max(0.0, array.potencia_array_w / 1000.0))
 
         # ======================================================
         # 3. PÉRDIDAS DC
