@@ -1,18 +1,3 @@
-"""
-IRRADIANCIA EN PLANO INCLINADO — FV Engine
-
-Dominio: solar
-
-Responsabilidad
----------------
-Calcular la irradiancia que incide sobre el plano del panel FV.
-
-Implementa un modelo isotrópico simple ampliamente utilizado
-para simulaciones energéticas preliminares.
-
-POA = Directa + Difusa + Reflejada
-"""
-
 from dataclasses import dataclass
 from math import cos, sin, radians
 
@@ -21,25 +6,20 @@ from math import cos, sin, radians
 # MODELOS DE DATOS
 # ==========================================================
 
-@dataclass
+@dataclass(frozen=True)
 class IrradianciaInput:
-
     dni: float
     dhi: float
     ghi: float
-
     solar_zenith_deg: float
     solar_azimuth_deg: float
-
     panel_tilt_deg: float
     panel_azimuth_deg: float
-
     albedo: float = 0.2
 
 
-@dataclass
+@dataclass(frozen=True)
 class IrradianciaPlano:
-
     poa_total: float
     poa_directa: float
     poa_difusa: float
@@ -47,7 +27,7 @@ class IrradianciaPlano:
 
 
 # ==========================================================
-# CÁLCULO DEL ÁNGULO DE INCIDENCIA
+# ÁNGULO DE INCIDENCIA
 # ==========================================================
 
 def _cos_theta_i(inp: IrradianciaInput):
@@ -64,7 +44,7 @@ def _cos_theta_i(inp: IrradianciaInput):
         sin(zen) * sin(tilt) * cos(az - panel_az)
     )
 
-    return max(cos_theta, 0)
+    return max(cos_theta, 0.0)
 
 
 # ==========================================================
@@ -73,20 +53,43 @@ def _cos_theta_i(inp: IrradianciaInput):
 
 def calcular_irradiancia_plano(inp: IrradianciaInput) -> IrradianciaPlano:
 
+    # validación básica
+    if inp.dni < 0 or inp.dhi < 0 or inp.ghi < 0:
+        raise ValueError("Irradiancia negativa no válida")
+
     cos_theta = _cos_theta_i(inp)
 
     tilt = radians(inp.panel_tilt_deg)
 
-    # componente directa
-    poa_directa = inp.dni * cos_theta
+    # ------------------------------------------------------
+    # DIRECTA
+    # ------------------------------------------------------
 
-    # componente difusa
+    if inp.solar_zenith_deg >= 90:
+        poa_directa = 0.0
+    else:
+        poa_directa = inp.dni * cos_theta
+
+    # ------------------------------------------------------
+    # DIFUSA (isotrópico)
+    # ------------------------------------------------------
+
     poa_difusa = inp.dhi * (1 + cos(tilt)) / 2
 
-    # componente reflejada
+    # ------------------------------------------------------
+    # REFLEJADA
+    # ------------------------------------------------------
+
     poa_reflejada = inp.ghi * inp.albedo * (1 - cos(tilt)) / 2
 
-    poa_total = poa_directa + poa_difusa + poa_reflejada
+    # ------------------------------------------------------
+    # TOTAL
+    # ------------------------------------------------------
+
+    poa_total = max(
+        poa_directa + poa_difusa + poa_reflejada,
+        0.0
+    )
 
     return IrradianciaPlano(
         poa_total=poa_total,
