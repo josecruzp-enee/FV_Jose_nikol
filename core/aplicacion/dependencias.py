@@ -145,7 +145,7 @@ class EnergiaAdapter:
             # 8760
             # --------------------------------------------------
             clima=clima,
-            tilt_deg=sf.get("inclinacion_deg"),
+            tilt_deg=sf.get("inclinacion_deg") or 10.0,
 
             # --------------------------------------------------
             # ARREGLO FV
