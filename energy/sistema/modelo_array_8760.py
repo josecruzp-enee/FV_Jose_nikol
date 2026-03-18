@@ -7,7 +7,7 @@ MODELO DEL ARREGLO FV (SIMULACIÓN 8760) — FV Engine
 from dataclasses import dataclass
 from typing import List
 
-from electrical.paneles.potencia_panel import (
+from energy.panel_energia.potencia_panel import (
     calcular_potencia_panel,
     PotenciaPanelInput,
 )
