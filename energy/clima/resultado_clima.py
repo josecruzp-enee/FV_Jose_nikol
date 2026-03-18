@@ -2,27 +2,10 @@ from __future__ import annotations
 
 """
 RESULTADO DEL DOMINIO CLIMA — FV Engine
-
-Responsabilidad
----------------
-Representar el estado climático horario utilizado por el
-motor energético fotovoltaico.
-
-Este resultado es producido por:
-
-    lector_pvgis
-    clima_tmy
-    generador_clima_base
-
-y consumido por:
-
-    solar.simulacion_8760
-
-Contiene el clima horario del año (8760 registros).
 """
 
 from dataclasses import dataclass
-from typing import List
+from typing import List, Dict
 from datetime import datetime
 
 
@@ -32,9 +15,6 @@ from datetime import datetime
 
 @dataclass(frozen=True)
 class ClimaHora:
-    """
-    Condiciones climáticas en una hora específica.
-    """
 
     timestamp: datetime
 
@@ -52,22 +32,21 @@ class ClimaHora:
 
 @dataclass(frozen=True)
 class ResultadoClima:
-    """
-    Resultado completo del dominio clima.
-
-    Contiene los datos climáticos horarios necesarios
-    para la simulación solar del sistema FV.
-    """
 
     latitud: float
     longitud: float
 
     horas: List[ClimaHora]
 
+    # 👇 opcional pero clave
+    fuente: str = "desconocido"
+    meta: Dict[str, object] = None
+
 
 # ==========================================================
 # VALIDADOR
 # ==========================================================
+
 def validar_clima_8760(clima: ResultadoClima) -> None:
 
     if not clima.horas:
@@ -78,19 +57,43 @@ def validar_clima_8760(clima: ResultadoClima) -> None:
             f"Se esperaban 8760 horas, pero hay {len(clima.horas)}"
         )
 
-    # 🔴 VALIDACIÓN CRÍTICA
-    ghi_total = sum(h.ghi_wm2 for h in clima.horas)
+    ghi_total = 0.0
+    dni_total = 0.0
 
+    for i, h in enumerate(clima.horas):
+
+        # ----------------------------------------
+        # timestamp
+        # ----------------------------------------
+        if h.timestamp is None:
+            raise ValueError(f"Hora {i} sin timestamp")
+
+        # ----------------------------------------
+        # irradiancia
+        # ----------------------------------------
+        if h.ghi_wm2 < 0 or h.dni_wm2 < 0 or h.dhi_wm2 < 0:
+            raise ValueError(f"Irradiancia negativa en hora {i}")
+
+        # ----------------------------------------
+        # temperatura (rango físico razonable)
+        # ----------------------------------------
+        if h.temp_amb_c < -50 or h.temp_amb_c > 80:
+            raise ValueError(f"Temperatura fuera de rango en hora {i}")
+
+        # ----------------------------------------
+        # viento
+        # ----------------------------------------
+        if h.viento_ms < 0:
+            raise ValueError(f"Viento negativo en hora {i}")
+
+        ghi_total += h.ghi_wm2
+        dni_total += h.dni_wm2
+
+    # ----------------------------------------
+    # validación global
+    # ----------------------------------------
     if ghi_total <= 0:
         raise ValueError("Clima inválido: GHI total = 0")
 
-    # opcional: validar DNI también
-    dni_total = sum(h.dni_wm2 for h in clima.horas)
-
     if dni_total <= 0:
-        raise ValueError("Clima inválido: DNI total = 0")ValueError("ResultadoClima no contiene horas")
-
-    if len(clima.horas) != 8760:
-        raise ValueError(
-            f"Se esperaban 8760 horas de clima, pero se recibieron {len(clima.horas)}"
-        )
+        raise ValueError("Clima inválido: DNI total = 0")
