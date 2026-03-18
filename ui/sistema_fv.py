@@ -282,14 +282,26 @@ def render(ctx):
 
     sf = _get_sf(ctx)
 
+    # 🔴 NUEVO BLOQUE
+    st.markdown("### Modelo energético")
+
+    modo = st.radio(
+        "Seleccione nivel de simulación",
+        [
+            "Rápido (HSP mensual)",
+            "Ingeniería (8760 horario)"
+        ],
+        index=1
+    )
+
+    sf["modo_simulacion"] = "8760" if "8760" in modo else "mensual"
+
+    # 🔴 RESTO NORMAL
     _render_modo_dimensionado(sf)
-
     _render_geometria(sf)
-
     _render_condiciones(sf)
 
     ctx.sistema_fv = sf
-
 
 # ==========================================================
 # VALIDACIÓN
