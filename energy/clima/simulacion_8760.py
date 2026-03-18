@@ -54,12 +54,14 @@ class ResultadoClima8760:
 # ==========================================================
 # SIMULACIÓN
 # ==========================================================
-
 def simular_clima_8760(
     clima: ResultadoClima,
     tilt: float,
     azimuth: float
 ) -> ResultadoClima8760:
+
+    from energy.solar.posicion_solar import SolarInput
+    from energy.solar.irradiancia_plano import IrradianciaInput
 
     # validar que existan 8760 registros
     validar_clima_8760(clima)
@@ -71,30 +73,34 @@ def simular_clima_8760(
     for hora in clima.horas:
 
         # ======================================================
-        # 1. POSICIÓN SOLAR (CORRECTO)
+        # 1. POSICIÓN SOLAR
         # ======================================================
 
         pos = calcular_posicion_solar(
             SolarInput(
                 latitud_deg=clima.latitud,
                 longitud_deg=clima.longitud,
-                fecha_hora=hora.timestamp  # ✔ datetime correcto
+                fecha_hora=hora.timestamp
             )
         )
 
         # ======================================================
-        # 2. IRRADIANCIA EN PLANO DEL GENERADOR
+        # 2. IRRADIANCIA EN PLANO (POA)
         # ======================================================
 
-        poa = calcular_irradiancia_plano(
-            ghi_wm2=hora.ghi_wm2,
-            zenith_deg=pos.zenith_deg,
-            azimuth_sol_deg=pos.azimuth_deg,
-            tilt_deg=tilt,
-            azimuth_panel_deg=azimuth
+        irr = calcular_irradiancia_plano(
+            IrradianciaInput(
+                dni=hora.dni_wm2,
+                dhi=hora.dhi_wm2,
+                ghi=hora.ghi_wm2,
+                solar_zenith_deg=pos.zenith_deg,
+                solar_azimuth_deg=pos.azimuth_deg,
+                panel_tilt_deg=tilt,
+                panel_azimuth_deg=azimuth
+            )
         )
 
-        poa = max(0.0, poa)
+        poa = max(0.0, irr.poa_total)
 
         # ======================================================
         # 3. TEMPERATURA DE CELDA
