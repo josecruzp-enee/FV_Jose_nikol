@@ -1,4 +1,3 @@
-```python
 from __future__ import annotations
 
 from .contrato import EnergiaInput, EnergiaResultado
@@ -331,4 +330,4 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
         st.write(str(e))
 
         return _resultado_error(inp, [str(e)])
-```
+
