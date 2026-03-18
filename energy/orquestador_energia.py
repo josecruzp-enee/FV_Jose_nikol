@@ -299,7 +299,7 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
 
     except Exception as e:
 
-        st.error("Error en motor energía")
-        st.write(str(e))
+        print("🔥 ERROR REAL MOTOR ENERGIA:", str(e))
+        raise
 
         return _resultado_error(inp, [str(e)])
