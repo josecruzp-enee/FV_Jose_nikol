@@ -15,13 +15,10 @@ from datetime import datetime
 
 @dataclass(frozen=True)
 class ClimaHora:
-
     timestamp: datetime
-
     ghi_wm2: float
     dni_wm2: float
     dhi_wm2: float
-
     temp_amb_c: float
     viento_ms: float
 
