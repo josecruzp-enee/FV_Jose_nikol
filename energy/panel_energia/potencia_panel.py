@@ -102,6 +102,7 @@ def calcular_potencia_panel(inp: PotenciaPanelInput) -> PotenciaPanelResultado:
     Modelo:
         - Escalamiento por irradiancia
         - Corrección térmica lineal
+        - Consistencia eléctrica: Pmp = Vmp * Imp
     """
 
     poa = inp.irradiancia_poa_wm2
@@ -121,51 +122,42 @@ def calcular_potencia_panel(inp: PotenciaPanelInput) -> PotenciaPanelResultado:
         )
 
     # ------------------------------------------------------
-    # IRRADIANCIA RELATIVA (respecto a 1000 W/m²)
+    # IRRADIANCIA RELATIVA
     # ------------------------------------------------------
 
     g_rel = poa / 1000.0
 
     # ------------------------------------------------------
-    # DELTA TÉRMICO (respecto a 25°C)
+    # DELTA TÉRMICO
     # ------------------------------------------------------
 
     delta_t = t_cell - 25.0
 
     # ------------------------------------------------------
-    # POTENCIA (Pmp)
-    # ------------------------------------------------------
-
-    pmp = (
-        inp.p_panel_w
-        * g_rel
-        * (1 + inp.coef_potencia * delta_t)
-    )
-
-    # ------------------------------------------------------
     # VOLTAJE MPP
     # ------------------------------------------------------
 
-    vmp = (
-        inp.vmp_panel_v
-        * (1 + inp.coef_vmp * delta_t)
-    )
+    vmp = inp.vmp_panel_v * (1 + inp.coef_vmp * delta_t)
 
     # ------------------------------------------------------
     # VOLTAJE VOC
     # ------------------------------------------------------
 
-    voc = (
-        inp.voc_panel_v
-        * (1 + inp.coef_voc * delta_t)
-    )
+    voc = inp.voc_panel_v * (1 + inp.coef_voc * delta_t)
 
     # ------------------------------------------------------
-    # CORRIENTE (aprox proporcional a irradiancia)
+    # CORRIENTES
     # ------------------------------------------------------
 
     imp = inp.imp_panel_a * g_rel
     isc = inp.isc_panel_a * g_rel
+
+    # ------------------------------------------------------
+    # POTENCIA CONSISTENTE
+    # ------------------------------------------------------
+
+    pmp = vmp * imp
+    pmp = max(0.0, pmp)
 
     # ------------------------------------------------------
     # RESULTADO
