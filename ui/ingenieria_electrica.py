@@ -27,9 +27,7 @@ def _fmt(v, unit: str = "") -> str:
         return "—"
 
     if isinstance(v, (int, float)):
-
         s = f"{v:.3f}".rstrip("0").rstrip(".")
-
         return f"{s} {unit}".rstrip() if unit else s
 
     return str(v)
@@ -50,46 +48,23 @@ def _ui_inputs_electricos(e: dict):
     c1, c2, c3 = st.columns(3)
 
     with c1:
-        e["vac"] = st.number_input(
-            "Voltaje AC (V)",
-            min_value=100.0,
-            max_value=600.0,
-            value=float(e.get("vac", 240.0)),
-        )
+        e["vac"] = st.number_input("Voltaje AC (V)", 100.0, 600.0, float(e.get("vac", 240.0)))
 
     with c2:
-        e["fases"] = st.selectbox(
-            "Fases",
-            [1, 3],
-            index=0 if int(e.get("fases", 1)) == 1 else 1,
-        )
+        e["fases"] = st.selectbox("Fases", [1, 3], index=0 if int(e.get("fases", 1)) == 1 else 1)
 
     with c3:
-        e["fp"] = st.number_input(
-            "Factor de potencia",
-            min_value=0.80,
-            max_value=1.00,
-            value=float(e.get("fp", 1.0)),
-            step=0.01,
-        )
+        e["fp"] = st.number_input("Factor de potencia", 0.80, 1.00, float(e.get("fp", 1.0)), step=0.01)
 
     st.markdown("### Distancias")
 
     d1, d2 = st.columns(2)
 
     with d1:
-        e["dist_dc_m"] = st.number_input(
-            "Distancia DC (m)",
-            min_value=1.0,
-            value=float(e.get("dist_dc_m", 15.0)),
-        )
+        e["dist_dc_m"] = st.number_input("Distancia DC (m)", 1.0, value=float(e.get("dist_dc_m", 15.0)))
 
     with d2:
-        e["dist_ac_m"] = st.number_input(
-            "Distancia AC (m)",
-            min_value=1.0,
-            value=float(e.get("dist_ac_m", 25.0)),
-        )
+        e["dist_ac_m"] = st.number_input("Distancia AC (m)", 1.0, value=float(e.get("dist_ac_m", 25.0)))
 
 
 # ==========================================================
@@ -105,44 +80,36 @@ def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
 
     consumo = c.get("kwh_12m", [0] * 12)
 
-    p = Datosproyecto(
+    return Datosproyecto(
 
         cliente=str(dc.get("cliente", "")),
-
         ubicacion=str(dc.get("ubicacion", "")),
 
+        # 🔴 FIX CLAVE
+        lat=float(sf.get("latitud", 14.8)),
+        lon=float(sf.get("longitud", -86.2)),
+
         consumo_12m=[float(x) for x in consumo],
-
         tarifa_energia=float(c.get("tarifa_energia_L_kwh", 0)),
-
         cargos_fijos=float(c.get("cargos_fijos_L_mes", 0)),
 
         prod_base_kwh_kwp_mes=float(sf.get("produccion_base_kwh_kwp_mes", 145)),
-
         factores_fv_12m=[float(x) for x in sf.get("factores_fv_12m", [1] * 12)],
 
         cobertura_objetivo=float(sf.get("cobertura_objetivo", 0.8)),
 
         costo_usd_kwp=float(sf.get("costo_usd_kwp", 1200)),
-
         tcambio=float(sf.get("tcambio", 27)),
 
         tasa_anual=float(sf.get("tasa_anual", 0.08)),
-
         plazo_anios=int(sf.get("plazo_anios", 10)),
 
         porcentaje_financiado=float(sf.get("porcentaje_financiado", 1)),
 
         om_anual_pct=float(sf.get("om_anual_pct", 0.01)),
+
+        instalacion_electrica=None
     )
-
-    p.sistema_fv = dict(sf)
-
-    p.electrico = dict(_asegurar_dict(ctx, "electrico"))
-
-    p.equipos = dict(eq)
-
-    return p
 
 
 # ==========================================================
@@ -156,9 +123,7 @@ def _mostrar_sizing(sizing):
     c1, c2, c3 = st.columns(3)
 
     c1.metric("Paneles", sizing.n_paneles)
-
     c2.metric("Potencia DC", f"{sizing.pdc_kw} kWp")
-
     c3.metric("Potencia AC", f"{sizing.kw_ac} kW")
 
 
@@ -174,77 +139,7 @@ def _mostrar_nec(nec):
         st.info("Sin resultados NEC.")
         return
 
-    st.subheader("DEBUG NEC")
     st.json(nec)
-
-    paquete = nec.get("paquete_nec", {})
-
-    corrientes = paquete.get("corrientes", {})
-    protecciones = paquete.get("protecciones", {})
-    conductores = paquete.get("conductores", {}).get("circuitos", [])
-
-    dc = corrientes.get("dc_total", {})
-    ac = corrientes.get("ac", {})
-
-    tabs = st.tabs(["DC", "AC", "Conductores"])
-
-    with tabs[0]:
-
-        st.metric(
-            "Corriente DC operación",
-            _fmt(dc.get("i_operacion_a"), "A")
-        )
-
-        st.metric(
-            "Corriente DC diseño NEC",
-            _fmt(dc.get("i_diseno_a"), "A")
-        )
-
-    with tabs[1]:
-
-        st.metric(
-            "Corriente AC operación",
-            _fmt(ac.get("i_operacion_a"), "A")
-        )
-
-        st.metric(
-            "Corriente AC diseño",
-            _fmt(ac.get("i_diseno_a"), "A")
-        )
-
-        breaker = getattr(protecciones, "breaker_ac", None)
-
-
-        if breaker:
-
-            st.metric(
-                "Breaker AC",
-                _fmt(breaker.tamano_a, "A")
-            )
-
-    with tabs[2]:
-
-        if not conductores:
-            st.info("Sin datos de conductores")
-            return
-
-        filas = []
-
-        for c in conductores:
-
-            filas.append({
-
-                "Circuito": c.get("nombre"),
-                "Calibre": c.get("calibre"),
-                "I diseño": _fmt(c.get("i_diseno_a"), "A"),
-                "Ampacidad": _fmt(c.get("ampacidad_ajustada_a"), "A"),
-                "VD": _fmt(c.get("vd_pct"), "%"),
-
-            })
-
-        df = pd.DataFrame(filas)
-
-        st.dataframe(df, use_container_width=True)
 
 
 # ==========================================================
@@ -277,67 +172,23 @@ def render(ctx):
 
         resultado = ejecutar_estudio(datos, deps)
 
-        # ======================================================
-        # DEBUG MOTOR FV
-        # ======================================================
-
-        with st.expander("🔎 DEBUG MOTOR FV", expanded=True):
-
-            st.write("Tipo resultado:")
-            st.write(type(resultado))
-
-            st.write("Contenido completo:")
-            st.write(resultado)
-
-            if hasattr(resultado, "sizing"):
-
-                st.subheader("Sizing")
-
-                st.write("paneles:", resultado.sizing.n_paneles)
-                st.write("pdc_kw:", resultado.sizing.pdc_kw)
-                st.write("kw_ac:", resultado.sizing.kw_ac)
-                st.write("n_inversores:", resultado.sizing.n_inversores)
-
-            if hasattr(resultado, "strings"):
-
-                st.subheader("Strings")
-
-                st.write("tipo strings:", type(resultado.strings))
-
-                if hasattr(resultado.strings, "n_strings_total"):
-                    st.write("n_strings_total:", resultado.strings.n_strings_total)
-
-                if hasattr(resultado.strings, "n_series"):
-                    st.write("n_series:", resultado.strings.n_series)
-
-                if hasattr(resultado.strings, "strings"):
-                    st.write("lista strings:")
-                    st.write(resultado.strings.strings)
-
-            if hasattr(resultado, "nec"):
-
-                st.subheader("NEC")
-
-                st.write(resultado.nec)
-
-        # ------------------------------------------------------
-
         ctx.resultado_proyecto = resultado
 
         st.success("Ingeniería generada correctamente.")
 
         _mostrar_sizing(resultado.sizing)
-
         _mostrar_nec(resultado.nec)
 
-    except Exception as exc:
+    except Exception:
 
         import traceback
 
         st.error("Error en motor FV")
         st.code(traceback.format_exc())
+
+
 # ==========================================================
-# VALIDACIÓN DEL PASO
+# VALIDACIÓN
 # ==========================================================
 
 def validar(ctx) -> Tuple[bool, List[str]]:
@@ -345,7 +196,6 @@ def validar(ctx) -> Tuple[bool, List[str]]:
     errores = []
 
     if not getattr(ctx, "resultado_proyecto", None):
-
         errores.append("Debe generar ingeniería.")
 
     return len(errores) == 0, errores
