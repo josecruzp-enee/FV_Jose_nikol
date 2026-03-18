@@ -3,7 +3,7 @@ from core.aplicacion.orquestador_estudio import DependenciasEstudio
 from core.dominio.contrato import StringInfo
 from core.dominio.contrato import ResultadoStrings
 from energy.clima.lector_pvgis import (descargar_clima_pvgis, EntradaClimaPVGIS)
-
+from energy.clima.generador_clima_base import generar_clima_base
 from electrical.catalogos.catalogos import get_panel
 
 from core.servicios.sizing import calcular_sizing_unificado
@@ -166,14 +166,7 @@ class EnergiaAdapter:
         # CLIMA PVGIS (8760)
         # --------------------------------------------------
 
-        clima = descargar_clima_pvgis(
-            EntradaClimaPVGIS(
-                lat=sf.get("latitud"),
-                lon=sf.get("longitud"),
-                startyear=2019,
-                endyear=2019
-            )
-        )
+        clima = generar_clima_base()
 
         # --------------------------------------------------
         # CONSTRUIR ENTRADA
