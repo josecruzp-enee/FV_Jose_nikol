@@ -99,7 +99,6 @@ class PanelesAdapter:
 # ==========================================================
 # ENERGÍA (8760 REAL)
 # ==========================================================
-
 class EnergiaAdapter:
 
     def ejecutar(self, datos, sizing, strings):
@@ -110,20 +109,27 @@ class EnergiaAdapter:
         sf = getattr(datos, "sistema_fv", {}) or {}
         eq = getattr(datos, "equipos", {}) or {}
 
+        # --------------------------------------------------
+        # CATÁLOGO
+        # --------------------------------------------------
         panel = get_panel(eq.get("panel_id"))
+        inversor = get_inversor(eq.get("inversor_id"))
 
         if panel is None:
             raise ValueError("panel_id no definido")
 
-        lat = getattr(datos, "lat", None)
-        lon = getattr(datos, "lon", None)
+        if inversor is None:
+            raise ValueError("inversor_id no definido")
 
-        if lat is None:
-            lat = sf.get("latitud", 14.8)
+        # --------------------------------------------------
+        # UBICACIÓN
+        # --------------------------------------------------
+        lat = getattr(datos, "lat", None) or sf.get("latitud", 14.8)
+        lon = getattr(datos, "lon", None) or sf.get("longitud", -86.2)
 
-        if lon is None:
-            lon = sf.get("longitud", -86.2)
-
+        # --------------------------------------------------
+        # CLIMA 8760
+        # --------------------------------------------------
         clima = descargar_clima_pvgis(
             EntradaClimaPVGIS(
                 lat=float(lat),
@@ -133,47 +139,52 @@ class EnergiaAdapter:
             )
         )
 
+        # --------------------------------------------------
+        # 🔥 RECONSTRUIR ResultadoPaneles (ADAPTADOR LIMPIO)
+        # --------------------------------------------------
+        # NOTA: Esto es temporal hasta que unifiques paneles→energy directo
+
+        class ResultadoPanelesAdapter:
+            def __init__(self, panel, strings, sizing):
+                self.ok = True
+                self.panel = panel
+                self.strings = strings.strings
+                self.n_series = strings.n_series
+                self.n_strings_total = strings.n_strings_total
+                self.pdc_total_kw = sizing.pdc_kw
+
+        resultado_paneles = ResultadoPanelesAdapter(panel, strings, sizing)
+
+        # --------------------------------------------------
+        # ENTRADA ENERGÍA (NUEVO CONTRATO)
+        # --------------------------------------------------
         entrada = EnergiaInput(
 
-            # --------------------------------------------------
-            # POTENCIA
-            # --------------------------------------------------
-            pdc_instalada_kw=sizing.pdc_kw,
+            # GENERADOR FV
+            paneles=resultado_paneles,
+
+            # INVERSOR
             pac_nominal_kw=sizing.kw_ac,
 
-            # --------------------------------------------------
-            # 8760
-            # --------------------------------------------------
+            # GEOMETRÍA
+            tilt_deg=sf.get("inclinacion_deg", 10.0),
+            azimut_deg=sf.get("azimut_deg", 180.0),
+
+            # CLIMA
             clima=clima,
-            tilt_deg=sf.get("inclinacion_deg") or 10.0,
 
-            # --------------------------------------------------
-            # ARREGLO FV
-            # --------------------------------------------------
-            paneles_por_string=strings.n_series,
-            n_strings_total=strings.n_strings_total,
-
-            pmax_stc_w=panel.pmax_w,
-            vmp_stc_v=panel.vmp_v,
-            voc_stc_v=panel.voc_v,
-
-            coef_pmax_pct_per_c=getattr(panel, "coef_pmax", -0.004),
-            coef_vmp_pct_per_c=getattr(panel, "coef_vmp", -0.003),
-            coef_voc_pct_per_c=getattr(panel, "coef_voc", -0.002),
-
-            # --------------------------------------------------
             # PÉRDIDAS
-            # --------------------------------------------------
             perdidas_dc_pct=sf.get("perdidas_dc_pct", 0.03),
             perdidas_ac_pct=sf.get("perdidas_ac_pct", 0.02),
             sombras_pct=sf.get("sombras_pct", 0.0),
 
-            # --------------------------------------------------
             # INVERSOR
-            # --------------------------------------------------
             eficiencia_inversor=sf.get("eficiencia_inversor", 0.97),
         )
 
+        # --------------------------------------------------
+        # EJECUCIÓN MOTOR
+        # --------------------------------------------------
         return ejecutar_motor_energia(entrada)
 
 
