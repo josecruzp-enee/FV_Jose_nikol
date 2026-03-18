@@ -1,24 +1,3 @@
-"""
-POSICIÓN SOLAR — FV Engine
-
-Dominio: solar
-
-Responsabilidad
-----------------
-Calcular la posición del sol para una fecha y ubicación geográfica.
-
-Este módulo implementa un modelo astronómico simplificado
-adecuado para simulación energética de sistemas fotovoltaicos.
-
-Entradas
---------
-SolarInput
-
-Salidas
--------
-SolarPosition
-"""
-
 from dataclasses import dataclass
 from datetime import datetime
 from math import sin, cos, asin, acos, radians, degrees
@@ -28,27 +7,18 @@ from math import sin, cos, asin, acos, radians, degrees
 # MODELOS DE DATOS
 # ==========================================================
 
-@dataclass
+@dataclass(frozen=True)
 class SolarInput:
-    """
-    Parámetros de entrada para cálculo de posición solar
-    """
-
     latitud_deg: float
     longitud_deg: float
     fecha_hora: datetime
 
 
-@dataclass
+@dataclass(frozen=True)
 class SolarPosition:
-    """
-    Resultado de la posición solar
-    """
-
     azimuth_deg: float
     elevation_deg: float
     zenith_deg: float
-
     declination_deg: float
     hour_angle_deg: float
 
@@ -58,11 +28,9 @@ class SolarPosition:
 # ==========================================================
 
 def calcular_posicion_solar(entrada: SolarInput) -> SolarPosition:
-    """
-    Calcula la posición solar usando un modelo astronómico simplificado.
-    """
 
     lat = entrada.latitud_deg
+    lon = entrada.longitud_deg
     fecha_hora = entrada.fecha_hora
 
     # día del año
@@ -72,23 +40,30 @@ def calcular_posicion_solar(entrada: SolarInput) -> SolarPosition:
     hora = fecha_hora.hour + fecha_hora.minute / 60
 
     # ------------------------------------------------------
-    # Declinación solar
+    # CORRECCIÓN POR LONGITUD (aprox)
+    # ------------------------------------------------------
+
+    offset = lon / 15
+    hora_solar = hora + offset
+
+    # ------------------------------------------------------
+    # DECLINACIÓN
     # ------------------------------------------------------
 
     decl = 23.45 * sin(radians(360 * (284 + dia) / 365))
 
     # ------------------------------------------------------
-    # Ángulo horario
+    # ÁNGULO HORARIO
     # ------------------------------------------------------
 
-    hour_angle = 15 * (hora - 12)
+    hour_angle = 15 * (hora_solar - 12)
 
     lat_r = radians(lat)
     decl_r = radians(decl)
     h_r = radians(hour_angle)
 
     # ------------------------------------------------------
-    # Elevación solar
+    # ELEVACIÓN
     # ------------------------------------------------------
 
     elevation = asin(
@@ -99,28 +74,29 @@ def calcular_posicion_solar(entrada: SolarInput) -> SolarPosition:
     elevation_deg = degrees(elevation)
 
     # ------------------------------------------------------
-    # Ángulo cenital
+    # ZENITH
     # ------------------------------------------------------
 
     zenith_deg = 90 - elevation_deg
 
     # ------------------------------------------------------
-    # Azimut solar
+    # AZIMUTH ROBUSTO
     # ------------------------------------------------------
 
-    az = acos(
-        (
-            sin(decl_r)
-            - sin(elevation) * sin(lat_r)
-        )
-        /
-        (cos(elevation) * cos(lat_r))
-    )
+    x = (
+        sin(decl_r) - sin(elevation) * sin(lat_r)
+    ) / (cos(elevation) * cos(lat_r))
 
+    x = max(-1.0, min(1.0, x))
+
+    az = acos(x)
     azimuth_deg = degrees(az)
 
+    if hour_angle > 0:
+        azimuth_deg = 360 - azimuth_deg
+
     # ------------------------------------------------------
-    # Resultado
+    # RESULTADO
     # ------------------------------------------------------
 
     return SolarPosition(
