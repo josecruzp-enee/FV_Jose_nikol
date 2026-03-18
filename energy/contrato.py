@@ -80,58 +80,41 @@ class EstadoEnergiaHora:
 # ENTRADA DEL MOTOR ENERGÉTICO
 # ==========================================================
 
+from dataclasses import dataclass, field
+from typing import List
+
 @dataclass(frozen=True)
 class EnergiaInput:
-    """
-    Entrada del motor energético FV (modelo 8760).
-    """
 
     # ------------------------------------------------------
-    # GENERADOR FV (FUENTE PRINCIPAL)
+    # 🔹 SIN DEFAULT (PRIMERO)
     # ------------------------------------------------------
 
     paneles: ResultadoPaneles
-
-    # ------------------------------------------------------
-    # INVERSOR
-    # ------------------------------------------------------
-
     pac_nominal_kw: float
-    eficiencia_inversor: float = 0.97
-    permitir_clipping: bool = True
-
-    # ------------------------------------------------------
-    # GEOMETRÍA DEL SISTEMA
-    # ------------------------------------------------------
 
     tilt_deg: float
     azimut_deg: float
-
-    # ------------------------------------------------------
-    # CLIMA
-    # ------------------------------------------------------
-
     clima: ResultadoClima
 
     # ------------------------------------------------------
-    # PÉRDIDAS
+    # 🔹 CON DEFAULT (DESPUÉS)
     # ------------------------------------------------------
+
+    eficiencia_inversor: float = 0.97
+    permitir_clipping: bool = True
 
     perdidas_dc_pct: float = 0.0
     perdidas_ac_pct: float = 0.0
     sombras_pct: float = 0.0
 
     # ======================================================
-    # VALIDACIÓN DEL CONTRATO
+    # VALIDACIÓN
     # ======================================================
 
     def validar(self) -> List[str]:
 
         errores: List[str] = []
-
-        # -------------------------------
-        # PANELes (CRÍTICO)
-        # -------------------------------
 
         if self.paneles is None:
             errores.append("ResultadoPaneles requerido")
@@ -142,16 +125,8 @@ class EnergiaInput:
         elif not self.paneles.strings:
             errores.append("No hay strings definidos")
 
-        # -------------------------------
-        # POTENCIA
-        # -------------------------------
-
         if self.pac_nominal_kw <= 0:
             errores.append("pac_nominal_kw debe ser > 0")
-
-        # -------------------------------
-        # GEOMETRÍA
-        # -------------------------------
 
         if self.tilt_deg is None:
             errores.append("tilt_deg requerido")
@@ -159,15 +134,10 @@ class EnergiaInput:
         if self.azimut_deg is None:
             errores.append("azimut_deg requerido")
 
-        # -------------------------------
-        # CLIMA
-        # -------------------------------
-
         if self.clima is None:
             errores.append("clima requerido (8760)")
 
         return errores
-
 
 # ==========================================================
 # RESULTADO DEL MOTOR ENERGÉTICO
