@@ -80,12 +80,19 @@ def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
 
     consumo = c.get("kwh_12m", [0] * 12)
 
-    return Datosproyecto(
+    # 🔴 FIX EQUIPOS (OBLIGATORIO PARA SIZING)
+    if "panel_id" not in eq:
+        eq["panel_id"] = "JA_550"  # ⚠️ usa un ID real de tu catálogo
+
+    if "inversor_id" not in eq:
+        eq["inversor_id"] = "HUAWEI_50K"  # ⚠️ usa uno real
+
+    p = Datosproyecto(
 
         cliente=str(dc.get("cliente", "")),
         ubicacion=str(dc.get("ubicacion", "")),
 
-        # 🔴 FIX CLAVE
+        # 🔴 COORDENADAS
         lat=float(sf.get("latitud", 14.8)),
         lon=float(sf.get("longitud", -86.2)),
 
@@ -111,7 +118,10 @@ def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
         instalacion_electrica=None
     )
 
+    # 🔴 IMPORTANTE: pasar equipos al dominio
+    p.equipos = dict(eq)
 
+    return p
 # ==========================================================
 # MOSTRAR SIZING
 # ==========================================================
