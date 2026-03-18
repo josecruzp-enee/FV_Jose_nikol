@@ -68,14 +68,27 @@ class ResultadoClima:
 # ==========================================================
 # VALIDADOR
 # ==========================================================
-
 def validar_clima_8760(clima: ResultadoClima) -> None:
-    """
-    Verifica que el clima tenga 8760 registros horarios.
-    """
 
     if not clima.horas:
         raise ValueError("ResultadoClima no contiene horas")
+
+    if len(clima.horas) != 8760:
+        raise ValueError(
+            f"Se esperaban 8760 horas, pero hay {len(clima.horas)}"
+        )
+
+    # 🔴 VALIDACIÓN CRÍTICA
+    ghi_total = sum(h.ghi_wm2 for h in clima.horas)
+
+    if ghi_total <= 0:
+        raise ValueError("Clima inválido: GHI total = 0")
+
+    # opcional: validar DNI también
+    dni_total = sum(h.dni_wm2 for h in clima.horas)
+
+    if dni_total <= 0:
+        raise ValueError("Clima inválido: DNI total = 0")ValueError("ResultadoClima no contiene horas")
 
     if len(clima.horas) != 8760:
         raise ValueError(
