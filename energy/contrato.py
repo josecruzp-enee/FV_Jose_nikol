@@ -31,97 +31,84 @@ from typing import List, Dict, Any, Literal
 
 @dataclass(frozen=True)
 class EnergiaInput:
-    """
-    Entrada del motor energético FV.
-
-    Contiene todos los parámetros necesarios para ejecutar
-    cualquiera de los modelos energéticos disponibles.
-    """
 
     # ------------------------------------------------------
     # POTENCIA DEL SISTEMA
     # ------------------------------------------------------
 
-    # potencia DC total instalada (kW)
     pdc_instalada_kw: float
-
-    # potencia AC nominal del inversor (kW)
     pac_nominal_kw: float
 
-
     # ------------------------------------------------------
-    # MODO DE SIMULACIÓN
+    # MODO
     # ------------------------------------------------------
 
-    # "mensual" → modelo HSP
-    # "8760"    → simulación física horaria
     modo_simulacion: Literal["mensual", "8760"] = "8760"
 
-
     # ------------------------------------------------------
-    # RECURSO SOLAR (MODELO HSP)
+    # HSP
     # ------------------------------------------------------
 
-    # Peak Sun Hours mensual
-    # unidades: kWh/m²/día
     hsp_12m: List[float] | None = None
-
-    # días de cada mes
     dias_mes: List[int] | None = None
 
-
     # ------------------------------------------------------
-    # PARÁMETROS DE ORIENTACIÓN
+    # ORIENTACIÓN
     # ------------------------------------------------------
 
     tipo_superficie: str | None = None
-
     azimut_deg: float | None = None
-
     azimut_a_deg: float | None = None
-
     azimut_b_deg: float | None = None
-
     reparto_pct_a: float | None = None
-
     hemisferio: str | None = None
 
+    # 🔴 NUEVO (8760 REAL)
+    tilt_deg: float | None = None
 
     # ------------------------------------------------------
-    # PÉRDIDAS DEL SISTEMA
+    # CLIMA 8760
     # ------------------------------------------------------
 
-    # pérdidas DC (%)
+    clima: Any | None = None   # ResultadoClima
+
+    # ------------------------------------------------------
+    # ARREGLO FV (8760)
+    # ------------------------------------------------------
+
+    paneles_por_string: int | None = None
+    n_strings_total: int | None = None
+
+    pmax_stc_w: float | None = None
+    vmp_stc_v: float | None = None
+    voc_stc_v: float | None = None
+
+    coef_pmax_pct_per_c: float | None = None
+    coef_voc_pct_per_c: float | None = None
+    coef_vmp_pct_per_c: float | None = None
+
+    # ------------------------------------------------------
+    # PÉRDIDAS
+    # ------------------------------------------------------
+
     perdidas_dc_pct: float = 0.0
-
-    # pérdidas AC (%)
     perdidas_ac_pct: float = 0.0
-
-    # pérdidas por sombras (%)
     sombras_pct: float = 0.0
-
 
     # ------------------------------------------------------
     # INVERSOR
     # ------------------------------------------------------
 
-    # eficiencia del inversor
     eficiencia_inversor: float = 0.97
-
-    # permitir clipping DC/AC
     permitir_clipping: bool = True
 
-
     # ------------------------------------------------------
-    # PARÁMETROS PARA MODELOS FÍSICOS
+    # AMBIENTE
     # ------------------------------------------------------
 
     latitud: float | None = None
-
     longitud: float | None = None
-
     temp_ambiente_c: float = 25.0
-
 
 
 # ==========================================================
