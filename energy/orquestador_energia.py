@@ -356,7 +356,8 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
         # ==================================================
 
         if modo == "8760":
-
+            st.success("ENTRÓ A 8760")
+            st.write("Modo solicitado:", inp.modo_simulacion)
             resultado = _modelo_8760(inp)
 
             resultado.meta = {
