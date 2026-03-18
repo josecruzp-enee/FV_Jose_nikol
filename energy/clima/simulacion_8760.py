@@ -107,8 +107,8 @@ def simular_clima_8760(
         # ======================================================
 
         temp_celda = calcular_temperatura_celda(
-            irradiancia_wm2=poa,
-            temperatura_amb_c=hora.temp_amb_c
+            poa,
+            hora.temp_amb_c
         )
 
         # ======================================================
