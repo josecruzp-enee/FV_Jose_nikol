@@ -85,7 +85,7 @@ def calcular_potencia_arreglo(inp: PotenciaArregloInput) -> PotenciaArregloResul
 
         V_array = V_string
         I_array = I_string × N_strings
-        P_array = P_string × N_strings
+        P_array = V_array × I_array
     """
 
     # -----------------------------------------------------
@@ -110,10 +110,10 @@ def calcular_potencia_arreglo(inp: PotenciaArregloInput) -> PotenciaArregloResul
     isc_array = inp.isc_string_a * inp.n_strings_total
 
     # -----------------------------------------------------
-    # POTENCIA (consistente con modelo previo)
+    # POTENCIA CONSISTENTE
     # -----------------------------------------------------
 
-    potencia_array = inp.potencia_string_w * inp.n_strings_total
+    potencia_array = vdc_array * idc_array
 
     # -----------------------------------------------------
     # RESULTADO
@@ -122,9 +122,7 @@ def calcular_potencia_arreglo(inp: PotenciaArregloInput) -> PotenciaArregloResul
     return PotenciaArregloResultado(
         vdc_array_v=vdc_array,
         voc_array_v=voc_array,
-
         idc_array_a=idc_array,
         isc_array_a=isc_array,
-
         potencia_array_w=potencia_array,
     )
