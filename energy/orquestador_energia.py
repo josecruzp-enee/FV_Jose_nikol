@@ -132,43 +132,156 @@ def _modelo_hsp(inp: EnergiaInput):
 # MODELO 8760 (SIMPLIFICADO)
 # ==========================================================
 
-def _modelo_8760(inp: EnergiaInput):
+def _modelo_8760(inp: EnergiaInput) -> EnergiaResultado:
 
-    from energy.clima.simulador_8760 import simular_clima_8760
-    from energy.sistema.agregacion_8760 import agregar_8760
-    from energy.panel_energia.potencia_panel import calcular_potencia_dc
-    from energy.sistema.modelo_energetico_inversor import calcular_energia_inversor_horario
+    try:
 
-    # 1. clima horario real
-    clima_8760 = simular_clima_8760(
-        clima=inp.clima,
-        tilt=inp.tilt,
-        azimuth=inp.azimuth
-    )
+        # --------------------------------------------------
+        # VALIDACIONES
+        # --------------------------------------------------
 
-    energia_horaria = []
-    clipping_horaria = []
+        pdc = inp.pdc_instalada_kw
+        pac = inp.pac_nominal_kw
 
-    # 2. loop real
-    for h in clima_8760.horas:
+        if pdc <= 0 or pac <= 0:
+            raise ValueError("Potencias inválidas")
 
-        p_dc = calcular_potencia_dc(
-            poa_wm2=h.poa_wm2,
-            temp_celda_c=h.temp_celda_c,
-            pdc_kw=inp.pdc_instalada_kw
+        if inp.clima is None:
+            raise ValueError("No se proporcionó clima para simulación 8760")
+
+        # --------------------------------------------------
+        # IMPORTS (tus módulos reales)
+        # --------------------------------------------------
+
+        from energy.clima.simulador_8760 import simular_clima_8760
+        from energy.sistema.agregacion_8760 import agregar_8760
+        from energy.panel_energia.array_8760 import (
+            calcular_array_8760,
+            Array8760Input
+        )
+        from energy.sistema.modelo_energetico_inversor import (
+            calcular_energia_inversor_horario
         )
 
-        p_ac, clipping = calcular_energia_inversor_horario(
-            p_dc_kw=p_dc,
-            pac_kw=inp.pac_nominal_kw,
-            eficiencia=inp.eficiencia_inversor
+        # --------------------------------------------------
+        # 1. CLIMA 8760
+        # --------------------------------------------------
+
+        clima_8760 = simular_clima_8760(
+            clima=inp.clima,
+            tilt=inp.tilt_deg,
+            azimuth=inp.azimut_deg
         )
 
-        energia_horaria.append(p_ac)
-        clipping_horaria.append(clipping)
+        # --------------------------------------------------
+        # 2. ARRAY DC (REAL)
+        # --------------------------------------------------
 
-    # 3. agregación
-    return agregar_8760(energia_horaria, clipping_horaria)
+        array = calcular_array_8760(
+
+            Array8760Input(
+                estado_solar=clima_8760.horas,
+
+                paneles_por_string=inp.paneles_por_string,
+                strings_totales=inp.n_strings_total,
+
+                pmax_stc_w=inp.pmax_stc_w,
+                vmp_stc_v=inp.vmp_stc_v,
+                voc_stc_v=inp.voc_stc_v,
+
+                coef_pmax_pct_per_c=inp.coef_pmax_pct_per_c,
+                coef_voc_pct_per_c=inp.coef_voc_pct_per_c,
+                coef_vmp_pct_per_c=inp.coef_vmp_pct_per_c,
+            )
+        )
+
+        potencia_dc = array.potencia_dc_kw
+
+        energia_horaria = []
+        clipping_horaria = []
+
+        # --------------------------------------------------
+        # 3. INVERSOR (HORARIO)
+        # --------------------------------------------------
+
+        for p_dc in potencia_dc:
+
+            p_ac, clipping = calcular_energia_inversor_horario(
+                p_dc_kw=p_dc,
+                pac_kw=pac,
+                eficiencia=inp.eficiencia_inversor
+            )
+
+            energia_horaria.append(p_ac)
+            clipping_horaria.append(clipping)
+
+        # --------------------------------------------------
+        # 4. AGREGACIÓN
+        # --------------------------------------------------
+
+        agg = agregar_8760(
+            energia_horaria=energia_horaria,
+            clipping_horaria=clipping_horaria
+        )
+
+        energia_12m = agg["energia_12m"]
+        clipping_12m = agg["clipping_12m"]
+        energia_anual = agg["energia_anual"]
+        clipping_anual = agg["clipping_anual"]
+
+        # --------------------------------------------------
+        # 5. PÉRDIDAS
+        # --------------------------------------------------
+
+        perdidas_pct = (
+            inp.perdidas_dc_pct +
+            inp.perdidas_ac_pct +
+            inp.sombras_pct
+        ) / 100.0
+
+        energia_util_12m = [e * (1 - perdidas_pct) for e in energia_12m]
+        energia_util_anual = energia_anual * (1 - perdidas_pct)
+
+        energia_perdidas_12m = [
+            e - u for e, u in zip(energia_12m, energia_util_12m)
+        ]
+        energia_perdidas_anual = energia_anual - energia_util_anual
+
+        # --------------------------------------------------
+        # RESULTADO FINAL
+        # --------------------------------------------------
+
+        return EnergiaResultado(
+
+            ok=True,
+            errores=[],
+
+            pdc_instalada_kw=pdc,
+            pac_nominal_kw=pac,
+
+            dc_ac_ratio=pdc / pac,
+
+            energia_bruta_12m=energia_12m,
+            energia_perdidas_12m=energia_perdidas_12m,
+            energia_despues_perdidas_12m=energia_util_12m,
+            energia_clipping_12m=clipping_12m,
+            energia_util_12m=energia_util_12m,
+
+            energia_bruta_anual=energia_anual,
+            energia_perdidas_anual=energia_perdidas_anual,
+            energia_despues_perdidas_anual=energia_util_anual,
+            energia_clipping_anual=clipping_anual,
+            energia_util_anual=energia_util_anual,
+
+            meta={
+                "motor": "8760",
+                "horas": 8760
+            }
+        )
+
+    except Exception as e:
+
+        return _resultado_error(inp, [str(e)])
 
 
 # ==========================================================
