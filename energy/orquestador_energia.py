@@ -44,7 +44,7 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
         return _resultado_error(inp, errores)
 
     if inp.clima is None:
-        return _resultado_error(inp, ["Se requiere clima para simulación 8760"])
+        return _resultado_error(inp, ["Se requiere clima para 8760"])
 
     if inp.tilt_deg is None:
         return _resultado_error(inp, ["Se requiere tilt_deg"])
@@ -54,7 +54,7 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
         st.success("Ejecutando modelo 8760")
 
         # ======================================================
-        # 1. SOLAR (POA + TEMP)
+        # 1. CLIMA + SOLAR
         # ======================================================
 
         from energy.clima.simulacion_8760 import simular_clima_8760
@@ -69,33 +69,45 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
 
 
         # ======================================================
-        # 2. ARRAY DC
+        # 2. DC (USANDO panel_energia)
         # ======================================================
 
-        from energy.sistema.modelo_array_8760 import (
-            calcular_array_8760,
-            Array8760Input,
+        from energy.panel_energia.potencia_panel import (
+            calcular_potencia_panel,
+            PotenciaPanelInput,
         )
 
-        array = calcular_array_8760(
-            Array8760Input(
-                estado_solar=estado,
-                paneles_por_string=inp.paneles_por_string,
-                strings_totales=inp.n_strings_total,
-                pmax_stc_w=inp.pmax_stc_w,
-                vmp_stc_v=inp.vmp_stc_v,
-                voc_stc_v=inp.voc_stc_v,
-                coef_pmax_pct_per_c=inp.coef_pmax_pct_per_c,
-                coef_voc_pct_per_c=inp.coef_voc_pct_per_c,
-                coef_vmp_pct_per_c=inp.coef_vmp_pct_per_c,
+        potencia_dc = []
+
+        for hora in estado:
+
+            if hora.poa_wm2 <= 0:
+                potencia_dc.append(0.0)
+                continue
+
+            panel = calcular_potencia_panel(
+                PotenciaPanelInput(
+                    irradiancia_poa_wm2=hora.poa_wm2,
+                    temperatura_celda_c=hora.temp_celda_c,
+
+                    pmax_stc_w=inp.pmax_stc_w,
+                    vmp_stc_v=inp.vmp_stc_v,
+                    voc_stc_v=inp.voc_stc_v,
+
+                    coef_pmax_pct_per_c=inp.coef_pmax_pct_per_c,
+                    coef_voc_pct_per_c=inp.coef_voc_pct_per_c,
+                    coef_vmp_pct_per_c=inp.coef_vmp_pct_per_c,
+                )
             )
-        )
 
-        potencia_dc = array.potencia_dc_kw
+            potencia_string_w = panel.pmp_w * inp.paneles_por_string
+            potencia_array_w = potencia_string_w * inp.n_strings_total
+
+            potencia_dc.append(max(0.0, potencia_array_w / 1000.0))
 
 
         # ======================================================
-        # 3. PÉRDIDAS FÍSICAS (DC)
+        # 3. PÉRDIDAS DC
         # ======================================================
 
         from energy.sistema.perdidas_fisicas import (
@@ -103,7 +115,7 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
             PerdidasInput,
         )
 
-        r_perdidas_dc = aplicar_perdidas_fisicas(
+        r_dc = aplicar_perdidas_fisicas(
             PerdidasInput(
                 potencia_kw=potencia_dc,
                 perdidas_dc_pct=inp.perdidas_dc_pct,
@@ -111,28 +123,25 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
             )
         )
 
-        potencia_dc_corr = r_perdidas_dc.potencia_kw
+        potencia_dc_corr = r_dc.potencia_kw
 
 
         # ======================================================
-        # 4. INVERSOR (DC → AC + CLIPPING)
+        # 4. INVERSOR (CLIPPING REAL)
         # ======================================================
 
         from energy.sistema.modelo_energetico_inversor import (
             calcular_inversor_8760,
-            Inversor8760Input,
         )
 
         inv = calcular_inversor_8760(
-            Inversor8760Input(
-                potencia_dc_kw=potencia_dc_corr,
-                p_ac_nominal_kw=inp.pac_nominal_kw,
-                eficiencia_nominal=inp.eficiencia_inversor,
-            )
+            potencia_dc_kw_8760=potencia_dc_corr,
+            p_ac_nominal_kw=inp.pac_nominal_kw,
+            eficiencia_nominal=inp.eficiencia_inversor,
         )
 
-        potencia_ac = inv.potencia_ac_kw
-        clipping_kw = inv.clipping_kw
+        potencia_ac = inv["potencia_ac_kw_8760"]
+        clipping_kw = inv["clipping_kw_8760"]
 
 
         # ======================================================
@@ -181,12 +190,13 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
         return EnergiaResultado(
             ok=True,
             errores=[],
+
             pdc_instalada_kw=inp.pdc_instalada_kw,
             pac_nominal_kw=inp.pac_nominal_kw,
             dc_ac_ratio=inp.pdc_instalada_kw / inp.pac_nominal_kw,
 
             energia_bruta_12m=energia_mensual,
-            energia_perdidas_12m=[0.0] * 12,
+            energia_perdidas_12m=[0.0]*12,
             energia_despues_perdidas_12m=energia_mensual,
             energia_clipping_12m=energia_clipping_12m,
             energia_util_12m=energia_mensual,
@@ -200,7 +210,7 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
             meta={
                 "motor": "8760",
                 "horas": 8760,
-                "factor_perdidas_dc": r_perdidas_dc.factor_total,
+                "factor_perdidas_dc": r_dc.factor_total,
                 "factor_perdidas_ac": r_ac.factor_ac,
             }
         )
