@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 MODELO DE POTENCIA DEL PANEL FV — FV Engine
 
@@ -10,9 +12,11 @@ en condiciones reales de operación.
 
 Este módulo ajusta:
 
-• potencia máxima del módulo
+• potencia del módulo (Pmp)
 • voltaje en punto de máxima potencia (Vmp)
 • voltaje en circuito abierto (Voc)
+• corriente en MPP (Imp)
+• corriente de cortocircuito (Isc)
 
 en función de:
 
@@ -22,50 +26,13 @@ en función de:
 
 Modelo utilizado
 ----------------
-Modelo simplificado basado en coeficientes térmicos.
+Modelo físico simplificado basado en:
+
+    - irradiancia relativa (G/1000)
+    - coeficientes térmicos lineales
+
+Este modelo es consistente con simuladores tipo PVsyst (nivel básico).
 """
-"""
-RELACIÓN DEL MÓDULO EN EL MOTOR FV — FV Engine
-
-Este módulo calcula el comportamiento eléctrico de un módulo
-fotovoltaico bajo condiciones reales de operación.
-
-Recibe información de:
-
-    modelo_termico.py
-        → temperatura de celda del módulo
-
-    modelo_clima / irradiancia_poa
-        → irradiancia incidente en el plano del generador (POA)
-
-    catálogo de paneles
-        → parámetros eléctricos del módulo en STC
-           (Pmax, Vmp, Voc y coeficientes térmicos)
-
-Entrega resultados a:
-
-    potencia_string.py
-        → cálculo del comportamiento eléctrico del string FV
-           (paneles conectados en serie)
-
-Rol en el flujo energético del sistema:
-
-    clima / irradiancia
-            ↓
-    modelo_termico
-            ↓
-    potencia_panel
-            ↓
-    potencia_string
-            ↓
-    potencia_arreglo
-            ↓
-    producción energética del sistema FV
-
-Este módulo representa el nivel físico más bajo del modelo
-energético del generador fotovoltaico.
-"""
-
 
 from dataclasses import dataclass
 
@@ -74,33 +41,53 @@ from dataclasses import dataclass
 # MODELOS DE DATOS
 # ==========================================================
 
-@dataclass
+@dataclass(frozen=True)
 class PotenciaPanelInput:
     """
-    Parámetros de entrada del modelo del panel
+    Parámetros de entrada del modelo del panel FV.
     """
+
+    # ------------------------------------------------------
+    # CONDICIONES OPERATIVAS
+    # ------------------------------------------------------
 
     irradiancia_poa_wm2: float
     temperatura_celda_c: float
 
-    pmax_stc_w: float
-    vmp_stc_v: float
-    voc_stc_v: float
+    # ------------------------------------------------------
+    # PARÁMETROS DEL PANEL (referencia nominal)
+    # ------------------------------------------------------
 
-    coef_pmax_pct_per_c: float
-    coef_voc_pct_per_c: float
-    coef_vmp_pct_per_c: float
+    p_panel_w: float
+
+    vmp_panel_v: float
+    voc_panel_v: float
+
+    imp_panel_a: float
+    isc_panel_a: float
+
+    # ------------------------------------------------------
+    # COEFICIENTES TÉRMICOS (1/°C)
+    # ------------------------------------------------------
+
+    coef_potencia: float
+    coef_vmp: float
+    coef_voc: float
 
 
-@dataclass
+@dataclass(frozen=True)
 class PotenciaPanelResultado:
     """
-    Resultado del comportamiento del panel
+    Resultado del comportamiento eléctrico del panel FV.
     """
 
     pmp_w: float
+
     vmp_v: float
     voc_v: float
+
+    imp_a: float
+    isc_a: float
 
 
 # ==========================================================
@@ -109,63 +96,85 @@ class PotenciaPanelResultado:
 
 def calcular_potencia_panel(inp: PotenciaPanelInput) -> PotenciaPanelResultado:
     """
-    Calcula potencia y voltajes del panel bajo condiciones
-    reales de irradiancia y temperatura.
+    Calcula el comportamiento eléctrico del panel FV bajo
+    condiciones reales de irradiancia y temperatura.
+
+    Modelo:
+        - Escalamiento por irradiancia
+        - Corrección térmica lineal
     """
 
     poa = inp.irradiancia_poa_wm2
     t_cell = inp.temperatura_celda_c
 
     # ------------------------------------------------------
-    # Sin irradiancia no hay generación
+    # SIN IRRADIANCIA → NO GENERACIÓN
     # ------------------------------------------------------
 
     if poa <= 0:
         return PotenciaPanelResultado(
             pmp_w=0.0,
             vmp_v=0.0,
-            voc_v=0.0
+            voc_v=0.0,
+            imp_a=0.0,
+            isc_a=0.0,
         )
 
     # ------------------------------------------------------
-    # irradiancia relativa respecto a STC
+    # IRRADIANCIA RELATIVA (respecto a 1000 W/m²)
     # ------------------------------------------------------
 
-    g_rel = poa / 1000
-
-    # diferencia de temperatura respecto a STC
-    delta_t = t_cell - 25
+    g_rel = poa / 1000.0
 
     # ------------------------------------------------------
-    # ajuste de potencia
+    # DELTA TÉRMICO (respecto a 25°C)
+    # ------------------------------------------------------
+
+    delta_t = t_cell - 25.0
+
+    # ------------------------------------------------------
+    # POTENCIA (Pmp)
     # ------------------------------------------------------
 
     pmp = (
-        inp.pmax_stc_w
+        inp.p_panel_w
         * g_rel
-        * (1 + inp.coef_pmax_pct_per_c * delta_t)
+        * (1 + inp.coef_potencia * delta_t)
     )
 
     # ------------------------------------------------------
-    # ajuste de voltaje MPP
+    # VOLTAJE MPP
     # ------------------------------------------------------
 
     vmp = (
-        inp.vmp_stc_v
-        * (1 + inp.coef_vmp_pct_per_c * delta_t)
+        inp.vmp_panel_v
+        * (1 + inp.coef_vmp * delta_t)
     )
 
     # ------------------------------------------------------
-    # ajuste de Voc
+    # VOLTAJE VOC
     # ------------------------------------------------------
 
     voc = (
-        inp.voc_stc_v
-        * (1 + inp.coef_voc_pct_per_c * delta_t)
+        inp.voc_panel_v
+        * (1 + inp.coef_voc * delta_t)
     )
+
+    # ------------------------------------------------------
+    # CORRIENTE (aprox proporcional a irradiancia)
+    # ------------------------------------------------------
+
+    imp = inp.imp_panel_a * g_rel
+    isc = inp.isc_panel_a * g_rel
+
+    # ------------------------------------------------------
+    # RESULTADO
+    # ------------------------------------------------------
 
     return PotenciaPanelResultado(
         pmp_w=pmp,
         vmp_v=vmp,
-        voc_v=voc
+        voc_v=voc,
+        imp_a=imp,
+        isc_a=isc,
     )
