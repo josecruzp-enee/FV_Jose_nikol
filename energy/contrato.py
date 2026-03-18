@@ -42,7 +42,7 @@ from dataclasses import dataclass, field
 from typing import List, Dict, Optional
 
 # 👉 Fuente única del generador FV
-from electrical.paneles.contrato import ResultadoPaneles
+from electrical.paneles.resultado_paneles import ResultadoPaneles
 
 
 # ==========================================================
