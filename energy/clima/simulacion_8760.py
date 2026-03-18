@@ -141,7 +141,10 @@ def simular_clima_8760(
     # ======================================================
     # RESULTADO FINAL
     # ======================================================
-
+    print("DEBUG CLIMA:")
+    print("Horas:", len(inp.clima.horas))
+    print("DNI total:", sum(h.dni for h in inp.clima.horas))
+    print("Ejemplo:", inp.clima.horas[0])
     return ResultadoClima8760(
         horas=horas,
         poa_total_kwh_m2=poa_total_kwh_m2
