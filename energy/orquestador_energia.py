@@ -12,6 +12,8 @@ from .sistema.modelo_energetico_inversor import (
     EnergiaInversorInput
 )
 
+import streamlit as st
+
 
 # ==========================================================
 # RESULTADO ERROR
@@ -22,24 +24,19 @@ def _resultado_error(inp: EnergiaInput, errores: list[str]) -> EnergiaResultado:
     return EnergiaResultado(
         ok=False,
         errores=errores,
-
         pdc_instalada_kw=inp.pdc_instalada_kw,
         pac_nominal_kw=inp.pac_nominal_kw,
-
         dc_ac_ratio=0.0,
-
         energia_bruta_12m=[],
         energia_perdidas_12m=[],
         energia_despues_perdidas_12m=[],
         energia_clipping_12m=[],
         energia_util_12m=[],
-
         energia_bruta_anual=0.0,
         energia_perdidas_anual=0.0,
         energia_despues_perdidas_anual=0.0,
         energia_clipping_anual=0.0,
         energia_util_anual=0.0,
-
         meta={"estado": "error"},
     )
 
@@ -130,81 +127,81 @@ def _modelo_hsp(inp: EnergiaInput):
 # ==========================================================
 # ORQUESTADOR PRINCIPAL
 # ==========================================================
+
 def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
 
-import streamlit as st
+    errores = inp.validar()
+    if errores:
+        raise ValueError(f"Errores en EnergiaInput: {errores}")
 
-errores = inp.validar()
-if errores:
-    raise ValueError(f"Errores en EnergiaInput: {errores}")
+    modo = str(inp.modo_simulacion).strip().lower()
 
-modo = str(inp.modo_simulacion).strip().lower()
-
-if modo not in ("mensual", "8760"):
-    raise ValueError(f"Modo inválido: {modo}")
-
-if modo == "8760":
-    if inp.clima is None:
-        raise ValueError("8760 requiere clima")
-    if inp.tilt_deg is None:
-        raise ValueError("8760 requiere tilt_deg")
-
-st.warning("DEBUG MOTOR ENERGÍA")
-st.write("Modo:", modo)
-st.write("PDC:", inp.pdc_instalada_kw)
-st.write("PAC:", inp.pac_nominal_kw)
-
-try:
-
-    if modo == "mensual":
-
-        st.info("Ejecutando modelo HSP")
-
-        data, errores = _modelo_hsp(inp)
-
-        if errores:
-            raise ValueError(f"Error modelo HSP: {errores}")
-
-        (
-            energia_bruta,
-            energia_perdidas,
-            energia_despues_perdidas,
-            energia_util,
-            energia_clipping,
-            factor_orientacion,
-        ) = data
-
-        return EnergiaResultado(
-            ok=True,
-            errores=[],
-            pdc_instalada_kw=inp.pdc_instalada_kw,
-            pac_nominal_kw=inp.pac_nominal_kw,
-            dc_ac_ratio=inp.pdc_instalada_kw / inp.pac_nominal_kw,
-            energia_bruta_12m=energia_bruta,
-            energia_perdidas_12m=energia_perdidas,
-            energia_despues_perdidas_12m=energia_despues_perdidas,
-            energia_clipping_12m=energia_clipping,
-            energia_util_12m=energia_util,
-            energia_bruta_anual=sum(energia_bruta),
-            energia_perdidas_anual=sum(energia_perdidas),
-            energia_despues_perdidas_anual=sum(energia_despues_perdidas),
-            energia_clipping_anual=sum(energia_clipping),
-            energia_util_anual=sum(energia_util),
-            meta={"motor": "mensual", "meses": 12}
-        )
+    if modo not in ("mensual", "8760"):
+        raise ValueError(f"Modo inválido: {modo}")
 
     if modo == "8760":
+        if inp.clima is None:
+            raise ValueError("8760 requiere clima")
+        if inp.tilt_deg is None:
+            raise ValueError("8760 requiere tilt_deg")
 
-        st.success("Ejecutando modelo 8760")
+    # DEBUG CLARO
+    st.warning("DEBUG MOTOR ENERGÍA")
+    st.write("Modo:", modo)
+    st.write("PDC:", inp.pdc_instalada_kw)
+    st.write("PAC:", inp.pac_nominal_kw)
 
-        from .modelo_8760 import _modelo_8760
+    try:
 
-        return _modelo_8760(inp)
+        if modo == "mensual":
 
-    raise RuntimeError("Estado inválido en motor de energía")
+            st.info("Ejecutando modelo HSP")
 
-except Exception as e:
+            data, errores = _modelo_hsp(inp)
 
-    st.error("Error en motor energía")
-    st.write(str(e))
-    raise
+            if errores:
+                raise ValueError(f"Error modelo HSP: {errores}")
+
+            (
+                energia_bruta,
+                energia_perdidas,
+                energia_despues_perdidas,
+                energia_util,
+                energia_clipping,
+                factor_orientacion,
+            ) = data
+
+            return EnergiaResultado(
+                ok=True,
+                errores=[],
+                pdc_instalada_kw=inp.pdc_instalada_kw,
+                pac_nominal_kw=inp.pac_nominal_kw,
+                dc_ac_ratio=inp.pdc_instalada_kw / inp.pac_nominal_kw,
+                energia_bruta_12m=energia_bruta,
+                energia_perdidas_12m=energia_perdidas,
+                energia_despues_perdidas_12m=energia_despues_perdidas,
+                energia_clipping_12m=energia_clipping,
+                energia_util_12m=energia_util,
+                energia_bruta_anual=sum(energia_bruta),
+                energia_perdidas_anual=sum(energia_perdidas),
+                energia_despues_perdidas_anual=sum(energia_despues_perdidas),
+                energia_clipping_anual=sum(energia_clipping),
+                energia_util_anual=sum(energia_util),
+                meta={"motor": "mensual", "meses": 12}
+            )
+
+        if modo == "8760":
+
+            st.success("Ejecutando modelo 8760")
+
+            from .modelo_8760 import _modelo_8760
+
+            return _modelo_8760(inp)
+
+        raise RuntimeError("Estado inválido en motor de energía")
+
+    except Exception as e:
+
+        st.error("Error en motor energía")
+        st.write(str(e))
+        raise
