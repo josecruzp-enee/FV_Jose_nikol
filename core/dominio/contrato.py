@@ -236,3 +236,16 @@ class Datosproyecto:
     # ------------------------------------------------------
 
     instalacion_electrica: dict | None = None
+
+@dataclass(frozen=True)
+class ResultadoProyecto:
+
+    sizing: ResultadoSizing
+    strings: ResultadoStrings
+    energia: EnergiaResultado
+    nec: ResultadoNEC
+    financiero: ResultadoFinanciero
+
+    ok: bool = True
+    errores: List[str] = field(default_factory=list)
+    meta: Dict[str, Any] = field(default_factory=dict)
