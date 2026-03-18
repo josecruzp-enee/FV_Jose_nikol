@@ -16,8 +16,8 @@ from .resultado_clima import ResultadoClima, ClimaHora
 class EntradaClimaPVGIS:
     lat: float
     lon: float
-    startyear: int = 2020
-    endyear: int = 2020
+    startyear: int = 2019   # ✔ año no bisiesto
+    endyear: int = 2019
 
 
 # ==========================================================
@@ -25,6 +25,33 @@ class EntradaClimaPVGIS:
 # ==========================================================
 
 PVGIS_URL = "https://re.jrc.ec.europa.eu/api/seriescalc"
+
+
+# ==========================================================
+# MAPEO ROBUSTO
+# ==========================================================
+
+def _mapear_radiacion(h: dict) -> tuple[float, float, float]:
+
+    # --- GHI ---
+    ghi = h.get("G(h)")
+    if ghi is None:
+        ghi = h.get("G(i)", 0.0)
+
+    # --- DNI ---
+    dni = h.get("Gb(n)", 0.0)
+
+    # --- DHI ---
+    dhi = h.get("Gd(h)", 0.0)
+
+    # --- fallback mínimo ---
+    if ghi == 0 and dni > 0:
+        ghi = dni * 0.7
+
+    if dhi == 0 and ghi > 0:
+        dhi = ghi * 0.2
+
+    return float(ghi), float(dni), float(dhi)
 
 
 # ==========================================================
@@ -50,7 +77,7 @@ def descargar_clima_pvgis(
         raise ValueError(f"Longitud inválida: {entrada.lon}")
 
     # ------------------------------------------------------
-    # PARAMS CORRECTOS (SIN ERRORES 400)
+    # PARAMS
     # ------------------------------------------------------
 
     params = {
@@ -61,8 +88,8 @@ def descargar_clima_pvgis(
         "endyear": entrada.endyear,
         "usehorizon": 1,
         "pvcalculation": 0,
-        "angle": 0, 
-        "aspect": 0,  
+        "angle": 0,
+        "aspect": 0,
     }
 
     st.write("📡 Enviando request a PVGIS...")
@@ -117,9 +144,8 @@ def descargar_clima_pvgis(
         except Exception:
             raise RuntimeError(f"Error parseando timestamp: {h.get('time')}")
 
-        ghi = float(h.get("G(h)", 0.0))
-        dni = float(h.get("Gb(n)", 0.0))
-        dhi = float(h.get("Gd(h)", 0.0))
+        # 🔥 CORRECCIÓN CLAVE
+        ghi, dni, dhi = _mapear_radiacion(h)
 
         if ghi < 0 or dni < 0 or dhi < 0:
             raise RuntimeError("Irradiancia negativa detectada")
