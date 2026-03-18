@@ -2,15 +2,7 @@ from __future__ import annotations
 
 from .contrato import EnergiaInput, EnergiaResultado
 
-from .sistema.orientacion import factor_orientacion_total
-from .sistema.generacion_bruta import calcular_energia_bruta_dc
-from .sistema.perdidas_fisicas import aplicar_perdidas
-from .sistema.perdidas_ac import aplicar_perdidas_ac
-from .sistema.agregacion_8760 import agregar_energia_por_mes
-from .sistema.modelo_energetico_inversor import (
-    calcular_energia_inversor,
-    EnergiaInversorInput
-)
+from energy.sistema.agregacion_8760 import agregar_energia_por_mes
 
 import streamlit as st
 
@@ -42,241 +34,180 @@ def _resultado_error(inp: EnergiaInput, errores: list[str]) -> EnergiaResultado:
 
 
 # ==========================================================
-# MODELO HSP
-# ==========================================================
-
-def _modelo_hsp(inp: EnergiaInput):
-
-    factor_orientacion = factor_orientacion_total(
-        tipo_superficie=inp.tipo_superficie,
-        azimut_deg=inp.azimut_deg,
-        azimut_a_deg=inp.azimut_a_deg,
-        azimut_b_deg=inp.azimut_b_deg,
-        reparto_pct_a=inp.reparto_pct_a,
-        hemisferio=inp.hemisferio,
-    )
-
-    r_bruta = calcular_energia_bruta_dc(
-        pdc_kw=inp.pdc_instalada_kw,
-        hsp_12m=inp.hsp_12m,
-        dias_mes=inp.dias_mes,
-        factor_orientacion=factor_orientacion,
-    )
-
-    if not r_bruta.ok:
-        return None, r_bruta.errores
-
-    energia_bruta = r_bruta.energia_mensual_dc_kwh
-
-    r_perdidas = aplicar_perdidas(
-        energia_dc_12m=energia_bruta,
-        perdidas_dc_pct=inp.perdidas_dc_pct,
-        perdidas_ac_pct=0.0,
-        sombras_pct=inp.sombras_pct,
-    )
-
-    if not r_perdidas.ok:
-        return None, r_perdidas.errores
-
-    energia_despues_perdidas_dc = r_perdidas.energia_neta_12m_kwh
-
-    energia_perdidas = [
-        b - d for b, d in zip(energia_bruta, energia_despues_perdidas_dc)
-    ]
-
-    inv_input = EnergiaInversorInput(
-        energia_dc_12m_kwh=energia_despues_perdidas_dc,
-        kw_ac=inp.pac_nominal_kw,
-        pdc_kw=inp.pdc_instalada_kw,
-        eficiencia_nominal=inp.eficiencia_inversor,
-    )
-
-    r_inv = calcular_energia_inversor(inv_input)
-
-    energia_ac_pre = r_inv.energia_ac_12m_kwh
-    energia_clipping = r_inv.energia_clipping_12m_kwh
-
-    r_ac = aplicar_perdidas_ac(
-        energia_ac_12m=energia_ac_pre,
-        perdidas_ac_pct=inp.perdidas_ac_pct,
-    )
-
-    if not r_ac.ok:
-        return None, r_ac.errores
-
-    energia_util = r_ac.energia_final_12m_kwh
-
-    energia_perdidas_ac = [
-        a - b for a, b in zip(energia_ac_pre, energia_util)
-    ]
-
-    energia_perdidas = [
-        dc + ac for dc, ac in zip(energia_perdidas, energia_perdidas_ac)
-    ]
-
-    return (
-        energia_bruta,
-        energia_perdidas,
-        energia_despues_perdidas_dc,
-        energia_util,
-        energia_clipping,
-        factor_orientacion,
-    ), []
-
-
-# ==========================================================
-# ORQUESTADOR PRINCIPAL
+# ORQUESTADOR PRINCIPAL (SOLO 8760)
 # ==========================================================
 
 def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
 
     errores = inp.validar()
     if errores:
-        raise ValueError(f"Errores en EnergiaInput: {errores}")
+        return _resultado_error(inp, errores)
 
-    modo = str(inp.modo_simulacion).strip().lower()
+    if inp.clima is None:
+        return _resultado_error(inp, ["Se requiere clima para simulación 8760"])
 
-    if modo not in ("mensual", "8760"):
-        raise ValueError(f"Modo inválido: {modo}")
-
-    if modo == "8760":
-        if inp.clima is None:
-            raise ValueError("8760 requiere clima")
-        if inp.tilt_deg is None:
-            raise ValueError("8760 requiere tilt_deg")
-
-    # DEBUG
-    st.warning("DEBUG MOTOR ENERGÍA")
-    st.write("Modo:", modo)
-    st.write("PDC:", inp.pdc_instalada_kw)
-    st.write("PAC:", inp.pac_nominal_kw)
+    if inp.tilt_deg is None:
+        return _resultado_error(inp, ["Se requiere tilt_deg"])
 
     try:
 
-        # ======================================================
-        # MODELO MENSUAL
-        # ======================================================
-
-        if modo == "mensual":
-
-            st.info("Ejecutando modelo HSP")
-
-            data, errores = _modelo_hsp(inp)
-
-            if errores:
-                raise ValueError(f"Error modelo HSP: {errores}")
-
-            (
-                energia_bruta,
-                energia_perdidas,
-                energia_despues_perdidas,
-                energia_util,
-                energia_clipping,
-                factor_orientacion,
-            ) = data
-
-            return EnergiaResultado(
-                ok=True,
-                errores=[],
-                pdc_instalada_kw=inp.pdc_instalada_kw,
-                pac_nominal_kw=inp.pac_nominal_kw,
-                dc_ac_ratio=inp.pdc_instalada_kw / inp.pac_nominal_kw,
-                energia_bruta_12m=energia_bruta,
-                energia_perdidas_12m=energia_perdidas,
-                energia_despues_perdidas_12m=energia_despues_perdidas,
-                energia_clipping_12m=energia_clipping,
-                energia_util_12m=energia_util,
-                energia_bruta_anual=sum(energia_bruta),
-                energia_perdidas_anual=sum(energia_perdidas),
-                energia_despues_perdidas_anual=sum(energia_despues_perdidas),
-                energia_clipping_anual=sum(energia_clipping),
-                energia_util_anual=sum(energia_util),
-                meta={"motor": "mensual", "meses": 12}
-            )
+        st.success("Ejecutando modelo 8760")
 
         # ======================================================
-        # MODELO 8760 (TU PIPELINE REAL)
+        # 1. SOLAR (POA + TEMP)
         # ======================================================
 
-        if modo == "8760":
+        from energy.clima.simulacion_8760 import simular_clima_8760
 
-            st.success("Ejecutando modelo 8760")
+        resultado_solar = simular_clima_8760(
+            clima=inp.clima,
+            tilt=inp.tilt_deg,
+            azimuth=180
+        )
 
-            # 1. SOLAR
-            from energy.clima.simulacion_8760 import simular_clima_8760
+        estado = resultado_solar.horas
 
-            resultado_solar = simular_clima_8760(
-                clima=inp.clima,
-                tilt=inp.tilt_deg,
-                azimuth=180
+
+        # ======================================================
+        # 2. ARRAY DC
+        # ======================================================
+
+        from energy.sistema.modelo_array_8760 import (
+            calcular_array_8760,
+            Array8760Input,
+        )
+
+        array = calcular_array_8760(
+            Array8760Input(
+                estado_solar=estado,
+                paneles_por_string=inp.paneles_por_string,
+                strings_totales=inp.n_strings_total,
+                pmax_stc_w=inp.pmax_stc_w,
+                vmp_stc_v=inp.vmp_stc_v,
+                voc_stc_v=inp.voc_stc_v,
+                coef_pmax_pct_per_c=inp.coef_pmax_pct_per_c,
+                coef_voc_pct_per_c=inp.coef_voc_pct_per_c,
+                coef_vmp_pct_per_c=inp.coef_vmp_pct_per_c,
             )
+        )
 
-            estado = resultado_solar.horas
+        potencia_dc = array.potencia_dc_kw
 
-            # 2. ARRAY DC
-            from energy.sistema.modelo_array_8760 import (
-                calcular_array_8760,
-                Array8760Input,
+
+        # ======================================================
+        # 3. PÉRDIDAS FÍSICAS (DC)
+        # ======================================================
+
+        from energy.sistema.perdidas_fisicas import (
+            aplicar_perdidas_fisicas,
+            PerdidasInput,
+        )
+
+        r_perdidas_dc = aplicar_perdidas_fisicas(
+            PerdidasInput(
+                potencia_kw=potencia_dc,
+                perdidas_dc_pct=inp.perdidas_dc_pct,
+                sombras_pct=inp.sombras_pct,
             )
+        )
 
-            array = calcular_array_8760(
-                Array8760Input(
-                    estado_solar=estado,
-                    paneles_por_string=inp.paneles_por_string,
-                    strings_totales=inp.n_strings_total,
-                    pmax_stc_w=inp.pmax_stc_w,
-                    vmp_stc_v=inp.vmp_stc_v,
-                    voc_stc_v=inp.voc_stc_v,
-                    coef_pmax_pct_per_c=inp.coef_pmax_pct_per_c,
-                    coef_voc_pct_per_c=inp.coef_voc_pct_per_c,
-                    coef_vmp_pct_per_c=inp.coef_vmp_pct_per_c,
-                )
+        potencia_dc_corr = r_perdidas_dc.potencia_kw
+
+
+        # ======================================================
+        # 4. INVERSOR (DC → AC + CLIPPING)
+        # ======================================================
+
+        from energy.sistema.modelo_energetico_inversor import (
+            calcular_inversor_8760,
+            Inversor8760Input,
+        )
+
+        inv = calcular_inversor_8760(
+            Inversor8760Input(
+                potencia_dc_kw=potencia_dc_corr,
+                p_ac_nominal_kw=inp.pac_nominal_kw,
+                eficiencia_nominal=inp.eficiencia_inversor,
             )
+        )
 
-            potencia_dc = array.potencia_dc_kw
+        potencia_ac = inv.potencia_ac_kw
+        clipping_kw = inv.clipping_kw
 
-            # 3. INVERSOR (MVP)
-            potencia_ac = []
 
-            for p in potencia_dc:
-                p_ac = p * inp.eficiencia_inversor
-                p_ac *= (1 - inp.perdidas_ac_pct)
-                potencia_ac.append(p_ac)
+        # ======================================================
+        # 5. PÉRDIDAS AC
+        # ======================================================
 
-            # 4. NORMALIZAR
-            if len(potencia_ac) == 8784:
-                potencia_ac = potencia_ac[:8760]
+        from energy.sistema.perdidas_ac import (
+            aplicar_perdidas_ac,
+            PerdidasACInput,
+        )
 
-            # 5. ENERGÍA
-            
-
-            energia_mensual = agregar_energia_por_mes(potencia_ac)
-            energia_anual = sum(potencia_ac)
-
-            # 6. SALIDA
-            return EnergiaResultado(
-                ok=True,
-                errores=[],
-                pdc_instalada_kw=inp.pdc_instalada_kw,
-                pac_nominal_kw=inp.pac_nominal_kw,
-                dc_ac_ratio=inp.pdc_instalada_kw / inp.pac_nominal_kw,
-                energia_bruta_12m=energia_mensual,
-                energia_perdidas_12m=[0.0]*12,
-                energia_despues_perdidas_12m=energia_mensual,
-                energia_clipping_12m=[0.0]*12,
-                energia_util_12m=energia_mensual,
-                energia_bruta_anual=energia_anual,
-                energia_perdidas_anual=0.0,
-                energia_despues_perdidas_anual=energia_anual,
-                energia_clipping_anual=0.0,
-                energia_util_anual=energia_anual,
-                meta={"motor": "8760", "horas": 8760}
+        r_ac = aplicar_perdidas_ac(
+            PerdidasACInput(
+                potencia_kw=potencia_ac,
+                perdidas_ac_pct=inp.perdidas_ac_pct,
             )
+        )
 
-        raise RuntimeError("Estado inválido en motor de energía")
+        potencia_ac_final = r_ac.potencia_kw
+
+
+        # ======================================================
+        # 6. NORMALIZAR
+        # ======================================================
+
+        if len(potencia_ac_final) == 8784:
+            potencia_ac_final = potencia_ac_final[:8760]
+            clipping_kw = clipping_kw[:8760]
+
+
+        # ======================================================
+        # 7. AGREGACIÓN
+        # ======================================================
+
+        energia_mensual = agregar_energia_por_mes(potencia_ac_final)
+        energia_anual = sum(potencia_ac_final)
+
+        energia_clipping_12m = agregar_energia_por_mes(clipping_kw)
+        energia_clipping_anual = sum(clipping_kw)
+
+
+        # ======================================================
+        # 8. SALIDA
+        # ======================================================
+
+        return EnergiaResultado(
+            ok=True,
+            errores=[],
+            pdc_instalada_kw=inp.pdc_instalada_kw,
+            pac_nominal_kw=inp.pac_nominal_kw,
+            dc_ac_ratio=inp.pdc_instalada_kw / inp.pac_nominal_kw,
+
+            energia_bruta_12m=energia_mensual,
+            energia_perdidas_12m=[0.0] * 12,
+            energia_despues_perdidas_12m=energia_mensual,
+            energia_clipping_12m=energia_clipping_12m,
+            energia_util_12m=energia_mensual,
+
+            energia_bruta_anual=energia_anual,
+            energia_perdidas_anual=0.0,
+            energia_despues_perdidas_anual=energia_anual,
+            energia_clipping_anual=energia_clipping_anual,
+            energia_util_anual=energia_anual,
+
+            meta={
+                "motor": "8760",
+                "horas": 8760,
+                "factor_perdidas_dc": r_perdidas_dc.factor_total,
+                "factor_perdidas_ac": r_ac.factor_ac,
+            }
+        )
 
     except Exception as e:
 
         st.error("Error en motor energía")
         st.write(str(e))
-        raise
+
+        return _resultado_error(inp, [str(e)])
