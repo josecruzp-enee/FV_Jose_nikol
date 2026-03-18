@@ -135,31 +135,42 @@ class EnergiaAdapter:
 
         entrada = EnergiaInput(
 
+            # --------------------------------------------------
+            # POTENCIA
+            # --------------------------------------------------
             pdc_instalada_kw=sizing.pdc_kw,
             pac_nominal_kw=sizing.kw_ac,
 
+            # --------------------------------------------------
+            # 8760
+            # --------------------------------------------------
             clima=clima,
             tilt_deg=sf.get("inclinacion_deg"),
 
+            # --------------------------------------------------
+            # ARREGLO FV
+            # --------------------------------------------------
             paneles_por_string=strings.n_series,
             n_strings_total=strings.n_strings_total,
 
-            p_panel_w=panel.pmax_w,
-            vmp_panel_v=panel.vmp_v,
-            voc_panel_v=panel.voc_v,
-            imp_panel_a=panel.imp_a,
-            isc_panel_a=panel.isc_a,
+            pmax_stc_w=panel.pmax_w,
+            vmp_stc_v=panel.vmp_v,
+            voc_stc_v=panel.voc_v,
 
-            coef_potencia=getattr(panel, "coef_pmax", -0.004),
-            coef_vmp=getattr(panel, "coef_vmp", -0.003),
-            coef_voc=getattr(panel, "coef_voc", -0.002),
+            coef_pmax_pct_per_c=getattr(panel, "coef_pmax", -0.004),
+            coef_vmp_pct_per_c=getattr(panel, "coef_vmp", -0.003),
+            coef_voc_pct_per_c=getattr(panel, "coef_voc", -0.002),
 
-            noct_c=getattr(panel, "noct_c", 45.0),
-
+            # --------------------------------------------------
+            # PÉRDIDAS
+            # --------------------------------------------------
             perdidas_dc_pct=sf.get("perdidas_dc_pct", 0.03),
             perdidas_ac_pct=sf.get("perdidas_ac_pct", 0.02),
             sombras_pct=sf.get("sombras_pct", 0.0),
 
+            # --------------------------------------------------
+            # INVERSOR
+            # --------------------------------------------------
             eficiencia_inversor=sf.get("eficiencia_inversor", 0.97),
         )
 
