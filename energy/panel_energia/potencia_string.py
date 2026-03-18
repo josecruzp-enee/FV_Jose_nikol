@@ -90,7 +90,7 @@ def calcular_potencia_string(inp: PotenciaStringInput) -> PotenciaStringResultad
 
         V_string = V_panel * N_series
         I_string = I_panel
-        P_string = P_panel * N_series
+        P_string = V_string * I_string
     """
 
     # -----------------------------------------------------
@@ -108,18 +108,17 @@ def calcular_potencia_string(inp: PotenciaStringInput) -> PotenciaStringResultad
     voc_string = inp.voc_panel_v * inp.n_series
 
     # -----------------------------------------------------
-    # CORRIENTES (serie → no cambian)
+    # CORRIENTES (serie)
     # -----------------------------------------------------
 
     imp_string = inp.imp_panel_a
     isc_string = inp.isc_panel_a
 
     # -----------------------------------------------------
-    # POTENCIA
+    # POTENCIA CONSISTENTE
     # -----------------------------------------------------
 
-    # opción consistente con tu modelo panel:
-    potencia_string = inp.p_panel_w * inp.n_series
+    potencia_string = vmp_string * imp_string
 
     # -----------------------------------------------------
     # RESULTADO
@@ -128,9 +127,7 @@ def calcular_potencia_string(inp: PotenciaStringInput) -> PotenciaStringResultad
     return PotenciaStringResultado(
         vmp_string_v=vmp_string,
         voc_string_v=voc_string,
-
         imp_string_a=imp_string,
         isc_string_a=isc_string,
-
         potencia_string_w=potencia_string,
     )
