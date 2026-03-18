@@ -252,7 +252,7 @@ def descargar_clima_pvgis(
         }
     )
 
-'''
+"""
 ResultadoClima
     ├─ latitud
     ├─ longitud
@@ -267,5 +267,4 @@ ResultadoClima
     │
     ├─ fuente
     └─ meta
-
-    '''
+"""
