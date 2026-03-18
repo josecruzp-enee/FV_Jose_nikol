@@ -75,8 +75,7 @@ def descargar_clima_pvgis(
         "endyear": entrada.endyear,
         "usehorizon": 1,
         "pvcalculation": 0,
-        "components": 1,               # 🔥 NECESARIO PARA DNI
-        "raddatabase": "PVGIS-SARAH2", # 🔥 NECESARIO PARA LATAM
+        "raddatabase": "PVGIS-SARAH2",
         "browser": 0,
     }
 
