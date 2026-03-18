@@ -1,27 +1,9 @@
 from __future__ import annotations
 
-"""
-LECTOR PVGIS — FV Engine (VERSIÓN FINAL PRODUCCIÓN)
-
-Responsabilidad
----------------
-Descargar datos climáticos horarios desde la API de PVGIS
-y convertirlos al modelo interno del dominio clima.
-
-Incluye:
-✔ Corrección DNI (components=1)
-✔ Base de datos correcta (SARAH2)
-✔ Validaciones fuertes
-✔ Protección contra respuestas vacías
-
-Salida
-------
-ResultadoClima con 8760 horas válidas.
-"""
-
 from dataclasses import dataclass
 from datetime import datetime
 import requests
+import streamlit as st
 
 from .resultado_clima import ResultadoClima, ClimaHora
 
@@ -39,19 +21,23 @@ class EntradaClimaPVGIS:
 
 
 # ==========================================================
-# URL BASE PVGIS
+# URL BASE
 # ==========================================================
 
 PVGIS_URL = "https://re.jrc.ec.europa.eu/api/seriescalc"
 
 
 # ==========================================================
-# DESCARGA CLIMA PVGIS
+# FUNCIÓN PRINCIPAL
 # ==========================================================
 
 def descargar_clima_pvgis(
     entrada: EntradaClimaPVGIS
 ) -> ResultadoClima:
+
+    st.write("🌍 Descargando clima desde PVGIS...")
+    st.write(f"📍 Lat: {entrada.lat}, Lon: {entrada.lon}")
+    st.write(f"📅 Año: {entrada.startyear}")
 
     # ------------------------------------------------------
     # VALIDACIÓN ENTRADA
@@ -64,7 +50,7 @@ def descargar_clima_pvgis(
         raise ValueError(f"Longitud inválida: {entrada.lon}")
 
     # ------------------------------------------------------
-    # PARAMETROS CORRECTOS
+    # PARAMS CORRECTOS (SIN ERRORES 400)
     # ------------------------------------------------------
 
     params = {
@@ -75,17 +61,25 @@ def descargar_clima_pvgis(
         "endyear": entrada.endyear,
         "usehorizon": 1,
         "pvcalculation": 0,
-        "raddatabase": "PVGIS-SARAH2",
-        "browser": 0,
     }
 
+    st.write("📡 Enviando request a PVGIS...")
+    st.json(params)
+
     # ------------------------------------------------------
-    # DESCARGA
+    # REQUEST
     # ------------------------------------------------------
 
     try:
         r = requests.get(PVGIS_URL, params=params, timeout=60)
-        r.raise_for_status()
+
+        st.write("📥 Status code:", r.status_code)
+
+        if r.status_code != 200:
+            st.error("❌ Error en PVGIS")
+            st.text(r.text)
+            r.raise_for_status()
+
     except requests.RequestException as e:
         raise RuntimeError(f"Error descargando datos PVGIS: {e}") from e
 
@@ -96,44 +90,38 @@ def descargar_clima_pvgis(
     # ------------------------------------------------------
 
     if "outputs" not in data or "hourly" not in data["outputs"]:
+        st.error("❌ Respuesta inválida de PVGIS")
+        st.json(data)
         raise RuntimeError("Formato de respuesta PVGIS inválido")
 
     hourly = data["outputs"]["hourly"]
 
+    st.write("📊 Primer registro PVGIS:")
+    st.json(hourly[0])
+
     if not hourly:
         raise RuntimeError("PVGIS devolvió lista vacía")
 
-    # Validación clave: irradiancia presente
-    if "G(h)" not in hourly[0] and "Gb(n)" not in hourly[0]:
-        raise RuntimeError(
-            "PVGIS no devolvió irradiancia. "
-            "Verifique coordenadas o parámetros."
-        )
-
     # ------------------------------------------------------
-    # CONSTRUIR SERIE CLIMÁTICA
+    # CONSTRUIR CLIMA
     # ------------------------------------------------------
 
     horas: list[ClimaHora] = []
 
     for h in hourly:
 
-        # TIMESTAMP
         try:
             timestamp = datetime.strptime(h["time"], "%Y%m%d:%H%M")
         except Exception:
             raise RuntimeError(f"Error parseando timestamp: {h.get('time')}")
 
-        # IRRADIANCIA
         ghi = float(h.get("G(h)", 0.0))
         dni = float(h.get("Gb(n)", 0.0))
         dhi = float(h.get("Gd(h)", 0.0))
 
-        # VALIDACIÓN LOCAL
         if ghi < 0 or dni < 0 or dhi < 0:
-            raise RuntimeError("Irradiancia negativa detectada en PVGIS")
+            raise RuntimeError("Irradiancia negativa detectada")
 
-        # TEMPERATURA Y VIENTO
         temp = float(h.get("T2m", 25.0))
         viento = float(h.get("WS10m", 1.0))
 
@@ -152,32 +140,25 @@ def descargar_clima_pvgis(
     # VALIDACIÓN GLOBAL
     # ------------------------------------------------------
 
-    if len(horas) != 8760:
-        raise RuntimeError(
-            f"PVGIS devolvió {len(horas)} horas en lugar de 8760"
-        )
-
+    n = len(horas)
     ghi_total = sum(h.ghi_wm2 for h in horas)
     dni_total = sum(h.dni_wm2 for h in horas)
+
+    st.write("📈 VALIDACIÓN GLOBAL")
+    st.write(f"Horas: {n}")
+    st.write(f"GHI total: {round(ghi_total, 2)}")
+    st.write(f"DNI total: {round(dni_total, 2)}")
+
+    if n != 8760:
+        raise RuntimeError(f"PVGIS devolvió {n} horas en lugar de 8760")
 
     if ghi_total <= 0:
         raise RuntimeError("PVGIS devolvió GHI total = 0")
 
     if dni_total <= 0:
-        raise RuntimeError(
-            "PVGIS devolvió DNI total = 0 (revisar components=1)"
-        )
+        raise RuntimeError("PVGIS devolvió DNI total = 0")
 
-    # ------------------------------------------------------
-    # DEBUG CONTROLADO
-    # ------------------------------------------------------
-
-    print("\nDEBUG PVGIS")
-    print("Lat:", entrada.lat, "Lon:", entrada.lon)
-    print("Horas:", len(horas))
-    print("GHI total:", round(ghi_total, 2))
-    print("DNI total:", round(dni_total, 2))
-    print()
+    st.success("✅ Clima PVGIS válido")
 
     # ------------------------------------------------------
     # RESULTADO FINAL
@@ -191,6 +172,6 @@ def descargar_clima_pvgis(
         meta={
             "startyear": entrada.startyear,
             "endyear": entrada.endyear,
-            "n_horas": len(horas),
+            "n_horas": n,
         }
     )
