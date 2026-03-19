@@ -35,7 +35,7 @@ def _resultado_error(inp, errores):
 
         dc_ac_ratio=0.0,
 
-        energia_horaria=[],
+        energia_horaria_kwh=[],
 
         energia_bruta_12m=[],
         energia_perdidas_12m=[],
