@@ -1,243 +1,259 @@
 from __future__ import annotations
 
-"""
-CONTRATO DEL DOMINIO ENERGÍA — FV Engine
-========================================
+from .contrato import EnergiaInput, EnergiaResultado
+from energy.sistema.agregacion_8760 import agregar_energia_por_mes
 
-Este módulo define las estructuras formales del dominio energía.
-
-IMPORTANTE
-----------
-
-El dominio energía NO define el sistema FV.
-El sistema FV es responsabilidad del dominio:
-
-    electrical.paneles
-
-Sin embargo, en la implementación actual:
-
-    ✔ energía recibe paneles como dict estructurado
-    ✔ energía valida fuertemente ese dict
-    ❌ energía NO reconstruye el sistema
-
-Esto es una adaptación controlada (no es solución final).
-
-Responsabilidad del dominio energía
------------------------------------
-
-Calcular la producción energética del sistema a partir de:
-
-    • generador FV (paneles)
-    • clima horario (8760)
-    • geometría
-    • pérdidas
-    • inversor
-
-Modelo soportado
-----------------
-
-    ✔ Simulación física horaria (8760)
-
-Este módulo NO contiene lógica de cálculo.
-"""
+import streamlit as st
 
 
 # ==========================================================
-# IMPORTS
+# HELPERS (PARCHE COMPATIBILIDAD)
 # ==========================================================
 
-from dataclasses import dataclass, field
-from typing import List, Dict, Any
-
-
-# ==========================================================
-# (TEMPORAL) TIPO DE CLIMA
-# ==========================================================
-
-# ⚠️ Reemplazar por contrato real cuando exista
-ResultadoClima = object
-
-
-# ==========================================================
-# ESTADO HORARIO (BASE DEL MODELO 8760)
-# ==========================================================
-
-@dataclass(frozen=True)
-class EstadoEnergiaHora:
+def _get_pdc_kw(paneles):
     """
-    Estado energético en una hora específica.
-
-    Representa el resultado físico del sistema FV bajo
-    condiciones climáticas puntuales.
+    Soporta:
+        - dict (legacy)
+        - ResultadoPaneles (nuevo)
     """
 
-    # Irradiancia en plano del arreglo
-    poa_wm2: float
+    # Caso dict (legacy)
+    if isinstance(paneles, dict):
+        return paneles.get("pdc_total_kw")
 
-    # Temperaturas
-    temp_amb_c: float
-    temp_celda_c: float
+    # Caso objeto nuevo
+    if hasattr(paneles, "array") and hasattr(paneles.array, "pdc_kw"):
+        return paneles.array.pdc_kw
 
-    # Potencias instantáneas
-    p_dc_w: float
-    p_ac_w: float
-
-    # Energía generada en la hora
-    energia_dc_wh: float
-    energia_ac_wh: float
+    return None
 
 
-# ==========================================================
-# ENTRADA DEL MOTOR ENERGÉTICO
-# ==========================================================
+def _paneles_ok(paneles):
 
-@dataclass(frozen=True)
-class EnergiaInput:
-    """
-    Entrada del motor energético FV.
+    if isinstance(paneles, dict):
+        return paneles.get("ok", False)
 
-    Representa todos los datos necesarios para ejecutar
-    la simulación física 8760.
-    """
-
-    # ------------------------------------------------------
-    # GENERADOR FV
-    # ------------------------------------------------------
-    # ⚠️ Actualmente se recibe como dict estructurado
-    # proveniente de electrical.paneles
-    paneles: Dict[str, Any]
-
-    # ------------------------------------------------------
-    # INVERSOR
-    # ------------------------------------------------------
-    pac_nominal_kw: float
-
-    # ------------------------------------------------------
-    # GEOMETRÍA
-    # ------------------------------------------------------
-    tilt_deg: float
-    azimut_deg: float
-
-    # ------------------------------------------------------
-    # CLIMA
-    # ------------------------------------------------------
-    clima: Any
-
-    # ------------------------------------------------------
-    # PARÁMETROS DEL SISTEMA
-    # ------------------------------------------------------
-    eficiencia_inversor: float = 0.97
-    permitir_clipping: bool = True
-
-    perdidas_dc_pct: float = 0.0
-    perdidas_ac_pct: float = 0.0
-    sombras_pct: float = 0.0
-
-    # ======================================================
-    # VALIDACIÓN DEL CONTRATO
-    # ======================================================
-
-    def validar(self) -> List[str]:
-        """
-        Valida consistencia de la entrada.
-
-        Regla:
-            Si algo falta → se reporta error
-        """
-
-        errores: List[str] = []
-
-        # -------------------------------
-        # PANELes (CRÍTICO)
-        # -------------------------------
-        if not isinstance(self.paneles, dict):
-            errores.append("paneles debe ser dict")
-
-        else:
-
-            if not self.paneles.get("ok", False):
-                errores.append("paneles no válido")
-
-            if "strings" not in self.paneles:
-                errores.append("paneles sin strings")
-
-            if "n_strings_total" not in self.paneles:
-                errores.append("paneles sin n_strings_total")
-
-        # -------------------------------
-        # POTENCIA
-        # -------------------------------
-        if self.pac_nominal_kw <= 0:
-            errores.append("pac_nominal_kw inválido")
-
-        # -------------------------------
-        # GEOMETRÍA
-        # -------------------------------
-        if self.tilt_deg is None:
-            errores.append("tilt_deg requerido")
-
-        if self.azimut_deg is None:
-            errores.append("azimut_deg requerido")
-
-        # -------------------------------
-        # CLIMA
-        # -------------------------------
-        if self.clima is None:
-            errores.append("clima requerido")
-
-        return errores
+    return getattr(paneles, "ok", False)
 
 
 # ==========================================================
-# RESULTADO DEL MOTOR ENERGÉTICO
+# RESULTADO ERROR
 # ==========================================================
 
-@dataclass(frozen=True)
-class EnergiaResultado:
-    """
-    Resultado final del motor energético.
+def _resultado_error(inp, errores):
 
-    Contiene toda la producción del sistema FV:
-    horaria, mensual y anual.
-    """
+    paneles = inp.paneles
+    pdc_kw = _get_pdc_kw(paneles) or 0.0
+
+    return EnergiaResultado(
+        ok=False,
+        errores=errores,
+
+        pdc_instalada_kw=pdc_kw,
+        pac_nominal_kw=inp.pac_nominal_kw,
+
+        dc_ac_ratio=0.0,
+
+        energia_horaria=[],
+
+        energia_bruta_12m=[],
+        energia_perdidas_12m=[],
+        energia_despues_perdidas_12m=[],
+        energia_clipping_12m=[],
+        energia_util_12m=[],
+
+        energia_bruta_anual=0.0,
+        energia_perdidas_anual=0.0,
+        energia_despues_perdidas_anual=0.0,
+        energia_clipping_anual=0.0,
+        energia_util_anual=0.0,
+
+        meta={}
+    )
+
+
+# ==========================================================
+# 1. CLIMA
+# ==========================================================
+
+def _simular_estado_8760(inp: EnergiaInput):
+
+    from energy.clima.simulacion_8760 import simular_clima_8760
+
+    resultado = simular_clima_8760(
+        clima=inp.clima,
+        tilt=inp.tilt_deg,
+        azimuth=inp.azimut_deg,
+    )
+
+    return resultado.horas
+
+
+# ==========================================================
+# 2. DC
+# ==========================================================
+
+def _calcular_dc(inp, estado):
+
+    paneles = inp.paneles
 
     # ------------------------------------------------------
-    # ESTADO
+    # VALIDACIÓN FLEXIBLE (PARCHE)
     # ------------------------------------------------------
-    ok: bool
-    errores: List[str]
+    if paneles is None:
+        raise ValueError("paneles es None")
+
+    if not _paneles_ok(paneles):
+        raise ValueError("paneles no válido")
+
+    pdc_kw = _get_pdc_kw(paneles)
+
+    if pdc_kw is None:
+        raise ValueError(f"No se pudo obtener pdc_kw de paneles: {paneles}")
 
     # ------------------------------------------------------
-    # POTENCIA
+    # DATOS BASE
     # ------------------------------------------------------
-    pdc_instalada_kw: float
-    pac_nominal_kw: float
-    dc_ac_ratio: float
+    poa = estado.poa_wm2
+
+    if poa is None:
+        raise ValueError("estado sin poa_wm2")
 
     # ------------------------------------------------------
-    # ENERGÍA HORARIA (8760)
+    # MODELO
     # ------------------------------------------------------
-    energia_horaria: List[EstadoEnergiaHora]
+    factor_irradiancia = max(poa / 1000.0, 0.0)
 
-    # ------------------------------------------------------
-    # ENERGÍA MENSUAL
-    # ------------------------------------------------------
-    energia_bruta_12m: List[float]
-    energia_perdidas_12m: List[float]
-    energia_despues_perdidas_12m: List[float]
-    energia_clipping_12m: List[float]
-    energia_util_12m: List[float]
+    pdc_w = pdc_kw * 1000.0 * factor_irradiancia
 
-    # ------------------------------------------------------
-    # ENERGÍA ANUAL
-    # ------------------------------------------------------
-    energia_bruta_anual: float
-    energia_perdidas_anual: float
-    energia_despues_perdidas_anual: float
-    energia_clipping_anual: float
-    energia_util_anual: float
+    return pdc_w
 
-    # ------------------------------------------------------
-    # METADATA
-    # ------------------------------------------------------
-    meta: Dict[str, object] = field(default_factory=dict)
+
+# ==========================================================
+# 3. PÉRDIDAS DC
+# ==========================================================
+
+def _aplicar_perdidas_dc(inp: EnergiaInput, potencia_dc_kw):
+
+    from energy.sistema.perdidas_fisicas import (
+        aplicar_perdidas_fisicas, PerdidasInput
+    )
+
+    return aplicar_perdidas_fisicas(
+        PerdidasInput(
+            potencia_kw=potencia_dc_kw,
+            perdidas_dc_pct=inp.perdidas_dc_pct,
+            sombras_pct=inp.sombras_pct,
+        )
+    )
+
+
+# ==========================================================
+# 4. INVERSOR
+# ==========================================================
+
+def _aplicar_inversor(inp: EnergiaInput, potencia_dc_kw):
+
+    from energy.sistema.modelo_energetico_inversor import (
+        calcular_inversor_8760, Inversor8760Input
+    )
+
+    return calcular_inversor_8760(
+        Inversor8760Input(
+            potencia_dc_kw=potencia_dc_kw,
+            p_ac_nominal_kw=inp.pac_nominal_kw,
+            eficiencia_nominal=inp.eficiencia_inversor,
+        )
+    )
+
+
+# ==========================================================
+# 5. PÉRDIDAS AC
+# ==========================================================
+
+def _aplicar_perdidas_ac(inp: EnergiaInput, potencia_ac_kw):
+
+    from energy.sistema.perdidas_ac import (
+        aplicar_perdidas_ac, PerdidasACInput
+    )
+
+    return aplicar_perdidas_ac(
+        PerdidasACInput(
+            potencia_kw=potencia_ac_kw,
+            perdidas_ac_pct=inp.perdidas_ac_pct,
+        )
+    )
+
+
+# ==========================================================
+# 6. RESULTADO
+# ==========================================================
+
+def _construir_resultado(inp, potencia_dc_kw, potencia_ac_kw, clipping_kw):
+
+    energia_bruta_12m = agregar_energia_por_mes(potencia_dc_kw)
+    energia_final_12m = agregar_energia_por_mes(potencia_ac_kw)
+    energia_clipping_12m = agregar_energia_por_mes(clipping_kw)
+
+    energia_bruta_anual = sum(potencia_dc_kw)
+    energia_final_anual = sum(potencia_ac_kw)
+    energia_clipping_anual = sum(clipping_kw)
+
+    pdc_kw = _get_pdc_kw(inp.paneles) or 0.0
+
+    return EnergiaResultado(
+        ok=True,
+        errores=[],
+
+        pdc_instalada_kw=pdc_kw,
+        pac_nominal_kw=inp.pac_nominal_kw,
+        dc_ac_ratio=pdc_kw / inp.pac_nominal_kw if inp.pac_nominal_kw else 0.0,
+
+        energia_horaria=[],
+
+        energia_bruta_12m=energia_bruta_12m,
+        energia_perdidas_12m=[b - f for b, f in zip(energia_bruta_12m, energia_final_12m)],
+        energia_despues_perdidas_12m=energia_final_12m,
+        energia_clipping_12m=energia_clipping_12m,
+        energia_util_12m=energia_final_12m,
+
+        energia_bruta_anual=energia_bruta_anual,
+        energia_perdidas_anual=energia_bruta_anual - energia_final_anual,
+        energia_despues_perdidas_anual=energia_final_anual,
+        energia_clipping_anual=energia_clipping_anual,
+        energia_util_anual=energia_final_anual,
+
+        meta={"motor": "8760"},
+    )
+
+
+# ==========================================================
+# MAIN
+# ==========================================================
+
+def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
+
+    errores = inp.validar()
+
+    # 🔥 PARCHE: ignorar error de dict (temporal)
+    errores = [e for e in errores if e != "paneles debe ser dict"]
+
+    if errores:
+        return _resultado_error(inp, errores)
+
+    estado = _simular_estado_8760(inp)
+
+    potencia_dc = _calcular_dc(inp, estado)
+
+    r_dc = _aplicar_perdidas_dc(inp, potencia_dc)
+
+    inv = _aplicar_inversor(inp, r_dc.potencia_kw)
+
+    r_ac = _aplicar_perdidas_ac(inp, inv.potencia_ac_kw)
+
+    return _construir_resultado(
+        inp,
+        potencia_dc,
+        r_ac.potencia_kw,
+        inv.clipping_kw,
+    )
