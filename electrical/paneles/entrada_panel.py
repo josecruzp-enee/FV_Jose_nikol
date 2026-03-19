@@ -14,81 +14,94 @@ Reglas:
 Consumido por:
     electrical.paneles.orquestador_paneles
 """
+from __future__ import annotations
+
+"""
+SALIDA PÚBLICA DEL DOMINIO PANELES — FV ENGINE
+=============================================
+
+Este módulo representa la INTERFAZ OFICIAL hacia el exterior.
+
+Consumido por:
+    - core.aplicacion
+    - energy (8760)
+    - conductores
+    - protecciones
+    - reportes
+    - UI
+
+Reglas:
+    - No contiene lógica
+    - No redefine modelos
+    - Solo expone datos necesarios
+"""
 
 from dataclasses import dataclass
-from typing import Optional
-
-from electrical.modelos.paneles import PanelSpec
-from electrical.modelos.inversor import InversorSpec
+from typing import List
 
 
-# ==========================================================
-# ENTRADA DEL DOMINIO PANELES
-# ==========================================================
+# =========================================================
+# RESUMEN DEL ARRAY FV (EXTERNO)
+# =========================================================
 
 @dataclass(frozen=True)
-class EntradaPaneles:
+class ArrayFVOut:
+    """
+    Vista simplificada del generador FV para otros dominios.
+    """
 
-    # ------------------------------------------------------
-    # Equipos
-    # ------------------------------------------------------
-    panel: PanelSpec
-    inversor: InversorSpec
+    potencia_dc_w: float
+    vdc_nom: float
+    idc_nom: float
 
-    # ------------------------------------------------------
-    # Sistema
-    # ------------------------------------------------------
+    n_strings_total: int
     n_paneles_total: int
-    n_inversores: Optional[int] = None
 
-    # ------------------------------------------------------
-    # Condiciones térmicas
-    # ------------------------------------------------------
-    t_min_c: float = -5.0
-    t_oper_c: float = 45.0
+    strings_por_mppt: int
+    n_mppt: int
 
-    # ------------------------------------------------------
-    # Instalación
-    # ------------------------------------------------------
-    dos_aguas: bool = False
 
-    # ------------------------------------------------------
-    # Objetivos de diseño
-    # ------------------------------------------------------
-    objetivo_dc_ac: Optional[float] = None
-    pdc_kw_objetivo: Optional[float] = None
+# =========================================================
+# STRING FV (EXTERNO)
+# =========================================================
 
-    # ======================================================
-    # VALIDACIÓN BÁSICA (CRÍTICA)
-    # ======================================================
+@dataclass(frozen=True)
+class StringFVOut:
+    """
+    Información necesaria para downstream (conductores, protecciones).
+    """
 
-    def __post_init__(self):
+    mppt: int
+    n_series: int
+    n_strings: int
 
-        errores = []
+    vmp_string_v: float
+    voc_frio_string_v: float
 
-        # -------------------------
-        # Validaciones numéricas
-        # -------------------------
-        if self.n_paneles_total <= 0:
-            errores.append("n_paneles_total debe ser > 0")
+    imp_string_a: float
+    isc_string_a: float
 
-        if self.n_inversores is not None and self.n_inversores <= 0:
-            errores.append("n_inversores debe ser > 0")
+    i_mppt_a: float
+    isc_mppt_a: float
+    idesign_cont_a: float
 
-        # -------------------------
-        # Temperaturas
-        # -------------------------
-        if self.t_min_c > self.t_oper_c:
-            errores.append("t_min_c no puede ser mayor que t_oper_c")
 
-        # -------------------------
-        # Objetivos incompatibles
-        # -------------------------
-        if self.objetivo_dc_ac is not None and self.pdc_kw_objetivo is not None:
-            errores.append("No puedes definir objetivo_dc_ac y pdc_kw_objetivo al mismo tiempo")
+# =========================================================
+# RESULTADO PÚBLICO DEL DOMINIO
+# =========================================================
 
-        # -------------------------
-        # Resultado
-        # -------------------------
-        if errores:
-            raise ValueError(f"EntradaPaneles inválida: {errores}")
+@dataclass(frozen=True)
+class ResultadoPanelesOut:
+    """
+    Objeto que consumen los otros dominios.
+
+    Este es el único punto de entrada al dominio paneles.
+    """
+
+    ok: bool
+
+    array: ArrayFVOut
+    strings: List[StringFVOut]
+
+    warnings: List[str]
+    errores: List[str]
