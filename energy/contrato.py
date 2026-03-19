@@ -10,7 +10,7 @@ from typing import List, Dict, Any
 
 @dataclass(frozen=True)
 class EnergiaInput:
-    paneles: Dict[str, Any]
+    paneles: Any                 # ← objeto ResultadoPaneles (NO dict)
     pac_nominal_kw: float
     clima: Any
     tilt_deg: float
@@ -25,11 +25,14 @@ class EnergiaInput:
     def validar(self) -> List[str]:
         errores: List[str] = []
 
-        # PANELes
-        if not isinstance(self.paneles, dict):
-            errores.append("paneles debe ser dict")
-        elif not self.paneles.get("ok", False):
-            errores.append("paneles no válido")
+        # PANELes (objeto)
+        if self.paneles is None:
+            errores.append("paneles requerido")
+        else:
+            if not getattr(self.paneles, "ok", False):
+                errores.append("paneles no válido")
+            if not hasattr(self.paneles, "array"):
+                errores.append("paneles sin atributo array")
 
         # POTENCIA
         if self.pac_nominal_kw <= 0:
@@ -38,7 +41,6 @@ class EnergiaInput:
         # GEOMETRÍA
         if self.tilt_deg is None:
             errores.append("tilt_deg requerido")
-
         if self.azimut_deg is None:
             errores.append("azimut_deg requerido")
 
@@ -62,8 +64,6 @@ class EnergiaResultado:
     pac_nominal_kw: float
     dc_ac_ratio: float
 
-    energia_horaria_kwh=[]
-
     energia_bruta_12m: List[float]
     energia_perdidas_12m: List[float]
     energia_despues_perdidas_12m: List[float]
@@ -76,4 +76,8 @@ class EnergiaResultado:
     energia_clipping_anual: float
     energia_util_anual: float
 
+    # ---- defaults SIEMPRE al final ----
+    energia_horaria_kwh: List[float] = field(default_factory=list)
+    produccion_especifica_kwh_kwp: float = 0.0
+    performance_ratio: float = 0.0
     meta: Dict[str, Any] = field(default_factory=dict)
