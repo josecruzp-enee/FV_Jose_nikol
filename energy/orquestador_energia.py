@@ -35,6 +35,10 @@ def _resultado_error(inp, errores):
 
         dc_ac_ratio=0.0,
 
+        # 👇 FIX CRÍTICO
+        produccion_especifica_kwh_kwp=0.0,
+
+        # ⚠️ Mantén consistente con tu contrato
         energia_horaria_kwh=[],
 
         energia_bruta_12m=[],
@@ -51,7 +55,6 @@ def _resultado_error(inp, errores):
 
         meta={}
     )
-
 
 # ==========================================================
 # 1. CLIMA + SOLAR
@@ -172,7 +175,6 @@ def _aplicar_perdidas_ac(inp: EnergiaInput, potencia_ac_kw):
 # ==========================================================
 # 6. RESULTADO
 # ==========================================================
-
 def _construir_resultado(inp, potencia_dc_kw, potencia_ac_kw, clipping_kw):
 
     energia_bruta_12m = agregar_energia_por_mes(potencia_dc_kw)
@@ -185,15 +187,24 @@ def _construir_resultado(inp, potencia_dc_kw, potencia_ac_kw, clipping_kw):
 
     pdc_kw = inp.paneles.array.pdc_kw  # ✅ consistente
 
+    # 👇 FIX CRÍTICO
+    produccion_especifica_kwh_kwp = (
+        energia_final_anual / pdc_kw if pdc_kw > 0 else 0.0
+    )
+
     return EnergiaResultado(
         ok=True,
         errores=[],
 
         pdc_instalada_kw=pdc_kw,
         pac_nominal_kw=inp.pac_nominal_kw,
-        dc_ac_ratio=pdc_kw / inp.pac_nominal_kw,
+        dc_ac_ratio=pdc_kw / inp.pac_nominal_kw if inp.pac_nominal_kw else 0.0,
 
-        energia_horaria=[],
+        # ⚠️ DEBE coincidir con tu contrato
+        energia_horaria_kwh=[],
+
+        # 👇 NUEVO CAMPO
+        produccion_especifica_kwh_kwp=produccion_especifica_kwh_kwp,
 
         energia_bruta_12m=energia_bruta_12m,
         energia_perdidas_12m=[b - f for b, f in zip(energia_bruta_12m, energia_final_12m)],
@@ -209,7 +220,6 @@ def _construir_resultado(inp, potencia_dc_kw, potencia_ac_kw, clipping_kw):
 
         meta={"motor": "8760"},
     )
-
 
 # ==========================================================
 # MAIN
