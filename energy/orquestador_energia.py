@@ -26,6 +26,8 @@ def _resultado_error(inp, errores):
         pac_nominal_kw=inp.pac_nominal_kw,
         dc_ac_ratio=0.0,
 
+        energia_horaria_kwh=[],
+
         energia_bruta_12m=[],
         energia_perdidas_12m=[],
         energia_despues_perdidas_12m=[],
@@ -38,10 +40,9 @@ def _resultado_error(inp, errores):
         energia_clipping_anual=0.0,
         energia_util_anual=0.0,
 
-        # defaults ya cubren:
-        # energia_horaria_kwh=[]
-        # produccion_especifica_kwh_kwp=0.0
-        # performance_ratio=0.0
+        # 👇 OBLIGATORIOS (antes faltaban)
+        produccion_especifica_kwh_kwp=0.0,
+        performance_ratio=0.0,
 
         meta={}
     )
@@ -174,11 +175,15 @@ def _construir_resultado(inp, potencia_dc_kw, potencia_ac_kw, clipping_kw):
     energia_final_anual = sum(potencia_ac_kw)
     energia_clipping_anual = sum(clipping_kw)
 
-    pdc_kw = inp.paneles.array.pdc_kw  # ✅ consistente
+    pdc_kw = inp.paneles.array.pdc_kw
 
-    # 👇 FIX CRÍTICO
     produccion_especifica_kwh_kwp = (
         energia_final_anual / pdc_kw if pdc_kw > 0 else 0.0
+    )
+
+    performance_ratio = (
+        energia_final_anual / energia_bruta_anual
+        if energia_bruta_anual > 0 else 0.0
     )
 
     return EnergiaResultado(
@@ -189,11 +194,7 @@ def _construir_resultado(inp, potencia_dc_kw, potencia_ac_kw, clipping_kw):
         pac_nominal_kw=inp.pac_nominal_kw,
         dc_ac_ratio=pdc_kw / inp.pac_nominal_kw if inp.pac_nominal_kw else 0.0,
 
-        # ⚠️ DEBE coincidir con tu contrato
         energia_horaria_kwh=[],
-
-        # 👇 NUEVO CAMPO
-        produccion_especifica_kwh_kwp=produccion_especifica_kwh_kwp,
 
         energia_bruta_12m=energia_bruta_12m,
         energia_perdidas_12m=[b - f for b, f in zip(energia_bruta_12m, energia_final_12m)],
@@ -207,9 +208,11 @@ def _construir_resultado(inp, potencia_dc_kw, potencia_ac_kw, clipping_kw):
         energia_clipping_anual=energia_clipping_anual,
         energia_util_anual=energia_final_anual,
 
+        produccion_especifica_kwh_kwp=produccion_especifica_kwh_kwp,
+        performance_ratio=performance_ratio,
+
         meta={"motor": "8760"},
     )
-
 # ==========================================================
 # MAIN
 # ==========================================================
