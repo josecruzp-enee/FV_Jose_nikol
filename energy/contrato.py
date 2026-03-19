@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import List, Dict, Any
 from energy.sistema.agregacion_8760 import agregar_energia_por_mes
-
+from energy.resultado_energia import EnergiaResultado
 import streamlit as st
 
 
