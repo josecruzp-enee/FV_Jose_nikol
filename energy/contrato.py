@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from .contrato import EnergiaInput, EnergiaResultado
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import List, Dict, Any
 from energy.sistema.agregacion_8760 import agregar_energia_por_mes
 
 import streamlit as st
