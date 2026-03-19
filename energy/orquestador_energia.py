@@ -7,11 +7,7 @@ import streamlit as st
 
 
 # ==========================================================
-# ERROR
-# ==========================================================
-
-# ==========================================================
-# RESULTADO ERROR (ALINEADO A DICT)
+# RESULTADO ERROR (ALINEADO A ResultadoPaneles)
 # ==========================================================
 
 def _resultado_error(inp, errores):
@@ -23,8 +19,8 @@ def _resultado_error(inp, errores):
     # ------------------------------------------------------
     pdc_kw = 0.0
 
-    if isinstance(paneles, dict):
-        pdc_kw = paneles.get("pdc_total_kw", 0.0)
+    if paneles and hasattr(paneles, "array"):
+        pdc_kw = paneles.array.pdc_kw
 
     # ------------------------------------------------------
     # RESULTADO
@@ -55,6 +51,7 @@ def _resultado_error(inp, errores):
         meta={}
     )
 
+
 # ==========================================================
 # 1. CLIMA + SOLAR
 # ==========================================================
@@ -76,59 +73,44 @@ def _simular_estado_8760(inp: EnergiaInput):
 # 2. DC
 # ==========================================================
 
-# ==========================================================
-# CÁLCULO DE POTENCIA DC (ALINEADO A CONTRATO DICT)
-# ==========================================================
-
 def _calcular_dc(inp, estado):
     """
     Calcula la potencia DC instantánea del sistema FV.
-
-    Basado en:
-        • POA (irradiancia)
-        • Potencia DC instalada (paneles)
     """
 
     paneles = inp.paneles
 
     # ------------------------------------------------------
-    # VALIDACIÓN FUERTE
+    # VALIDACIÓN CORRECTA
     # ------------------------------------------------------
-    if not isinstance(paneles, dict):
-        raise ValueError("paneles debe ser dict")
+    if paneles is None:
+        raise ValueError("paneles es None")
 
-    if not paneles.get("ok", False):
-        raise ValueError("paneles no válido")
+    if not getattr(paneles, "ok", False):
+        raise ValueError(f"paneles inválido: {paneles.errores}")
 
-    pdc_kw = paneles.get("pdc_total_kw")
+    if not hasattr(paneles, "array"):
+        raise ValueError("paneles sin atributo array")
 
-    if pdc_kw is None:
-        raise ValueError("paneles sin pdc_total_kw")
+    pdc_kw = paneles.array.pdc_kw  # ✅ correcto
 
     # ------------------------------------------------------
     # DATOS BASE
     # ------------------------------------------------------
-    poa = estado.poa_wm2  # irradiancia en plano
+    poa = estado.poa_wm2
 
     if poa is None:
         raise ValueError("estado sin poa_wm2")
 
     # ------------------------------------------------------
-    # MODELO FÍSICO SIMPLE
+    # MODELO
     # ------------------------------------------------------
-    # Referencia: 1000 W/m² → potencia nominal
-    factor_irradiancia = poa / 1000.0
+    factor_irradiancia = max(poa / 1000.0, 0.0)
 
-    # limitar a rango físico
-    if factor_irradiancia < 0:
-        factor_irradiancia = 0.0
-
-    # ------------------------------------------------------
-    # POTENCIA DC
-    # ------------------------------------------------------
     pdc_w = pdc_kw * 1000.0 * factor_irradiancia
 
     return pdc_w
+
 
 # ==========================================================
 # 3. PÉRDIDAS DC
@@ -200,7 +182,7 @@ def _construir_resultado(inp, potencia_dc_kw, potencia_ac_kw, clipping_kw):
     energia_final_anual = sum(potencia_ac_kw)
     energia_clipping_anual = sum(clipping_kw)
 
-    pdc_kw = inp.paneles.array.potencia_dc_w / 1000
+    pdc_kw = inp.paneles.array.pdc_kw  # ✅ consistente
 
     return EnergiaResultado(
         ok=True,
