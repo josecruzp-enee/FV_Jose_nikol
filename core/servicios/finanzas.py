@@ -4,7 +4,7 @@ from typing import Any, Dict, List
 
 from core.dominio.modelo import Datosproyecto
 from core.dominio.contrato import ResultadoSizing
-from energy.contrato import EnergiaResultado
+from energy.resultado_energia import EnergiaResultado
 
 
 # ==========================================================
