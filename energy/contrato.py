@@ -62,7 +62,7 @@ class EnergiaResultado:
     pac_nominal_kw: float
     dc_ac_ratio: float
 
-    energia_horaria: List[Any]
+    energia_horaria_kwh=[]
 
     energia_bruta_12m: List[float]
     energia_perdidas_12m: List[float]
