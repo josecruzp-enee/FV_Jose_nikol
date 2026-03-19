@@ -139,21 +139,24 @@ def _evaluacion_mensual(tabla: List[Dict[str, float]], cuota: float) -> Dict[str
 # ==========================================================
 # 🔵 ENTRYPOINT FINANCIERO
 # ==========================================================
-
 def ejecutar_finanzas(
     *,
     datos: Datosproyecto,
-    sizing: ResultadoSizing,   # ← YA NO Dict
+    sizing: ResultadoSizing,
     energia: EnergiaResultado,
 ) -> Dict[str, Any]:
 
-    kwp_dc = float(sizing.pdc_kw)   # ← CONTRATO FUERTE
+    kwp_dc = float(sizing.pdc_kw)
 
     if kwp_dc <= 0:
         raise ValueError("Sizing incompleto para finanzas.")
 
+    # 🔥 FIX REAL
+    if energia is None:
+        raise ValueError("Resultado energético no definido.")
+
     if not energia.ok:
-        raise ValueError("Motor energético inválido.")
+        raise ValueError(f"Energía inválida: {energia.errores}")
 
     capex = calcular_capex_L(
         pdc_kw=kwp_dc,
@@ -171,6 +174,9 @@ def ejecutar_finanzas(
     om_mensual_val = om_mensual(capex, datos.om_anual_pct)
 
     energia_fv_12m = energia.energia_util_12m
+
+    if not energia_fv_12m:
+        raise ValueError("Energía mensual vacía.")
 
     tabla_12m = simular_12_meses(
         consumo_12m=datos.consumo_12m,
