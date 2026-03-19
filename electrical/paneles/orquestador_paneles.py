@@ -109,7 +109,7 @@ except Exception:
 
 from typing import Dict, List
 
-from .contrato import ResultadoPaneles, ArrayFV, StringFV
+from .resultado_paneles import ResultadoPaneles, ArrayFV, StringFV
 
 from typing import List, Dict
 
