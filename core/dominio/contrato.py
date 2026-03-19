@@ -26,7 +26,7 @@ Este contrato unifica los resultados de:
 from dataclasses import dataclass, field
 from typing import List, Dict, Any
 
-from energy.contrato import EnergiaResultado
+from energy.resultado_energia import EnergiaResultado
 
 
 # =========================================================
