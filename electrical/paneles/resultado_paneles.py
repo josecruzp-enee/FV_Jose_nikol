@@ -69,6 +69,22 @@ class ArrayFV:
 
     p_panel_w: float
 
+    # =====================================================
+    # ADAPTADORES (COMPATIBILIDAD CON OTROS DOMINIOS)
+    # =====================================================
+
+    @property
+    def pdc_kw(self) -> float:
+        """
+        Compatibilidad con NEC y core.
+
+        NEC espera pdc_kw, pero el dominio paneles
+        trabaja en W.
+
+        Conversión:
+            W → kW
+        """
+        return self.potencia_dc_w / 1000
 
 # =========================================================
 # RESULTADO FINAL
