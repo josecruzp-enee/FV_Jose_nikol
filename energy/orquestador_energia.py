@@ -218,34 +218,46 @@ def _construir_resultado(inp, potencia_dc_kw, potencia_ac_kw, clipping_kw):
 # ==========================================================
 def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
 
-    errores = inp.validar()
-    if errores:
-        return _resultado_error(inp, errores)
 
-    # 🔥 SIMULACIÓN 8760
-    estados = _simular_estado_8760(inp)
+errores = inp.validar()
+if errores:
+    return _resultado_error(inp, errores)
 
-    potencia_dc = []
-    potencia_ac = []
-    clipping = []
+# 🔥 SIMULACIÓN 8760
+estados = _simular_estado_8760(inp)
 
-    for estado in estados:
+# ======================================================
+# 1. DC (generar serie completa 8760)
+# ======================================================
+potencia_dc = []
 
-        p_dc = _calcular_dc(inp, estado)
+for estado in estados:
+    p_dc = _calcular_dc(inp, estado)  # float por hora
+    potencia_dc.append(p_dc)
 
-        r_dc = _aplicar_perdidas_dc(inp, p_dc)
+# ======================================================
+# 2. PÉRDIDAS DC (AHORA SÍ 8760)
+# ======================================================
+r_dc = _aplicar_perdidas_dc(inp, potencia_dc)
 
-        inv = _aplicar_inversor(inp, r_dc.potencia_kw)
+# ======================================================
+# 3. INVERSOR (8760)
+# ======================================================
+inv = _aplicar_inversor(inp, r_dc.potencia_kw)
 
-        r_ac = _aplicar_perdidas_ac(inp, inv.potencia_ac_kw)
+# ======================================================
+# 4. PÉRDIDAS AC (8760)
+# ======================================================
+r_ac = _aplicar_perdidas_ac(inp, inv.potencia_ac_kw)
 
-        potencia_dc.append(p_dc)
-        potencia_ac.append(r_ac.potencia_kw)
-        clipping.append(inv.clipping_kw)
+# ======================================================
+# 5. RESULTADOS
+# ======================================================
+return _construir_resultado(
+    inp,
+    potencia_dc,                 # DC original
+    r_ac.potencia_kw,            # AC final
+    inv.clipping_kw,             # clipping
+)
 
-    return _construir_resultado(
-        inp,
-        potencia_dc,
-        potencia_ac,
-        clipping,
-    )
+
