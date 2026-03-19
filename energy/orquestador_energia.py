@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 
-from energy.resultado_energia import EnergiaResultado
+from energy.contrato import EnergiaResultado, EnergiaInput
 from energy.sistema.agregacion_8760 import agregar_energia_por_mes
 
 import streamlit as st
@@ -10,36 +10,21 @@ import streamlit as st
 # ==========================================================
 # RESULTADO ERROR (ALINEADO A ResultadoPaneles)
 # ==========================================================
-
 def _resultado_error(inp, errores):
 
     paneles = inp.paneles
 
-    # ------------------------------------------------------
-    # POTENCIA DC INSTALADA
-    # ------------------------------------------------------
     pdc_kw = 0.0
-
     if paneles and hasattr(paneles, "array"):
         pdc_kw = paneles.array.pdc_kw
 
-    # ------------------------------------------------------
-    # RESULTADO
-    # ------------------------------------------------------
     return EnergiaResultado(
         ok=False,
         errores=errores,
 
         pdc_instalada_kw=pdc_kw,
         pac_nominal_kw=inp.pac_nominal_kw,
-
         dc_ac_ratio=0.0,
-
-        # 👇 FIX CRÍTICO
-        produccion_especifica_kwh_kwp=0.0,
-
-        # ⚠️ Mantén consistente con tu contrato
-        energia_horaria_kwh=[],
 
         energia_bruta_12m=[],
         energia_perdidas_12m=[],
@@ -53,9 +38,13 @@ def _resultado_error(inp, errores):
         energia_clipping_anual=0.0,
         energia_util_anual=0.0,
 
+        # defaults ya cubren:
+        # energia_horaria_kwh=[]
+        # produccion_especifica_kwh_kwp=0.0
+        # performance_ratio=0.0
+
         meta={}
     )
-
 # ==========================================================
 # 1. CLIMA + SOLAR
 # ==========================================================
