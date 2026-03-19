@@ -286,7 +286,7 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
         perdidas_dc_kw=r_dc.perdidas_kw,
         ac_bruta_kw=inv.potencia_ac_kw,
         clipping_kw=inv.clipping_kw,
-        ac_neta_kw=r_ac.potencia_kw,
+        ac_neta_kw=r_ac.potencia_neta_kw,
         perdidas_ac_kw=r_ac.perdidas_kw,
         energia_horaria_kwh=energia_horaria_kwh,
     )
