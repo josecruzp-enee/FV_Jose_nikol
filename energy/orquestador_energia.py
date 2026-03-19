@@ -218,46 +218,68 @@ def _construir_resultado(inp, potencia_dc_kw, potencia_ac_kw, clipping_kw):
 # ==========================================================
 def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
 
+    # ======================================================
+    # VALIDACIÓN
+    # ======================================================
+    errores = inp.validar()
+    if errores:
+        return _resultado_error(inp, errores)
 
-errores = inp.validar()
-if errores:
-    return _resultado_error(inp, errores)
+    # ======================================================
+    # SIMULACIÓN 8760
+    # ======================================================
+    estados = _simular_estado_8760(inp)
 
-# 🔥 SIMULACIÓN 8760
-estados = _simular_estado_8760(inp)
+    # ======================================================
+    # 1. DC BRUTA (8760)
+    # ======================================================
+    potencia_dc_bruta = [
+        _calcular_dc(inp, estado)
+        for estado in estados
+    ]
 
-# ======================================================
-# 1. DC (generar serie completa 8760)
-# ======================================================
-potencia_dc = []
+    # ======================================================
+    # 2. PÉRDIDAS DC (8760)
+    # ======================================================
+    r_dc = _aplicar_perdidas_dc(inp, potencia_dc_bruta)
+    # contrato esperado:
+    # r_dc.potencia_neta_kw
+    # r_dc.perdidas_kw
 
-for estado in estados:
-    p_dc = _calcular_dc(inp, estado)  # float por hora
-    potencia_dc.append(p_dc)
+    # ======================================================
+    # 3. INVERSOR (8760)
+    # ======================================================
+    inv = _aplicar_inversor(inp, r_dc.potencia_neta_kw)
+    # contrato esperado:
+    # inv.potencia_ac_kw
+    # inv.clipping_kw
 
-# ======================================================
-# 2. PÉRDIDAS DC (AHORA SÍ 8760)
-# ======================================================
-r_dc = _aplicar_perdidas_dc(inp, potencia_dc)
+    # ======================================================
+    # 4. PÉRDIDAS AC (8760)
+    # ======================================================
+    r_ac = _aplicar_perdidas_ac(inp, inv.potencia_ac_kw)
+    # contrato esperado:
+    # r_ac.potencia_kw
+    # r_ac.perdidas_kw
 
-# ======================================================
-# 3. INVERSOR (8760)
-# ======================================================
-inv = _aplicar_inversor(inp, r_dc.potencia_kw)
+    # ======================================================
+    # 5. ENERGÍA HORARIA (kWh)
+    # ======================================================
+    energia_horaria_kwh = r_ac.potencia_kw  # Δt = 1h
 
-# ======================================================
-# 4. PÉRDIDAS AC (8760)
-# ======================================================
-r_ac = _aplicar_perdidas_ac(inp, inv.potencia_ac_kw)
-
-# ======================================================
-# 5. RESULTADOS
-# ======================================================
-return _construir_resultado(
-    inp,
-    potencia_dc,                 # DC original
-    r_ac.potencia_kw,            # AC final
-    inv.clipping_kw,             # clipping
-)
+    # ======================================================
+    # 6. RESULTADO FINAL (TRAZABLE)
+    # ======================================================
+    return _construir_resultado(
+        inp=inp,
+        dc_bruta_kw=potencia_dc_bruta,
+        dc_neta_kw=r_dc.potencia_neta_kw,
+        perdidas_dc_kw=r_dc.perdidas_kw,
+        ac_bruta_kw=inv.potencia_ac_kw,
+        clipping_kw=inv.clipping_kw,
+        ac_neta_kw=r_ac.potencia_kw,
+        perdidas_ac_kw=r_ac.perdidas_kw,
+        energia_horaria_kwh=energia_horaria_kwh,
+    )
 
 
