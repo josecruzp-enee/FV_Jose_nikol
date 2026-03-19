@@ -61,61 +61,59 @@ def _simular_estado_8760(inp: EnergiaInput):
 # 2. DC
 # ==========================================================
 
-def _calcular_dc(inp: EnergiaInput, estado):
+# ==========================================================
+# CÁLCULO DE POTENCIA DC (ALINEADO A CONTRATO DICT)
+# ==========================================================
 
-    from energy.panel_energia.modelo_termico import (
-        calcular_temperatura_celda, ModeloTermicoInput
-    )
-    from energy.panel_energia.potencia_panel import (
-        calcular_potencia_panel, PotenciaPanelInput
-    )
+def _calcular_dc(inp, estado):
+    """
+    Calcula la potencia DC instantánea del sistema FV.
+
+    Basado en:
+        • POA (irradiancia)
+        • Potencia DC instalada (paneles)
+    """
 
     paneles = inp.paneles
-    array = paneles.array
-    string = paneles.strings[0]
 
-    potencia_dc_kw = []
+    # ------------------------------------------------------
+    # VALIDACIÓN FUERTE
+    # ------------------------------------------------------
+    if not isinstance(paneles, dict):
+        raise ValueError("paneles debe ser dict")
 
-    for hora in estado:
+    if not paneles.get("ok", False):
+        raise ValueError("paneles no válido")
 
-        if hora.poa_wm2 <= 0:
-            potencia_dc_kw.append(0.0)
-            continue
+    pdc_kw = paneles.get("pdc_total_kw")
 
-        # térmico
-        t_cell = calcular_temperatura_celda(
-            ModeloTermicoInput(
-                irradiancia_poa_wm2=hora.poa_wm2,
-                temperatura_ambiente_c=hora.temp_amb_c,
-                noct_c=45.0,
-            )
-        ).temperatura_celda_c
+    if pdc_kw is None:
+        raise ValueError("paneles sin pdc_total_kw")
 
-        # panel
-        panel = calcular_potencia_panel(
-            PotenciaPanelInput(
-                irradiancia_poa_wm2=hora.poa_wm2,
-                temperatura_celda_c=t_cell,
+    # ------------------------------------------------------
+    # DATOS BASE
+    # ------------------------------------------------------
+    poa = estado.poa_wm2  # irradiancia en plano
 
-                p_panel_w=array.p_panel_w,
-                vmp_panel_v=string.vmp_string_v / string.n_series,
-                voc_panel_v=string.voc_frio_string_v / string.n_series,
+    if poa is None:
+        raise ValueError("estado sin poa_wm2")
 
-                imp_panel_a=string.imp_string_a,
-                isc_panel_a=string.isc_string_a,
+    # ------------------------------------------------------
+    # MODELO FÍSICO SIMPLE
+    # ------------------------------------------------------
+    # Referencia: 1000 W/m² → potencia nominal
+    factor_irradiancia = poa / 1000.0
 
-                coef_potencia=array.coef_potencia,
-                coef_vmp=array.coef_vmp,
-                coef_voc=array.coef_voc,
-            )
-        )
+    # limitar a rango físico
+    if factor_irradiancia < 0:
+        factor_irradiancia = 0.0
 
-        p_array_w = panel.pmp_w * array.n_paneles_total
+    # ------------------------------------------------------
+    # POTENCIA DC
+    # ------------------------------------------------------
+    pdc_w = pdc_kw * 1000.0 * factor_irradiancia
 
-        potencia_dc_kw.append(p_array_w / 1000.0)
-
-    return potencia_dc_kw
-
+    return pdc_w
 
 # ==========================================================
 # 3. PÉRDIDAS DC
