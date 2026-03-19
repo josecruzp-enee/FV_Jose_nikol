@@ -111,6 +111,15 @@ from typing import Dict, List
 
 from .contrato import ResultadoPaneles, ArrayFV, StringFV
 
+from typing import List, Dict
+
+from .contrato import (
+    ResultadoPaneles,
+    ArrayFV,
+    StringFV,
+    RecomendacionStrings
+)
+
 
 def ejecutar_paneles(
     entrada
@@ -146,12 +155,34 @@ def ejecutar_paneles(
     if errores:
         return ResultadoPaneles(
             ok=False,
-            array=ArrayFV(pdc_kw=0.0, n_strings=0),
-            strings=[]
+            topologia="desconocida",
+            array=ArrayFV(
+                potencia_dc_w=0.0,
+                vdc_nom=0.0,
+                idc_nom=0.0,
+                voc_frio_array_v=0.0,
+                n_strings_total=0,
+                n_paneles_total=0,
+                strings_por_mppt=0,
+                n_mppt=0,
+                p_panel_w=0.0,
+            ),
+            recomendacion=RecomendacionStrings(
+                n_series=0,
+                n_strings_total=0,
+                strings_por_mppt=0,
+                vmp_string_v=0.0,
+                vmp_stc_string_v=0.0,
+                voc_frio_string_v=0.0,
+            ),
+            strings=[],
+            warnings=warnings,
+            errores=errores,
+            meta={},
         )
 
     # ------------------------------------------------------
-    # DIMENSIONADO DE PANELES
+    # DIMENSIONADO
     # ------------------------------------------------------
 
     dim = dimensionar_paneles(entrada)
@@ -159,8 +190,30 @@ def ejecutar_paneles(
     if not dim.ok:
         return ResultadoPaneles(
             ok=False,
-            array=ArrayFV(pdc_kw=0.0, n_strings=0),
-            strings=[]
+            topologia="desconocida",
+            array=ArrayFV(
+                potencia_dc_w=0.0,
+                vdc_nom=0.0,
+                idc_nom=0.0,
+                voc_frio_array_v=0.0,
+                n_strings_total=0,
+                n_paneles_total=0,
+                strings_por_mppt=0,
+                n_mppt=0,
+                p_panel_w=0.0,
+            ),
+            recomendacion=RecomendacionStrings(
+                n_series=0,
+                n_strings_total=0,
+                strings_por_mppt=0,
+                vmp_string_v=0.0,
+                vmp_stc_string_v=0.0,
+                voc_frio_string_v=0.0,
+            ),
+            strings=[],
+            warnings=warnings,
+            errores=dim.errores,
+            meta={},
         )
 
     n_paneles_total = dim.n_paneles
@@ -168,22 +221,39 @@ def ejecutar_paneles(
     if n_paneles_total <= 0:
         return ResultadoPaneles(
             ok=False,
-            array=ArrayFV(pdc_kw=0.0, n_strings=0),
-            strings=[]
+            topologia="desconocida",
+            array=ArrayFV(
+                potencia_dc_w=0.0,
+                vdc_nom=0.0,
+                idc_nom=0.0,
+                voc_frio_array_v=0.0,
+                n_strings_total=0,
+                n_paneles_total=0,
+                strings_por_mppt=0,
+                n_mppt=0,
+                p_panel_w=0.0,
+            ),
+            recomendacion=RecomendacionStrings(
+                n_series=0,
+                n_strings_total=0,
+                strings_por_mppt=0,
+                vmp_string_v=0.0,
+                vmp_stc_string_v=0.0,
+                voc_frio_string_v=0.0,
+            ),
+            strings=[],
+            warnings=warnings,
+            errores=["Número de paneles inválido"],
+            meta={},
         )
 
     # ------------------------------------------------------
-    # PARÁMETROS DE CÁLCULO
+    # CÁLCULO STRINGS
     # ------------------------------------------------------
 
     n_inversores = max(1, int(entrada.n_inversores or 1))
 
-    # ------------------------------------------------------
-    # CÁLCULO DE STRINGS
-    # ------------------------------------------------------
-
     resultado = calcular_strings_fv(
-
         n_paneles_total=n_paneles_total,
         panel=panel,
         inversor=inversor,
@@ -195,10 +265,6 @@ def ejecutar_paneles(
         t_oper_c=entrada.t_oper_c,
     )
 
-    # ------------------------------------------------------
-    # NORMALIZAR RESULTADO
-    # ------------------------------------------------------
-
     resultado.setdefault("ok", False)
     resultado.setdefault("errores", [])
     resultado.setdefault("warnings", [])
@@ -206,24 +272,78 @@ def ejecutar_paneles(
     resultado["warnings"] = warnings + list(resultado.get("warnings", []))
 
     resultado.setdefault("meta", {})
-
     resultado["meta"]["n_paneles_total"] = n_paneles_total
     resultado["meta"]["pdc_kw"] = dim.pdc_kw
     resultado["meta"]["n_inversores"] = n_inversores
 
     # ------------------------------------------------------
-    # SI HUBO ERROR EN STRINGS
+    # ERROR EN STRINGS
     # ------------------------------------------------------
 
     if not resultado.get("ok", False):
         return ResultadoPaneles(
             ok=False,
-            array=ArrayFV(pdc_kw=0.0, n_strings=0),
-            strings=[]
+            topologia="desconocida",
+            array=ArrayFV(
+                potencia_dc_w=0.0,
+                vdc_nom=0.0,
+                idc_nom=0.0,
+                voc_frio_array_v=0.0,
+                n_strings_total=0,
+                n_paneles_total=0,
+                strings_por_mppt=0,
+                n_mppt=0,
+                p_panel_w=0.0,
+            ),
+            recomendacion=RecomendacionStrings(
+                n_series=0,
+                n_strings_total=0,
+                strings_por_mppt=0,
+                vmp_string_v=0.0,
+                vmp_stc_string_v=0.0,
+                voc_frio_string_v=0.0,
+            ),
+            strings=[],
+            warnings=resultado.get("warnings", []),
+            errores=resultado.get("errores", []),
+            meta=resultado.get("meta", {}),
         )
 
     # ------------------------------------------------------
-    # CONVERTIR STRINGS → OBJETO
+    # ARRAY
+    # ------------------------------------------------------
+
+    meta = resultado.get("meta", {})
+
+    array = ArrayFV(
+        potencia_dc_w=meta.get("pdc_kw", 0.0) * 1000.0,
+        vdc_nom=resultado.get("vdc_nom", 0.0),
+        idc_nom=resultado.get("idc_nom", 0.0),
+        voc_frio_array_v=resultado.get("voc_frio_array_v", 0.0),
+        n_strings_total=resultado.get("n_strings_total", 0),
+        n_paneles_total=meta.get("n_paneles_total", 0),
+        strings_por_mppt=resultado.get("strings_por_mppt", 0),
+        n_mppt=resultado.get("n_mppt", 0),
+        p_panel_w=panel.pmax_w,
+    )
+
+    # ------------------------------------------------------
+    # RECOMENDACIÓN
+    # ------------------------------------------------------
+
+    rec = resultado.get("recomendacion", {})
+
+    recomendacion = RecomendacionStrings(
+        n_series=rec.get("n_series", 0),
+        n_strings_total=rec.get("n_strings_total", 0),
+        strings_por_mppt=rec.get("strings_por_mppt", 0),
+        vmp_string_v=rec.get("vmp_string_v", 0.0),
+        vmp_stc_string_v=rec.get("vmp_stc_string_v", 0.0),
+        voc_frio_string_v=rec.get("voc_frio_string_v", 0.0),
+    )
+
+    # ------------------------------------------------------
+    # STRINGS
     # ------------------------------------------------------
 
     strings_obj = []
@@ -232,34 +352,33 @@ def ejecutar_paneles(
 
         strings_obj.append(
             StringFV(
-                id=s["id"],
-                inversor=s["inversor"],
                 mppt=s["mppt"],
                 n_series=s["n_series"],
+                n_strings=s.get("n_strings", 1),
                 vmp_string_v=s["vmp_string_v"],
-                voc_string_v=s["voc_frio_string_v"],
+                voc_frio_string_v=s["voc_frio_string_v"],
                 imp_string_a=s["imp_string_a"],
                 isc_string_a=s["isc_string_a"],
+                i_mppt_a=s.get("i_mppt_a", 0.0),
+                isc_mppt_a=s.get("isc_mppt_a", 0.0),
+                imax_pv_a=s.get("imax_pv_a", 0.0),
+                idesign_cont_a=s.get("idesign_cont_a", 0.0),
             )
         )
 
     # ------------------------------------------------------
-    # ARRAY
-    # ------------------------------------------------------
-
-    array = ArrayFV(
-        pdc_kw=resultado.get("meta", {}).get("pdc_kw", 0.0),
-        n_strings=resultado.get("n_strings_total", len(strings_obj)),
-    )
-
-    # ------------------------------------------------------
-    # SALIDA FINAL (OBJETO)
+    # SALIDA FINAL
     # ------------------------------------------------------
 
     return ResultadoPaneles(
         ok=True,
+        topologia=resultado.get("topologia", "desconocida"),
         array=array,
+        recomendacion=recomendacion,
         strings=strings_obj,
+        warnings=resultado.get("warnings", []),
+        errores=resultado.get("errores", []),
+        meta=meta,
     )
 # ==========================================================
 # SALIDA DEL DOMINIO
