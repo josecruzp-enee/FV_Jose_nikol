@@ -68,138 +68,45 @@ from typing import Optional
 
 @dataclass(frozen=True)
 class EntradaPaneles:
-    """
-    Representa TODOS los datos necesarios para ejecutar
-    el dominio paneles.
-
-    Este objeto es inmutable y debe estar completamente
-    definido antes de entrar al dominio.
-    """
 
     # -----------------------------------------------------
     # ESPECIFICACIÓN DEL MÓDULO FV
     # -----------------------------------------------------
 
     panel: any
-    """
-    Objeto PanelSpec.
-
-    Contiene:
-        - pmax_w
-        - vmp_v
-        - voc_v
-        - imp_a
-        - isc_a
-        - coeficientes térmicos
-
-    Fuente:
-        catálogo de paneles (data / YAML)
-    """
 
     # -----------------------------------------------------
     # ESPECIFICACIÓN DEL INVERSOR
     # -----------------------------------------------------
 
     inversor: any
-    """
-    Objeto InversorSpec.
-
-    Contiene:
-        - rango MPPT
-        - número de MPPT
-        - corriente máxima por MPPT
-        - potencia nominal AC
-
-    Fuente:
-        catálogo de inversores
-    """
 
     # -----------------------------------------------------
     # CONFIGURACIÓN DEL SISTEMA
     # -----------------------------------------------------
 
-    n_paneles_total: Optional[int]
-    """
-    Número total de paneles (modo manual).
-
-    Si se define:
-        → se ignora pdc_kw_objetivo
-
-    Si es None:
-        → se usa modo automático
-    """
-
-    n_inversores: Optional[int]
-    """
-    Número de inversores en el sistema.
-
-    Default implícito:
-        1 si no se especifica
-    """
+    n_paneles_total: Optional[int] = None
+    n_inversores: Optional[int] = None
 
     # -----------------------------------------------------
     # CONDICIONES TÉRMICAS
     # -----------------------------------------------------
 
-    t_min_c: float
-    """
-    Temperatura mínima del sitio (°C).
-
-    Usada para:
-        cálculo de Voc en frío (condición crítica)
-    """
-
-    t_oper_c: float
-    """
-    Temperatura operativa típica (°C).
-
-    Usada para:
-        cálculo de Vmp real del sistema
-    """
+    t_min_c: float = 25.0
+    t_oper_c: float = 55.0
 
     # -----------------------------------------------------
     # CONFIGURACIÓN FÍSICA
     # -----------------------------------------------------
 
-    dos_aguas: bool
-    """
-    Indica si el sistema está distribuido en dos orientaciones.
-
-    True:
-        distribución por MPPT separada
-
-    False:
-        sistema uniforme
-    """
+    dos_aguas: bool = False
 
     # -----------------------------------------------------
     # OBJETIVO DE DISEÑO
     # -----------------------------------------------------
 
-    objetivo_dc_ac: Optional[float]
-    """
-    Relación DC/AC objetivo.
-
-    Ejemplo:
-        1.2 → sobredimensionamiento DC
-
-    Usado en:
-        optimización de strings
-    """
-
-    pdc_kw_objetivo: Optional[float]
-    """
-    Potencia DC objetivo (kW).
-
-    Usado en modo automático:
-
-        demanda → cobertura → potencia requerida
-
-    Si se define:
-        se calcula n_paneles automáticamente
-    """
-
-
+    objetivo_dc_ac: Optional[float] = None
+    pdc_kw_objetivo: Optional[float] = None
 # =========================================================
 # RELACIÓN CON LA SALIDA DEL DOMINIO
 # =========================================================
