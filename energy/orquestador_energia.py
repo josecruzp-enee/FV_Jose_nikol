@@ -10,16 +10,32 @@ import streamlit as st
 # ERROR
 # ==========================================================
 
-def _resultado_error(inp: EnergiaInput, errores: list[str]) -> EnergiaResultado:
+# ==========================================================
+# RESULTADO ERROR (ALINEADO A DICT)
+# ==========================================================
 
-    pdc_kw = inp.paneles.array.potencia_dc_w / 1000 if inp.paneles else 0.0
+def _resultado_error(inp, errores):
 
+    paneles = inp.paneles
+
+    # ------------------------------------------------------
+    # POTENCIA DC INSTALADA
+    # ------------------------------------------------------
+    pdc_kw = 0.0
+
+    if isinstance(paneles, dict):
+        pdc_kw = paneles.get("pdc_total_kw", 0.0)
+
+    # ------------------------------------------------------
+    # RESULTADO
+    # ------------------------------------------------------
     return EnergiaResultado(
         ok=False,
         errores=errores,
 
         pdc_instalada_kw=pdc_kw,
         pac_nominal_kw=inp.pac_nominal_kw,
+
         dc_ac_ratio=0.0,
 
         energia_horaria=[],
@@ -36,9 +52,8 @@ def _resultado_error(inp: EnergiaInput, errores: list[str]) -> EnergiaResultado:
         energia_clipping_anual=0.0,
         energia_util_anual=0.0,
 
-        meta={"estado": "error"},
+        meta={}
     )
-
 
 # ==========================================================
 # 1. CLIMA + SOLAR
