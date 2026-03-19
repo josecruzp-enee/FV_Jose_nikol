@@ -216,26 +216,36 @@ def _construir_resultado(inp, potencia_dc_kw, potencia_ac_kw, clipping_kw):
 # ==========================================================
 # MAIN
 # ==========================================================
-
 def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
 
     errores = inp.validar()
     if errores:
         return _resultado_error(inp, errores)
 
-    estado = _simular_estado_8760(inp)
+    # 🔥 SIMULACIÓN 8760
+    estados = _simular_estado_8760(inp)
 
-    potencia_dc = _calcular_dc(inp, estado)
+    potencia_dc = []
+    potencia_ac = []
+    clipping = []
 
-    r_dc = _aplicar_perdidas_dc(inp, potencia_dc)
+    for estado in estados:
 
-    inv = _aplicar_inversor(inp, r_dc.potencia_kw)
+        p_dc = _calcular_dc(inp, estado)
 
-    r_ac = _aplicar_perdidas_ac(inp, inv.potencia_ac_kw)
+        r_dc = _aplicar_perdidas_dc(inp, p_dc)
+
+        inv = _aplicar_inversor(inp, r_dc.potencia_kw)
+
+        r_ac = _aplicar_perdidas_ac(inp, inv.potencia_ac_kw)
+
+        potencia_dc.append(p_dc)
+        potencia_ac.append(r_ac.potencia_kw)
+        clipping.append(inv.clipping_kw)
 
     return _construir_resultado(
         inp,
         potencia_dc,
-        r_ac.potencia_kw,
-        inv.clipping_kw,
+        potencia_ac,
+        clipping,
     )
