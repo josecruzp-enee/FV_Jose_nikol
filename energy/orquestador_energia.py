@@ -152,19 +152,45 @@ def _aplicar_inversor(inp: EnergiaInput, potencia_dc_kw):
 # ==========================================================
 # PÉRDIDAS AC
 # ==========================================================
+# ==========================================================
+# PÉRDIDAS AC (CORREGIDO - TRAZABLE)
+# ==========================================================
 def _aplicar_perdidas_ac(inp: EnergiaInput, potencia_ac_kw):
 
     from energy.sistema.perdidas_ac import (
         aplicar_perdidas_ac, PerdidasACInput
     )
+    from dataclasses import dataclass
+    from typing import List
 
-    return aplicar_perdidas_ac(
+    # ------------------------------------------------------
+    # CONTRATO CORRECTO
+    # ------------------------------------------------------
+    @dataclass(frozen=True)
+    class ResultadoAC:
+        potencia_bruta_kw: List[float]
+        potencia_neta_kw: List[float]
+        perdidas_kw: List[float]
+
+    base = aplicar_perdidas_ac(
         PerdidasACInput(
             potencia_kw=potencia_ac_kw,
             perdidas_ac_pct=inp.perdidas_ac_pct,
         )
     )
 
+    potencia_neta = base.potencia_kw
+
+    perdidas = [
+        p_in - p_out
+        for p_in, p_out in zip(potencia_ac_kw, potencia_neta)
+    ]
+
+    return ResultadoAC(
+        potencia_bruta_kw=potencia_ac_kw,
+        potencia_neta_kw=potencia_neta,
+        perdidas_kw=perdidas,
+    )
 
 # ==========================================================
 # RESULTADO (CORREGIDO)
@@ -251,7 +277,7 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
 
     r_ac = _aplicar_perdidas_ac(inp, inv.potencia_ac_kw)
 
-    energia_horaria_kwh = r_ac.potencia_kw
+    energia_horaria_kwh = r_ac.potencia_neta_kw
 
     return _construir_resultado(
         inp=inp,
