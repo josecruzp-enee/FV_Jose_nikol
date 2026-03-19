@@ -1,90 +1,33 @@
 from __future__ import annotations
 
 """
-ORQUESTADOR DEL DOMINIO PANELES
-=====================================================
+ORQUESTADOR DEL DOMINIO PANELES — VERSION FINAL
+==============================================
 
-Este módulo coordina el cálculo completo del generador
-fotovoltaico.
+Coordina:
 
-Responsabilidad:
-    Coordinar motores del dominio paneles.
+    EntradaPaneles
+        ↓
+    validaciones
+        ↓
+    dimensionado
+        ↓
+    cálculo de strings
+        ↓
+    ResultadoPaneles (TIPADO)
 
-Este módulo NO implementa cálculos eléctricos complejos.
-
----------------------------------------------------------
-FLUJO DEL DOMINIO
----------------------------------------------------------
-
-EntradaPaneles
-    ↓
-validaciones
-    ↓
-dimensionado de paneles
-    ↓
-cálculo de strings
-    ↓
-resultado final del dominio
-
-
----------------------------------------------------------
-ENTRADA
----------------------------------------------------------
-
-entrada : EntradaPaneles
-
-Contiene:
-
-    panel : PanelSpec
-    inversor : InversorSpec
-
-    n_paneles_total : int
-    n_inversores : int | None
-
-    t_min_c : float
-    t_oper_c : float
-
-    dos_aguas : bool
-
-    objetivo_dc_ac : float | None
-    pdc_kw_objetivo : float | None
-
-
----------------------------------------------------------
-SALIDA
----------------------------------------------------------
-
-dict
-
-{
-    ok : bool
-
-    errores : list[str]
-
-    warnings : list[str]
-
-    strings : list
-
-    recomendacion : {...}
-
-    bounds : {...}
-
-    meta : {
-        n_paneles_total
-        pdc_kw
-        n_inversores
-    }
-}
+REGLA:
+    - NO dict
+    - NO get
+    - NO lógica eléctrica
+    - SOLO orquestación
 """
 
-from typing import Dict, List
+from typing import List
 
-from electrical.modelos.paneles import PanelSpec
-from electrical.modelos.inversor import InversorSpec
-
-from .calculo_de_strings import calcular_strings_fv
-from .dimensionado_paneles import dimensionar_paneles
 from .entrada_panel import EntradaPaneles
+from .dimensionado_paneles import dimensionar_paneles
+from .calculo_de_strings import calcular_strings_fv
 
 from .validacion_strings import (
     validar_panel,
@@ -92,38 +35,54 @@ from .validacion_strings import (
     validar_parametros_generales,
 )
 
-# ==========================================================
-# DEBUG STREAMLIT (solo si existe)
-# ==========================================================
-
-try:
-    import streamlit as st
-    DEBUG_UI = True
-except Exception:
-    DEBUG_UI = False
-
-
-# ==========================================================
-# ORQUESTADOR PRINCIPAL
-# ==========================================================
-
-from typing import Dict, List
-
-from .resultado_paneles import ResultadoPaneles, ArrayFV, StringFV
-
-from typing import List, Dict
-
-from .contrato import (
+from .resultado_paneles import (
     ResultadoPaneles,
     ArrayFV,
     StringFV,
-    RecomendacionStrings
+    RecomendacionStrings,
 )
 
 
-def ejecutar_paneles(
-    entrada
-) -> ResultadoPaneles:
+# =========================================================
+# HELPERS
+# =========================================================
+
+def _resultado_error(errores: List[str], warnings: List[str]) -> ResultadoPaneles:
+
+    return ResultadoPaneles(
+        ok=False,
+        topologia="desconocida",
+        array=ArrayFV(
+            potencia_dc_w=0.0,
+            vdc_nom=0.0,
+            idc_nom=0.0,
+            voc_frio_array_v=0.0,
+            n_strings_total=0,
+            n_paneles_total=0,
+            strings_por_mppt=0,
+            n_mppt=0,
+            p_panel_w=0.0,
+        ),
+        recomendacion=RecomendacionStrings(
+            n_series=0,
+            n_strings_total=0,
+            strings_por_mppt=0,
+            vmp_string_v=0.0,
+            vmp_stc_string_v=0.0,
+            voc_frio_string_v=0.0,
+        ),
+        strings=[],
+        warnings=warnings,
+        errores=errores,
+        meta={},
+    )
+
+
+# =========================================================
+# ORQUESTADOR PRINCIPAL
+# =========================================================
+
+def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
 
     errores: List[str] = []
     warnings: List[str] = []
@@ -131,263 +90,135 @@ def ejecutar_paneles(
     panel = entrada.panel
     inversor = entrada.inversor
 
-    # ------------------------------------------------------
+    # ======================================================
     # VALIDACIONES
-    # ------------------------------------------------------
+    # ======================================================
 
-    e, w = validar_panel(panel)
-    errores += e
-    warnings += w
+    val = validar_panel(panel)
+    errores += val.errores
+    warnings += val.warnings
 
-    e, w = validar_inversor(inversor)
-    errores += e
-    warnings += w
+    val = validar_inversor(inversor)
+    errores += val.errores
+    warnings += val.warnings
 
-    e, w = validar_parametros_generales(
+    val = validar_parametros_generales(
         entrada.n_paneles_total,
         entrada.t_min_c,
         entrada.t_oper_c,
     )
-
-    errores += e
-    warnings += w
+    errores += val.errores
+    warnings += val.warnings
 
     if errores:
-        return ResultadoPaneles(
-            ok=False,
-            topologia="desconocida",
-            array=ArrayFV(
-                potencia_dc_w=0.0,
-                vdc_nom=0.0,
-                idc_nom=0.0,
-                voc_frio_array_v=0.0,
-                n_strings_total=0,
-                n_paneles_total=0,
-                strings_por_mppt=0,
-                n_mppt=0,
-                p_panel_w=0.0,
-            ),
-            recomendacion=RecomendacionStrings(
-                n_series=0,
-                n_strings_total=0,
-                strings_por_mppt=0,
-                vmp_string_v=0.0,
-                vmp_stc_string_v=0.0,
-                voc_frio_string_v=0.0,
-            ),
-            strings=[],
-            warnings=warnings,
-            errores=errores,
-            meta={},
-        )
+        return _resultado_error(errores, warnings)
 
-    # ------------------------------------------------------
+    # ======================================================
     # DIMENSIONADO
-    # ------------------------------------------------------
+    # ======================================================
 
     dim = dimensionar_paneles(entrada)
 
     if not dim.ok:
-        return ResultadoPaneles(
-            ok=False,
-            topologia="desconocida",
-            array=ArrayFV(
-                potencia_dc_w=0.0,
-                vdc_nom=0.0,
-                idc_nom=0.0,
-                voc_frio_array_v=0.0,
-                n_strings_total=0,
-                n_paneles_total=0,
-                strings_por_mppt=0,
-                n_mppt=0,
-                p_panel_w=0.0,
-            ),
-            recomendacion=RecomendacionStrings(
-                n_series=0,
-                n_strings_total=0,
-                strings_por_mppt=0,
-                vmp_string_v=0.0,
-                vmp_stc_string_v=0.0,
-                voc_frio_string_v=0.0,
-            ),
-            strings=[],
-            warnings=warnings,
-            errores=dim.errores,
-            meta={},
-        )
+        return _resultado_error(dim.errores, warnings)
 
-    n_paneles_total = dim.n_paneles
+    if dim.n_paneles <= 0:
+        return _resultado_error(["Número de paneles inválido"], warnings)
 
-    if n_paneles_total <= 0:
-        return ResultadoPaneles(
-            ok=False,
-            topologia="desconocida",
-            array=ArrayFV(
-                potencia_dc_w=0.0,
-                vdc_nom=0.0,
-                idc_nom=0.0,
-                voc_frio_array_v=0.0,
-                n_strings_total=0,
-                n_paneles_total=0,
-                strings_por_mppt=0,
-                n_mppt=0,
-                p_panel_w=0.0,
-            ),
-            recomendacion=RecomendacionStrings(
-                n_series=0,
-                n_strings_total=0,
-                strings_por_mppt=0,
-                vmp_string_v=0.0,
-                vmp_stc_string_v=0.0,
-                voc_frio_string_v=0.0,
-            ),
-            strings=[],
-            warnings=warnings,
-            errores=["Número de paneles inválido"],
-            meta={},
-        )
-
-    # ------------------------------------------------------
-    # CÁLCULO STRINGS
-    # ------------------------------------------------------
+    # ======================================================
+    # STRINGS
+    # ======================================================
 
     n_inversores = max(1, int(entrada.n_inversores or 1))
 
-    resultado = calcular_strings_fv(
-        n_paneles_total=n_paneles_total,
+    strings_res = calcular_strings_fv(
+        n_paneles_total=dim.n_paneles,
         panel=panel,
         inversor=inversor,
         n_inversores=n_inversores,
         t_min_c=float(entrada.t_min_c),
-        dos_aguas=bool(entrada.dos_aguas),
+        t_oper_c=entrada.t_oper_c,
+        dos_aguas=entrada.dos_aguas,
         objetivo_dc_ac=entrada.objetivo_dc_ac,
         pdc_kw_objetivo=entrada.pdc_kw_objetivo,
-        t_oper_c=entrada.t_oper_c,
     )
 
-    resultado.setdefault("ok", False)
-    resultado.setdefault("errores", [])
-    resultado.setdefault("warnings", [])
+    warnings += strings_res.warnings
 
-    resultado["warnings"] = warnings + list(resultado.get("warnings", []))
+    if not strings_res.ok:
+        return _resultado_error(strings_res.errores, warnings)
 
-    resultado.setdefault("meta", {})
-    resultado["meta"]["n_paneles_total"] = n_paneles_total
-    resultado["meta"]["pdc_kw"] = dim.pdc_kw
-    resultado["meta"]["n_inversores"] = n_inversores
-
-    # ------------------------------------------------------
-    # ERROR EN STRINGS
-    # ------------------------------------------------------
-
-    if not resultado.get("ok", False):
-        return ResultadoPaneles(
-            ok=False,
-            topologia="desconocida",
-            array=ArrayFV(
-                potencia_dc_w=0.0,
-                vdc_nom=0.0,
-                idc_nom=0.0,
-                voc_frio_array_v=0.0,
-                n_strings_total=0,
-                n_paneles_total=0,
-                strings_por_mppt=0,
-                n_mppt=0,
-                p_panel_w=0.0,
-            ),
-            recomendacion=RecomendacionStrings(
-                n_series=0,
-                n_strings_total=0,
-                strings_por_mppt=0,
-                vmp_string_v=0.0,
-                vmp_stc_string_v=0.0,
-                voc_frio_string_v=0.0,
-            ),
-            strings=[],
-            warnings=resultado.get("warnings", []),
-            errores=resultado.get("errores", []),
-            meta=resultado.get("meta", {}),
-        )
-
-    # ------------------------------------------------------
-    # ARRAY
-    # ------------------------------------------------------
-
-    meta = resultado.get("meta", {})
+    # ======================================================
+    # ARRAY FV
+    # ======================================================
 
     array = ArrayFV(
-        potencia_dc_w=meta.get("pdc_kw", 0.0) * 1000.0,
-        vdc_nom=resultado.get("vdc_nom", 0.0),
-        idc_nom=resultado.get("idc_nom", 0.0),
-        voc_frio_array_v=resultado.get("voc_frio_array_v", 0.0),
-        n_strings_total=resultado.get("n_strings_total", 0),
-        n_paneles_total=meta.get("n_paneles_total", 0),
-        strings_por_mppt=resultado.get("strings_por_mppt", 0),
-        n_mppt=resultado.get("n_mppt", 0),
+        potencia_dc_w=dim.pdc_kw * 1000.0,
+        vdc_nom=strings_res.recomendacion.vmp_string_v,
+        idc_nom=0.0,  # lo puedes calcular después en dominio corrientes
+        voc_frio_array_v=strings_res.recomendacion.voc_string_v,
+        n_strings_total=strings_res.recomendacion.n_strings_total,
+        n_paneles_total=dim.n_paneles,
+        strings_por_mppt=0,  # opcional: mover a strings_res después
+        n_mppt=inversor.n_mppt,
         p_panel_w=panel.pmax_w,
     )
 
-    # ------------------------------------------------------
-    # RECOMENDACIÓN
-    # ------------------------------------------------------
-
-    rec = resultado.get("recomendacion", {})
+    # ======================================================
+    # RECOMENDACION
+    # ======================================================
 
     recomendacion = RecomendacionStrings(
-        n_series=rec.get("n_series", 0),
-        n_strings_total=rec.get("n_strings_total", 0),
-        strings_por_mppt=rec.get("strings_por_mppt", 0),
-        vmp_string_v=rec.get("vmp_string_v", 0.0),
-        vmp_stc_string_v=rec.get("vmp_stc_string_v", 0.0),
-        voc_frio_string_v=rec.get("voc_frio_string_v", 0.0),
+        n_series=strings_res.recomendacion.n_series,
+        n_strings_total=strings_res.recomendacion.n_strings_total,
+        strings_por_mppt=0,
+        vmp_string_v=strings_res.recomendacion.vmp_string_v,
+        vmp_stc_string_v=strings_res.recomendacion.vmp_string_v,
+        voc_frio_string_v=strings_res.recomendacion.voc_string_v,
     )
 
-    # ------------------------------------------------------
-    # STRINGS
-    # ------------------------------------------------------
+    # ======================================================
+    # STRINGS → DOMAIN OBJECT
+    # ======================================================
 
-    strings_obj = []
-
-    for s in resultado.get("strings", []):
-
-        strings_obj.append(
-            StringFV(
-                mppt=s["mppt"],
-                n_series=s["n_series"],
-                n_strings=s.get("n_strings", 1),
-                vmp_string_v=s["vmp_string_v"],
-                voc_frio_string_v=s["voc_frio_string_v"],
-                imp_string_a=s["imp_string_a"],
-                isc_string_a=s["isc_string_a"],
-                i_mppt_a=s.get("i_mppt_a", 0.0),
-                isc_mppt_a=s.get("isc_mppt_a", 0.0),
-                imax_pv_a=s.get("imax_pv_a", 0.0),
-                idesign_cont_a=s.get("idesign_cont_a", 0.0),
-            )
+    strings_obj = [
+        StringFV(
+            mppt=s.mppt,
+            n_series=s.n_series,
+            n_strings=1,  # cada instancia es un string individual
+            vmp_string_v=s.vmp_string_v,
+            voc_frio_string_v=s.voc_frio_string_v,
+            imp_string_a=s.imp_string_a,
+            isc_string_a=s.isc_string_a,
+            i_mppt_a=s.imp_string_a,
+            isc_mppt_a=s.isc_string_a,
+            imax_pv_a=0.0,
+            idesign_cont_a=0.0,
         )
+        for s in strings_res.strings
+    ]
 
-    # ------------------------------------------------------
+    # ======================================================
+    # META
+    # ======================================================
+
+    meta = {
+        "n_paneles_total": dim.n_paneles,
+        "pdc_kw": dim.pdc_kw,
+        "n_inversores": n_inversores,
+    }
+
+    # ======================================================
     # SALIDA FINAL
-    # ------------------------------------------------------
+    # ======================================================
 
     return ResultadoPaneles(
         ok=True,
-        topologia=resultado.get("topologia", "desconocida"),
+        topologia="string-centralizado",
         array=array,
         recomendacion=recomendacion,
         strings=strings_obj,
-        warnings=resultado.get("warnings", []),
-        errores=resultado.get("errores", []),
+        warnings=warnings,
+        errores=[],
         meta=meta,
     )
-# ==========================================================
-# SALIDA DEL DOMINIO
-# ==========================================================
-
-"""
-ejecutar_paneles(entrada: EntradaPaneles) -> Dict
-
-Consumido por:
-
-    core.aplicacion.orquestador_estudio
-"""
