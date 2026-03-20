@@ -1,207 +1,267 @@
-"""
-Subdominio corrientes — FV Engine
-
-Responsabilidad:
-- Calcular corrientes eléctricas del sistema FV.
-- Separar niveles eléctricos reales:
-
-    panel → string → MPPT → inversor → sistema AC
-
-Salida estable para:
-- protecciones
-- conductores
-"""
-
 from __future__ import annotations
 
+"""
+SUBDOMINIO CORRIENTES — FV ENGINE
+================================
+
+🔷 PROPÓSITO
+----------------------------------------------------------
+Aplicar factores de diseño (NEC) a corrientes YA calculadas.
+
+Este módulo:
+    ✔ NO calcula física base
+    ✔ NO reconstruye strings
+    ✔ SOLO transforma datos provenientes de ResultadoPaneles
+
+----------------------------------------------------------
+🔷 FUENTE DE VERDAD
+----------------------------------------------------------
+
+ResultadoPaneles:
+    → array.idc_nom     (corriente total DC)
+    → array.isc_total   (corriente máxima DC)
+    → strings           (corriente por string)
+"""
+
+from dataclasses import dataclass
 import math
-from typing import Any, Mapping
+from typing import List
 
-from .resultado_corriente import ResultadoCorrientes, NivelCorriente
-
-
-ResultadoStrings = Mapping[str, Any]
-EntradaInversor = Mapping[str, Any]
+from electrical.paneles.resultado_paneles import ResultadoPaneles
 
 
 # ==========================================================
-# UTILIDADES SEGURAS
+# NIVEL DE CORRIENTE
 # ==========================================================
 
-def _get(m: Mapping[str, Any] | None, k: str, default: Any = None) -> Any:
-    if m is None:
-        return default
-    try:
-        return m.get(k, default)
-    except Exception:
-        return default
+@dataclass(frozen=True)
+class NivelCorriente:
+    """
+    Representa una corriente en un nivel del sistema.
+
+    i_operacion_a → corriente real
+    i_diseno_a    → corriente con factor NEC aplicado
+    """
+
+    i_operacion_a: float
+    i_diseno_a: float
 
 
-def _f(m: Mapping[str, Any] | None, k: str, default: float = 0.0) -> float:
-    try:
-        v = _get(m, k, default)
-        return float(v) if v is not None else float(default)
-    except Exception:
-        return float(default)
+# ==========================================================
+# RESULTADO FINAL
+# ==========================================================
+
+@dataclass(frozen=True)
+class ResultadoCorrientes:
+    """
+    Corrientes del sistema FV separadas por nivel eléctrico.
+    """
+
+    panel: NivelCorriente
+    string: NivelCorriente
+    mppt: NivelCorriente
+    dc_total: NivelCorriente
+    ac: NivelCorriente
 
 
-def _i(m: Mapping[str, Any] | None, k: str, default: int = 0) -> int:
-    try:
-        v = _get(m, k, default)
-        return int(v) if v is not None else int(default)
-    except Exception:
-        return int(default)
+# ==========================================================
+# ENTRADA TIPADA
+# ==========================================================
+
+@dataclass(frozen=True)
+class CorrientesInput:
+    """
+    VARIABLES DE ENTRADA
+
+    paneles:
+        → ResultadoPaneles (fuente completa DC)
+
+    kw_ac:
+        → potencia del inversor [kW]
+
+    vac:
+        → voltaje AC [V]
+
+    fases:
+        → 1 o 3
+
+    fp:
+        → factor de potencia
+
+    factor_dc:
+        → factor NEC DC (default 1.25)
+
+    factor_ac:
+        → factor NEC AC (default 1.25)
+    """
+
+    paneles: ResultadoPaneles
+
+    kw_ac: float
+    vac: float
+    fases: int = 1
+    fp: float = 1.0
+
+    factor_dc: float = 1.25
+    factor_ac: float = 1.25
 
 
 # ==========================================================
 # MOTOR PRINCIPAL
 # ==========================================================
 
-def calcular_corrientes(
-    strings: ResultadoStrings,
-    inv: EntradaInversor,
-    cfg_tecnicos: Mapping[str, Any] | None = None,
-) -> ResultadoCorrientes:
+def calcular_corrientes(inp: CorrientesInput) -> ResultadoCorrientes:
 
-    cfg_tecnicos = cfg_tecnicos or {}
+    array = inp.paneles.array
+    strings = inp.paneles.strings
 
-    f_dc = float(cfg_tecnicos.get("factor_seguridad_dc", 1.25))
-    f_ac = float(cfg_tecnicos.get("factor_seguridad_ac", 1.25))
+    if not strings:
+        raise ValueError("No hay strings definidos")
 
-    # ======================================================
-    # Adaptador entrada resultado strings
-    # ======================================================
+    s0 = strings[0]
 
-    if isinstance(strings, dict) and "strings" in strings:
+    # ---------------- PANEL ----------------
+    i_panel_operacion = s0.isc_string_a
+    i_panel_diseno = i_panel_operacion * inp.factor_dc
 
-        lista = strings.get("strings", [])
-        rec = strings.get("recomendacion", {})
+    # ---------------- STRING ----------------
+    i_string_operacion = s0.imp_string_a
+    i_string_diseno = s0.isc_string_a * inp.factor_dc
 
-        if not lista:
-            raise ValueError("Resultado strings vacío")
+    # ---------------- MPPT ----------------
+    strings_por_mppt = array.strings_por_mppt
 
-        s0 = lista[0]
+    i_mppt_operacion = s0.imp_string_a * strings_por_mppt
+    i_mppt_diseno = (s0.isc_string_a * strings_por_mppt) * inp.factor_dc
 
-        strings_por_mppt = _i(s0, "n_paralelo", 1)
-        n_strings_total = _i(rec, "n_strings_total", 0)
+    # ---------------- DC TOTAL ----------------
+    i_dc_operacion = array.idc_nom
+    i_dc_diseno = array.isc_total * inp.factor_dc
 
-        imp_string = _f(s0, "imp_string_a", 0.0)
-        isc_string = _f(s0, "isc_string_a", 0.0)
+    # ---------------- AC ----------------
+    p_w = inp.kw_ac * 1000.0
 
-        i_panel = isc_string
-
+    if inp.vac <= 0 or p_w <= 0:
+        i_ac_operacion = 0.0
     else:
-
-        imp_string = _f(strings, "imp_string_a", 0.0)
-        isc_string = _f(strings, "isc_string_a", 0.0)
-
-        strings_por_mppt = _i(strings, "strings_por_mppt", 1)
-        n_strings_total = _i(strings, "n_strings_total", 0)
-
-        i_panel = _f(strings, "panel_i", isc_string)
-
-    if n_strings_total <= 0:
-        raise ValueError("n_strings_total inválido para cálculo de corrientes")
-
-    # ======================================================
-    # STRING
-    # ======================================================
-
-    i_string_operacion = imp_string
-    i_string_diseno = isc_string * f_dc
-
-    # ======================================================
-    # MPPT
-    # ======================================================
-
-    i_mppt_operacion = imp_string * strings_por_mppt
-    isc_mppt = isc_string * strings_por_mppt
-
-    i_mppt_diseno = isc_mppt * f_dc
-
-    # ======================================================
-    # DC TOTAL
-    # ======================================================
-
-    i_dc_total_operacion = imp_string * n_strings_total
-    isc_total = isc_string * n_strings_total
-
-    # NEC 690.8
-    i_dc_diseno = isc_total * f_dc
-
-    # ======================================================
-    # AC
-    # ======================================================
-
-    i_ac_max_ds = _f(inv, "i_ac_max_a", 0.0)
-
-    if i_ac_max_ds > 0:
-
-        i_ac = i_ac_max_ds
-
-    else:
-
-        kw_ac = _f(inv, "kw_ac", 0.0)
-        if kw_ac <= 0:
-            kw_ac = _f(inv, "potencia_ac_kw", 0.0)
-
-        p_w = kw_ac * 1000.0
-
-        v = _f(inv, "v_ac_nom_v", 0.0)
-        if v <= 0:
-            v = _f(inv, "vac", 0.0)
-
-        fases = _i(inv, "fases", 1)
-
-        fp = _f(inv, "fp", 1.0)
-        if fp <= 0:
-            fp = 1.0
-
-        if v <= 0 or p_w <= 0:
-
-            i_ac = 0.0
-
+        if inp.fases == 3:
+            i_ac_operacion = p_w / (math.sqrt(3) * inp.vac * inp.fp)
         else:
+            i_ac_operacion = p_w / (inp.vac * inp.fp)
 
-            if fases == 3:
-                i_ac = p_w / (math.sqrt(3) * v * fp)
-            else:
-                i_ac = p_w / (v * fp)
+    i_ac_diseno = i_ac_operacion * inp.factor_ac
 
-    i_ac_diseno = i_ac * f_ac
-
-    # ======================================================
-    # RESULTADO TIPADO
-    # ======================================================
-    print("DEBUG CORRIENTES RESULTADO")
-    print("I string:", i_string_operacion)
-    print("I mppt:", i_mppt_operacion)
-    print("I dc:", i_dc_total_operacion)
-    print("I ac:", i_ac)
     return ResultadoCorrientes(
 
         panel=NivelCorriente(
-            i_operacion_a=float(i_panel),
-            i_diseno_a=float(i_panel * f_dc),
+            i_operacion_a=i_panel_operacion,
+            i_diseno_a=i_panel_diseno,
         ),
 
         string=NivelCorriente(
-            i_operacion_a=float(i_string_operacion),
-            i_diseno_a=float(i_string_diseno),
+            i_operacion_a=i_string_operacion,
+            i_diseno_a=i_string_diseno,
         ),
 
         mppt=NivelCorriente(
-            i_operacion_a=float(i_mppt_operacion),
-            i_diseno_a=float(i_mppt_diseno),
+            i_operacion_a=i_mppt_operacion,
+            i_diseno_a=i_mppt_diseno,
         ),
 
         dc_total=NivelCorriente(
-            i_operacion_a=float(i_dc_total_operacion),
-            i_diseno_a=float(i_dc_diseno),
+            i_operacion_a=i_dc_operacion,
+            i_diseno_a=i_dc_diseno,
         ),
 
         ac=NivelCorriente(
-            i_operacion_a=float(i_ac),
-            i_diseno_a=float(i_ac_diseno),
+            i_operacion_a=i_ac_operacion,
+            i_diseno_a=i_ac_diseno,
         ),
     )
+
+
+# ==========================================================
+# RESUMEN DE VARIABLES DE SALIDA
+# ==========================================================
+
+"""
+SALIDA: ResultadoCorrientes
+==========================
+
+Cada nivel devuelve un objeto NivelCorriente con:
+
+    i_operacion_a → corriente real del sistema
+    i_diseno_a    → corriente con factor NEC aplicado
+
+----------------------------------------------------------
+
+1. PANEL
+----------------------------------------------------------
+panel.i_operacion_a
+    = corriente de corto circuito del módulo (Isc)
+
+panel.i_diseno_a
+    = Isc × 1.25 (NEC)
+
+----------------------------------------------------------
+
+2. STRING
+----------------------------------------------------------
+string.i_operacion_a
+    = corriente de operación del string (Imp)
+
+string.i_diseno_a
+    = Isc_string × 1.25
+
+----------------------------------------------------------
+
+3. MPPT
+----------------------------------------------------------
+mppt.i_operacion_a
+    = corriente total que entra a un MPPT
+    = Imp_string × strings_por_mppt
+
+mppt.i_diseno_a
+    = Isc_string × strings_por_mppt × 1.25
+
+----------------------------------------------------------
+
+4. DC TOTAL (GENERADOR FV)
+----------------------------------------------------------
+dc_total.i_operacion_a
+    = corriente total del generador DC
+    = array.idc_nom  (VIENE DE PANELES)
+
+dc_total.i_diseno_a
+    = corriente máxima DC × 1.25
+    = array.isc_total × 1.25
+
+----------------------------------------------------------
+
+5. AC (SALIDA DEL INVERSOR)
+----------------------------------------------------------
+ac.i_operacion_a
+    = corriente AC real del inversor
+    = P / (V × fp)  ó  P / (√3 × V × fp)
+
+ac.i_diseno_a
+    = corriente AC × 1.25
+
+----------------------------------------------------------
+
+USO DE SALIDAS
+----------------------------------------------------------
+
+dc_total → conductores DC
+string   → fusibles
+mppt     → validación de entrada inversor
+ac       → breaker y conductores AC
+
+----------------------------------------------------------
+
+REGLA FINAL
+----------------------------------------------------------
+
+Este módulo NO calcula corrientes base.
+Solo transforma datos provenientes de ResultadoPaneles.
+"""
