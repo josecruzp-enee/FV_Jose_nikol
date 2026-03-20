@@ -1,106 +1,73 @@
-"""
-calculo_conductores.py — FV Engine
-
-Motor de dimensionamiento de conductores.
-
-Responsabilidad:
-- Selección de calibre por ampacidad ajustada (derating).
-- Verificación y mejora por caída de tensión.
-- Entrega de resultado estable para UI/PDF/orquestador.
-
-Extras (FV):
-- Orquestador de tramos FV típicos (DC/AC) a partir de strings + inversor.
-"""
-
 from __future__ import annotations
 
-from typing import Any, Dict, List, Mapping, Optional
+"""
+TRAMO CONDUCTOR — FV ENGINE
+===========================
+
+Motor de decisión final del conductor.
+
+Integra:
+
+    ✔ Corriente (corrientes)
+    ✔ Ampacidad (NEC)
+    ✔ Caída de tensión (VD)
+
+Este módulo responde:
+
+    "¿Qué conductor cumple TODO?"
+
+"""
+
+from dataclasses import dataclass
+from typing import Optional
 
 from .tablas_conductores import tabla_base_conductores
 from .factores_nec import ampacidad_ajustada_nec
 from .caida_voltaje import caida_tension_pct, ajustar_calibre_por_vd
-from .corrientes import calcular_corrientes
-from .resultado_corriente import ResultadoCorrientes
-
-# Referencias normativas utilizadas en este módulo
-NEC_REFERENCIAS = [
-    "NEC 310.15(B)(1) - Ambient Temperature Correction",
-    "NEC 310.15(C)(1) - Adjustment Factors for CCC",
-    "NEC 215.2(A)(1) Informational Note - Voltage Drop Guidance",
-    "NEC 210.19(A)(1) Informational Note - Voltage Drop Guidance",
-]
 
 
 # ==========================================================
-# Utilidades internas
+# RESULTADO TIPADO
 # ==========================================================
 
-def tabla_conductores(material: str = "Cu") -> List[Dict[str, Any]]:
-    """Retorna la tabla base de conductores según material (Cu/Al)."""
-    return list(tabla_base_conductores(material))
+@dataclass(frozen=True)
+class ResultadoConductor:
 
+    nombre: str
 
-def _fila_por_awg(tabla: List[Dict[str, Any]], awg: str) -> Optional[Dict[str, Any]]:
-    a = str(awg)
-    for t in tabla:
-        if str(t.get("awg")) == a:
-            return dict(t)
-    return None
+    # Entrada relevante
+    i_diseno_a: float
+    v_base_v: float
+    l_m: float
 
+    # Resultado conductor
+    calibre: str
+    material: str
 
-def vdrop_pct(
-    i_a: float,
-    r_ohm_km: float,
-    l_m: float,
-    v_base: float,
-    *,
-    n_hilos: int = 2,
-) -> float:
-    """Wrapper VD% (delegación directa al modelo físico)."""
-    return caida_tension_pct(
-        v=float(v_base),
-        i=float(i_a),
-        l_m=float(l_m),
-        r_ohm_km=float(r_ohm_km),
-        n_hilos=int(n_hilos),
-    )
+    # Ampacidad
+    ampacidad_base_a: float
+    ampacidad_ajustada_a: float
 
+    # Factores
+    fac_temp: float
+    fac_ccc: float
 
-def seleccionar_por_ampacidad_nec(
-    i_a: float,
-    tabla: List[Dict[str, Any]],
-    *,
-    t_amb_c: float,
-    ccc: int,
-    aplicar_derating: bool,
-) -> Dict[str, Any]:
-    """
-    Selecciona el primer conductor que soporta corriente por ampacidad ajustada
-    NEC 310.15 (temperatura + CCC). Devuelve la fila base seleccionada.
-    """
-    if not tabla:
-        return {}
+    # Caída de tensión
+    vd_pct: float
+    vd_obj_pct: float
 
-    x = float(i_a)
-    ccc = max(1, int(ccc))
-    t_amb_c = float(t_amb_c)
+    # Evaluación
+    cumple_ampacidad: bool
+    cumple_vd: bool
+    cumple: bool
 
-    for t in tabla:
-        amp_base = float(t.get("amp_a", 0.0))
-        amp_adj, _, _ = ampacidad_ajustada_nec(
-            amp_base,
-            t_amb_c,
-            ccc,
-            aplicar=bool(aplicar_derating),
-        )
-        if x <= float(amp_adj):
-            return dict(t)
-
-    return dict(tabla[-1])
+    # Extras
+    r_ohm_km: float
+    agotado_vd: bool
 
 
 # ==========================================================
-# Motor principal (genérico)
+# MOTOR
 # ==========================================================
 
 def tramo_conductor(
@@ -112,281 +79,99 @@ def tramo_conductor(
     vd_obj_pct: float,
     material: str = "Cu",
     n_hilos: int = 2,
-    nec: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+    t_amb_c: float = 30.0,
+    ccc: int = 2,
+    aplicar_derating: bool = True,
+) -> ResultadoConductor:
 
-    if float(i_diseno_a) <= 0 or float(l_m) <= 0 or float(v_base_v) <= 0:
-        return {
-            "nombre": str(nombre),
-            "ok": False,
-            "cumple": False,
-            "nota": "Datos insuficientes para dimensionamiento de conductor.",
-        }
-
-    nec = nec or {}
-    t_amb_c = float(nec.get("t_amb_c", 30.0))
-    aplicar = bool(nec.get("aplicar_derating", True))
-
-    ccc_provisto = "ccc" in nec
-    ccc = int(nec.get("ccc", n_hilos))
-    ccc = max(1, ccc)
-
-    tab = tabla_conductores(material)
-
-    if not tab:
-        return {
-            "nombre": str(nombre),
-            "ok": False,
-            "cumple": False,
-            "nota": f"Tabla de conductores vacía para material={material!r}.",
-        }
+    tabla = list(tabla_base_conductores(material))
 
     # ------------------------------------------------------
-    # 1 Selección inicial por ampacidad
+    # 1 Selección por ampacidad
     # ------------------------------------------------------
 
-    cand = seleccionar_por_ampacidad_nec(
-        float(i_diseno_a),
-        tab,
-        t_amb_c=t_amb_c,
-        ccc=ccc,
-        aplicar_derating=aplicar,
-    )
+    for t in tabla:
 
-    awg_cand = str(cand.get("awg", tab[0].get("awg")))
-
-    # ------------------------------------------------------
-    # 2 Mejora por caída de tensión
-    # ------------------------------------------------------
-
-    awg_final = ajustar_calibre_por_vd(
-        tab,
-        awg=awg_cand,
-        i_a=float(i_diseno_a),
-        v_v=float(v_base_v),
-        l_m=float(l_m),
-        vd_obj_pct=float(vd_obj_pct),
-        n_hilos=int(n_hilos),
-    )
-
-    fila_final = _fila_por_awg(tab, awg_final) or dict(tab[-1])
-
-    # ------------------------------------------------------
-    # 3 Recalculo automático por ampacidad
-    # ------------------------------------------------------
-
-    idx = tab.index(fila_final)
-
-    while True:
-
-        amp_base = float(fila_final.get("amp_a", 0.0))
-        r_ohm_km = float(fila_final.get("r_ohm_km", 0.0))
+        amp_base = float(t["amp_a"])
 
         amp_adj, f_t, f_c = ampacidad_ajustada_nec(
             amp_base,
             t_amb_c,
             ccc,
-            aplicar=aplicar,
+            aplicar=aplicar_derating,
         )
 
-        vd_pct = caida_tension_pct(
-            v=float(v_base_v),
-            i=float(i_diseno_a),
-            l_m=float(l_m),
-            r_ohm_km=float(r_ohm_km),
-            n_hilos=int(n_hilos),
-        )
-
-        cumple_amp = float(amp_adj) >= float(i_diseno_a)
-        cumple_vd = float(vd_pct) <= float(vd_obj_pct)
-
-        if cumple_amp and cumple_vd:
+        if i_diseno_a <= amp_adj:
+            awg = t["awg"]
             break
-
-        if idx >= len(tab) - 1:
-            break
-
-        idx += 1
-        fila_final = tab[idx]
-
-    awg_final = str(fila_final.get("awg"))
+    else:
+        awg = tabla[-1]["awg"]
 
     # ------------------------------------------------------
-    # Cálculos finales
+    # 2 Ajuste por VD
     # ------------------------------------------------------
 
-    amp_base = float(fila_final.get("amp_a", 0.0))
-    r_ohm_km = float(fila_final.get("r_ohm_km", 0.0))
+    awg = ajustar_calibre_por_vd(
+        tabla,
+        awg=awg,
+        i_a=i_diseno_a,
+        v_v=v_base_v,
+        l_m=l_m,
+        vd_obj_pct=vd_obj_pct,
+        n_hilos=n_hilos,
+    )
+
+    # ------------------------------------------------------
+    # 3 Resultado final
+    # ------------------------------------------------------
+
+    fila = next(t for t in tabla if t["awg"] == awg)
+
+    amp_base = float(fila["amp_a"])
+    r = float(fila["r_ohm_km"])
 
     amp_adj, f_t, f_c = ampacidad_ajustada_nec(
         amp_base,
         t_amb_c,
         ccc,
-        aplicar=aplicar,
+        aplicar=aplicar_derating,
     )
 
-    vd_pct = caida_tension_pct(
-        v=float(v_base_v),
-        i=float(i_diseno_a),
-        l_m=float(l_m),
-        r_ohm_km=float(r_ohm_km),
-        n_hilos=int(n_hilos),
+    vd = caida_tension_pct(
+        v=v_base_v,
+        i=i_diseno_a,
+        l_m=l_m,
+        r_ohm_km=r,
+        n_hilos=n_hilos,
     )
 
-    cumple_amp = float(amp_adj) >= float(i_diseno_a)
-    cumple_vd = float(vd_pct) <= float(vd_obj_pct)
+    cumple_amp = amp_adj >= i_diseno_a
+    cumple_vd = vd <= vd_obj_pct
 
-    cumple = bool(cumple_amp and cumple_vd)
+    return ResultadoConductor(
 
-    agotado_vd = (awg_final == str(tab[-1].get("awg"))) and (
-        float(vd_pct) > float(vd_obj_pct)
+        nombre=nombre,
+
+        i_diseno_a=i_diseno_a,
+        v_base_v=v_base_v,
+        l_m=l_m,
+
+        calibre=str(awg),
+        material=material,
+
+        ampacidad_base_a=amp_base,
+        ampacidad_ajustada_a=amp_adj,
+
+        fac_temp=f_t,
+        fac_ccc=f_c,
+
+        vd_pct=vd,
+        vd_obj_pct=vd_obj_pct,
+
+        cumple_ampacidad=cumple_amp,
+        cumple_vd=cumple_vd,
+        cumple=(cumple_amp and cumple_vd),
+
+        r_ohm_km=r,
+        agotado_vd=(awg == tabla[-1]["awg"] and not cumple_vd),
     )
-
-    out: Dict[str, Any] = {
-
-        "nombre": str(nombre),
-        "ok": True,
-
-        "i_diseno_a": round(float(i_diseno_a), 3),
-        "l_m": round(float(l_m), 3),
-        "v_base_v": round(float(v_base_v), 3),
-
-        "material": str(material),
-        "n_hilos": int(n_hilos),
-
-        "calibre": awg_final,
-        "awg": awg_final,
-
-        "ampacidad_base_a": round(float(amp_base), 3),
-        "ampacidad_ajustada_a": round(float(amp_adj), 3),
-
-        "fac_temp": round(float(f_t), 4),
-        "fac_ccc": round(float(f_c), 4),
-
-        "r_ohm_km": round(float(r_ohm_km), 6),
-
-        "vd_pct": round(float(vd_pct), 4),
-        "vd_obj_pct": float(vd_obj_pct),
-
-        "cumple_ampacidad": bool(cumple_amp),
-        "cumple_vd": bool(cumple_vd),
-        "cumple": bool(cumple),
-
-        "nec": {
-            "t_amb_c": t_amb_c,
-            "ccc": int(ccc),
-            "aplicar_derating": bool(aplicar)
-        },
-
-        "agotado_vd": bool(agotado_vd),
-
-        "referencias": list(NEC_REFERENCIAS),
-    }
-
-    if not ccc_provisto:
-        out["nota_ccc"] = "CCC no provisto; se usó n_hilos como aproximación."
-
-    return out
-
-
-# ==========================================================
-# Orquestador FV
-# ==========================================================
-
-def _f(m: Mapping[str, Any], k: str, default: float = 0.0) -> float:
-    try:
-        v = m.get(k, default)
-        return float(v) if v is not None else float(default)
-    except Exception:
-        return float(default)
-
-
-def dimensionar_tramos_fv(
-    *,
-    strings: Mapping[str, Any],
-    inversor: Mapping[str, Any],
-    params_cableado: Mapping[str, Any],
-    cfg_tecnicos: Mapping[str, Any],
-    material_dc: str = "Cu",
-    material_ac: str = "Cu",
-    nec_dc: Optional[Dict[str, Any]] = None,
-    nec_ac: Optional[Dict[str, Any]] = None,
-    distancias_m: Optional[Dict[str, float]] = None,
-) -> Dict[str, Any]:
-
-    distancias_m = distancias_m or {}
-
-    # ======================================================
-    # 1 Corrientes
-    # ======================================================
-
-    corr: ResultadoCorrientes = calcular_corrientes(strings, inversor, cfg_tecnicos)
-
-    i_dc_diseno = corr.dc_total.i_diseno_a
-    i_ac_diseno = corr.ac.i_diseno_a
-
-    # ======================================================
-    # 2 Voltajes base
-    # ======================================================
-
-    vmp_dc = _f(strings, "vmp_string_v", 0.0)
-    if vmp_dc <= 0:
-        vmp_dc = _f(strings, "vmp_array_v", 0.0)
-
-    vac = _f(params_cableado, "vac", 0.0)
-    if vac <= 0:
-        vac = _f(inversor, "v_ac_nom_v", 0.0)
-
-    # ======================================================
-    # 3 Distancias
-    # ======================================================
-
-    dist_dc = float(distancias_m.get("dc_string_a_inversor", _f(params_cableado, "dist_dc_m", 0.0)))
-    dist_ac = float(distancias_m.get("ac_inversor_a_tabl_principal", _f(params_cableado, "dist_ac_m", 0.0)))
-
-    vd_obj_dc = _f(params_cableado, "vdrop_obj_dc_pct", 2.0)
-    vd_obj_ac = _f(params_cableado, "vdrop_obj_ac_pct", 2.0)
-
-    # ======================================================
-    # 4 Dimensionamiento
-    # ======================================================
-
-    out_tramos: Dict[str, Any] = {}
-
-    out_tramos["DC_STRING_A_INV"] = tramo_conductor(
-        nombre="DC_STRING_A_INV",
-        i_diseno_a=i_dc_diseno,
-        v_base_v=vmp_dc if vmp_dc > 0 else 1.0,
-        l_m=dist_dc,
-        vd_obj_pct=vd_obj_dc,
-        material=material_dc,
-        n_hilos=2,
-        nec=nec_dc,
-    )
-
-    fases = int(inversor.get("fases", 1) or 1)
-    n_hilos_ac = 3 if fases == 3 else 2
-
-    out_tramos["AC_INV_A_TABLERO"] = tramo_conductor(
-        nombre="AC_INV_A_TABLERO",
-        i_diseno_a=i_ac_diseno,
-        v_base_v=vac if vac > 0 else 1.0,
-        l_m=dist_ac,
-        vd_obj_pct=vd_obj_ac,
-        material=material_ac,
-        n_hilos=n_hilos_ac,
-        nec=nec_ac,
-    )
-
-    return {
-        "corrientes": corr,
-        "tramos": out_tramos,
-        "meta": {
-            "material_dc": material_dc,
-            "material_ac": material_ac,
-            "vd_obj_dc_pct": vd_obj_dc,
-            "vd_obj_ac_pct": vd_obj_ac,
-            "dist_dc_m": dist_dc,
-            "dist_ac_m": dist_ac,
-        },
-    }
