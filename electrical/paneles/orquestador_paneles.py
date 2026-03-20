@@ -186,7 +186,6 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
         StringFV(
             mppt=s.mppt,
             n_series=s.n_series,
-            n_strings=1,  # cada instancia es un string individual
             vmp_string_v=s.vmp_string_v,
             voc_frio_string_v=s.voc_frio_string_v,
             imp_string_a=s.imp_string_a,
