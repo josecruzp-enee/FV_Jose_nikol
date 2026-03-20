@@ -162,6 +162,7 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
         strings_por_mppt=0,  # opcional: mover a strings_res después
         n_mppt=inversor.n_mppt,
         p_panel_w=panel.pmax_w,
+        isc_total=panel.isc_a * strings_res.recomendacion.n_strings_total,
     )
 
     # ======================================================
