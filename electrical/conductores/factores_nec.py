@@ -1,31 +1,48 @@
-"""
-Factores de corrección NEC — FV Engine
-
-FRONTERA DEL MÓDULO
--------------------
-
-Este módulo implementa factores normativos NEC utilizados
-para ajustar la ampacidad de conductores.
-
-Responsabilidades:
-
-    - corrección por temperatura ambiente
-    - corrección por agrupamiento (CCC)
-    - cálculo de ampacidad ajustada
-
-NO realiza:
-
-    - selección de calibre
-    - cálculo de caída de voltaje
-    - acceso a tablas de conductores
-
-Normativa utilizada:
-
-    NEC 310.15(B)(1)  → Ambient Temperature Correction
-    NEC 310.15(C)(1)  → Adjustment Factors for CCC
-"""
-
 from __future__ import annotations
+
+"""
+FACTORES DE CORRECCIÓN NEC — FV ENGINE
+=====================================
+
+🔷 PROPÓSITO
+----------------------------------------------------------
+Aplicar factores normativos NEC para ajustar la ampacidad
+de conductores eléctricos.
+
+Este módulo calcula:
+
+    ✔ Factor por temperatura ambiente
+    ✔ Factor por agrupamiento (CCC)
+    ✔ Ampacidad ajustada
+
+----------------------------------------------------------
+🔷 ALCANCE
+----------------------------------------------------------
+
+Este módulo NO realiza:
+
+    ✘ Selección de calibre
+    ✘ Cálculo de caída de voltaje
+    ✘ Lectura de tablas AWG
+
+----------------------------------------------------------
+🔷 NORMATIVA
+----------------------------------------------------------
+
+    NEC 310.15(B)(1) → Corrección por temperatura
+    NEC 310.15(C)(1) → Ajuste por conductores (CCC)
+
+----------------------------------------------------------
+🔷 FILOSOFÍA
+----------------------------------------------------------
+
+Este módulo NO decide nada.
+
+Solo aplica factores:
+    entrada → ampacidad base
+    salida  → ampacidad corregida
+"""
+
 from typing import Tuple
 
 
@@ -48,13 +65,19 @@ def factor_temperatura_nec(
     columna: str = "75C",
 ) -> float:
     """
-    Factor de corrección por temperatura ambiente.
+    🔷 ENTRADA
 
-    Basado en NEC 310.15(B)(1).
+    t_amb_c:
+        → temperatura ambiente [°C]
 
     columna:
-        "75C" → terminales comunes
-        "90C" → THWN-2 / PV Wire
+        → "75C" (terminal típico)
+        → "90C" (THWN-2 / PV wire)
+
+    🔷 SALIDA
+
+    factor:
+        → multiplicador de ampacidad (0.71 – 1.0)
     """
 
     try:
@@ -67,19 +90,7 @@ def factor_temperatura_nec(
     if col not in {"75C", "90C"}:
         col = "75C"
 
-    # Simplificación por tramos
-
-    if col == "75C":
-
-        if t <= 30:
-            return 1.00
-        if t <= 40:
-            return 0.91
-        if t <= 50:
-            return 0.82
-        return 0.71
-
-    # 90°C insulation
+    # NEC simplificado por tramos
 
     if t <= 30:
         return 1.00
@@ -98,10 +109,15 @@ def factor_agrupamiento_ccc(
     ccc: int
 ) -> float:
     """
-    Factor de ajuste por cantidad de conductores portadores
-    de corriente (CCC).
+    🔷 ENTRADA
 
-    Basado en NEC 310.15(C)(1).
+    ccc:
+        → número de conductores portadores de corriente
+
+    🔷 SALIDA
+
+    factor:
+        → multiplicador de ampacidad (0.5 – 1.0)
     """
 
     try:
@@ -111,13 +127,10 @@ def factor_agrupamiento_ccc(
 
     if n <= 3:
         return 1.00
-
     if n <= 6:
         return 0.80
-
     if n <= 9:
         return 0.70
-
     return 0.50
 
 
@@ -134,16 +147,43 @@ def ampacidad_ajustada_nec(
     columna: str = "75C",
 ) -> Tuple[float, float, float]:
     """
-    Calcula ampacidad ajustada según NEC.
+    🔷 ENTRADAS
 
-    Fórmula:
+    ampacidad_base:
+        → ampacidad nominal del conductor [A]
 
-        Ampacidad_ajustada =
-            Ampacidad_base × f_temp × f_ccc
+    t_amb_c:
+        → temperatura ambiente [°C]
 
-    Returns
-    -------
-    (ampacidad_ajustada, factor_temperatura, factor_ccc)
+    ccc:
+        → conductores portadores de corriente
+
+    aplicar:
+        → True → aplicar factores NEC
+        → False → devolver ampacidad base
+
+    columna:
+        → "75C" o "90C"
+
+    ----------------------------------------------------------
+
+    🔷 PROCESO
+
+    ampacidad_ajustada =
+        ampacidad_base × f_temp × f_ccc
+
+    ----------------------------------------------------------
+
+    🔷 SALIDA (TUPLA)
+
+    ampacidad_ajustada:
+        → ampacidad final corregida
+
+    factor_temperatura:
+        → factor aplicado por temperatura
+
+    factor_ccc:
+        → factor aplicado por agrupamiento
     """
 
     try:
@@ -163,3 +203,84 @@ def ampacidad_ajustada_nec(
     amp_adj = amp_base * f_temp * f_ccc
 
     return float(amp_adj), float(f_temp), float(f_ccc)
+
+
+# ==========================================================
+# RESUMEN DE VARIABLES DE SALIDA
+# ==========================================================
+
+"""
+SALIDA PRINCIPAL
+================
+
+ampacidad_ajustada_nec(...) devuelve:
+
+    (ampacidad_ajustada, factor_temperatura, factor_ccc)
+
+----------------------------------------------------------
+
+1. ampacidad_ajustada
+----------------------------------------------------------
+
+    [A]
+
+    Capacidad real del conductor después de aplicar:
+
+        temperatura
+        agrupamiento (CCC)
+
+    👉 Esta es la que se usa para validar:
+
+        i_diseno <= ampacidad_ajustada
+
+----------------------------------------------------------
+
+2. factor_temperatura
+----------------------------------------------------------
+
+    [adimensional]
+
+    Factor aplicado por temperatura ambiente.
+
+    Ejemplo:
+        30°C → 1.00
+        40°C → 0.91
+
+----------------------------------------------------------
+
+3. factor_ccc
+----------------------------------------------------------
+
+    [adimensional]
+
+    Factor por número de conductores.
+
+    Ejemplo:
+        2 conductores → 1.00
+        6 conductores → 0.80
+
+----------------------------------------------------------
+
+USO EN FV ENGINE
+----------------------------------------------------------
+
+Este módulo es consumido por:
+
+    electrical.conductores.tramo_conductor
+
+Para validar:
+
+    ✔ ampacidad
+    ✔ cumplimiento NEC
+
+----------------------------------------------------------
+
+REGLA CLAVE
+----------------------------------------------------------
+
+Este módulo NO selecciona calibre.
+
+Solo responde:
+
+    "¿Este conductor aguanta o no?"
+"""
