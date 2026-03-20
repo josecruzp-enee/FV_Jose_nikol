@@ -1,30 +1,46 @@
-"""
-Motor físico de caída de voltaje — FV Engine
-
-FRONTERA DEL MÓDULO
--------------------
-Este módulo implementa únicamente el modelo físico resistivo
-del conductor.
-
-Responsabilidades:
-    - cálculo de caída de tensión
-    - lectura de resistencia del conductor
-    - ajuste de calibre por criterio de VD
-
-NO realiza:
-    - cálculo de ampacidad NEC
-    - factores de corrección
-    - selección inicial de conductor
-
-Eso pertenece a otros módulos del dominio conductores.
-"""
-
 from __future__ import annotations
+
+"""
+MOTOR FÍSICO DE CAÍDA DE VOLTAJE — FV ENGINE
+===========================================
+
+🔷 PROPÓSITO
+----------------------------------------------------------
+Calcular la caída de tensión en conductores eléctricos
+usando modelo resistivo puro.
+
+----------------------------------------------------------
+🔷 RESPONSABILIDADES
+----------------------------------------------------------
+
+✔ Cálculo de caída de tensión (%)
+✔ Lectura de resistencia del conductor
+✔ Ajuste de calibre por criterio de VD
+
+----------------------------------------------------------
+🔷 NO HACE
+----------------------------------------------------------
+
+✘ No calcula ampacidad
+✘ No aplica factores NEC
+✘ No selecciona calibre inicial
+
+----------------------------------------------------------
+🔷 FILOSOFÍA
+----------------------------------------------------------
+
+Este módulo responde:
+
+    "¿Este conductor cumple caída de tensión?"
+
+No decide ingeniería completa.
+"""
+
 from typing import Dict, List
 
 
 # ==========================================================
-# MODELO FÍSICO DE CAÍDA DE TENSIÓN
+# CAÍDA DE TENSIÓN
 # ==========================================================
 
 def caida_tension_pct(
@@ -36,30 +52,33 @@ def caida_tension_pct(
     n_hilos: float = 2.0,
 ) -> float:
     """
-    Calcula caída de tensión porcentual usando modelo resistivo.
+    🔷 ENTRADAS
 
-    Fórmula:
+    v:
+        → voltaje del circuito [V]
 
-        VD% = 100 * (I * R_total) / V
+    i:
+        → corriente del circuito [A]
 
-        R_total = r_ohm_km * (L_km) * n_hilos
+    l_m:
+        → longitud del tramo [m]
 
-    Parámetros
-    ----------
-    v : tensión del circuito (V)
-    i : corriente del circuito (A)
-    l_m : longitud del tramo (m)
-    r_ohm_km : resistencia del conductor (ohm/km)
-    n_hilos : número equivalente de conductores en el camino
-              de corriente.
+    r_ohm_km:
+        → resistencia del conductor [ohm/km]
 
-              Ejemplos típicos:
-                DC / monofásico ida-vuelta = 2
-                trifásico ≈ √3 ≈ 1.732
+    n_hilos:
+        → factor de camino eléctrico
 
-    Retorna
-    -------
-    float : caída de tensión en porcentaje
+        típicos:
+            DC / monofásico → 2
+            trifásico → 1.732
+
+    ----------------------------------------------------------
+
+    🔷 SALIDA
+
+    vd_pct:
+        → caída de tensión [%]
     """
 
     try:
@@ -77,7 +96,6 @@ def caida_tension_pct(
     if v <= 0 or i <= 0 or l_m <= 0 or r_ohm_km <= 0:
         return 0.0
 
-    # resistencia total del circuito
     r_total = r_ohm_km * (l_m / 1000.0) * n_hilos
 
     vd_pct = 100.0 * (i * r_total) / v
@@ -86,7 +104,7 @@ def caida_tension_pct(
 
 
 # ==========================================================
-# RESISTENCIA DE CONDUCTOR DESDE TABLA
+# RESISTENCIA DESDE TABLA
 # ==========================================================
 
 def resistencia_de_tabla(
@@ -94,9 +112,22 @@ def resistencia_de_tabla(
     awg: str,
 ) -> float:
     """
-    Obtiene la resistencia del conductor desde la tabla base.
+    🔷 ENTRADAS
 
-    Si el calibre no existe retorna 0.0.
+    tabla:
+        → lista de conductores (AWG, resistencia)
+
+    awg:
+        → calibre buscado
+
+    ----------------------------------------------------------
+
+    🔷 SALIDA
+
+    r_ohm_km:
+        → resistencia del conductor
+
+    Si no existe → 0.0
     """
 
     a = str(awg)
@@ -114,7 +145,7 @@ def resistencia_de_tabla(
 
 
 # ==========================================================
-# AJUSTE DE CALIBRE POR CAÍDA DE VOLTAJE
+# AJUSTE DE CALIBRE POR VD
 # ==========================================================
 
 def ajustar_calibre_por_vd(
@@ -128,17 +159,43 @@ def ajustar_calibre_por_vd(
     n_hilos: float = 2.0,
 ) -> str:
     """
-    Incrementa el calibre del conductor hasta cumplir
-    la caída de tensión objetivo.
+    🔷 ENTRADAS
 
-    Parámetros
-    ----------
-    tabla : tabla de conductores ordenada por calibre
-    awg : calibre inicial
-    i_a : corriente del circuito
-    v_v : tensión del circuito
-    l_m : longitud del tramo
-    vd_obj_pct : caída de tensión máxima permitida
+    tabla:
+        → lista ordenada de conductores (menor → mayor)
+
+    awg:
+        → calibre inicial
+
+    i_a:
+        → corriente del circuito [A]
+
+    v_v:
+        → voltaje del circuito [V]
+
+    l_m:
+        → longitud del tramo [m]
+
+    vd_obj_pct:
+        → caída máxima permitida [%]
+
+    n_hilos:
+        → camino eléctrico
+
+    ----------------------------------------------------------
+
+    🔷 PROCESO
+
+    Itera desde el calibre inicial hasta encontrar uno que cumpla:
+
+        VD <= VD_objetivo
+
+    ----------------------------------------------------------
+
+    🔷 SALIDA
+
+    awg_resultado:
+        → calibre mínimo que cumple VD
     """
 
     try:
@@ -152,7 +209,6 @@ def ajustar_calibre_por_vd(
 
     awg = str(awg)
 
-    # buscar posición inicial del calibre
     idx0 = next(
         (k for k, t in enumerate(tabla) if str(t.get("awg")) == awg),
         None,
@@ -183,5 +239,60 @@ def ajustar_calibre_por_vd(
 
         idx += 1
 
-    # si no cumple ni con el mayor calibre
     return str(tabla[-1].get("awg"))
+
+
+# ==========================================================
+# RESUMEN DE VARIABLES DE SALIDA
+# ==========================================================
+
+"""
+SALIDAS DEL MÓDULO
+==================
+
+1. caida_tension_pct(...)
+--------------------------------
+
+vd_pct:
+    → caída de tensión [%]
+
+Uso:
+    validar calidad del diseño
+
+----------------------------------------------------------
+
+2. resistencia_de_tabla(...)
+--------------------------------
+
+r_ohm_km:
+    → resistencia del conductor [ohm/km]
+
+Uso:
+    entrada para cálculo de VD
+
+----------------------------------------------------------
+
+3. ajustar_calibre_por_vd(...)
+--------------------------------
+
+awg_resultado:
+    → calibre mínimo que cumple VD objetivo
+
+Uso:
+    ajuste fino de conductor después de ampacidad
+
+----------------------------------------------------------
+
+REGLA DE INGENIERÍA
+----------------------------------------------------------
+
+Este módulo NO decide calibre final.
+
+Solo responde:
+
+    "¿Este calibre cumple caída de tensión?"
+
+La decisión final ocurre en:
+
+    tramo_conductor
+"""
