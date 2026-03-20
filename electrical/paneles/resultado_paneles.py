@@ -2,13 +2,26 @@ from __future__ import annotations
 
 """
 RESULTADO DEL DOMINIO PANELES — FV ENGINE
+=========================================
 
-Este archivo es la salida oficial del dominio.
-NO depende de ningún contrato externo.
+🔷 PROPÓSITO
+----------------------------------------------------------
+Representar la salida del dominio paneles.
+
+Este archivo:
+    - NO calcula
+    - NO transforma
+    - SOLO almacena resultados ya calculados
+
+🔷 REGLA
+----------------------------------------------------------
+Todas las variables aquí:
+    → ya vienen calculadas desde el motor
+    → son fuente de verdad para NEC y demás módulos
 """
 
 from dataclasses import dataclass
-from typing import List, Dict, Any
+from typing import List, Optional
 
 
 # =========================================================
@@ -17,28 +30,36 @@ from typing import List, Dict, Any
 
 @dataclass(frozen=True)
 class StringFV:
-    mppt: int
-    n_series: int
-    n_strings: int
+    """
+    Representa UN string físico (detalle eléctrico).
+    """
 
-    vmp_string_v: float
-    voc_frio_string_v: float
+    mppt: int                  # índice del MPPT
+    n_series: int              # paneles en serie
 
-    imp_string_a: float
-    isc_string_a: float
+    vmp_string_v: float        # voltaje de operación
+    voc_frio_string_v: float   # voltaje máximo en frío
 
-    i_mppt_a: float
-    isc_mppt_a: float
-    imax_pv_a: float
-    idesign_cont_a: float
+    imp_string_a: float        # corriente de operación
+    isc_string_a: float        # corriente de corto circuito
+
+    i_mppt_a: float            # corriente hacia MPPT
+    isc_mppt_a: float          # corriente máxima MPPT
+
+    imax_pv_a: float           # corriente máxima del string
+    idesign_cont_a: float      # corriente de diseño (NEC 125%)
 
 
 # =========================================================
-# RECOMENDACION
+# RECOMENDACIÓN
 # =========================================================
 
 @dataclass(frozen=True)
 class RecomendacionStrings:
+    """
+    Resultado de decisión de diseño.
+    """
+
     n_series: int
     n_strings_total: int
     strings_por_mppt: int
@@ -49,17 +70,25 @@ class RecomendacionStrings:
 
 
 # =========================================================
-# ARRAY
+# ARRAY (🔥 SISTEMA COMPLETO DC)
 # =========================================================
 
 @dataclass(frozen=True)
 class ArrayFV:
-    potencia_dc_w: float
+    """
+    Representa el sistema completo DC.
 
-    vdc_nom: float
-    idc_nom: float
+    🔥 Fuente principal para NEC
+    """
 
-    voc_frio_array_v: float
+    potencia_dc_w: float       # potencia total DC
+
+    vdc_nom: float             # voltaje nominal del sistema
+    idc_nom: float             # corriente total DC (YA CALCULADA)
+
+    isc_total: float           # corriente máxima total (YA CALCULADA)
+
+    voc_frio_array_v: float    # voltaje máximo en frío
 
     n_strings_total: int
     n_paneles_total: int
@@ -69,26 +98,45 @@ class ArrayFV:
 
     p_panel_w: float
 
-    # =====================================================
-    # ADAPTADORES (COMPATIBILIDAD)
-    # =====================================================
+    # ---------------------------------------------
+    # ADAPTADORES
+    # ---------------------------------------------
 
     @property
     def pdc_kw(self) -> float:
         return self.potencia_dc_w / 1000
 
-    @property
-    def n_strings(self) -> int:
-        """
-        Compatibilidad con NEC / core legacy.
-        """
-        return self.n_strings_total
+
+# =========================================================
+# METADATA (SIN DICTS)
+# =========================================================
+
+@dataclass(frozen=True)
+class PanelesMeta:
+    """
+    Información adicional del cálculo.
+    """
+
+    metodo: str
+    version: Optional[str] = None
+    notas: Optional[str] = None
+
+
 # =========================================================
 # RESULTADO FINAL
 # =========================================================
 
 @dataclass(frozen=True)
 class ResultadoPaneles:
+    """
+    Salida oficial del dominio paneles.
+
+    🔥 ESTE OBJETO ALIMENTA:
+        - NEC
+        - Energía
+        - Reportes
+    """
+
     ok: bool
     topologia: str
 
@@ -99,4 +147,4 @@ class ResultadoPaneles:
     warnings: List[str]
     errores: List[str]
 
-    meta: Dict[str, Any]
+    meta: PanelesMeta
