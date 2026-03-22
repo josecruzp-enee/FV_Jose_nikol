@@ -38,12 +38,6 @@ class PuertoNEC:
             raise ValueError("No existen strings en ResultadoPaneles")
 
         # ==================================================
-        # VOLTAJE DC (PARCHE CLAVE)
-        # ==================================================
-
-        vdc = paneles.strings[0].vmp_string_v
-
-        # ==================================================
         # CORRIENTES (NEC)
         # ==================================================
 
@@ -63,7 +57,8 @@ class PuertoNEC:
 
         protecciones = calcular_protecciones(
             EntradaProtecciones(
-                corrientes=corrientes
+                corrientes=corrientes,
+                n_strings=len(paneles.strings)
             )
         )
 
