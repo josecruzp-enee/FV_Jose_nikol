@@ -200,6 +200,7 @@ from electrical.conductores.corrientes import calcular_corrientes_dc
 from electrical.conductores.calculo_conductores import calcular_conductores
 from electrical.protecciones.protecciones import calcular_ocpd
 
+
 corrientes = calcular_corrientes_dc(sizing, strings)
 conductores = calcular_conductores(datos, sizing, strings)
 protecciones = calcular_ocpd(sizing, strings)
