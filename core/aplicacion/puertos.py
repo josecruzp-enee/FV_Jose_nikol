@@ -1,4 +1,4 @@
-from typing import Protocol
+from typing import Protocol, Any
 
 from core.dominio.contrato import ResultadoSizing
 from electrical.paneles.resultado_paneles import ResultadoPaneles
@@ -11,7 +11,7 @@ from energy.contrato import EnergiaResultado
 # ==========================================================
 
 class PuertoSizing(Protocol):
-    def ejecutar(self, datos) -> ResultadoSizing: ...
+    def ejecutar(self, datos: Any) -> ResultadoSizing: ...
 
 
 # ==========================================================
@@ -19,7 +19,7 @@ class PuertoSizing(Protocol):
 # ==========================================================
 
 class PuertoPaneles(Protocol):
-    def ejecutar(self, datos, sizing: ResultadoSizing) -> ResultadoPaneles: ...
+    def ejecutar(self, datos: Any, sizing: ResultadoSizing) -> ResultadoPaneles: ...
 
 
 # ==========================================================
@@ -27,8 +27,7 @@ class PuertoPaneles(Protocol):
 # ==========================================================
 
 class PuertoNEC(Protocol):
-    def ejecutar(self, *, datos, paneles: ResultadoPaneles) -> ResultadoElectrico:
-        ...
+    def ejecutar(self, *, datos: Any, paneles: ResultadoPaneles) -> ResultadoElectrico: ...
 
 
 # ==========================================================
@@ -36,8 +35,12 @@ class PuertoNEC(Protocol):
 # ==========================================================
 
 class PuertoEnergia(Protocol):
-    def ejecutar(self, datos, sizing: ResultadoSizing, paneles: ResultadoPaneles) -> EnergiaResultado:
-        ...
+    def ejecutar(
+        self,
+        datos: Any,
+        sizing: ResultadoSizing,
+        paneles: ResultadoPaneles
+    ) -> EnergiaResultado: ...
 
 
 # ==========================================================
@@ -45,5 +48,9 @@ class PuertoEnergia(Protocol):
 # ==========================================================
 
 class PuertoFinanzas(Protocol):
-    def ejecutar(self, datos, sizing: ResultadoSizing, energia: EnergiaResultado):
-        ...
+    def ejecutar(
+        self,
+        datos: Any,
+        sizing: ResultadoSizing,
+        energia: EnergiaResultado
+    ): ...
