@@ -1,166 +1,161 @@
 from __future__ import annotations
 
 """
-ADAPTADOR NEC — FV ENGINE
+ADAPTADOR NEC — FV ENGINE (CORRECTO)
 
-Este módulo actúa como frontera entre:
+Rol:
+    Adaptador tipado entre:
+        core → electrical
 
-    Motor FV (core)
-        ↓
-    Motor NEC (electrical)
+NO usa dict
+NO usa .get()
+NO calcula nada
 
-Responsabilidad:
-    - leer resultados de sizing y strings
-    - construir entrada NEC
-    - ejecutar motor de ingeniería eléctrica
-
-NO calcula ingeniería eléctrica directamente.
+Solo transforma estructuras
 """
 
-from typing import Dict, Any
+from dataclasses import dataclass
+from typing import List
 
 from core.dominio.contrato import ResultadoSizing
-from electrical.ingenieria_electrica import ejecutar_ingenieria_electrica
+
+from electrical.ingenieria_electrica import (
+    ejecutar_ingenieria_electrica,
+    ResultadoElectrico,
+)
+
+# ==========================================================
+# CONTRATOS INTERNOS
+# ==========================================================
+
+@dataclass(frozen=True)
+class StringData:
+    imp_string_a: float
+    isc_string_a: float
+    vmp_string_v: float
+
+
+@dataclass(frozen=True)
+class EntradaStrings:
+    strings: List[StringData]
+
+
+@dataclass(frozen=True)
+class DatosInversor:
+    kw_ac: float
+    v_ac_nom_v: float
+    fases: int
+    fp: float
+
+
+@dataclass(frozen=True)
+class ParametrosConductores:
+    vdc: float
+    vac: float
+    l_dc: float
+    l_ac: float
+    vd_dc: float
+    vd_ac: float
+
+
+@dataclass(frozen=True)
+class EntradaNEC:
+    strings: EntradaStrings
+    inversor: DatosInversor
+    n_strings: int
+    params_conductores: ParametrosConductores
+
+
+@dataclass(frozen=True)
+class ResultadoNEC:
+    entrada: EntradaNEC
+    resultado: ResultadoElectrico
 
 
 # ==========================================================
-# UTILIDAD: lista de strings
+# EXTRACCIÓN DE STRINGS (TIPADA)
 # ==========================================================
 
-def _lista_strings(strings):
-
-    if not strings:
-        return []
-
-    if isinstance(strings, dict):
-        return strings.get("strings", [])
+def _extraer_strings(strings) -> EntradaStrings:
 
     if hasattr(strings, "strings"):
-        return strings.strings
+        lista = strings.strings
+    elif isinstance(strings, list):
+        lista = strings
+    else:
+        raise ValueError("Formato de strings inválido")
 
-    if isinstance(strings, list):
-        return strings
+    resultado: List[StringData] = []
 
-    return []
+    for s in lista:
+
+        if hasattr(s, "imp_string_a"):
+            resultado.append(
+                StringData(
+                    imp_string_a=s.imp_string_a,
+                    isc_string_a=s.isc_string_a,
+                    vmp_string_v=s.vmp_string_v,
+                )
+            )
+        else:
+            raise ValueError("String sin atributos válidos")
+
+    return EntradaStrings(strings=resultado)
 
 
 # ==========================================================
-# UTILIDAD: leer base eléctrica del proyecto
+# BASE ELÉCTRICA
 # ==========================================================
 
 def _leer_base_electrica(p):
 
-    if isinstance(p, dict):
-        base = p.get("electrico", {})
-    else:
-        base = getattr(p, "electrico", {})
+    if not hasattr(p, "electrico"):
+        raise ValueError("Proyecto sin datos eléctricos")
 
-    vac_ll = base.get("vac") or base.get("vac_ll")
-    fases = base.get("fases", 1)
-    fp = base.get("fp", 1.0)
+    base = p.electrico
 
-    return vac_ll, fases, fp
+    return base.vac, base.fases, base.fp
 
 
 # ==========================================================
-# EXTRAER DATOS DE STRINGS
-# ==========================================================
-
-def _datos_strings(strings):
-
-    lista = _lista_strings(strings)
-
-    if not lista:
-
-        return {
-            "n_strings": 0,
-            "imp_string_a": 0,
-            "isc_string_a": 0,
-            "vmp_string_v": 0
-        }
-
-    s0 = lista[0]
-
-    if isinstance(s0, dict):
-
-        imp = s0.get("imp_string_a", 0)
-        isc = s0.get("isc_string_a", 0)
-        vmp = s0.get("vmp_string_v", 0)
-
-    else:
-
-        imp = getattr(s0, "imp_string_a", 0)
-        isc = getattr(s0, "isc_string_a", 0)
-        vmp = getattr(s0, "vmp_string_v", 0)
-
-    return {
-        "n_strings": len(lista),
-        "imp_string_a": imp,
-        "isc_string_a": isc,
-        "vmp_string_v": vmp
-    }
-
-
-# ==========================================================
-# CONSTRUIR ENTRADA NEC (alineada con ingenieria_electrica)
+# CONSTRUCCIÓN DE ENTRADA
 # ==========================================================
 
 def _construir_entrada_nec(
     p,
     sizing: ResultadoSizing,
     strings
-):
+) -> EntradaNEC:
 
-    vac_ll, fases, fp = _leer_base_electrica(p)
+    entrada_strings = _extraer_strings(strings)
 
-    datos_strings = _datos_strings(strings)
+    vac, fases, fp = _leer_base_electrica(p)
 
-    entrada_nec = {
+    if not entrada_strings.strings:
+        raise ValueError("No hay strings disponibles")
 
-        # --------------------------------------------------
-        # STRINGS (entrada para calcular_corrientes)
-        # --------------------------------------------------
+    s0 = entrada_strings.strings[0]
 
-        "strings": {
-            "corrientes_input": {
+    params = ParametrosConductores(
+        vdc=s0.vmp_string_v,
+        vac=vac,
+        l_dc=10.0,      # ⚠️ luego parametrizar
+        l_ac=10.0,
+        vd_dc=2.0,
+        vd_ac=2.0,
+    )
 
-                "imp_string_a": datos_strings["imp_string_a"],
-                "isc_string_a": datos_strings["isc_string_a"],
-                "vmp_string_v": datos_strings["vmp_string_v"]
-
-            }
-        },
-
-        # --------------------------------------------------
-        # DATOS DEL INVERSOR
-        # --------------------------------------------------
-
-        "inversor": {
-
-            "kw_ac": getattr(sizing, "kw_ac", 0),
-
-            "v_ac_nom_v": vac_ll,
-
-            "fases": fases,
-
-            "fp": fp
-
-        },
-
-        # --------------------------------------------------
-        # PARÁMETROS GENERALES
-        # --------------------------------------------------
-
-        "n_strings": datos_strings["n_strings"],
-
-        "isc_mod_a": datos_strings["isc_string_a"],
-
-        "vdc_nom": datos_strings["vmp_string_v"],
-
-        "vac_ll": vac_ll
-    }
-
-    return entrada_nec
+    return EntradaNEC(
+        strings=entrada_strings,
+        inversor=DatosInversor(
+            kw_ac=sizing.kw_ac,
+            v_ac_nom_v=vac,
+            fases=fases,
+            fp=fp,
+        ),
+        n_strings=len(entrada_strings.strings),
+        params_conductores=params,
+    )
 
 
 # ==========================================================
@@ -171,40 +166,22 @@ def ejecutar_nec(
     p,
     sizing: ResultadoSizing,
     strings
-) -> Dict[str, Any]:
+) -> ResultadoNEC:
 
-    entrada_nec = _construir_entrada_nec(
+    entrada = _construir_entrada_nec(
         p,
         sizing,
         strings
     )
 
-    paquete = ejecutar_ingenieria_electrica(entrada_nec)
+    resultado = ejecutar_ingenieria_electrica(
+        datos_strings=entrada.strings,
+        datos_inversor=entrada.inversor,
+        n_strings=entrada.n_strings,
+        params_conductores=entrada.params_conductores,
+    )
 
-    return {
-        "entrada_nec": entrada_nec,
-        "paquete_nec": paquete
-    }
-
-
-# ==========================================================
-# SALIDAS DEL ARCHIVO
-# ==========================================================
-#
-# ejecutar_nec()
-#
-# Entrada:
-#   proyecto
-#   ResultadoSizing
-#   strings
-#
-# Salida:
-#   dict
-#
-# Descripción:
-#   Adaptador entre el motor FV (core) y el motor NEC.
-#
-# Consumido por:
-#   core.orquestador_estudio
-#
-# ==========================================================
+    return ResultadoNEC(
+        entrada=entrada,
+        resultado=resultado
+    )
