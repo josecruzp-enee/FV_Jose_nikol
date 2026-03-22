@@ -1,316 +1,135 @@
 from __future__ import annotations
-import streamlit as st
+
 """
-ORQUESTADOR DE INGENIERÍA ELÉCTRICA — FV ENGINE
+ORQUESTADOR ELÉCTRICO — FV ENGINE (CORRECTO)
 
-FRONTERA DEL DOMINIO
---------------------
-Este módulo es la frontera del dominio eléctrico del sistema FV.
+Coordina dominios:
+    - corrientes
+    - protecciones
+    - conductores
 
-core
-   ↓
-ingenieria_electrica  ← ESTE MÓDULO
-   ↓
-corrientes
-protecciones
-conductores
-canalizacion
-
-Responsabilidad
----------------
-Coordinar los cálculos eléctricos del sistema FV y devolver un
-paquete eléctrico consolidado.
-
-Este módulo NO implementa modelos físicos complejos.
-Solo coordina módulos eléctricos especializados.
+SIN dict
+SIN UI
+TIPADO FUERTE
 """
 
-from typing import Mapping, Dict, Any
+from dataclasses import dataclass
+from typing import List
 
-from electrical.conductores.corrientes import calcular_corrientes
-from electrical.protecciones.protecciones import dimensionar_protecciones_fv
+# DOMINIOS
+from electrical.corrientes.corrientes import calcular_corrientes
+from electrical.protecciones.protecciones import (
+    ejecutar_protecciones_fv,
+    EntradaProteccionesFV,
+)
 from electrical.conductores.calculo_conductores import tramo_conductor
 
-try:
-    from electrical.canalizacion.canalizacion import canalizacion_fv
-except Exception:
-    canalizacion_fv = None
-
-# ==========================================================
-# ADAPTADOR DATACLASS → DICT
-# ==========================================================
-
-from dataclasses import asdict
-
-
-def _corrientes_dict(c):
-
-    print("DEBUG INGENIERIA ELECTRICA")
-    print(c)
-
-    if c is None:
-        return {}
-
-    if isinstance(c, dict):
-        return c
-
-    try:
-        return asdict(c)
-    except Exception:
-        return {}
-
-# ==========================================================
-# VALIDACIÓN DE ENTRADAS
-# ==========================================================
-
-def _validar_entrada(entrada: Mapping[str, Any]):
-
-    errores = []
-
-    if "strings" not in entrada:
-        errores.append("Faltan datos de strings.")
-
-    else:
-
-        strings = entrada["strings"]
-
-        if not isinstance(strings, dict):
-            errores.append("strings debe ser un dict.")
-
-        elif "corrientes_input" not in strings:
-            errores.append("strings.corrientes_input no definido.")
-
-    if "inversor" not in entrada:
-        errores.append("Faltan datos del inversor.")
-
-    if "n_strings" not in entrada:
-        errores.append("n_strings no definido.")
-
-    return errores
+from electrical.corrientes.resultado_corrientes import ResultadoCorrientes
 
 
 # ==========================================================
-# CORRIENTES
+# RESULTADO GLOBAL
 # ==========================================================
 
-def _resolver_corrientes(entrada):
+@dataclass(frozen=True)
+class ResultadoElectrico:
 
-    strings = entrada["strings"]
-    inversor = entrada["inversor"]
+    ok: bool
+    errores: List[str]
+    warnings: List[str]
 
-    corr_input = strings.get("corrientes_input", {})
+    corrientes: ResultadoCorrientes
+    protecciones: object
+    conductores: list
 
-    # agregar n_strings_total
-    corr_input["n_strings_total"] = entrada["n_strings"]
 
-    return calcular_corrientes(
-        strings=corr_input,
-        inv=inversor
-    )
 # ==========================================================
-# PROTECCIONES
+# ORQUESTADOR
 # ==========================================================
 
-def _resolver_protecciones(entrada, corrientes, warnings):
+def ejecutar_ingenieria_electrica(
+    *,
+    datos_strings,
+    datos_inversor,
+    n_strings: int,
+    params_conductores
+) -> ResultadoElectrico:
+
+    errores: List[str] = []
+    warnings: List[str] = []
 
     try:
 
-        iac = corrientes.get("ac", {}).get("i_operacion_a")
+        # --------------------------------------------------
+        # 1. CORRIENTES
+        # --------------------------------------------------
 
-        return dimensionar_protecciones_fv(
-            iac_nom_a=iac,
-            n_strings=entrada["n_strings"],
-            isc_mod_a=entrada.get("isc_mod_a", 0)
+        corrientes: ResultadoCorrientes = calcular_corrientes(
+            strings=datos_strings,
+            inv=datos_inversor
         )
 
-    except Exception as e:
+        # --------------------------------------------------
+        # 2. PROTECCIONES
+        # --------------------------------------------------
 
-        warnings.append(f"Error en protecciones: {str(e)}")
-        return None
-
-
-# ==========================================================
-# CONDUCTORES
-# ==========================================================
-
-def _resolver_conductores(entrada, corrientes, warnings):
-
-    circuitos = []
-
-    try:
-
-        dc_i = corrientes.get("dc_total", {}).get("i_diseno_a")
-       
-        if dc_i:
-
-            circuitos.append(
-                tramo_conductor(
-                    nombre="DC",
-                    i_diseno_a=dc_i,
-                    v_base_v=entrada.get("vdc_nom", 1),
-                    l_m=entrada.get("dist_dc_m", 1),
-                    vd_obj_pct=entrada.get("vdrop_obj_dc_pct", 2),
-                )
+        protecciones = ejecutar_protecciones_fv(
+            EntradaProteccionesFV(
+                corrientes=corrientes,
+                n_strings=n_strings
             )
+        )
 
-        ac_i = corrientes.get("ac", {}).get("i_operacion_a")
+        # --------------------------------------------------
+        # 3. CONDUCTORES
+        # --------------------------------------------------
 
-        if ac_i:
+        conductores = []
 
-            circuitos.append(
-                tramo_conductor(
-                    nombre="AC",
-                    i_diseno_a=ac_i,
-                    v_base_v=entrada.get("vac_ll", 1),
-                    l_m=entrada.get("dist_ac_m", 1),
-                    vd_obj_pct=entrada.get("vdrop_obj_ac_pct", 2),
-                )
+        # DC
+        conductores.append(
+            tramo_conductor(
+                nombre="DC",
+                i_diseno_a=corrientes.dc_total.i_diseno_a,
+                v_base_v=params_conductores.vdc,
+                l_m=params_conductores.l_dc,
+                vd_obj_pct=params_conductores.vd_dc,
             )
+        )
 
-    except Exception as e:
+        # AC
+        conductores.append(
+            tramo_conductor(
+                nombre="AC",
+                i_diseno_a=corrientes.ac.i_diseno_a,
+                v_base_v=params_conductores.vac,
+                l_m=params_conductores.l_ac,
+                vd_obj_pct=params_conductores.vd_ac,
+            )
+        )
 
-        warnings.append(f"Error en cálculo de conductores: {str(e)}")
+        # --------------------------------------------------
+        # RESULTADO
+        # --------------------------------------------------
 
-    return {"circuitos": circuitos}
-
-
-# ==========================================================
-# CANALIZACIÓN
-# ==========================================================
-
-def _resolver_canalizacion(entrada, corrientes, protecciones, conductores, warnings):
-
-    if not callable(canalizacion_fv):
-        return None
-
-    try:
-
-        return canalizacion_fv(
-            entrada=entrada,
+        return ResultadoElectrico(
+            ok=True,
+            errores=[],
+            warnings=warnings,
             corrientes=corrientes,
-            ocpd=protecciones,
+            protecciones=protecciones,
             conductores=conductores,
         )
 
     except Exception as e:
 
-        warnings.append(f"Error en canalización: {str(e)}")
-        return None
+        errores.append(str(e))
 
-
-# ==========================================================
-# RESUMEN ELÉCTRICO
-# ==========================================================
-
-def _armar_resumen(corrientes, protecciones, conductores):
-
-    circuitos = conductores.get("circuitos", [])
-
-    dc = next((c for c in circuitos if c.get("nombre") == "DC"), None)
-    ac = next((c for c in circuitos if c.get("nombre") == "AC"), None)
-
-    return {
-
-        "i_dc_nom": corrientes.get("dc_total", {}).get("i_operacion_a"),
-
-        "i_ac_nom": corrientes.get("ac", {}).get("i_operacion_a"),
-
-        "breaker_ac": (
-            protecciones.breaker_ac.tamano_a
-            if protecciones else None
-        ),
-
-        "conductor_dc": dc.get("calibre") if dc else None,
-
-        "conductor_ac": ac.get("calibre") if ac else None,
-    }
-
-# ==========================================================
-# ORQUESTADOR ELÉCTRICO
-# ==========================================================
-
-def ejecutar_ingenieria_electrica(
-    entrada: Mapping[str, Any]
-) -> Dict[str, Any]:
-
-    errores = _validar_entrada(entrada)
-
-    if errores:
-
-        return {
-            "ok": False,
-            "errores": errores
-        }
-
-    warnings = []
-
-    # ------------------------------------------------------
-    # Corrientes
-    # ------------------------------------------------------
-
-    corrientes = _resolver_corrientes(entrada)
-    corrientes = _corrientes_dict(corrientes)
-    import streamlit as st
-    st.json(corrientes)
-    # ------------------------------------------------------
-    # Protecciones
-    # ------------------------------------------------------
-
-    protecciones = _resolver_protecciones(
-        entrada,
-        corrientes,
-        warnings
-    )
-
-    # ------------------------------------------------------
-    # Conductores
-    # ------------------------------------------------------
-
-    conductores = _resolver_conductores(
-        entrada,
-        corrientes,
-        warnings
-    )
-
-    # ------------------------------------------------------
-    # Canalización
-    # ------------------------------------------------------
-
-    canalizacion = _resolver_canalizacion(
-        entrada,
-        corrientes,
-        protecciones,
-        conductores,
-        warnings
-    )
-
-    # ------------------------------------------------------
-    # Resumen para PDF / UI
-    # ------------------------------------------------------
-
-    resumen = _armar_resumen(
-        corrientes,
-        protecciones,
-        conductores
-    )
-
-    # ------------------------------------------------------
-    # Paquete eléctrico consolidado
-    # ------------------------------------------------------
-
-    return {
-
-        "ok": True,
-
-        "corrientes": corrientes,
-
-        "protecciones": protecciones,
-
-        "conductores": conductores,
-
-        "canalizacion": canalizacion,
-
-        "warnings": warnings,
-
-        "resumen_pdf": resumen,
-    }
+        return ResultadoElectrico(
+            ok=False,
+            errores=errores,
+            warnings=warnings,
+            corrientes=None,
+            protecciones=None,
+            conductores=[],
+        )
