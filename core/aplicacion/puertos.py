@@ -2,7 +2,7 @@ from typing import Protocol
 
 from core.dominio.contrato import ResultadoSizing
 from electrical.paneles.resultado_paneles import ResultadoPaneles
-from electrical.resultado_electrico import ResultadoElectrico
+from electrical.resultado_electrical import ResultadoElectrico
 from energy.contrato import EnergiaResultado
 
 
