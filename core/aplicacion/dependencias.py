@@ -19,14 +19,58 @@ class SizingAdapter:
 
 
 
+from electrical.paneles.entrada_panel import EntradaPaneles
+from electrical.paneles.orquestador_paneles import ejecutar_paneles
+from electrical.catalogos import get_panel
+from electrical.inversor.catalogo import get_inversor  # ⚠️ ajusta si cambia
+
 
 class PanelesAdapter:
     def ejecutar(self, datos, sizing):
 
+        # --------------------------------------------------
+        # PANEL (desde datos.equipos)
+        # --------------------------------------------------
+
+        eq = getattr(datos, "equipos", {}) or {}
+        panel_id = eq.get("panel_id")
+
+        panel = get_panel(panel_id)
+
+        if panel is None:
+            raise ValueError("Panel no encontrado")
+
+        # --------------------------------------------------
+        # INVERSOR
+        # --------------------------------------------------
+
+        inversor_id = eq.get("inversor_id")
+
+        inversor = None
+        if inversor_id:
+            inversor = get_inversor(inversor_id)
+
+        # --------------------------------------------------
+        # ENTRADA PANELES
+        # --------------------------------------------------
+
         entrada = EntradaPaneles(
-            datos=datos,
-            sizing=sizing
+            panel=panel,
+            inversor=inversor,
+
+            n_paneles_total=sizing.n_paneles,
+            n_inversores=sizing.n_inversores,
+
+            t_min_c=10,
+            t_oper_c=50,
+
+            objetivo_dc_ac=None,
+            pdc_kw_objetivo=sizing.pdc_kw,
         )
+
+        # --------------------------------------------------
+        # EJECUCIÓN
+        # --------------------------------------------------
 
         return ejecutar_paneles(entrada)
 
