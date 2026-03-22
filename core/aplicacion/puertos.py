@@ -3,7 +3,6 @@ from typing import Protocol
 from core.dominio.contrato import ResultadoSizing
 from electrical.paneles.resultado_paneles import ResultadoPaneles
 from energy.contrato import EnergiaResultado
-from electrical.nec.orquestador_nec import ResultadoNEC
 
 
 class PuertoSizing(Protocol):
@@ -15,7 +14,8 @@ class PuertoPaneles(Protocol):
 
 
 class PuertoNEC(Protocol):
-    def ejecutar(self, datos, sizing: ResultadoSizing, paneles: ResultadoPaneles) -> ResultadoNEC: ...
+    def ejecutar(self, datos, sizing: ResultadoSizing, paneles: ResultadoPaneles):
+        ...
 
 
 class PuertoEnergia(Protocol):
