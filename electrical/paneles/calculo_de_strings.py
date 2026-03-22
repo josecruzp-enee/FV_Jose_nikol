@@ -163,12 +163,24 @@ def distribuir_strings_por_inversor(
 ):
     posiciones = []
 
-    for mppt in range(1, mppt_por_inversor + 1):
-        for inv in range(1, n_inversores + 1):
-            posiciones.append((inv, mppt))
+    total_mppt = n_inversores * mppt_por_inversor
 
-    return posiciones[:n_strings_total]
+    # Inicializa contadores por MPPT
+    carga = [(inv, mppt, 0) 
+             for inv in range(1, n_inversores + 1)
+             for mppt in range(1, mppt_por_inversor + 1)]
 
+    for _ in range(n_strings_total):
+        # seleccionar el MPPT con menor carga
+        carga.sort(key=lambda x: x[2])
+        inv, mppt, count = carga[0]
+
+        posiciones.append((inv, mppt))
+
+        # actualizar carga
+        carga[0] = (inv, mppt, count + 1)
+
+    return posiciones
 
 # =========================================================
 # MOTOR PRINCIPAL
