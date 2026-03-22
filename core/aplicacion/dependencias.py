@@ -5,10 +5,8 @@ from core.aplicacion.orquestador_estudio import DependenciasEstudio
 # IMPORTS REALES
 from electrical.paneles.orquestador_paneles import ejecutar_paneles
 from electrical.paneles.entrada_panel import EntradaPaneles
-from core.aplicacion.puertos import PuertoNEC
 from core.servicios.sizing import calcular_sizing_unificado
 from electrical.catalogos import get_panel
-from electrical.modelos.inversor import InversorSpec
 
 
 # ==========================================================
@@ -59,23 +57,19 @@ class PanelesAdapter:
 
         return ejecutar_paneles(entrada)
 
-# ==========================================================
-# NEC
-# ==========================================================
-
-class NECAdapter:
-    def ejecutar(self, datos, sizing, paneles):
-        return PuertoNEC().ejecutar(datos, sizing, paneles)
-
 
 # ==========================================================
-# PLACEHOLDERS
+# ENERGÍA (PLACEHOLDER)
 # ==========================================================
 
 class EnergiaAdapter:
     def ejecutar(self, datos, sizing, paneles):
         return None
 
+
+# ==========================================================
+# FINANZAS (PLACEHOLDER)
+# ==========================================================
 
 class FinanzasAdapter:
     def ejecutar(self, datos, sizing, energia):
@@ -92,6 +86,6 @@ def construir_dependencias() -> DependenciasEstudio:
         sizing=SizingAdapter(),
         paneles=PanelesAdapter(),
         energia=EnergiaAdapter(),
-        nec=NECAdapter(),
+        nec=None,  # 🔥 NEC ELIMINADO CORRECTAMENTE
         finanzas=FinanzasAdapter(),
     )
