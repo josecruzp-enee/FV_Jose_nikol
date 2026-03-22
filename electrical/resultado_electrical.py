@@ -4,7 +4,7 @@ from typing import List
 
 from electrical.paneles.resultado_paneles import ResultadoPaneles
 from electrical.conductores.resultado_corriente import ResultadoCorrientes
-from electrical.conductores.resultado_corriente import ResultadoConductores
+from electrical.conductores.resultado_conductores import ResultadoConductores
 from electrical.protecciones.resultado_protecciones import ResultadoProtecciones
 
 
@@ -25,9 +25,6 @@ class ResultadoElectrico:
     errores: List[str]
     warnings: List[str]
 
-    # =========================
-    # 🔧 CONSTRUCTOR OFICIAL
-    # =========================
     @staticmethod
     def build(
         paneles: ResultadoPaneles,
@@ -35,12 +32,7 @@ class ResultadoElectrico:
         conductores: ResultadoConductores,
         protecciones: ResultadoProtecciones,
     ) -> "ResultadoElectrico":
-        """
-        Construye el resultado consolidado a partir de subresultados.
-        Este es el ÚNICO punto válido de creación.
-        """
 
-        # 🔴 Consolidación de errores
         errores = (
             (paneles.errores if paneles else [])
             + (corrientes.errores if corrientes else [])
@@ -48,7 +40,6 @@ class ResultadoElectrico:
             + (protecciones.errores if protecciones else [])
         )
 
-        # 🟡 Consolidación de warnings
         warnings = (
             (paneles.warnings if paneles else [])
             + (corrientes.warnings if corrientes else [])
@@ -56,7 +47,6 @@ class ResultadoElectrico:
             + (protecciones.warnings if protecciones else [])
         )
 
-        # ✅ Estado global
         ok = (
             paneles.ok
             and corrientes.ok
@@ -74,9 +64,6 @@ class ResultadoElectrico:
             warnings=warnings,
         )
 
-    # =========================
-    # 📊 PROPIEDADES ÚTILES
-    # =========================
     @property
     def hay_errores(self) -> bool:
         return len(self.errores) > 0
