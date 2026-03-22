@@ -1,45 +1,19 @@
 from __future__ import annotations
 
 """
-ORQUESTADOR DEL DOMINIO SOLAR (MODO UNITARIO) — FV Engine
-========================================================
+ORQUESTADOR DEL DOMINIO SOLAR — FV ENGINE
 
-Responsabilidad
----------------
+Responsabilidad:
+    - Calcular irradiancia en plano (POA) para una condición dada
 
-Calcular el estado solar para una única hora.
+Rol en arquitectura:
+    - Componente físico dentro del pipeline 8760
+    - NO es endpoint
+    - NO tiene modo unitario de uso externo
 
-Pipeline representado:
+Flujo:
 
-    clima (GHI, DNI, DHI)
-            ↓
-    posición solar
-            ↓
-    irradiancia en plano (POA)
-            ↓
-    SolarResultado
-
-Uso principal
--------------
-
-    ✔ pruebas unitarias
-    ✔ validación de modelos
-    ✔ simulaciones puntuales
-
-Para simulación anual usar:
-
-    simulacion_8760.py
-
-Frontera del dominio
---------------------
-
-Entrada:
-    EntradaSolar
-
-Salida:
-    SolarResultado
-
-Este módulo NO calcula energía.
+    clima → solar → energy
 """
 
 from dataclasses import dataclass
@@ -50,28 +24,22 @@ from .irradiancia_plano import calcular_irradiancia_plano, IrradianciaInput
 
 
 # ==========================================================
-# SALIDA DEL DOMINIO SOLAR
+# SALIDA
 # ==========================================================
 
 @dataclass(frozen=True)
 class SolarResultado:
     """
-    Resultado solar para una hora específica.
+    Resultado solar (estado físico en un instante).
     """
 
-    # ------------------------------------------------------
-    # IRRADIANCIA
-    # ------------------------------------------------------
-
+    # Irradiancia
     poa_total_wm2: float
     poa_directa_wm2: float
     poa_difusa_wm2: float
     poa_reflejada_wm2: float
 
-    # ------------------------------------------------------
-    # GEOMETRÍA
-    # ------------------------------------------------------
-
+    # Geometría solar
     zenith_deg: float
     azimuth_deg: float
 
@@ -80,125 +48,11 @@ class SolarResultado:
 # VALIDACIÓN
 # ==========================================================
 
-def _validar(e: EntradaSolar):
+def _validar(e: EntradaSolar) -> None:
     """
-    Valida consistencia de entrada solar.
-    """
-
-    if e.lat is None or e.lon is None:
-        raise ValueError("Lat/lon inválidos")
-
-    if e.fecha_hora is None:
-        raise ValueError("fecha_hora requerida")
-
-    if e.dni_wm2 < 0 or e.dhi_wm2 < 0 or e.ghi_wm2 < 0:
-        raise ValueError("Irradiancia negativa")
-
-    if e.tilt_deg is None or e.azimuth_panel_deg is None:
-        raise ValueError("Geometría inválida")
-
-
-# ==========================================================
-# ORQUESTADOR PRINCIPAL
-# ==========================================================
-
-def ejecutar_solar_unitario(entrada: EntradaSolar) -> SolarResultado:
-    """
-    Ejecuta el modelo solar para una hora.
-
-    Flujo:
-
-        1) Validación
-        2) Posición solar
-        3) POA
-        4) Construcción resultado
+    Valida consistencia de la entrada solar.
     """
 
-    _validar(entrada)
-
-    # ------------------------------------------------------
-    # 1. POSICIÓN SOLAR
-    # ------------------------------------------------------
-
-    pos = calcular_posicion_solar(
-        SolarInput(
-            latitud_deg=entrada.lat,
-            longitud_deg=entrada.lon,
-            fecha_hora=entrada.fecha_hora
-        )
-    )
-
-    # ------------------------------------------------------
-    # 2. IRRADIANCIA EN PLANO
-    # ------------------------------------------------------
-
-    irr = calcular_irradiancia_plano(
-        IrradianciaInput(
-            dni=entrada.dni_wm2,
-            dhi=entrada.dhi_wm2,
-            ghi=entrada.ghi_wm2,
-            solar_zenith_deg=pos.zenith_deg,
-            solar_azimuth_deg=pos.azimuth_deg,
-            panel_tilt_deg=entrada.tilt_deg,
-            panel_azimuth_deg=entrada.azimuth_panel_deg
-        )
-    )
-
-    # ------------------------------------------------------
-    # 3. RESULTADO
-    # ------------------------------------------------------
-
-    return SolarResultado(
-        poa_total_wm2=irr.poa_total,
-        poa_directa_wm2=irr.poa_directa,
-        poa_difusa_wm2=irr.poa_difusa,
-        poa_reflejada_wm2=irr.poa_reflejada,
-        zenith_deg=pos.zenith_deg,
-        azimuth_deg=pos.azimuth_deg
-    )
-
-
-# ==========================================================
-# ESTRUCTURA DEL DOMINIO
-# ==========================================================
-
-"""
-Este módulo produce:
-
-SolarResultado
-
-
-Estructura:
-
-SolarResultado
-    ├─ poa_total_wm2
-    ├─ poa_directa_wm2
-    ├─ poa_difusa_wm2
-    ├─ poa_reflejada_wm2
-    │
-    ├─ zenith_deg
-    └─ azimuth_deg
-
-
-Flujo de integración:
-
-ResultadoClima (1 hora)
-        ↓
-ejecutar_solar_unitario
-        ↓
-SolarResultado
-        ↓
-(simulación 8760 / energy)
-
-
-Fronteras:
-
-✔ clima → datos
-✔ solar → transformación física
-✔ energy → potencia
-
-Este módulo NO cruza esas fronteras.
-"""
     if e.lat is None or e.lon is None:
         raise ValueError("Lat/lon inválidos")
 
@@ -217,9 +71,18 @@ Este módulo NO cruza esas fronteras.
 # ==========================================================
 
 def ejecutar_solar(entrada: EntradaSolar) -> SolarResultado:
+    """
+    Ejecuta el modelo solar (componente físico).
+
+    Este método será llamado dentro del loop 8760,
+    no directamente por UI.
+    """
 
     _validar(entrada)
 
+    # ------------------------------------------------------
+    # POSICIÓN SOLAR
+    # ------------------------------------------------------
     pos = calcular_posicion_solar(
         SolarInput(
             latitud_deg=entrada.lat,
@@ -228,6 +91,9 @@ def ejecutar_solar(entrada: EntradaSolar) -> SolarResultado:
         )
     )
 
+    # ------------------------------------------------------
+    # IRRADIANCIA EN PLANO (POA)
+    # ------------------------------------------------------
     irr = calcular_irradiancia_plano(
         IrradianciaInput(
             dni=entrada.dni_wm2,
@@ -240,6 +106,9 @@ def ejecutar_solar(entrada: EntradaSolar) -> SolarResultado:
         )
     )
 
+    # ------------------------------------------------------
+    # RESULTADO
+    # ------------------------------------------------------
     return SolarResultado(
         poa_total_wm2=irr.poa_total,
         poa_directa_wm2=irr.poa_directa,
