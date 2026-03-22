@@ -1,165 +1,95 @@
 from __future__ import annotations
 
-"""
-PUERTOS DEL SISTEMA — FV Engine
+from dataclasses import dataclass
+from typing import Any
 
-Este módulo define las interfaces que conectan el orquestador
-del sistema con los distintos dominios del motor FV.
-
-Los puertos representan CONTRATOS.
-
-El orquestador solo conoce estos contratos.
-Las implementaciones viven en los dominios:
-
-    electrical.paneles
-    electrical.ingenieria_electrica
-    electrical.energia
-    core.servicios.finanzas
-"""
-
-from typing import Protocol, Dict, Any
+from core.dominio.contrato import ResultadoProyecto
+from core.aplicacion.puertos import (
+    PuertoSizing,
+    PuertoPaneles,
+    PuertoEnergia,
+    PuertoNEC,
+    PuertoFinanzas,
+)
 
 
-# ==========================================================
-# PUERTO: SIZING
-# ==========================================================
+@dataclass
+class DependenciasEstudio:
 
-class PuertoSizing(Protocol):
-    """
-    Dimensionamiento del sistema FV.
-
-    Entrada:
-        datos del proyecto
-
-    Salida:
-        ResultadoSizing
-    """
-
-    def ejecutar(
-        self,
-        datos: Any,
-    ) -> Dict[str, Any]: ...
+    sizing: PuertoSizing
+    paneles: PuertoPaneles
+    energia: PuertoEnergia
+    nec: PuertoNEC
+    finanzas: PuertoFinanzas
 
 
-# ==========================================================
-# PUERTO: PANELES / STRINGS
-# ==========================================================
+def ejecutar_estudio(
+    datos: Any,
+    deps: DependenciasEstudio,
+) -> ResultadoProyecto:
 
-class PuertoPaneles(Protocol):
-    """
-    Generación de strings FV.
+    # ------------------------------------------------------
+    # 1. SIZING
+    # ------------------------------------------------------
 
-    Entrada:
-        datos del proyecto
-        resultado de sizing
+    sizing = deps.sizing.ejecutar(datos)
 
-    Salida:
-        resultado de strings
-    """
+    if not sizing.ok:
+        return ResultadoProyecto(
+            sizing=sizing,
+            strings=None,
+            energia=None,
+            nec=None,
+            financiero=None,
+        )
 
-    def ejecutar(
-        self,
-        datos: Any,
-        sizing: Dict[str, Any],
-    ) -> Dict[str, Any]: ...
+    # ------------------------------------------------------
+    # 2. PANELES
+    # ------------------------------------------------------
 
+    paneles = deps.paneles.ejecutar(
+        datos,
+        sizing,
+    )
 
-# ==========================================================
-# PUERTO: INGENIERÍA ELÉCTRICA
-# ==========================================================
+    # ------------------------------------------------------
+    # 3. NEC
+    # ------------------------------------------------------
 
-class PuertoNEC(Protocol):
-    """
-    Ingeniería eléctrica del sistema FV.
+    nec = deps.nec.ejecutar(
+        datos,
+        sizing,
+        paneles,
+    )
 
-    Incluye:
+    # ------------------------------------------------------
+    # 4. ENERGÍA
+    # ------------------------------------------------------
 
-        corrientes
-        protecciones
-        conductores
-        canalización
+    energia = deps.energia.ejecutar(
+        datos,
+        sizing,
+        paneles,
+    )
 
-    Entrada:
-        datos
-        sizing
-        strings
+    # ------------------------------------------------------
+    # 5. FINANZAS
+    # ------------------------------------------------------
 
-    Salida:
-        paquete eléctrico completo
-    """
+    financiero = deps.finanzas.ejecutar(
+        datos,
+        sizing,
+        energia,
+    )
 
-    def ejecutar(
-        self,
-        datos: Any,
-        sizing: Dict[str, Any],
-        strings: Dict[str, Any],
-    ) -> Dict[str, Any]: ...
+    # ------------------------------------------------------
+    # RESULTADO FINAL
+    # ------------------------------------------------------
 
-
-# ==========================================================
-# PUERTO: PRODUCCIÓN ENERGÉTICA
-# ==========================================================
-
-class PuertoEnergia(Protocol):
-    """
-    Cálculo de producción energética del sistema FV.
-
-    Entrada:
-        datos
-        sizing
-        strings
-
-    Salida:
-        resultado energético
-    """
-
-    def ejecutar(
-        self,
-        datos: Any,
-        sizing: Dict[str, Any],
-        strings: Dict[str, Any],
-    ) -> Dict[str, Any]: ...
-
-
-# ==========================================================
-# PUERTO: FINANZAS
-# ==========================================================
-
-class PuertoFinanzas(Protocol):
-    """
-    Evaluación financiera del proyecto FV.
-
-    Entrada:
-        datos
-        sizing
-        energía generada
-
-    Salida:
-        análisis financiero
-    """
-
-    def ejecutar(
-        self,
-        datos: Any,
-        sizing: Dict[str, Any],
-        energia: Dict[str, Any],
-    ) -> Dict[str, Any]: ...
-
-
-# ==========================================================
-# RESUMEN DE PUERTOS
-# ==========================================================
-#
-# PuertoSizing
-# PuertoPaneles
-# PuertoNEC
-# PuertoEnergia
-# PuertoFinanzas
-#
-# Consumidos por:
-#   core.aplicacion.orquestador_estudio
-#
-# Implementados por:
-#   dominios del motor FV
-#
-# ==========================================================
+    return ResultadoProyecto(
+        sizing=sizing,
+        strings=paneles,
+        energia=energia,
+        nec=nec,
+        financiero=financiero,
+    )
