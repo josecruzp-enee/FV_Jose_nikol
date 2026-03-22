@@ -5,6 +5,7 @@ from core.aplicacion.orquestador_estudio import DependenciasEstudio
 # ✔ IMPORTS REALES (LOS TUYOS)
 from electrical.paneles.orquestador_paneles import ejecutar_paneles
 from core.aplicacion.puertos import PuertoNEC
+from core.servicios.sizing import ejecutar_sizing
 
 
 # ==========================================================
