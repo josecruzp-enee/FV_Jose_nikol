@@ -1,65 +1,37 @@
 from __future__ import annotations
 
-from core.dominio.modelo import Datosproyecto
-from core.dominio.contrato import ResultadoSizing
+"""
+DEPENDENCIAS — FV ENGINE (REAL)
 
-from electrical.paneles.resultado_paneles import ResultadoPaneles
-from electrical.conductores.corrientes import (
-    calcular_corrientes,
-    CorrientesInput,
-)
-from electrical.protecciones.protecciones import (
-    calcular_protecciones,
-    EntradaProtecciones,
-)
+Construye el objeto DependenciasEstudio que usa el orquestador
+"""
+
+from core.aplicacion.orquestador_estudio import DependenciasEstudio
+
+# ==========================================================
+# IMPLEMENTACIONES REALES (AQUÍ VAN TUS CLASES)
+# ==========================================================
+
+from core.aplicacion.sizing import SizingAdapter
+from core.aplicacion.paneles import PanelesAdapter
+from core.aplicacion.nec import NECAdapter
+from core.aplicacion.energia import EnergiaAdapter
+from core.aplicacion.finanzas import FinanzasAdapter
 
 
 # ==========================================================
-# NEC / CORRIENTES + PROTECCIONES
+# BUILDER REAL
 # ==========================================================
 
-class PuertoNEC:
+def construir_dependencias() -> DependenciasEstudio:
+    """
+    Construye TODAS las dependencias del estudio
+    """
 
-    def ejecutar(
-        self,
-        datos: Datosproyecto,
-        sizing: ResultadoSizing,
-        paneles: ResultadoPaneles,
-    ):
-
-        # ==================================================
-        # VALIDACIÓN
-        # ==================================================
-
-        if not paneles.ok:
-            raise ValueError("ResultadoPaneles inválido")
-
-        if not paneles.strings:
-            raise ValueError("No existen strings en ResultadoPaneles")
-
-        # ==================================================
-        # CORRIENTES (NEC)
-        # ==================================================
-
-        corrientes = calcular_corrientes(
-            CorrientesInput(
-                paneles=paneles,
-                kw_ac=sizing.pac_nominal_kw,
-                vac=datos.vac,
-                fases=getattr(datos, "fases", 1),
-                fp=getattr(datos, "fp", 1.0),
-            )
-        )
-
-        # ==================================================
-        # PROTECCIONES
-        # ==================================================
-
-        protecciones = calcular_protecciones(
-            EntradaProtecciones(
-                corrientes=corrientes,
-                n_strings=len(paneles.strings)
-            )
-        )
-
-        return protecciones
+    return DependenciasEstudio(
+        sizing=SizingAdapter(),
+        paneles=PanelesAdapter(),
+        energia=EnergiaAdapter(),
+        nec=NECAdapter(),
+        finanzas=FinanzasAdapter(),
+    )
