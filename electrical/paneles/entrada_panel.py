@@ -4,74 +4,41 @@ from __future__ import annotations
 CONTRATO DE ENTRADA — DOMINIO PANELES (FV ENGINE)
 ================================================
 
-🔷 QUÉ ES ESTE ARCHIVO
+🔷 PROPÓSITO
 ----------------------------------------------------------
-Este archivo define el CONTRATO DE ENTRADA del dominio paneles.
-
-Es decir:
-    → aquí se define TODO lo que entra al dominio
-    → NO se calcula nada aquí
-    → NO se transforma nada aquí
+Definir de forma estricta y tipada el problema eléctrico
+del sistema fotovoltaico en el dominio de paneles.
 
 Este objeto representa:
-    "las condiciones iniciales del problema eléctrico FV"
+
+    "las condiciones iniciales del sistema FV"
+
+NO realiza cálculos.
+NO transforma datos.
+NO contiene lógica.
 
 ----------------------------------------------------------
-🔷 QUÉ ENTRA (SEMÁNTICA GENERAL)
+🔷 PRINCIPIO FUNDAMENTAL
 ----------------------------------------------------------
 
-Este contrato recibe información de:
-
-1. PANEL (comportamiento eléctrico base)
-    - define voltajes y corrientes unitarias
-
-2. INVERSOR (restricciones del sistema)
-    - define límites de operación DC
-
-3. CONFIGURACIÓN
-    - tamaño del sistema (manual o automático)
-
-4. CONDICIONES TÉRMICAS
-    - afectan principalmente voltajes (Voc frío)
-
-5. OBJETIVO DE DISEÑO
-    - define cómo dimensionar (DC/AC o potencia objetivo)
-
-----------------------------------------------------------
-🔷 CÓMO SE USA
-----------------------------------------------------------
-
-Este objeto es consumido por:
-
-    electrical.paneles.orquestador_paneles
-
-Ese módulo:
-    - dimensiona paneles
-    - calcula strings
-    - distribuye MPPT
-
-----------------------------------------------------------
-🔷 QUÉ NO HACE
-----------------------------------------------------------
-
-Este objeto NO:
-
-    - calcula energía
-    - calcula pérdidas
-    - calcula NEC
-    - calcula corrientes totales
-
-Solo define el problema.
-
-----------------------------------------------------------
-🔷 PRINCIPIO CLAVE
-----------------------------------------------------------
-
-EntradaPaneles = definición del problema
+EntradaPaneles  = definición del problema
 ResultadoPaneles = solución eléctrica
 
 Nunca se mezclan.
 Nunca se mutan.
+Nunca se recalculan fuera del dominio.
+
+----------------------------------------------------------
+🔷 CONSUMIDO POR
+----------------------------------------------------------
+
+electrical.paneles.orquestador_paneles
+
+Ese módulo:
+    → valida entradas
+    → dimensiona sistema
+    → calcula strings
+    → construye ResultadoPaneles
 """
 
 from dataclasses import dataclass
@@ -85,116 +52,107 @@ from typing import Optional
 @dataclass(frozen=True)
 class EntradaPaneles:
 
-    # -----------------------------------------------------
+    # =====================================================
     # ESPECIFICACIÓN DEL MÓDULO FV
-    # -----------------------------------------------------
+    # =====================================================
 
     panel: any
     """
-    Datos eléctricos del panel fotovoltaico.
-
-    Representa el comportamiento UNITARIO del sistema.
+    Datos eléctricos del panel fotovoltaico (unidad).
 
     Debe incluir:
-        p_w     → potencia del panel [W]
-        vmp_v   → voltaje en operación [V]
-        voc_v   → voltaje en circuito abierto [V]
-        imp_a   → corriente en MPPT [A]
-        isc_a   → corriente de corto circuito [A]
+        pmax_w   → potencia nominal [W]
+        vmp_v    → voltaje en MPPT [V]
+        voc_v    → voltaje en circuito abierto [V]
+        imp_a    → corriente en MPPT [A]
+        isc_a    → corriente de cortocircuito [A]
 
-    Este bloque define:
-        → voltajes de string
-        → corrientes DC
-        → potencia total del sistema
+    Define:
+        → comportamiento eléctrico base del sistema
+        → voltajes y corrientes de strings
     """
 
-
-    # -----------------------------------------------------
+    # =====================================================
     # ESPECIFICACIÓN DEL INVERSOR
-    # -----------------------------------------------------
+    # =====================================================
 
     inversor: any
     """
-    Límites eléctricos del inversor (lado DC).
+    Restricciones eléctricas del inversor (lado DC y AC).
 
     Debe incluir:
-        kw_ac         → potencia AC nominal [kW]
+        kw_ac         → potencia nominal AC [kW]
         vmppt_min_v   → voltaje mínimo MPPT [V]
         vmppt_max_v   → voltaje máximo MPPT [V]
         vdc_max_v     → voltaje DC máximo permitido [V]
         n_mppt        → número de MPPT
 
-    Este bloque define:
+    Define:
         → límites de diseño de strings
         → validaciones eléctricas
         → distribución en MPPT
     """
 
-
-    # -----------------------------------------------------
+    # =====================================================
     # CONFIGURACIÓN DEL SISTEMA
-    # -----------------------------------------------------
+    # =====================================================
 
     n_paneles_total: Optional[int] = None
     """
     Número total de paneles del sistema.
 
     Reglas:
-        - Si viene definido → se respeta (modo manual)
-        - Si es None → se calcula automáticamente
+        - Si se define → modo manual
+        - Si None → dimensionamiento automático
 
     Impacto:
-        → define número de strings
-        → define potencia total del sistema
+        → potencia total del sistema
+        → número de strings
     """
-
 
     n_inversores: Optional[int] = None
     """
-    Número de inversores en el sistema.
+    Número de inversores del sistema.
 
     Impacto:
-        → divide la potencia total
-        → afecta distribución de strings
+        → distribución de strings
+        → potencia por inversor
     """
 
-
-    # -----------------------------------------------------
+    # =====================================================
     # CONDICIONES TÉRMICAS
-    # -----------------------------------------------------
+    # =====================================================
 
     t_min_c: float = 25.0
     """
-    Temperatura mínima ambiente [°C].
+    Temperatura mínima ambiente [°C]
 
     Uso:
         → cálculo de Voc en frío
 
-    Regla física:
+    Regla:
         ↓ temperatura → ↑ voltaje
 
     Impacto:
         → validación contra vdc_max del inversor
     """
 
-
     t_oper_c: float = 55.0
     """
-    Temperatura de operación del módulo [°C].
+    Temperatura de operación del módulo [°C]
 
     Uso:
-        → estimación de condiciones reales
-        → ajuste térmico (secundario en este dominio)
+        → condiciones reales de operación
+        → ajuste térmico secundario
     """
 
-
-    # -----------------------------------------------------
+    # =====================================================
     # CONFIGURACIÓN FÍSICA
-    # -----------------------------------------------------
+    # =====================================================
 
     dos_aguas: bool = False
     """
-    Configuración del techo.
+    Configuración del arreglo FV.
 
     True:
         → dos orientaciones (posible división de strings)
@@ -207,31 +165,29 @@ class EntradaPaneles:
         pero sí la distribución de strings.
     """
 
-
-    # -----------------------------------------------------
+    # =====================================================
     # OBJETIVO DE DISEÑO
-    # -----------------------------------------------------
+    # =====================================================
 
     objetivo_dc_ac: Optional[float] = None
     """
-    Relación DC/AC deseada.
+    Relación DC/AC objetivo.
 
     Ejemplo:
-        1.2 → 20% más potencia DC que AC
+        1.2 → 20% sobre dimensionamiento DC
 
     Uso:
-        → dimensionamiento automático del sistema
-        → optimización de producción vs clipping
+        → dimensionamiento automático
+        → optimización producción vs clipping
     """
-
 
     pdc_kw_objetivo: Optional[float] = None
     """
-    Potencia DC objetivo del sistema [kW].
+    Potencia DC objetivo del sistema [kW]
 
     Reglas:
-        - Si viene → define directamente el tamaño
-        - Si no → se calcula usando DC/AC
+        - Si se define → prioridad directa
+        - Si no → se calcula vía DC/AC
 
     Uso:
         → dimensionamiento directo del sistema
@@ -239,76 +195,62 @@ class EntradaPaneles:
 
 
 # =========================================================
-# SALIDA DEL DOMINIO (DOCUMENTACIÓN DE FRONTERA)
+# SALIDAS DEL DOMINIO (DOCUMENTACIÓN)
 # =========================================================
-
-"""
-🔷 QUÉ SALE DE ESTE DOMINIO
-----------------------------------------------------------
-
-Este contrato NO genera salida directamente,
-pero alimenta al flujo que produce:
-
-    ResultadoPaneles
-
-Ubicación:
-    electrical.paneles.resultado_paneles
-
-----------------------------------------------------------
-
-🔷 RESULTADO ESPERADO (SEMÁNTICA)
-----------------------------------------------------------
-
-ResultadoPaneles contiene:
-
-1. ARRAY (fuente principal del sistema)
-    - potencia_dc_w   → potencia total DC
-    - vdc_nom         → voltaje del sistema
-    - idc_nom         → corriente total DC 🔥
-    - n_strings_total → número de strings
-
-2. STRINGS (detalle eléctrico)
-    - vmp_string_v
-    - isc_string_a
-    - idesign_cont_a
-
-3. RECOMENDACIÓN
-    - configuración óptima del sistema
-
-----------------------------------------------------------
-
-🔷 REGLA CRÍTICA DEL SISTEMA
-----------------------------------------------------------
-
-ResultadoPaneles es:
-
-    → la ÚNICA fuente de verdad para NEC
-    → la base de todos los cálculos eléctricos posteriores
-
-----------------------------------------------------------
-
-🔷 FLUJO COMPLETO
-----------------------------------------------------------
-
-EntradaPaneles
-    ↓
-dimensionado_paneles
-    ↓
-calculo_de_strings
-    ↓
-configuración MPPT
-    ↓
-ResultadoPaneles
-
-----------------------------------------------------------
-
-🔷 PRINCIPIO FINAL
-----------------------------------------------------------
-
-EntradaPaneles  = define el problema
-ResultadoPaneles = define la solución
-
-No se mezclan.
-No se recalculan.
-No se transforman fuera del dominio.
-"""
+#
+# EntradaPaneles NO genera salida directamente.
+#
+# Alimenta el flujo que produce:
+#
+#   ResultadoPaneles
+#
+# Ubicación:
+#   electrical/paneles/resultado_paneles.py
+#
+# ---------------------------------------------------------
+# RESULTADO ESPERADO
+# ---------------------------------------------------------
+#
+# ResultadoPaneles contiene:
+#
+#   ARRAY (fuente principal del sistema)
+#       potencia_dc_w
+#       vdc_nom
+#       idc_nom
+#       isc_total
+#       n_strings_total
+#
+#   STRINGS (detalle eléctrico)
+#       vmp_string_v
+#       isc_string_a
+#       imp_string_a
+#
+#   RECOMENDACIÓN
+#       configuración óptima del sistema
+#
+# ---------------------------------------------------------
+# FLUJO COMPLETO
+# ---------------------------------------------------------
+#
+# EntradaPaneles
+#       ↓
+# dimensionado_paneles
+#       ↓
+# calculo_de_strings
+#       ↓
+# distribución MPPT
+#       ↓
+# ResultadoPaneles
+#
+# ---------------------------------------------------------
+# PRINCIPIO FINAL
+# ---------------------------------------------------------
+#
+# EntradaPaneles  = problema
+# ResultadoPaneles = solución
+#
+# No se mezclan.
+# No se recalculan.
+# No se transforman fuera del dominio.
+#
+# =========================================================
