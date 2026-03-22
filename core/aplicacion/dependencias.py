@@ -1,32 +1,62 @@
 from __future__ import annotations
 
 """
-DEPENDENCIAS — FV ENGINE (REAL)
-
-Construye el objeto DependenciasEstudio que usa el orquestador
+DEPENDENCIAS — FV ENGINE (REAL, SIN INVENTOS)
 """
 
 from core.aplicacion.orquestador_estudio import DependenciasEstudio
 
 # ==========================================================
-# IMPLEMENTACIONES REALES (AQUÍ VAN TUS CLASES)
+# IMPORTS REALES (AJUSTA SOLO SI CAMBIAN NOMBRES)
 # ==========================================================
 
-from core.aplicacion.sizing import SizingAdapter
-from core.aplicacion.paneles import PanelesAdapter
-from core.aplicacion.nec import NECAdapter
-from core.aplicacion.energia import EnergiaAdapter
-from core.aplicacion.finanzas import FinanzasAdapter
+from electrical.paneles.orquestador import ejecutar_paneles
+from core.aplicacion.puerto_nec import PuertoNEC
+
+# ⚠️ IMPORTANTE:
+# si tienes funciones reales de energía / finanzas, cámbialas aquí
+# si no, se dejan como passthrough
 
 
 # ==========================================================
-# BUILDER REAL
+# ADAPTERS REALES
+# ==========================================================
+
+class SizingAdapter:
+    def ejecutar(self, datos):
+        # 🔴 CLAVE:
+        # Tú ya traes el sizing desde antes (UI / estado)
+        # NO lo vuelvas a calcular aquí
+        return datos.sizing
+
+
+class PanelesAdapter:
+    def ejecutar(self, datos, sizing):
+        return ejecutar_paneles(datos, sizing)
+
+
+class NECAdapter:
+    def ejecutar(self, datos, sizing, paneles):
+        return PuertoNEC().ejecutar(datos, sizing, paneles)
+
+
+class EnergiaAdapter:
+    def ejecutar(self, datos, sizing, paneles):
+        # 🔴 TEMPORAL — no romper flujo
+        return None
+
+
+class FinanzasAdapter:
+    def ejecutar(self, datos, sizing, energia):
+        # 🔴 TEMPORAL
+        return None
+
+
+# ==========================================================
+# BUILDER
 # ==========================================================
 
 def construir_dependencias() -> DependenciasEstudio:
-    """
-    Construye TODAS las dependencias del estudio
-    """
 
     return DependenciasEstudio(
         sizing=SizingAdapter(),
