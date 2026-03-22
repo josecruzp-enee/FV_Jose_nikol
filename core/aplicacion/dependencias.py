@@ -14,8 +14,7 @@ from core.servicios.sizing import ejecutar_sizing
 
 class SizingAdapter:
     def ejecutar(self, datos):
-        return datos.sizing  # usa lo que ya tienes
-
+        return ejecutar_sizing(datos)
 
 class PanelesAdapter:
     def ejecutar(self, datos, sizing):
