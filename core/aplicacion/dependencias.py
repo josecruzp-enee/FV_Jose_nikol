@@ -1,33 +1,19 @@
 from __future__ import annotations
 
-"""
-DEPENDENCIAS — FV ENGINE (REAL, SIN INVENTOS)
-"""
-
 from core.aplicacion.orquestador_estudio import DependenciasEstudio
 
-# ==========================================================
-# IMPORTS REALES (AJUSTA SOLO SI CAMBIAN NOMBRES)
-# ==========================================================
-
-from electrical.paneles.orquestador import ejecutar_paneles
+# ✔ IMPORTS REALES (LOS TUYOS)
+from electrical.paneles.orquestador_paneles import ejecutar_paneles
 from core.aplicacion.puerto_nec import PuertoNEC
 
-# ⚠️ IMPORTANTE:
-# si tienes funciones reales de energía / finanzas, cámbialas aquí
-# si no, se dejan como passthrough
-
 
 # ==========================================================
-# ADAPTERS REALES
+# ADAPTERS
 # ==========================================================
 
 class SizingAdapter:
     def ejecutar(self, datos):
-        # 🔴 CLAVE:
-        # Tú ya traes el sizing desde antes (UI / estado)
-        # NO lo vuelvas a calcular aquí
-        return datos.sizing
+        return datos.sizing  # usa lo que ya tienes
 
 
 class PanelesAdapter:
@@ -42,14 +28,12 @@ class NECAdapter:
 
 class EnergiaAdapter:
     def ejecutar(self, datos, sizing, paneles):
-        # 🔴 TEMPORAL — no romper flujo
-        return None
+        return None  # temporal
 
 
 class FinanzasAdapter:
     def ejecutar(self, datos, sizing, energia):
-        # 🔴 TEMPORAL
-        return None
+        return None  # temporal
 
 
 # ==========================================================
