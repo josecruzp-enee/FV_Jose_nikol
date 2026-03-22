@@ -1,23 +1,12 @@
 from __future__ import annotations
 
-"""
-ORQUESTADOR ELÉCTRICO — FV ENGINE (CORRECTO)
-
-Coordina dominios:
-    - corrientes
-    - protecciones
-    - conductores
-
-SIN dict
-SIN UI
-TIPADO FUERTE
-"""
-
 from dataclasses import dataclass
 from typing import List
 
-# DOMINIOS
-from electrical.corrientes.corrientes import calcular_corrientes
+from electrical.conductores.corrientes import (
+    calcular_corrientes,
+    CorrientesInput,
+)
 from electrical.protecciones.protecciones import (
     ejecutar_protecciones_fv,
     EntradaProteccionesFV,
@@ -61,12 +50,17 @@ def ejecutar_ingenieria_electrica(
     try:
 
         # --------------------------------------------------
-        # 1. CORRIENTES
+        # 1. CORRIENTES (CORREGIDO)
         # --------------------------------------------------
 
         corrientes: ResultadoCorrientes = calcular_corrientes(
-            strings=datos_strings,
-            inv=datos_inversor
+            CorrientesInput(
+                paneles=datos_strings,
+                kw_ac=datos_inversor.kw_ac,
+                vac=datos_inversor.v_ac_nom_v,
+                fases=getattr(datos_inversor, "fases", 1),
+                fp=getattr(datos_inversor, "fp", 1.0),
+            )
         )
 
         # --------------------------------------------------
