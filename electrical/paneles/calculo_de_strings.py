@@ -316,3 +316,174 @@ def calcular_strings_fv(
         ),
         n_paneles_total=n_paneles_total
     )
+
+
+# ==========================================================
+# SALIDAS DEL ARCHIVO
+# ==========================================================
+#
+# FUNCIÓN PRINCIPAL:
+# ----------------------------------------------------------
+# calcular_strings_fv()
+#
+#
+# ----------------------------------------------------------
+# ENTRADA (CONTRATO)
+# ----------------------------------------------------------
+#
+# n_paneles_total : int
+#     → número total de paneles del sistema
+#
+# panel : PanelSpec
+#     → datos eléctricos del módulo FV
+#         - vmp_v
+#         - voc_v
+#         - imp_a
+#         - isc_a
+#         - coeficientes térmicos
+#
+# inversor : InversorSpec
+#     → restricciones eléctricas del inversor
+#         - vdc_max_v
+#         - mppt_min_v
+#         - mppt_max_v
+#         - n_mppt
+#
+# n_inversores : int
+#     → cantidad de inversores en el sistema
+#
+# t_min_c : float
+#     → temperatura mínima (para Voc en frío)
+#
+# t_oper_c : float (opcional)
+#     → temperatura de operación (para Vmp)
+#
+# dos_aguas : bool
+#     → configuración física del sistema (no afecta cálculo base)
+#
+# objetivo_dc_ac / pdc_kw_objetivo
+#     → parámetros de diseño (no usados directamente aquí)
+#
+#
+# ----------------------------------------------------------
+# PROCESO (QUÉ CALCULA)
+# ----------------------------------------------------------
+#
+# Este módulo calcula:
+#
+#   1. Límites eléctricos por voltaje:
+#       - mínimo y máximo número de módulos en serie
+#
+#   2. Selección óptima de n_series:
+#       - centrado en ventana MPPT
+#       - minimizando desperdicio de paneles
+#
+#   3. Número total de strings:
+#       n_strings_total = n_paneles_total / n_series
+#
+#   4. Distribución:
+#       - strings por inversor
+#       - strings por MPPT
+#
+#   5. Parámetros eléctricos:
+#       - Vmp string
+#       - Voc frío string
+#       - corriente de string
+#
+#
+# ----------------------------------------------------------
+# SALIDA
+# ----------------------------------------------------------
+#
+# StringsResultado
+#
+# Campos:
+#
+#   ok : bool
+#       → estado del cálculo
+#
+#   errores : list[str]
+#       → errores críticos (detienen cálculo)
+#
+#   warnings : list[str]
+#       → advertencias (ej: paneles sobrantes)
+#
+#   strings : list[StringCalc]
+#       → detalle por string:
+#           - inversor
+#           - mppt
+#           - n_series
+#           - vmp_string_v
+#           - voc_frio_string_v
+#           - imp_string_a
+#           - isc_string_a
+#
+#   recomendacion : RecomendacionCalc
+#       → resumen del sistema:
+#           - n_series
+#           - n_strings_total
+#           - voltajes
+#
+#   bounds : BoundsCalc
+#       → límites eléctricos:
+#           - n_min
+#           - n_max
+#
+#   n_paneles_total : int
+#       → paneles utilizados
+#
+#
+# ----------------------------------------------------------
+# UBICACIÓN EN LA ARQUITECTURA
+# ----------------------------------------------------------
+#
+# Carpeta:
+#   electrical/paneles/
+#
+# Rol:
+#   Motor de cálculo eléctrico de strings
+#
+#
+# ----------------------------------------------------------
+# FLUJO DEL SISTEMA
+# ----------------------------------------------------------
+#
+# EntradaPaneles
+#       ↓
+# dimensionar_paneles
+#       ↓
+# calcular_strings_fv   ← ESTE MÓDULO
+#       ↓
+# ResultadoPaneles
+#       ↓
+# NEC / Corrientes / Conductores
+#
+#
+# ----------------------------------------------------------
+# PRINCIPIOS
+# ----------------------------------------------------------
+#
+# ✔ NO usa dict
+# ✔ SOLO usa dataclass
+# ✔ NO calcula NEC
+# ✔ NO calcula energía
+# ✔ SOLO define el generador FV
+#
+#
+# ----------------------------------------------------------
+# CONSUMIDO POR
+# ----------------------------------------------------------
+#
+# electrical.paneles.orquestador_paneles
+#
+#
+# ----------------------------------------------------------
+# NOTA DE DISEÑO
+# ----------------------------------------------------------
+#
+# Este módulo define el comportamiento eléctrico base del sistema.
+#
+# Todo lo que sigue (corrientes, NEC, conductores)
+# depende directamente de este resultado.
+#
+# ==========================================================
