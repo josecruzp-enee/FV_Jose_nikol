@@ -1,16 +1,10 @@
 from __future__ import annotations
 
 """
-PROTECCIONES FV — MÓDULO UNIFICADO (OCPD)
+PROTECCIONES FV — DOMINIO
 
 Responsabilidad:
-    - Selección de protecciones (NO cálculo de corrientes)
-
-Fuente de verdad:
-    - ResultadoCorrientes (corrientes ya con NEC aplicado)
-
-REGLAS:
-    - SOLO usar i_diseno
+    - Selección de protecciones
 """
 
 from dataclasses import dataclass
@@ -29,7 +23,7 @@ from electrical.protecciones.resultado_protecciones import (
 # ==========================================================
 
 @dataclass(frozen=True)
-class EntradaProteccionesFV:
+class EntradaProtecciones:
     corrientes: ResultadoCorrientes
     n_strings: int
 
@@ -62,32 +56,16 @@ def seleccionar_ocpd(i_diseno: float) -> int:
 # CÁLCULOS
 # ==========================================================
 
-def calcular_ocpd_ac(i_diseno_ac: float) -> OCPDResultado:
-
-    size = seleccionar_ocpd(i_diseno_ac)
-
+def _ocpd(i: float, norma: str) -> OCPDResultado:
+    size = seleccionar_ocpd(i)
     return OCPDResultado(
-        i_diseno_a=round(i_diseno_ac, 3),
+        i_diseno_a=round(i, 3),
         tamano_a=size,
-        norma="NEC 690.8 / 210.20(A)"
+        norma=norma
     )
 
 
-def calcular_ocpd_dc_array(i_diseno_dc: float) -> OCPDResultado:
-
-    size = seleccionar_ocpd(i_diseno_dc)
-
-    return OCPDResultado(
-        i_diseno_a=round(i_diseno_dc, 3),
-        tamano_a=size,
-        norma="NEC 690.9"
-    )
-
-
-def calcular_fusible_string(
-    n_strings: int,
-    i_diseno_string: float
-) -> FusibleStringResultado:
+def _fusible_string(n_strings: int, i: float) -> FusibleStringResultado:
 
     if n_strings < 3:
         return FusibleStringResultado(
@@ -98,11 +76,11 @@ def calcular_fusible_string(
             nota="No requerido (<3 strings)"
         )
 
-    size = seleccionar_ocpd(i_diseno_string)
+    size = seleccionar_ocpd(i)
 
     return FusibleStringResultado(
         requerido=True,
-        i_diseno_a=round(i_diseno_string, 3),
+        i_diseno_a=round(i, 3),
         tamano_a=size,
         norma="NEC 690.9",
         nota=None
@@ -110,11 +88,11 @@ def calcular_fusible_string(
 
 
 # ==========================================================
-# ORQUESTADOR
+# MOTOR PRINCIPAL (ESTO ES LO QUE FALTABA)
 # ==========================================================
 
-def ejecutar_protecciones_fv(
-    entrada: EntradaProteccionesFV
+def calcular_protecciones(
+    entrada: EntradaProtecciones
 ) -> ResultadoProtecciones:
 
     errores: list[str] = []
@@ -123,37 +101,36 @@ def ejecutar_protecciones_fv(
     try:
         corr = entrada.corrientes
 
-        ocpd_ac = calcular_ocpd_ac(
-            corr.ac.i_diseno_a
-        )
-
-        ocpd_dc_array = calcular_ocpd_dc_array(
-            corr.dc_total.i_diseno_a
-        )
-
-        fusible_string = calcular_fusible_string(
-            entrada.n_strings,
-            corr.string.i_diseno_a
-        )
-
         return ResultadoProtecciones(
             ok=True,
             errores=[],
             warnings=warnings,
-            ocpd_ac=ocpd_ac,
-            ocpd_dc_array=ocpd_dc_array,
-            fusible_string=fusible_string
+
+            ocpd_ac=_ocpd(
+                corr.ac.i_diseno_a,
+                "NEC 690.8 / 210.20(A)"
+            ),
+
+            ocpd_dc_array=_ocpd(
+                corr.dc_total.i_diseno_a,
+                "NEC 690.9"
+            ),
+
+            fusible_string=_fusible_string(
+                entrada.n_strings,
+                corr.string.i_diseno_a
+            )
         )
 
     except Exception as e:
 
         errores.append(str(e))
 
-        # fallback seguro (NO None)
         return ResultadoProtecciones(
             ok=False,
             errores=errores,
             warnings=warnings,
+
             ocpd_ac=OCPDResultado(0.0, 0, ""),
             ocpd_dc_array=OCPDResultado(0.0, 0, ""),
             fusible_string=FusibleStringResultado(
