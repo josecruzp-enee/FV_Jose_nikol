@@ -146,7 +146,7 @@ class NECAdapter:
                 "imp_string_a": s0.imp_string_a,
                 "isc_string_a": s0.isc_string_a,
                 "strings_por_mppt": 1,
-                "n_strings_total": paneles.array.n_strings,
+                "n_strings_total": paneles.array.n_strings_total,
             },
             "inversor": {
                 "kw_ac": sizing.kw_ac,
