@@ -1,84 +1,156 @@
 from __future__ import annotations
 
-from core.aplicacion.orquestador_estudio import DependenciasEstudio
+from dataclasses import dataclass
+from typing import Any, Optional
 
-# 🔥 SOLO ORQUESTADORES (caja negra)
-from electrical.paneles.orquestador_paneles import ejecutar_paneles
-from electrical.orquestador_electrical import ejecutar_electrical
+from core.dominio.contrato import ResultadoProyecto
 
-from core.servicios.sizing import calcular_sizing_unificado
-
-
-# ==========================================================
-# SIZING
-# ==========================================================
-
-class SizingAdapter:
-    def ejecutar(self, datos):
-        return calcular_sizing_unificado(datos)
+from core.aplicacion.puertos import (
+    PuertoSizing,
+    PuertoPaneles,
+    PuertoEnergia,
+    PuertoNEC,
+    PuertoFinanzas,
+)
 
 
 # ==========================================================
-# PANELES (CAJA NEGRA)
+# DEPENDENCIAS
 # ==========================================================
 
-class PanelesAdapter:
-    def ejecutar(self, datos, sizing):
-        """
-        core NO arma entradas
-        electrical resuelve TODO internamente
-        """
-        return ejecutar_paneles(
-            datos=datos,
+@dataclass
+class DependenciasEstudio:
+    sizing: PuertoSizing
+    paneles: PuertoPaneles
+    energia: PuertoEnergia
+    nec: Optional[PuertoNEC] = None
+    finanzas: PuertoFinanzas = None
+
+
+# ==========================================================
+# ORQUESTADOR LIMPIO
+# ==========================================================
+
+def ejecutar_estudio(
+    datos: Any,
+    deps: DependenciasEstudio,
+):
+
+    print("\n==============================")
+    print("FV ENGINE — INICIO ESTUDIO")
+    print("==============================")
+
+    try:
+
+        # ------------------------------------------------------
+        # 1. SIZING
+        # ------------------------------------------------------
+
+        print("\n[1] EJECUTANDO SIZING")
+
+        sizing = deps.sizing.ejecutar(datos)
+
+        if getattr(sizing, "ok", True) is False:
+            return ResultadoProyecto(
+                sizing=sizing,
+                strings=None,
+                energia=None,
+                nec=None,
+                financiero=None,
+            )
+
+        # ------------------------------------------------------
+        # 2. PANELES
+        # ------------------------------------------------------
+
+        print("\n[2] EJECUTANDO PANEL / STRINGS")
+
+        resultado_paneles = deps.paneles.ejecutar(datos, sizing)
+
+        if not resultado_paneles.ok:
+            return ResultadoProyecto(
+                sizing=sizing,
+                strings=resultado_paneles,
+                energia=None,
+                nec=None,
+                financiero=None,
+            )
+
+        # ------------------------------------------------------
+        # 3. ELECTRICAL (CAJA NEGRA)
+        # ------------------------------------------------------
+
+        print("\n[3] CALCULOS ELECTRICOS")
+
+        if deps.nec:
+
+            resultado_electrico = deps.nec.ejecutar(
+                datos=datos,
+                paneles=resultado_paneles,
+            )
+
+            if not resultado_electrico.ok:
+                return ResultadoProyecto(
+                    sizing=sizing,
+                    strings=resultado_paneles,
+                    energia=None,
+                    nec=resultado_electrico,
+                    financiero=None,
+                )
+
+        else:
+            resultado_electrico = None
+
+        # ------------------------------------------------------
+        # 4. ENERGÍA
+        # ------------------------------------------------------
+
+        print("\n[4] EJECUTANDO ENERGIA")
+
+        energia = deps.energia.ejecutar(
+            datos,
+            sizing,
+            resultado_paneles,
+        )
+
+        # ------------------------------------------------------
+        # 5. FINANZAS
+        # ------------------------------------------------------
+
+        print("\n[5] EJECUTANDO FINANZAS")
+
+        financiero = deps.finanzas.ejecutar(
+            datos,
+            sizing,
+            energia,
+        )
+
+        # ------------------------------------------------------
+        # RESULTADO FINAL
+        # ------------------------------------------------------
+
+        resultado = ResultadoProyecto(
             sizing=sizing,
+            strings=resultado_paneles,
+            energia=energia,
+            nec=resultado_electrico,
+            financiero=financiero,
         )
 
+        print("\n==============================")
+        print("FV ENGINE — FIN ESTUDIO")
+        print("==============================")
 
-# ==========================================================
-# ELECTRICAL (ORQUESTADOR GLOBAL)
-# ==========================================================
+        return resultado
 
-class ElectricalAdapter:
-    def ejecutar(self, *, datos, paneles):
-        """
-        Adapter que traduce datos → params_conductores
-        """
+    except Exception as e:
 
-        params = datos.electrical  # ajusta si tu estructura cambia
+        print("\n❌ ERROR EN ORQUESTADOR:", str(e))
 
-        return ejecutar_electrical(
-            paneles=paneles,
-            params_conductores=params,
+        return ResultadoProyecto(
+            sizing=None,
+            strings=None,
+            energia=None,
+            nec=None,
+            financiero=None,
         )
-
-# ==========================================================
-# ENERGÍA (PLACEHOLDER)
-# ==========================================================
-
-class EnergiaAdapter:
-    def ejecutar(self, datos, sizing, paneles):
-        return None
-
-
-# ==========================================================
-# FINANZAS (PLACEHOLDER)
-# ==========================================================
-
-class FinanzasAdapter:
-    def ejecutar(self, datos, sizing, energia):
-        return None
-
-
-# ==========================================================
-# BUILDER
-# ==========================================================
-
-def construir_dependencias() -> DependenciasEstudio:
-
-    return DependenciasEstudio(
-        sizing=SizingAdapter(),
-        paneles=PanelesAdapter(),
-        energia=EnergiaAdapter(),
-        nec=ElectricalAdapter(),  # 🔥 AQUÍ VA TODO ELECTRICAL
-        finanzas=FinanzasAdapter(),
-    )
