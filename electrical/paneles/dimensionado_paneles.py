@@ -1,81 +1,21 @@
-"""
-DIMENSIONADO DE PANELES FV
-==========================================================
+from __future__ import annotations
 
-Este módulo convierte una potencia DC objetivo en el
-número de paneles necesarios y la potencia DC instalada.
+"""
+DIMENSIONADO DE PANELES — FV ENGINE
+
+Convierte una potencia DC objetivo o una cantidad de paneles
+en un sistema FV definido en potencia instalada.
 
 NO calcula:
-    - HSP
-    - PR
-    - consumo energético
+    - energía
     - strings
-    - distribución MPPT
+    - MPPT
+    - pérdidas
 
-Solo determina:
+Solo resuelve:
 
-    potencia DC objetivo → cantidad de paneles.
-
-----------------------------------------------------------
-ENTRADAS
-
-Origen:
-    electrical.paneles.entrada_panel.EntradaPaneles
-
-Variables utilizadas:
-
-    entrada.panel.pmax_w
-        Potencia nominal del panel (W), dada por catálogos. 
-
-    entrada.n_paneles_total
-        Número total de paneles definido por el usuario. Esta si se hace de modo manual. 
-
-    entrada.pdc_kw_objetivo
-        Potencia DC objetivo del sistema (kW). Esta si se hace de modo automático para alcanzar una cobertura de demanda (80% predefinido).
-
-----------------------------------------------------------
-SALIDAS
-
-Tipo retornado:
-    PanelSizingResultado
-
-Campos:
-
-    ok
-        Indica si el cálculo fue válido
-
-    errores
-        Lista de errores detectados
-
-    kwp_req
-        Potencia DC objetivo solicitada (kW)
-
-    n_paneles
-        Número final de paneles del sistema
-
-    pdc_kw
-        Potencia DC instalada del sistema (kW)
-
-----------------------------------------------------------
-CONSUMIDO POR
-
-Archivo:
-    electrical.paneles.orquestador_paneles
-
-Flujo del dominio paneles:
-
-    EntradaPaneles
-        ↓
-    dimensionar_paneles()
-        ↓
-    PanelSizingResultado
-        ↓
-    calculo_de_strings()
-
-==========================================================
+    tamaño del sistema (paneles y potencia DC)
 """
-
-from __future__ import annotations
 
 from dataclasses import dataclass
 from math import ceil
@@ -103,14 +43,7 @@ class PanelSizingResultado:
 # UTILIDADES
 # ==========================================================
 
-def _safe_float(x, default: float = 0.0) -> float:
-    try:
-        return float(x)
-    except Exception:
-        return default
-
-
-def _n_paneles(kwp_req: float, panel_w: float) -> int:
+def _calcular_n_paneles(kwp_req: float, panel_w: float) -> int:
 
     if panel_w <= 0:
         raise ValueError("panel_w inválido (<=0).")
@@ -121,9 +54,15 @@ def _n_paneles(kwp_req: float, panel_w: float) -> int:
     return max(1, int(ceil((kwp_req * 1000.0) / panel_w)))
 
 
-def _pdc_kw(n_paneles: int, panel_w: float) -> float:
+def _calcular_pdc_kw(n_paneles: int, panel_w: float) -> float:
 
-    return (int(n_paneles) * float(panel_w)) / 1000.0
+    if n_paneles <= 0:
+        raise ValueError("n_paneles inválido (<=0).")
+
+    if panel_w <= 0:
+        raise ValueError("panel_w inválido (<=0).")
+
+    return (n_paneles * panel_w) / 1000.0
 
 
 # ==========================================================
@@ -136,101 +75,126 @@ def dimensionar_paneles(
 
     errores: List[str] = []
 
-    panel = entrada.panel
-
     # ------------------------------------------------------
-    # POTENCIA DEL PANEL
+    # VALIDACIÓN PANEL
     # ------------------------------------------------------
 
     try:
-        panel_w = float(panel.pmax_w)
+        panel_w = float(entrada.panel.pmax_w)
     except Exception:
-        panel_w = 0.0
-        errores.append("Panel inválido: pmax_w no numérica.")
-
-    # ------------------------------------------------------
-    # POTENCIA OBJETIVO
-    # ------------------------------------------------------
-
-    kwp_req = _safe_float(entrada.pdc_kw_objetivo, 0.0)
-
-    # ------------------------------------------------------
-    # VALIDAR CONFLICTO DE ENTRADAS
-    # ------------------------------------------------------
-
-    if entrada.n_paneles_total is not None and kwp_req > 0:
-
-        errores.append(
-            "Definir solo uno: n_paneles_total o pdc_kw_objetivo"
+        return PanelSizingResultado(
+            ok=False,
+            errores=["Panel inválido: pmax_w no numérica"],
+            kwp_req=0.0,
+            n_paneles=0,
+            pdc_kw=0.0,
         )
 
     # ------------------------------------------------------
-    # RESULTADOS
+    # VALIDACIÓN ENTRADAS
     # ------------------------------------------------------
 
-    n_pan = 0
-    pdc = 0.0
-
-    if not errores:
-
-        try:
-
-            # --------------------------------------------------
-            # CASO 1: usuario define número de paneles
-            # --------------------------------------------------
-
-            if entrada.n_paneles_total is not None:
-
-                n_pan = int(entrada.n_paneles_total)
-
-                if n_pan <= 0:
-                    raise ValueError("n_paneles_total inválido")
-
-            # --------------------------------------------------
-            # CASO 2: usuario define potencia objetivo
-            # --------------------------------------------------
-
-            else:
-
-                if kwp_req <= 0:
-                    raise ValueError(
-                        "pdc_kw_objetivo inválido o no definido."
-                    )
-
-                n_pan = _n_paneles(kwp_req, panel_w)
-
-            # --------------------------------------------------
-            # POTENCIA DC INSTALADA
-            # --------------------------------------------------
-
-            pdc = _pdc_kw(n_pan, panel_w)
-
-        except Exception as e:
-
-            errores.append(str(e))
+    if (
+        entrada.n_paneles_total is not None
+        and entrada.pdc_kw_objetivo is not None
+    ):
+        return PanelSizingResultado(
+            ok=False,
+            errores=["Definir solo uno: n_paneles_total o pdc_kw_objetivo"],
+            kwp_req=0.0,
+            n_paneles=0,
+            pdc_kw=0.0,
+        )
 
     # ------------------------------------------------------
-    # RESULTADO FINAL
+    # CASOS DE DIMENSIONAMIENTO
     # ------------------------------------------------------
 
-    ok = len(errores) == 0
+    try:
 
-    return PanelSizingResultado(
-        ok=ok,
-        errores=errores,
-        kwp_req=float(kwp_req),
-        n_paneles=int(n_pan),
-        pdc_kw=float(pdc),
-    )
+        # CASO 1 → manual
+        if entrada.n_paneles_total is not None:
+
+            n_paneles = int(entrada.n_paneles_total)
+
+            if n_paneles <= 0:
+                raise ValueError("n_paneles_total inválido")
+
+            kwp_req = (n_paneles * panel_w) / 1000.0
+
+        # CASO 2 → automático
+        else:
+
+            kwp_req = float(entrada.pdc_kw_objetivo or 0.0)
+
+            if kwp_req <= 0:
+                raise ValueError(
+                    "pdc_kw_objetivo no definido o inválido"
+                )
+
+            n_paneles = _calcular_n_paneles(kwp_req, panel_w)
+
+        # --------------------------------------------------
+        # POTENCIA FINAL
+        # --------------------------------------------------
+
+        pdc_kw = _calcular_pdc_kw(n_paneles, panel_w)
+
+        return PanelSizingResultado(
+            ok=True,
+            errores=[],
+            kwp_req=float(kwp_req),
+            n_paneles=int(n_paneles),
+            pdc_kw=float(pdc_kw),
+        )
+
+    except Exception as e:
+
+        return PanelSizingResultado(
+            ok=False,
+            errores=[str(e)],
+            kwp_req=0.0,
+            n_paneles=0,
+            pdc_kw=0.0,
+        )
 
 
 # ==========================================================
 # SALIDAS DEL ARCHIVO
 # ==========================================================
 #
-# PanelSizingResultado
-# Campos: ok : bool  ; errores : list[str]   ; kwp_req : float   ; n_paneles : int   ; pdc_kw : float; 
+# dimensionar_paneles()
+#
+# Entrada:
+#   EntradaPaneles
+#       - panel (pmax_w)
+#       - n_paneles_total (opcional)
+#       - pdc_kw_objetivo (opcional)
+#
+# Proceso:
+#   - valida coherencia de entradas
+#   - calcula número de paneles o usa valor directo
+#   - calcula potencia DC instalada
+#
+# Salida:
+#   PanelSizingResultado
+#
+# Campos:
+#   ok            → estado del cálculo
+#   errores       → lista de errores
+#   kwp_req       → potencia objetivo
+#   n_paneles     → número final de paneles
+#   pdc_kw        → potencia instalada
+#
 # Consumido por:
-# electrical.paneles.orquestador_paneles
-##########################################
+#   electrical.paneles.orquestador_paneles
+#
+# Ubicación en flujo:
+#
+#   EntradaPaneles
+#       ↓
+#   dimensionar_paneles
+#       ↓
+#   calculo_de_strings
+#
 # ==========================================================
