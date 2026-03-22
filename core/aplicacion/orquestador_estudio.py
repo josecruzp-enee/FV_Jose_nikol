@@ -196,9 +196,9 @@ def ejecutar_estudio(
 
 print("\n[3] CALCULOS ELECTRICOS")
 
-from electrical.paneles.corrientes_dc import calcular_corrientes_dc
+from electrical.conductores.corrientes import calcular_corrientes_dc
 from electrical.conductores.calculo_conductores import calcular_conductores
-from electrical.protecciones.ocpd import calcular_ocpd
+from electrical.protecciones.protecciones import calcular_ocpd
 
 corrientes = calcular_corrientes_dc(sizing, strings)
 conductores = calcular_conductores(datos, sizing, strings)
