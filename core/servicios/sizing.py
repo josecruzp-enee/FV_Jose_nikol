@@ -1,28 +1,8 @@
+from __future__ import annotations
+
 """
 Servicio de sizing FV.
-
-FRONTERA DEL MÓDULO
-===================
-
-Entrada:
-    Datosproyecto
-
-Salida:
-    ResultadoSizing
-
-Este módulo:
-    - calcula número de paneles
-    - calcula potencia DC instalada
-    - selecciona inversor
-    - divide arreglo por inversor
-
-Este módulo NO:
-    - calcula strings
-    - calcula corrientes
-    - calcula NEC
 """
-
-from __future__ import annotations
 
 from typing import Any, Dict, Optional, List
 from math import ceil
@@ -53,39 +33,29 @@ def _clamp(x: float, lo: float, hi: float) -> float:
 
 
 def _leer_equipos(p: Datosproyecto) -> Dict[str, Any]:
-
     eq = getattr(p, "equipos", None) or {}
-
     if not isinstance(eq, dict):
         raise ValueError("Formato inválido en p.equipos")
-
     return eq
 
 
 def _panel_id(eq: Dict[str, Any]) -> str:
-
     pid = str(eq.get("panel_id") or "").strip()
-
     if not pid:
         raise ValueError("panel_id no definido en equipos")
-
     return pid
 
 
 def _inv_id(eq: Dict[str, Any]) -> Optional[str]:
-
     v = eq.get("inversor_id")
-
     if v is None:
         return None
-
     v = str(v).strip()
-
     return v if v else None
 
 
 # ==========================================================
-# API pública — Servicio de sizing
+# Lectura base
 # ==========================================================
 
 def _leer_panel_y_config(p: Datosproyecto):
@@ -153,6 +123,10 @@ def _leer_modo_dimensionado(p: Datosproyecto):
     return modo_dimensionado, n_paneles_manual
 
 
+# ==========================================================
+# Generador FV
+# ==========================================================
+
 def _dimensionar_generador(panel, modo_dimensionado, n_paneles_manual, consumo_anual, cobertura_obj):
 
     energia_por_kwp_anual = 1500.0
@@ -162,16 +136,11 @@ def _dimensionar_generador(panel, modo_dimensionado, n_paneles_manual, consumo_a
     from electrical.paneles.entrada_panel import EntradaPaneles
 
     entrada_panel = EntradaPaneles(
-
         panel=panel,
-
         inversor=None,
-
         pdc_kw_objetivo=kwp_objetivo if modo_dimensionado == "auto" else None,
-
         t_min_c=10,
         t_oper_c=50,
-
         n_paneles_total=n_paneles_manual if modo_dimensionado == "manual" else None,
     )
 
@@ -190,51 +159,40 @@ def _dimensionar_generador(panel, modo_dimensionado, n_paneles_manual, consumo_a
     return kwp_req, n_pan, pdc
 
 
+# ==========================================================
+# INVERSOR (FIX)
+# ==========================================================
+
 def _seleccionar_inversor(pdc, dc_ac_obj, eq):
 
     resultado_inv = ejecutar_inversor_desde_sizing(
-
         pdc_kw=pdc,
         dc_ac_obj=dc_ac_obj,
         inversor_id_forzado=_inv_id(eq),
     )
 
+    inversor = resultado_inv["inversor"]  # 🔥 FIX
+
     kw_ac = float(resultado_inv["kw_ac"])
-
-    n_inversores = int(
-        resultado_inv.get("n_inversores", 1)
-    )
-
+    n_inversores = int(resultado_inv.get("n_inversores", 1))
     pac_total_kw = kw_ac * n_inversores
 
-    return kw_ac, n_inversores, pac_total_kw
+    return inversor, kw_ac, n_inversores, pac_total_kw
 
+
+# ==========================================================
+# API PRINCIPAL
+# ==========================================================
 
 def calcular_sizing_unificado(
     p: Datosproyecto,
 ) -> ResultadoSizing:
 
-    # --------------------------------------------------
-    # Equipos
-    # --------------------------------------------------
-
     panel, dc_ac_obj, eq = _leer_panel_y_config(p)
-
-    # --------------------------------------------------
-    # Consumo
-    # --------------------------------------------------
 
     consumo_anual, cobertura_obj = _leer_consumo_y_cobertura(p)
 
-    # --------------------------------------------------
-    # Modo dimensionado
-    # --------------------------------------------------
-
     modo_dimensionado, n_paneles_manual = _leer_modo_dimensionado(p)
-
-    # --------------------------------------------------
-    # Generador FV
-    # --------------------------------------------------
 
     kwp_req, n_pan, pdc = _dimensionar_generador(
         panel,
@@ -244,67 +202,27 @@ def calcular_sizing_unificado(
         cobertura_obj
     )
 
-    # --------------------------------------------------
-    # Inversor
-    # --------------------------------------------------
-
-    kw_ac, n_inversores, pac_total_kw = _seleccionar_inversor(
+    # 🔥 FIX: ahora trae inversor
+    inversor, kw_ac, n_inversores, pac_total_kw = _seleccionar_inversor(
         pdc,
         dc_ac_obj,
         eq
     )
 
-    # --------------------------------------------------
-    # División arreglo
-    # --------------------------------------------------
-
-    paneles_por_inversor = ceil(
-        n_pan / n_inversores
-    )
+    paneles_por_inversor = ceil(n_pan / n_inversores)
 
     energia_12m: List[MesEnergia] = []
 
-    # --------------------------------------------------
-    # Resultado final
-    # --------------------------------------------------
-
     return ResultadoSizing(
-
         n_paneles=n_pan,
-
         kwp_dc=round(pdc, 3),
-
         pdc_kw=round(pdc, 3),
 
         kw_ac=pac_total_kw,
-
         n_inversores=n_inversores,
-
         paneles_por_inversor=paneles_por_inversor,
+
+        inversor=inversor,   # 🔥 FIX FINAL
 
         energia_12m=energia_12m,
     )
-
-
-# ==========================================================
-# SALIDAS DEL MÓDULO
-# ==========================================================
-#
-# calcular_sizing_unificado()
-#
-# devuelve:
-#
-# ResultadoSizing
-#
-# Campos principales:
-#   n_paneles
-#   pdc_kw
-#   kw_ac
-#   n_inversores
-#   paneles_por_inversor
-#   energia_12m
-#
-# Consumido por:
-# core.aplicacion.orquestador_estudio
-#
-# ==========================================================
