@@ -220,10 +220,6 @@ def ejecutar_solar(entrada: EntradaSolar) -> SolarResultado:
 
     _validar(entrada)
 
-    # ------------------------------------------------------
-    # POSICIÓN SOLAR
-    # ------------------------------------------------------
-
     pos = calcular_posicion_solar(
         SolarInput(
             latitud_deg=entrada.lat,
@@ -231,10 +227,6 @@ def ejecutar_solar(entrada: EntradaSolar) -> SolarResultado:
             fecha_hora=entrada.fecha_hora
         )
     )
-
-    # ------------------------------------------------------
-    # IRRADIANCIA EN PLANO
-    # ------------------------------------------------------
 
     irr = calcular_irradiancia_plano(
         IrradianciaInput(
@@ -248,12 +240,11 @@ def ejecutar_solar(entrada: EntradaSolar) -> SolarResultado:
         )
     )
 
-    # ------------------------------------------------------
-    # RESULTADO
-    # ------------------------------------------------------
-
     return SolarResultado(
-        poa_wm2=irr.poa_total,
+        poa_total_wm2=irr.poa_total,
+        poa_directa_wm2=irr.poa_directa,
+        poa_difusa_wm2=irr.poa_difusa,
+        poa_reflejada_wm2=irr.poa_reflejada,
         zenith_deg=pos.zenith_deg,
         azimuth_deg=pos.azimuth_deg
     )
