@@ -189,3 +189,21 @@ def ejecutar_estudio(
     print("==============================")
 
     return resultado
+
+# ------------------------------------------------------
+# 3. ELÉCTRICO (RÁPIDO)
+# ------------------------------------------------------
+
+print("\n[3] CALCULOS ELECTRICOS")
+
+from electrical.paneles.corrientes_dc import calcular_corrientes_dc
+from electrical.conductores.calculo_conductores import calcular_conductores
+from electrical.protecciones.ocpd import calcular_ocpd
+
+corrientes = calcular_corrientes_dc(sizing, strings)
+conductores = calcular_conductores(datos, sizing, strings)
+protecciones = calcular_ocpd(sizing, strings)
+
+print("corrientes:", corrientes)
+print("conductores:", conductores)
+print("protecciones:", protecciones)
