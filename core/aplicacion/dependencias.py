@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from core.aplicacion.orquestador_estudio import DependenciasEstudio
 
-# IMPORTS REALES
+# 🔥 SOLO ORQUESTADORES (caja negra)
 from electrical.paneles.orquestador_paneles import ejecutar_paneles
-from electrical.paneles.entrada_panel import EntradaPaneles
+from electrical.orquestador_electrical import ejecutar_electrical
+
 from core.servicios.sizing import calcular_sizing_unificado
-from electrical.catalogos import get_panel
 
 
 # ==========================================================
@@ -19,43 +19,35 @@ class SizingAdapter:
 
 
 # ==========================================================
-# PANELES
+# PANELES (CAJA NEGRA)
 # ==========================================================
 
 class PanelesAdapter:
     def ejecutar(self, datos, sizing):
-
-        eq = getattr(datos, "equipos", None)
-        if not eq:
-            raise ValueError("datos.equipos no definido")
-
-        panel_id = eq.get("panel_id")
-        panel = get_panel(panel_id)
-
-        if panel is None:
-            raise ValueError("Panel no encontrado en catálogo")
-
-        # ✅ INVERSOR REAL
-        inversor = sizing.inversor
-
-        if inversor is None:
-            raise ValueError("Inversor no definido desde sizing")
-
-        entrada = EntradaPaneles(
-            panel=panel,
-            inversor=inversor,
-
-            n_paneles_total=sizing.n_paneles,
-            n_inversores=sizing.n_inversores,
-
-            t_min_c=10,
-            t_oper_c=50,
-
-            objetivo_dc_ac=None,
-            pdc_kw_objetivo=sizing.pdc_kw,
+        """
+        core NO arma entradas
+        electrical resuelve TODO internamente
+        """
+        return ejecutar_paneles(
+            datos=datos,
+            sizing=sizing,
         )
 
-        return ejecutar_paneles(entrada)
+
+# ==========================================================
+# ELECTRICAL (ORQUESTADOR GLOBAL)
+# ==========================================================
+
+class ElectricalAdapter:
+    def ejecutar(self, datos, paneles):
+        """
+        Entrada mínima: resultado de paneles
+        electrical resuelve el resto
+        """
+        return ejecutar_electrical(
+            paneles=paneles,
+            datos=datos,
+        )
 
 
 # ==========================================================
@@ -86,6 +78,6 @@ def construir_dependencias() -> DependenciasEstudio:
         sizing=SizingAdapter(),
         paneles=PanelesAdapter(),
         energia=EnergiaAdapter(),
-        nec=None,  # 🔥 NEC ELIMINADO CORRECTAMENTE
+        nec=ElectricalAdapter(),  # 🔥 AQUÍ VA TODO ELECTRICAL
         finanzas=FinanzasAdapter(),
     )
