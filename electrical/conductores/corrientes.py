@@ -6,11 +6,14 @@ SUBDOMINIO CORRIENTES — FV ENGINE
 
 🔷 PROPÓSITO
 ----------------------------------------------------------
-Aplicar factores de diseño (NEC) a corrientes YA calculadas.
+Aplicar factores de diseño (NEC) a corrientes YA calculadas
+en el dominio paneles.
 
 Este módulo:
+
     ✔ NO calcula física base
     ✔ NO reconstruye strings
+    ✔ NO usa dict
     ✔ SOLO transforma datos provenientes de ResultadoPaneles
 
 ----------------------------------------------------------
@@ -18,14 +21,22 @@ Este módulo:
 ----------------------------------------------------------
 
 ResultadoPaneles:
-    → array.idc_nom     (corriente total DC)
-    → array.isc_total   (corriente máxima DC)
-    → strings           (corriente por string)
+
+    → array.idc_nom       (corriente total DC)
+    → array.isc_total     (corriente máxima DC)
+    → array.strings_por_mppt
+    → strings             (corriente por string)
+
+----------------------------------------------------------
+🔷 PRINCIPIO
+----------------------------------------------------------
+
+Paneles define la física
+Corrientes aplica normativa (NEC)
 """
 
 from dataclasses import dataclass
 import math
-from typing import List
 
 from electrical.paneles.resultado_paneles import ResultadoPaneles
 
@@ -39,7 +50,7 @@ class NivelCorriente:
     """
     Representa una corriente en un nivel del sistema.
 
-    i_operacion_a → corriente real
+    i_operacion_a → corriente real del sistema
     i_diseno_a    → corriente con factor NEC aplicado
     """
 
@@ -111,34 +122,72 @@ class CorrientesInput:
 # ==========================================================
 
 def calcular_corrientes(inp: CorrientesInput) -> ResultadoCorrientes:
+    """
+    Calcula corrientes del sistema FV a partir de ResultadoPaneles.
 
-    array = inp.paneles.array
-    strings = inp.paneles.strings
+    Aplica factores NEC sobre valores ya calculados.
+
+    NO modifica la física base.
+    """
+
+    paneles = inp.paneles
+    array = paneles.array
+    strings = paneles.strings
+
+    # ------------------------------------------------------
+    # VALIDACIONES
+    # ------------------------------------------------------
 
     if not strings:
         raise ValueError("No hay strings definidos")
 
+    if array.n_strings_total <= 0:
+        raise ValueError("n_strings_total inválido")
+
     s0 = strings[0]
 
-    # ---------------- PANEL ----------------
+    # ------------------------------------------------------
+    # FACTORES NEC
+    # ------------------------------------------------------
+
+    FACTOR_DC = inp.factor_dc
+    FACTOR_AC = inp.factor_ac
+
+    # ------------------------------------------------------
+    # PANEL (referencial)
+    # ------------------------------------------------------
+
+    # Se toma el primer string como referencia del módulo
     i_panel_operacion = s0.isc_string_a
-    i_panel_diseno = i_panel_operacion * inp.factor_dc
+    i_panel_diseno = i_panel_operacion * FACTOR_DC
 
-    # ---------------- STRING ----------------
+    # ------------------------------------------------------
+    # STRING
+    # ------------------------------------------------------
+
     i_string_operacion = s0.imp_string_a
-    i_string_diseno = s0.isc_string_a * inp.factor_dc
+    i_string_diseno = s0.isc_string_a * FACTOR_DC
 
-    # ---------------- MPPT ----------------
-    strings_por_mppt = array.strings_por_mppt
+    # ------------------------------------------------------
+    # MPPT
+    # ------------------------------------------------------
+
+    strings_por_mppt = max(1, array.strings_por_mppt)
 
     i_mppt_operacion = s0.imp_string_a * strings_por_mppt
-    i_mppt_diseno = (s0.isc_string_a * strings_por_mppt) * inp.factor_dc
+    i_mppt_diseno = (s0.isc_string_a * strings_por_mppt) * FACTOR_DC
 
-    # ---------------- DC TOTAL ----------------
+    # ------------------------------------------------------
+    # DC TOTAL (GENERADOR FV)
+    # ------------------------------------------------------
+
     i_dc_operacion = array.idc_nom
-    i_dc_diseno = array.isc_total * inp.factor_dc
+    i_dc_diseno = array.isc_total * FACTOR_DC
 
-    # ---------------- AC ----------------
+    # ------------------------------------------------------
+    # AC (SALIDA DEL INVERSOR)
+    # ------------------------------------------------------
+
     p_w = inp.kw_ac * 1000.0
 
     if inp.vac <= 0 or p_w <= 0:
@@ -149,7 +198,11 @@ def calcular_corrientes(inp: CorrientesInput) -> ResultadoCorrientes:
         else:
             i_ac_operacion = p_w / (inp.vac * inp.fp)
 
-    i_ac_diseno = i_ac_operacion * inp.factor_ac
+    i_ac_diseno = i_ac_operacion * FACTOR_AC
+
+    # ------------------------------------------------------
+    # RESULTADO FINAL
+    # ------------------------------------------------------
 
     return ResultadoCorrientes(
 
@@ -181,87 +234,101 @@ def calcular_corrientes(inp: CorrientesInput) -> ResultadoCorrientes:
 
 
 # ==========================================================
-# RESUMEN DE VARIABLES DE SALIDA
+# SALIDAS DEL ARCHIVO
 # ==========================================================
-
-"""
-SALIDA: ResultadoCorrientes
-==========================
-
-Cada nivel devuelve un objeto NivelCorriente con:
-
-    i_operacion_a → corriente real del sistema
-    i_diseno_a    → corriente con factor NEC aplicado
-
-----------------------------------------------------------
-
-1. PANEL
-----------------------------------------------------------
-panel.i_operacion_a
-    = corriente de corto circuito del módulo (Isc)
-
-panel.i_diseno_a
-    = Isc × 1.25 (NEC)
-
-----------------------------------------------------------
-
-2. STRING
-----------------------------------------------------------
-string.i_operacion_a
-    = corriente de operación del string (Imp)
-
-string.i_diseno_a
-    = Isc_string × 1.25
-
-----------------------------------------------------------
-
-3. MPPT
-----------------------------------------------------------
-mppt.i_operacion_a
-    = corriente total que entra a un MPPT
-    = Imp_string × strings_por_mppt
-
-mppt.i_diseno_a
-    = Isc_string × strings_por_mppt × 1.25
-
-----------------------------------------------------------
-
-4. DC TOTAL (GENERADOR FV)
-----------------------------------------------------------
-dc_total.i_operacion_a
-    = corriente total del generador DC
-    = array.idc_nom  (VIENE DE PANELES)
-
-dc_total.i_diseno_a
-    = corriente máxima DC × 1.25
-    = array.isc_total × 1.25
-
-----------------------------------------------------------
-
-5. AC (SALIDA DEL INVERSOR)
-----------------------------------------------------------
-ac.i_operacion_a
-    = corriente AC real del inversor
-    = P / (V × fp)  ó  P / (√3 × V × fp)
-
-ac.i_diseno_a
-    = corriente AC × 1.25
-
-----------------------------------------------------------
-
-USO DE SALIDAS
-----------------------------------------------------------
-
-dc_total → conductores DC
-string   → fusibles
-mppt     → validación de entrada inversor
-ac       → breaker y conductores AC
-
-----------------------------------------------------------
-
-REGLA FINAL
-----------------------------------------------------------
-
-Este módulo NO calcula corrientes base.
-Solo transforma datos provenientes de ResultadoPaneles.
-"""
+#
+# FUNCIÓN PRINCIPAL:
+# ----------------------------------------------------------
+# calcular_corrientes(inp: CorrientesInput)
+#
+#
+# ----------------------------------------------------------
+# ENTRADA
+# ----------------------------------------------------------
+#
+# CorrientesInput:
+#
+#   paneles: ResultadoPaneles
+#       → fuente de verdad del sistema FV
+#
+#   kw_ac: float
+#       → potencia del inversor [kW]
+#
+#   vac: float
+#       → voltaje AC [V]
+#
+#   fases: int
+#       → 1 o 3
+#
+#   fp: float
+#       → factor de potencia
+#
+#
+# ----------------------------------------------------------
+# PROCESO
+# ----------------------------------------------------------
+#
+# 1. Lee datos desde ResultadoPaneles
+#
+# 2. Calcula corrientes en niveles:
+#       - panel
+#       - string
+#       - MPPT
+#       - DC total
+#       - AC
+#
+# 3. Aplica factores NEC (1.25 por defecto)
+#
+#
+# ----------------------------------------------------------
+# VARIABLES CLAVE
+# ----------------------------------------------------------
+#
+# i_dc_operacion
+#       → corriente total DC
+#
+# i_dc_diseno
+#       → corriente DC con NEC
+#
+# i_ac_operacion
+#       → corriente AC del inversor
+#
+# i_ac_diseno
+#       → corriente AC con NEC
+#
+#
+# ----------------------------------------------------------
+# SALIDA
+# ----------------------------------------------------------
+#
+# ResultadoCorrientes:
+#
+#   panel
+#   string
+#   mppt
+#   dc_total
+#   ac
+#
+#
+# ----------------------------------------------------------
+# UBICACIÓN EN FLUJO
+# ----------------------------------------------------------
+#
+# ResultadoPaneles
+#       ↓
+# calcular_corrientes   ← ESTE MÓDULO
+#       ↓
+# conductores
+#       ↓
+# protecciones
+#
+#
+# ----------------------------------------------------------
+# PRINCIPIO
+# ----------------------------------------------------------
+#
+# Este módulo NO define el sistema.
+#
+# SOLO aplica normativa sobre resultados existentes.
+#
+# ==========================================================
