@@ -28,7 +28,7 @@ class DependenciasEstudio:
 
 
 # ==========================================================
-# ORQUESTADOR
+# ORQUESTADOR LIMPIO
 # ==========================================================
 
 def ejecutar_estudio(
@@ -40,136 +40,113 @@ def ejecutar_estudio(
     print("FV ENGINE — INICIO ESTUDIO")
     print("==============================")
 
-    # ------------------------------------------------------
-    # 1. SIZING
-    # ------------------------------------------------------
+    try:
 
-    print("\n[1] EJECUTANDO SIZING")
+        # ------------------------------------------------------
+        # 1. SIZING
+        # ------------------------------------------------------
 
-    sizing = deps.sizing.ejecutar(datos)
+        print("\n[1] EJECUTANDO SIZING")
 
-    if getattr(sizing, "ok", True) is False:
-        return asdict(ResultadoProyecto(
+        sizing = deps.sizing.ejecutar(datos)
+
+        if getattr(sizing, "ok", True) is False:
+            return ResultadoProyecto(
+                sizing=sizing,
+                strings=None,
+                energia=None,
+                nec=None,
+                financiero=None,
+            )
+
+        # ------------------------------------------------------
+        # 2. PANELES
+        # ------------------------------------------------------
+
+        print("\n[2] EJECUTANDO PANEL / STRINGS")
+
+        resultado_paneles = deps.paneles.ejecutar(datos, sizing)
+
+        if not resultado_paneles.ok:
+            return ResultadoProyecto(
+                sizing=sizing,
+                strings=resultado_paneles,
+                energia=None,
+                nec=None,
+                financiero=None,
+            )
+
+        # ------------------------------------------------------
+        # 3. ELECTRICAL (CAJA NEGRA)
+        # ------------------------------------------------------
+
+        print("\n[3] CALCULOS ELECTRICOS")
+
+        resultado_electrico = None
+
+        if deps.nec:
+            resultado_electrico = deps.nec.ejecutar(
+                datos=datos,
+                paneles=resultado_paneles,
+            )
+
+            if not resultado_electrico.ok:
+                return ResultadoProyecto(
+                    sizing=sizing,
+                    strings=resultado_paneles,
+                    energia=None,
+                    nec=resultado_electrico,
+                    financiero=None,
+                )
+
+        # ------------------------------------------------------
+        # 4. ENERGÍA
+        # ------------------------------------------------------
+
+        print("\n[4] EJECUTANDO ENERGIA")
+
+        energia = deps.energia.ejecutar(
+            datos,
+            sizing,
+            resultado_paneles,
+        )
+
+        # ------------------------------------------------------
+        # 5. FINANZAS
+        # ------------------------------------------------------
+
+        print("\n[5] EJECUTANDO FINANZAS")
+
+        financiero = deps.finanzas.ejecutar(
+            datos,
+            sizing,
+            energia,
+        )
+
+        # ------------------------------------------------------
+        # RESULTADO FINAL
+        # ------------------------------------------------------
+
+        resultado = ResultadoProyecto(
             sizing=sizing,
+            strings=resultado_paneles,
+            energia=energia,
+            nec=resultado_electrico,
+            financiero=financiero,
+        )
+
+        print("\n==============================")
+        print("FV ENGINE — FIN ESTUDIO")
+        print("==============================")
+
+        return resultado
+
+    except Exception as e:
+
+        return ResultadoProyecto(
+            sizing=None,
             strings=None,
             energia=None,
             nec=None,
             financiero=None,
-        ))
-
-    # ------------------------------------------------------
-    # 2. PANELES / STRINGS
-    # ------------------------------------------------------
-
-    print("\n[2] EJECUTANDO PANEL / STRINGS")
-
-    resultado_paneles = deps.paneles.ejecutar(datos, sizing)
-
-    print("CANTIDAD DE STRINGS:", len(resultado_paneles.strings))
-
-    # VALIDACIÓN FUERTE
-    if not resultado_paneles.strings:
-        raise ValueError("Paneles no generó strings. Revisar cálculo.")
-
-    # ------------------------------------------------------
-    # 3. ELÉCTRICO
-    # ------------------------------------------------------
-
-    print("\n[3] CALCULOS ELECTRICOS")
-
-    from electrical.conductores.corrientes import calcular_corrientes, CorrientesInput
-    from electrical.conductores.calculo_conductores import dimensionar_tramos_fv
-    from electrical.protecciones.protecciones import calcular_protecciones, EntradaProtecciones
-
-    # -------------------------
-    # CORRIENTES
-    # -------------------------
-    corrientes_input = CorrientesInput(
-        paneles=resultado_paneles,   # ✅ CORRECTO
-        kw_ac=sizing.kw_ac,
-        vac=240,
-        fases=1,
-        fp=1.0
-    )
-
-    corrientes = calcular_corrientes(corrientes_input)
-
-    # -------------------------
-    # CONDUCTORES
-    # -------------------------
-    conductores = dimensionar_tramos_fv(
-        corrientes=corrientes,
-        vmp_dc=600,
-        vac=240,
-        dist_dc_m=15,
-        dist_ac_m=25,
-        fases=1
-    )
-
-    # -------------------------
-    # PROTECCIONES
-    # -------------------------
-    entrada_prot = EntradaProtecciones(
-        corrientes=corrientes,
-        n_strings=len(resultado_paneles.strings)
-    )
-
-    protecciones = calcular_protecciones(entrada_prot)
-
-    # DEBUG
-    print("\n--- RESULTADOS ELÉCTRICOS ---")
-
-    print("\n[CORRIENTES]")
-    print(corrientes)
-
-    print("\n[CONDUCTORES]")
-    print(conductores)
-
-    print("\n[PROTECCIONES]")
-    print(protecciones)
-
-    # ------------------------------------------------------
-    # 4. ENERGÍA
-    # ------------------------------------------------------
-
-    print("\n[4] EJECUTANDO ENERGIA")
-
-    energia = deps.energia.ejecutar(
-        datos,
-        sizing,
-        resultado_paneles,
-    )
-
-    # ------------------------------------------------------
-    # 5. FINANZAS
-    # ------------------------------------------------------
-
-    print("\n[5] EJECUTANDO FINANZAS")
-
-    financiero = deps.finanzas.ejecutar(
-        datos,
-        sizing,
-        energia,
-    )
-
-    # ------------------------------------------------------
-    # RESULTADO FINAL
-    # ------------------------------------------------------
-
-    resultado = ResultadoProyecto(
-        sizing=sizing,
-        strings=resultado_paneles,
-        energia=energia,
-        nec={
-            "corrientes": corrientes,
-            "conductores": conductores,
-            "protecciones": protecciones,
-        },
-        financiero=financiero,
-    )
-
-    print("\n==============================")
-    print("FV ENGINE — FIN ESTUDIO")
-    print("==============================")
-
-    return resultado
+        )
