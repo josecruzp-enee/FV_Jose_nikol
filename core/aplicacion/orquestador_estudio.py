@@ -64,7 +64,7 @@ def ejecutar_estudio(
     print("\n[2] EJECUTANDO PANEL / STRINGS")
 
     strings = deps.paneles.ejecutar(datos, sizing)
-
+    print(len(strings.strings))
     print("\n--- DEBUG STRINGS ---")
     print(strings)
     print(getattr(strings, "strings", None))
