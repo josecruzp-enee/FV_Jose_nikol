@@ -2,52 +2,43 @@ from __future__ import annotations
 
 """
 RESULTADO DEL DOMINIO PANELES — FV ENGINE
-=========================================
 
-🔷 PROPÓSITO
-----------------------------------------------------------
-Representar la salida del dominio paneles.
+Representa la salida final del dominio paneles.
 
-Este archivo:
-    - NO calcula
-    - NO transforma
-    - SOLO almacena resultados ya calculados
-
-🔷 REGLA
-----------------------------------------------------------
-Todas las variables aquí:
-    → ya vienen calculadas desde el motor
-    → son fuente de verdad para NEC y demás módulos
+REGLA:
+- NO calcula
+- NO transforma
+- SOLO almacena resultados ya calculados
 """
 
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import List
 
 
 # =========================================================
-# STRING
+# STRING (DETALLE)
 # =========================================================
 
 @dataclass(frozen=True)
 class StringFV:
     """
-    Representa UN string físico (detalle eléctrico).
+    Representa un string físico del sistema FV.
     """
 
-    mppt: int                  # índice del MPPT
-    n_series: int              # paneles en serie
+    mppt: int
+    n_series: int
 
-    vmp_string_v: float        # voltaje de operación
-    voc_frio_string_v: float   # voltaje máximo en frío
+    vmp_string_v: float
+    voc_frio_string_v: float
 
-    imp_string_a: float        # corriente de operación
-    isc_string_a: float        # corriente de corto circuito
+    imp_string_a: float
+    isc_string_a: float
 
-    i_mppt_a: float            # corriente hacia MPPT
-    isc_mppt_a: float          # corriente máxima MPPT
+    i_mppt_a: float
+    isc_mppt_a: float
 
-    imax_pv_a: float           # corriente máxima del string
-    idesign_cont_a: float      # corriente de diseño (NEC 125%)
+    imax_pv_a: float
+    idesign_cont_a: float
 
 
 # =========================================================
@@ -57,7 +48,7 @@ class StringFV:
 @dataclass(frozen=True)
 class RecomendacionStrings:
     """
-    Resultado de decisión de diseño.
+    Resultado de decisión de diseño del sistema.
     """
 
     n_series: int
@@ -70,7 +61,7 @@ class RecomendacionStrings:
 
 
 # =========================================================
-# ARRAY (🔥 SISTEMA COMPLETO DC)
+# ARRAY (SISTEMA COMPLETO DC)
 # =========================================================
 
 @dataclass(frozen=True)
@@ -78,17 +69,17 @@ class ArrayFV:
     """
     Representa el sistema completo DC.
 
-    🔥 Fuente principal para NEC
+    Fuente principal para NEC y cálculos eléctricos posteriores.
     """
 
-    potencia_dc_w: float       # potencia total DC
+    potencia_dc_w: float
 
-    vdc_nom: float             # voltaje nominal del sistema
-    idc_nom: float             # corriente total DC (YA CALCULADA)
+    vdc_nom: float
+    idc_nom: float
 
-    isc_total: float           # corriente máxima total (YA CALCULADA)
+    isc_total: float
 
-    voc_frio_array_v: float    # voltaje máximo en frío
+    voc_frio_array_v: float
 
     n_strings_total: int
     n_paneles_total: int
@@ -106,20 +97,24 @@ class ArrayFV:
     def pdc_kw(self) -> float:
         return self.potencia_dc_w / 1000
 
+    @property
+    def n_strings(self) -> int:
+        return self.n_strings_total
+
 
 # =========================================================
-# METADATA (SIN DICTS)
+# META (SIN DICTS)
 # =========================================================
 
 @dataclass(frozen=True)
 class PanelesMeta:
     """
-    Información adicional del cálculo.
+    Datos auxiliares del cálculo.
     """
 
-    metodo: str
-    version: Optional[str] = None
-    notas: Optional[str] = None
+    n_paneles_total: int
+    pdc_kw: float
+    n_inversores: int
 
 
 # =========================================================
@@ -131,9 +126,10 @@ class ResultadoPaneles:
     """
     Salida oficial del dominio paneles.
 
-    🔥 ESTE OBJETO ALIMENTA:
+    ESTE OBJETO ALIMENTA:
+        - Corrientes
         - NEC
-        - Energía
+        - Conductores
         - Reportes
     """
 
@@ -148,3 +144,143 @@ class ResultadoPaneles:
     errores: List[str]
 
     meta: PanelesMeta
+
+
+# ==========================================================
+# SALIDAS DEL ARCHIVO
+# ==========================================================
+#
+# OBJETO PRINCIPAL:
+# ----------------------------------------------------------
+# ResultadoPaneles
+#
+#
+# ----------------------------------------------------------
+# ENTRADA (IMPLÍCITA)
+# ----------------------------------------------------------
+#
+# Este archivo NO recibe entrada directa.
+#
+# Es construido por:
+#   electrical.paneles.orquestador_paneles
+#
+#
+# ----------------------------------------------------------
+# PROCESO (ORIGEN DE DATOS)
+# ----------------------------------------------------------
+#
+# Los datos provienen de:
+#
+#   1. dimensionar_paneles
+#       → número de paneles
+#       → potencia DC
+#
+#   2. calcular_strings_fv
+#       → configuración eléctrica
+#       → voltajes
+#       → corrientes
+#
+#   3. distribución MPPT
+#
+#
+# ----------------------------------------------------------
+# VARIABLES CLAVE
+# ----------------------------------------------------------
+#
+# ArrayFV:
+#
+#   potencia_dc_w
+#       → potencia total del sistema
+#
+#   vdc_nom
+#       → voltaje del generador FV
+#
+#   idc_nom
+#       → corriente DC de operación
+#
+#   isc_total
+#       → corriente máxima del sistema
+#
+#   voc_frio_array_v
+#       → voltaje máximo en frío
+#
+#   n_strings_total
+#       → número total de strings
+#
+#   n_paneles_total
+#       → número total de módulos
+#
+#
+# ----------------------------------------------------------
+# DETALLE DEL SISTEMA
+# ----------------------------------------------------------
+#
+# strings: List[StringFV]
+#
+# Cada string contiene:
+#   - configuración eléctrica
+#   - voltajes
+#   - corrientes
+#
+#
+# ----------------------------------------------------------
+# RECOMENDACIÓN
+# ----------------------------------------------------------
+#
+# recomendacion: RecomendacionStrings
+#
+# Define:
+#   - módulos en serie
+#   - número de strings
+#   - voltajes
+#
+#
+# ----------------------------------------------------------
+# SALIDA
+# ----------------------------------------------------------
+#
+# ResultadoPaneles:
+#
+#   ok
+#   topologia
+#   array
+#   recomendacion
+#   strings
+#   warnings
+#   errores
+#   meta
+#
+#
+# ----------------------------------------------------------
+# UBICACIÓN
+# ----------------------------------------------------------
+#
+# electrical/paneles/
+#
+#
+# ----------------------------------------------------------
+# FLUJO GLOBAL
+# ----------------------------------------------------------
+#
+# EntradaPaneles
+#       ↓
+# ejecutar_paneles
+#       ↓
+# ResultadoPaneles  ← ESTE ARCHIVO
+#       ↓
+# Corrientes
+#       ↓
+# Conductores
+#       ↓
+# NEC
+#
+#
+# ----------------------------------------------------------
+# PRINCIPIO
+# ----------------------------------------------------------
+#
+# Este objeto es la fuente única de verdad del sistema FV.
+#
+# Ningún módulo debe recalcular estos valores.
+#
+# ==========================================================
