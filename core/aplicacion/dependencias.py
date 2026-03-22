@@ -27,7 +27,6 @@ class SizingAdapter:
 class PanelesAdapter:
     def ejecutar(self, datos, sizing):
 
-        # asegurar que equipos exista
         eq = getattr(datos, "equipos", None)
         if not eq:
             raise ValueError("datos.equipos no definido")
@@ -38,18 +37,11 @@ class PanelesAdapter:
         if panel is None:
             raise ValueError("Panel no encontrado en catálogo")
 
-        # 🔥 INVERSOR MÍNIMO (para que no explote)
-        inversor = InversorSpec(
-            kw_ac=sizing.kw_ac,
-            v_ac_nom_v=240,
-            fases=1,
-            fp=1.0,
+        # ✅ INVERSOR REAL
+        inversor = sizing.inversor
 
-            vdc_max_v=1000,
-            vdc_min_v=200,
-            mppt_min_v=200,
-            mppt_max_v=800,
-        )
+        if inversor is None:
+            raise ValueError("Inversor no definido desde sizing")
 
         entrada = EntradaPaneles(
             panel=panel,
@@ -66,7 +58,6 @@ class PanelesAdapter:
         )
 
         return ejecutar_paneles(entrada)
-
 
 # ==========================================================
 # NEC
