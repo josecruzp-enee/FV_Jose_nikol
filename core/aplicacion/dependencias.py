@@ -39,16 +39,17 @@ class PanelesAdapter:
 # ==========================================================
 
 class ElectricalAdapter:
-    def ejecutar(self, datos, paneles):
+    def ejecutar(self, *, datos, paneles):
         """
-        Entrada mínima: resultado de paneles
-        electrical resuelve el resto
+        Adapter que traduce datos → params_conductores
         """
+
+        params = datos.electrical  # ajusta si tu estructura cambia
+
         return ejecutar_electrical(
             paneles=paneles,
-            datos=datos,
+            params_conductores=params,
         )
-
 
 # ==========================================================
 # ENERGÍA (PLACEHOLDER)
