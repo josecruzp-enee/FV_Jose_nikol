@@ -24,7 +24,7 @@ class DependenciasEstudio:
     sizing: PuertoSizing
     paneles: PuertoPaneles
     energia: PuertoEnergia
-    nec: Optional[PuertoNEC] = None  # ✅ NEC ahora opcional
+    nec: Optional[PuertoNEC] = None
     finanzas: PuertoFinanzas = None
 
 
@@ -82,65 +82,56 @@ def ejecutar_estudio(
     print("TYPE:", type(strings))
     print("RAW VALUE:", strings)
 
-    if isinstance(strings, dict):
-
-        print("DICT DETECTADO")
-        print("KEYS:", list(strings.keys()))
-
-        if "strings" in strings:
-
-            lista = strings["strings"]
-
-            print("strings len:", len(lista))
-
-            if len(lista) > 0:
-                print("primer string:", lista[0])
-
-        else:
-            print("NO EXISTE CLAVE 'strings'")
-
-    elif hasattr(strings, "strings"):
-
-        print("DATACLASS DETECTADA")
-
-        print("n_strings_total:", getattr(strings, "n_strings_total", None))
-        print("strings len:", len(strings.strings))
-
-        if strings.strings:
-            print("primer string:", strings.strings[0])
-
-    else:
-        print("FORMATO DESCONOCIDO")
-
     # ------------------------------------------------------
-    # 3. NEC (OPCIONAL)
+    # 3. ELÉCTRICO (CORRECTO)
     # ------------------------------------------------------
 
-    print("\n[3] EJECUTANDO NEC")
+    print("\n[3] CALCULOS ELECTRICOS")
 
-    nec = None
+    from electrical.conductores.corrientes import calcular_corrientes, CorrientesInput
+    from electrical.conductores.calculo_conductores import dimensionar_tramos_fv
+    from electrical.protecciones.protecciones import calcular_protecciones, EntradaProtecciones
 
-    if deps.nec is not None:
+    # CORRIENTES
+    corrientes_input = CorrientesInput(
+        paneles=strings,
+        kw_ac=sizing.kw_ac,
+        vac=240,
+        fases=1,
+        fp=1.0
+    )
 
-        try:
+    corrientes = calcular_corrientes(corrientes_input)
 
-            nec = deps.nec.ejecutar(
-                datos,
-                sizing,
-                strings,
-            )
+    # CONDUCTORES
+    conductores = dimensionar_tramos_fv(
+        corrientes=corrientes,
+        vmp_dc=600,
+        vac=240,
+        dist_dc_m=20,
+        dist_ac_m=20,
+        fases=1
+    )
 
-            print("NEC TYPE:", type(nec))
-            print("NEC VALUE:", nec)
+    # PROTECCIONES
+    entrada_prot = EntradaProtecciones(
+        corrientes=corrientes,
+        n_strings=len(strings.strings) if hasattr(strings, "strings") and strings.strings else 1
+    )
 
-        except Exception as e:
+    protecciones = calcular_protecciones(entrada_prot)
 
-            print("\n*** ERROR EN NEC ***")
-            print("EXCEPTION:", e)
-            raise
+    # DEBUG
+    print("\n--- RESULTADOS ELÉCTRICOS ---")
 
-    else:
-        print("NEC no implementado — se omite")
+    print("\n[CORRIENTES]")
+    print(corrientes)
+
+    print("\n[CONDUCTORES]")
+    print(conductores)
+
+    print("\n[PROTECCIONES]")
+    print(protecciones)
 
     # ------------------------------------------------------
     # 4. ENERGÍA
@@ -154,9 +145,6 @@ def ejecutar_estudio(
         strings,
     )
 
-    print("ENERGIA TYPE:", type(energia))
-    print("ENERGIA VALUE:", energia)
-
     # ------------------------------------------------------
     # 5. FINANZAS
     # ------------------------------------------------------
@@ -169,9 +157,6 @@ def ejecutar_estudio(
         energia,
     )
 
-    print("FINANZAS TYPE:", type(financiero))
-    print("FINANZAS VALUE:", financiero)
-
     # ------------------------------------------------------
     # RESULTADO FINAL
     # ------------------------------------------------------
@@ -180,7 +165,11 @@ def ejecutar_estudio(
         sizing=sizing,
         strings=strings,
         energia=energia,
-        nec=nec,
+        nec={
+            "corrientes": corrientes,
+            "conductores": conductores,
+            "protecciones": protecciones,
+        },
         financiero=financiero,
     )
 
@@ -189,39 +178,3 @@ def ejecutar_estudio(
     print("==============================")
 
     return resultado
-
-# ------------------------------------------------------
-# 3. ELÉCTRICO (AQUÍ VA TODO)
-# ------------------------------------------------------
-
-print("\n[3] CALCULOS ELECTRICOS")
-
-from electrical.conductores.corrientes import calcular_corrientes, CorrientesInput
-from electrical.conductores.calculo_conductores import dimensionar_tramos_fv
-from electrical.protecciones.protecciones import calcular_protecciones, EntradaProtecciones
-
-corrientes_input = CorrientesInput(
-    paneles=strings,
-    kw_ac=sizing.kw_ac,
-    vac=240,
-    fases=1,
-    fp=1.0
-)
-
-corrientes = calcular_corrientes(corrientes_input)
-
-conductores = dimensionar_tramos_fv(
-    corrientes=corrientes,
-    vmp_dc=600,
-    vac=240,
-    dist_dc_m=20,
-    dist_ac_m=20,
-    fases=1
-)
-
-entrada_prot = EntradaProtecciones(
-    corrientes=corrientes,
-    n_strings=len(strings.strings) if hasattr(strings, "strings") else 1
-)
-
-protecciones = calcular_protecciones(entrada_prot)
