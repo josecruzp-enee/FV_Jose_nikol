@@ -39,11 +39,27 @@ Este módulo NO realiza:
 Este módulo NO decide nada.
 
 Solo aplica factores:
+
     entrada → ampacidad base
     salida  → ampacidad corregida
 """
 
-from typing import Tuple
+from dataclasses import dataclass
+
+
+# ==========================================================
+# RESULTADO TIPADO
+# ==========================================================
+
+@dataclass(frozen=True)
+class AmpacidadResultado:
+    """
+    Resultado del ajuste de ampacidad según NEC.
+    """
+
+    ampacidad_ajustada: float
+    factor_temperatura: float
+    factor_ccc: float
 
 
 # ==========================================================
@@ -65,25 +81,35 @@ def factor_temperatura_nec(
     columna: str = "75C",
 ) -> float:
     """
-    🔷 ENTRADA
+    Calcula el factor de corrección por temperatura ambiente.
+
+    ----------------------------------------------------------
+    ENTRADA
 
     t_amb_c:
-        → temperatura ambiente [°C]
+        temperatura ambiente [°C]
 
     columna:
-        → "75C" (terminal típico)
-        → "90C" (THWN-2 / PV wire)
+        tipo de conductor:
+            "75C" → terminal típico
+            "90C" → THWN-2 / PV Wire
 
-    🔷 SALIDA
+    ----------------------------------------------------------
+    SALIDA
 
     factor:
-        → multiplicador de ampacidad (0.71 – 1.0)
+        multiplicador de ampacidad (0.71 – 1.00)
+
+    ----------------------------------------------------------
+    NOTA
+
+    Tabla simplificada (no interpolada).
     """
 
     try:
         t = float(t_amb_c)
     except Exception:
-        t = 30.0
+        raise ValueError("t_amb_c inválido")
 
     col = str(columna).strip().upper()
 
@@ -102,28 +128,32 @@ def factor_temperatura_nec(
 
 
 # ==========================================================
-# FACTOR CCC (AGRUPAMIENTO)
+# FACTOR AGRUPAMIENTO (CCC)
 # ==========================================================
 
 def factor_agrupamiento_ccc(
     ccc: int
 ) -> float:
     """
-    🔷 ENTRADA
+    Calcula el factor por número de conductores portadores.
+
+    ----------------------------------------------------------
+    ENTRADA
 
     ccc:
-        → número de conductores portadores de corriente
+        número de conductores portadores de corriente
 
-    🔷 SALIDA
+    ----------------------------------------------------------
+    SALIDA
 
     factor:
-        → multiplicador de ampacidad (0.5 – 1.0)
+        multiplicador de ampacidad (0.50 – 1.00)
     """
 
     try:
         n = int(ccc)
     except Exception:
-        n = 1
+        raise ValueError("ccc inválido")
 
     if n <= 3:
         return 1.00
@@ -135,7 +165,7 @@ def factor_agrupamiento_ccc(
 
 
 # ==========================================================
-# AMPACIDAD AJUSTADA
+# AMPACIDAD AJUSTADA (FUNCIÓN PRINCIPAL)
 # ==========================================================
 
 def ampacidad_ajustada_nec(
@@ -145,142 +175,165 @@ def ampacidad_ajustada_nec(
     aplicar: bool = True,
     *,
     columna: str = "75C",
-) -> Tuple[float, float, float]:
+) -> AmpacidadResultado:
     """
-    🔷 ENTRADAS
-
-    ampacidad_base:
-        → ampacidad nominal del conductor [A]
-
-    t_amb_c:
-        → temperatura ambiente [°C]
-
-    ccc:
-        → conductores portadores de corriente
-
-    aplicar:
-        → True → aplicar factores NEC
-        → False → devolver ampacidad base
-
-    columna:
-        → "75C" o "90C"
+    Aplica factores NEC a la ampacidad base.
 
     ----------------------------------------------------------
+    ENTRADAS
 
-    🔷 PROCESO
+    ampacidad_base:
+        ampacidad nominal del conductor [A]
+
+    t_amb_c:
+        temperatura ambiente [°C]
+
+    ccc:
+        conductores portadores de corriente
+
+    aplicar:
+        True  → aplicar factores NEC
+        False → devolver ampacidad base
+
+    columna:
+        "75C" o "90C"
+
+    ----------------------------------------------------------
+    PROCESO
 
     ampacidad_ajustada =
         ampacidad_base × f_temp × f_ccc
 
     ----------------------------------------------------------
+    SALIDA
 
-    🔷 SALIDA (TUPLA)
+    AmpacidadResultado:
 
-    ampacidad_ajustada:
-        → ampacidad final corregida
-
-    factor_temperatura:
-        → factor aplicado por temperatura
-
-    factor_ccc:
-        → factor aplicado por agrupamiento
+        ampacidad_ajustada
+        factor_temperatura
+        factor_ccc
     """
 
     try:
         amp_base = float(ampacidad_base)
     except Exception:
-        amp_base = 0.0
+        raise ValueError("ampacidad_base inválida")
 
-    if amp_base <= 0.0:
-        return 0.0, 1.0, 1.0
+    if amp_base <= 0:
+        return AmpacidadResultado(0.0, 1.0, 1.0)
 
-    if not bool(aplicar):
-        return amp_base, 1.0, 1.0
+    if not aplicar:
+        return AmpacidadResultado(amp_base, 1.0, 1.0)
 
     f_temp = factor_temperatura_nec(t_amb_c, columna=columna)
     f_ccc = factor_agrupamiento_ccc(ccc)
 
     amp_adj = amp_base * f_temp * f_ccc
 
-    return float(amp_adj), float(f_temp), float(f_ccc)
+    return AmpacidadResultado(
+        ampacidad_ajustada=float(amp_adj),
+        factor_temperatura=float(f_temp),
+        factor_ccc=float(f_ccc),
+    )
 
 
 # ==========================================================
-# RESUMEN DE VARIABLES DE SALIDA
+# SALIDAS DEL ARCHIVO
 # ==========================================================
-
-"""
-SALIDA PRINCIPAL
-================
-
-ampacidad_ajustada_nec(...) devuelve:
-
-    (ampacidad_ajustada, factor_temperatura, factor_ccc)
-
-----------------------------------------------------------
-
-1. ampacidad_ajustada
-----------------------------------------------------------
-
-    [A]
-
-    Capacidad real del conductor después de aplicar:
-
-        temperatura
-        agrupamiento (CCC)
-
-    👉 Esta es la que se usa para validar:
-
-        i_diseno <= ampacidad_ajustada
-
-----------------------------------------------------------
-
-2. factor_temperatura
-----------------------------------------------------------
-
-    [adimensional]
-
-    Factor aplicado por temperatura ambiente.
-
-    Ejemplo:
-        30°C → 1.00
-        40°C → 0.91
-
-----------------------------------------------------------
-
-3. factor_ccc
-----------------------------------------------------------
-
-    [adimensional]
-
-    Factor por número de conductores.
-
-    Ejemplo:
-        2 conductores → 1.00
-        6 conductores → 0.80
-
-----------------------------------------------------------
-
-USO EN FV ENGINE
-----------------------------------------------------------
-
-Este módulo es consumido por:
-
-    electrical.conductores.tramo_conductor
-
-Para validar:
-
-    ✔ ampacidad
-    ✔ cumplimiento NEC
-
-----------------------------------------------------------
-
-REGLA CLAVE
-----------------------------------------------------------
-
-Este módulo NO selecciona calibre.
-
-Solo responde:
-
-    "¿Este conductor aguanta o no?"
-"""
+#
+# FUNCIÓN PRINCIPAL:
+# ----------------------------------------------------------
+# ampacidad_ajustada_nec(...)
+#
+#
+# ----------------------------------------------------------
+# ENTRADA
+# ----------------------------------------------------------
+#
+# ampacidad_base : float
+#     → ampacidad nominal del conductor
+#
+# t_amb_c : float
+#     → temperatura ambiente
+#
+# ccc : int
+#     → conductores portadores
+#
+# aplicar : bool
+#     → aplicar o no factores NEC
+#
+# columna : str
+#     → tipo de conductor (75C / 90C)
+#
+#
+# ----------------------------------------------------------
+# PROCESO
+# ----------------------------------------------------------
+#
+# 1. Calcula factor por temperatura
+# 2. Calcula factor por agrupamiento
+# 3. Ajusta ampacidad
+#
+#
+# ----------------------------------------------------------
+# VARIABLES CLAVE
+# ----------------------------------------------------------
+#
+# ampacidad_ajustada
+#     → valor final para validación
+#
+# factor_temperatura
+#     → impacto térmico
+#
+# factor_ccc
+#     → impacto por agrupamiento
+#
+#
+# ----------------------------------------------------------
+# SALIDA
+# ----------------------------------------------------------
+#
+# AmpacidadResultado:
+#
+#   ampacidad_ajustada
+#   factor_temperatura
+#   factor_ccc
+#
+#
+# ----------------------------------------------------------
+# USO EN FV ENGINE
+# ----------------------------------------------------------
+#
+# Este módulo es consumido por:
+#
+#   electrical.conductores.tramo_conductor
+#
+# Para validar:
+#
+#   i_diseno <= ampacidad_ajustada
+#
+#
+# ----------------------------------------------------------
+# UBICACIÓN EN FLUJO
+# ----------------------------------------------------------
+#
+# Corrientes
+#       ↓
+# conductores (tramo_conductor)
+#       ↓
+# FACTORES NEC (este módulo)
+#       ↓
+# validación final
+#
+#
+# ----------------------------------------------------------
+# PRINCIPIO
+# ----------------------------------------------------------
+#
+# Este módulo NO selecciona conductores.
+#
+# SOLO responde:
+#
+#   "¿Este conductor cumple ampacidad?"
+#
+# ==========================================================
