@@ -1,95 +1,27 @@
-from __future__ import annotations
+from typing import Protocol
 
-from dataclasses import dataclass
-from typing import Any
-
-from core.dominio.contrato import ResultadoProyecto
-from core.aplicacion.puertos import (
-    PuertoSizing,
-    PuertoPaneles,
-    PuertoEnergia,
-    PuertoNEC,
-    PuertoFinanzas,
-)
+from core.dominio.contrato import ResultadoSizing
+from electrical.paneles.resultado_paneles import ResultadoPaneles
+from energy.contrato import EnergiaResultado
+from electrical.nec.contrato import ResultadoNEC
 
 
-@dataclass
-class DependenciasEstudio:
-
-    sizing: PuertoSizing
-    paneles: PuertoPaneles
-    energia: PuertoEnergia
-    nec: PuertoNEC
-    finanzas: PuertoFinanzas
+class PuertoSizing(Protocol):
+    def ejecutar(self, datos) -> ResultadoSizing: ...
 
 
-def ejecutar_estudio(
-    datos: Any,
-    deps: DependenciasEstudio,
-) -> ResultadoProyecto:
+class PuertoPaneles(Protocol):
+    def ejecutar(self, datos, sizing: ResultadoSizing) -> ResultadoPaneles: ...
 
-    # ------------------------------------------------------
-    # 1. SIZING
-    # ------------------------------------------------------
 
-    sizing = deps.sizing.ejecutar(datos)
+class PuertoNEC(Protocol):
+    def ejecutar(self, datos, sizing: ResultadoSizing, paneles: ResultadoPaneles) -> ResultadoNEC: ...
 
-    if not sizing.ok:
-        return ResultadoProyecto(
-            sizing=sizing,
-            strings=None,
-            energia=None,
-            nec=None,
-            financiero=None,
-        )
 
-    # ------------------------------------------------------
-    # 2. PANELES
-    # ------------------------------------------------------
+class PuertoEnergia(Protocol):
+    def ejecutar(self, datos, sizing: ResultadoSizing, paneles: ResultadoPaneles) -> EnergiaResultado: ...
 
-    paneles = deps.paneles.ejecutar(
-        datos,
-        sizing,
-    )
 
-    # ------------------------------------------------------
-    # 3. NEC
-    # ------------------------------------------------------
-
-    nec = deps.nec.ejecutar(
-        datos,
-        sizing,
-        paneles,
-    )
-
-    # ------------------------------------------------------
-    # 4. ENERGÍA
-    # ------------------------------------------------------
-
-    energia = deps.energia.ejecutar(
-        datos,
-        sizing,
-        paneles,
-    )
-
-    # ------------------------------------------------------
-    # 5. FINANZAS
-    # ------------------------------------------------------
-
-    financiero = deps.finanzas.ejecutar(
-        datos,
-        sizing,
-        energia,
-    )
-
-    # ------------------------------------------------------
-    # RESULTADO FINAL
-    # ------------------------------------------------------
-
-    return ResultadoProyecto(
-        sizing=sizing,
-        strings=paneles,
-        energia=energia,
-        nec=nec,
-        financiero=financiero,
-    )
+class PuertoFinanzas(Protocol):
+    def ejecutar(self, datos, sizing: ResultadoSizing, energia: EnergiaResultado):
+        ...
