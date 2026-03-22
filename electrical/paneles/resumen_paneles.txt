@@ -5,128 +5,198 @@ Ubicación: electrical/paneles/
 
 PROPÓSITO
 --------------------------------------------------------
-Este módulo implementa el motor de configuración eléctrica
-del generador fotovoltaico (lado DC).
+Este módulo implementa el dominio eléctrico del generador
+fotovoltaico (lado DC).
 
-Convierte datos de panel e inversor en una configuración
-válida de strings FV.
+Convierte:
+
+    especificación de panel + inversor + condiciones
+
+en:
+
+    una configuración eléctrica válida del sistema FV
+
+Es la fuente de verdad eléctrica base del sistema.
+
+
+PRINCIPIO ARQUITECTÓNICO
+--------------------------------------------------------
+EntradaPaneles  = problema eléctrico
+ResultadoPaneles = solución eléctrica
+
+El dominio es:
+
+    determinista
+    tipado
+    sin efectos colaterales
+
+No usa dict.
+No mezcla responsabilidades.
+No contiene lógica NEC.
 
 
 QUÉ RESUELVE
 --------------------------------------------------------
-Panel + restricciones eléctricas + condiciones ambientales
+Panel + inversor + temperatura + configuración
                           ↓
-Configuración eléctrica del arreglo FV:
-- Paneles en serie (Ns)
-- Strings en paralelo (Np)
-- Voltajes del string
-- Corrientes del arreglo
-- Distribución por MPPT
+Generador FV definido:
+
+- número de módulos en serie (Ns)
+- número de strings (Np)
+- voltajes (Vmp, Voc frío)
+- corrientes base (Imp, Isc)
+- distribución por MPPT
 
 
 FLUJO INTERNO
 --------------------------------------------------------
-UI / Excel / API
+EntradaPaneles
         ↓
-entradas_strings
-(normaliza datos)
+validacion_strings
         ↓
-orquestador_paneles
-(coordina proceso)
+dimensionado_paneles
         ↓
 calculo_de_strings
-(MOTOR ELÉCTRICO)
         ↓
-resumen_strings / a_lineas_strings
-(salida para UI y PDF)
+orquestador_paneles
+        ↓
+ResultadoPaneles
 
 
-QUÉ CALCULA EL MOTOR
+QUÉ CALCULA EL DOMINIO
 --------------------------------------------------------
-- Voc frío del string
-- Límites eléctricos por MPPT y Vdc_max
-- Selección óptima de paneles en serie
-- Número total de strings
-- Corriente por MPPT
-- Topología (1 agua / 2 aguas)
+- Voc en condiciones frías
+- Vmp en condiciones de operación
+- límites eléctricos por inversor (MPPT y Vdc_max)
+- número óptimo de módulos en serie
+- número total de strings
+- paneles no utilizados (warnings)
+- topología base del sistema
 
 
 QUÉ NO HACE (FUERA DE ALCANCE)
 --------------------------------------------------------
-Este módulo NO:
-- selecciona inversores
-- dimensiona protecciones
-- calcula conductores
-- aplica NEC completo
-- dimensiona canalización
-- calcula producción energética anual final
+Este dominio NO:
 
-Solo configura el generador FV DC.
+- aplica factores NEC (125%, etc.)
+- dimensiona conductores
+- selecciona protecciones
+- calcula caída de voltaje
+- dimensiona canalización
+- calcula energía (kWh)
+- selecciona inversores
+
+Solo define el generador FV DC.
 
 
 ARCHIVOS PRINCIPALES
 --------------------------------------------------------
-calculo_de_strings.py
-    Motor eléctrico principal.
-
-orquestador_paneles.py
-    Punto de entrada del dominio.
-    Normaliza datos y ejecuta el motor.
+entrada_panel.py
+    Contrato de entrada del dominio (tipado).
 
 validacion_strings.py
-    Compatibilidad con UI legacy.
-
-resumen_strings.py
-    Genera resumen estable para UI/PDF.
-
-entradas_strings.py
-    Normaliza entradas externas.
+    Validaciones eléctricas y de coherencia.
 
 dimensionado_paneles.py
-    Sizing energético preliminar.
+    Define cantidad de paneles y potencia DC.
 
-__init__.py
-    API pública y compatibilidad de imports.
+calculo_de_strings.py
+    Motor eléctrico principal (strings).
+
+orquestador_paneles.py
+    Orquestador del dominio.
+    Coordina todo el flujo.
+
+resultado_paneles.py
+    Contrato de salida (fuente de verdad).
 
 
 ENTRYPOINT OFICIAL
 --------------------------------------------------------
 Usar siempre:
 
-    ejecutar_calculo_strings()
+    ejecutar_paneles()
 
-Evitar llamar directamente al motor desde la UI.
+NO llamar directamente:
+
+    calculo_de_strings
+    dimensionado_paneles
 
 
 SALIDA ESTÁNDAR
 --------------------------------------------------------
-Todos los cálculos retornan:
+ResultadoPaneles (inmutable)
+
+Contiene:
 
     ok
     errores[]
     warnings[]
-    topologia
-    recomendacion{}
-    strings[]
-    meta{}
+
+    array:
+        potencia_dc_w
+        vdc_nom
+        idc_nom
+        isc_total
+        voc_frio_array_v
+        n_strings_total
+        n_paneles_total
+
+    strings[]:
+        detalle por string
+
+    recomendacion:
+        configuración óptima
+
+    meta:
+        resumen del sistema
 
 
 IDEA CLAVE DEL DISEÑO
 --------------------------------------------------------
-Paneles = cerebro eléctrico DC.
-Los demás módulos consumen su resultado.
+Paneles = modelo físico del generador FV.
+
+Define:
+
+    voltajes
+    corrientes base
+    topología
+
+Todo lo demás depende de este resultado.
+
+
+REGLAS DEL DOMINIO
+--------------------------------------------------------
+- NO usar dict
+- SOLO dataclass tipado
+- Resultado inmutable (frozen=True)
+- NO lógica NEC
+- NO dependencias externas a paneles/modelos
+- SOLO un punto de salida (ResultadoPaneles)
+
+
+INTEGRACIÓN CON EL SISTEMA
+--------------------------------------------------------
+ResultadoPaneles alimenta:
+
+    → conductores
+    → protecciones
+    → análisis posteriores
+
+Nunca se recalcula fuera del dominio.
 
 
 ESTADO DEL MÓDULO
 --------------------------------------------------------
-ESTABLE (ARCHITECTURE FREEZE)
+ESTABLE — DOMINIO CERRADO
 
 Permitido:
 - corrección de bugs
-- mejoras internas
+- mejoras internas del motor
 
 No permitido:
-- refactor estructural
-- cambio de interfaces públicas
+- cambiar contratos (entrada/salida)
+- introducir NEC
+- romper flujo Entrada → Resultado
 
 ========================================================
