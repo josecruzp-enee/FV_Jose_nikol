@@ -12,7 +12,7 @@ Calcula caída de tensión y valida cumplimiento.
 from typing import List
 
 # 🔥 IMPORTANTE: modelo único
-from .modelos import Conductor
+from .tablas_conductores import Conductor
 
 
 # ==========================================================
