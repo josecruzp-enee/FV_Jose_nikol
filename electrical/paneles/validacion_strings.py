@@ -148,3 +148,90 @@ def validar_parametros_generales(
         errores=errores,
         warnings=warnings
     )
+
+# ==========================================================
+# SALIDAS DEL ARCHIVO
+# ==========================================================
+#
+# FUNCIONES:
+# ----------------------------------------------------------
+# validar_panel(panel: PanelSpec)
+# validar_inversor(inversor: InversorSpec)
+# validar_parametros_generales(...)
+#
+#
+# ----------------------------------------------------------
+# ENTRADA
+# ----------------------------------------------------------
+#
+# PanelSpec:
+#   - voc_v
+#   - vmp_v
+#   - isc_a
+#   - imp_a
+#   - pmax_w
+#   - coeficientes térmicos
+#
+# InversorSpec:
+#   - vdc_max_v
+#   - mppt_min_v
+#   - mppt_max_v
+#   - imppt_max_a
+#   - n_mppt
+#   - kw_ac
+#
+# Parámetros:
+#   - n_paneles_total
+#   - t_min_c
+#   - t_oper_c
+#
+#
+# ----------------------------------------------------------
+# PROCESO
+# ----------------------------------------------------------
+#
+# - valida coherencia de datos eléctricos
+# - detecta errores críticos
+# - genera advertencias técnicas
+#
+# NO realiza cálculos eléctricos
+#
+#
+# ----------------------------------------------------------
+# SALIDA
+# ----------------------------------------------------------
+#
+# ValidacionResultado:
+#
+#   ok       → estado de validación
+#   errores  → lista de errores críticos
+#   warnings → advertencias
+#
+#
+# ----------------------------------------------------------
+# UBICACIÓN EN FLUJO
+# ----------------------------------------------------------
+#
+# EntradaPaneles
+#       ↓
+# VALIDACIÓN (este módulo)
+#       ↓
+# dimensionado_paneles
+#       ↓
+# cálculo de strings
+#
+#
+# ----------------------------------------------------------
+# CONSUMIDO POR
+# ----------------------------------------------------------
+#
+# electrical.paneles.orquestador_paneles
+#
+#
+# ----------------------------------------------------------
+# PRINCIPIO
+# ----------------------------------------------------------
+#
+# Validar antes de calcular.
+#
+# ==========================================================
