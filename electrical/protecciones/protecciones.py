@@ -1,20 +1,24 @@
 from __future__ import annotations
 
 """
-MÓDULO DE PROTECCIONES FV (OCPD)
+PROTECCIONES FV — MÓDULO UNIFICADO (OCPD)
 
-Responsabilidades:
-    - dimensionar breaker AC de salida de inversor
-    - dimensionar fusible de string DC
+Responsabilidad:
+    - Selección de protecciones (NO cálculo de corrientes)
 
-Normativa base:
-    NEC 690.8
-    NEC 690.9
-    NEC 210.20(A)
-    NEC 240.6
+Fuente de verdad:
+    - ResultadoCorrientes (corrientes ya con NEC aplicado)
 
-Este módulo NO calcula corrientes.
-Solo dimensiona dispositivos de protección.
+Normativa:
+    - NEC 690.8
+    - NEC 690.9
+    - NEC 210.20(A)
+    - NEC 240.6
+
+REGLAS:
+    - NO recalcular factores (1.25 ya aplicado)
+    - NO usar datos crudos (isc, i_nom, etc.)
+    - SOLO usar i_diseno
 """
 
 from dataclasses import dataclass
@@ -22,7 +26,43 @@ from typing import Optional
 
 
 # ==========================================================
-# TAMAÑOS ESTÁNDAR OCPD (NEC 240.6)
+# CONTRATO DE CORRIENTES (DEPENDENCIA)
+# ==========================================================
+
+@dataclass(frozen=True)
+class NivelCorriente:
+    i_operacion_a: float
+    i_diseno_a: float
+
+
+@dataclass(frozen=True)
+class ResultadoCorrientes:
+    panel: NivelCorriente
+    string: NivelCorriente
+    mppt: NivelCorriente
+    dc_total: NivelCorriente
+    ac: NivelCorriente
+
+
+# ==========================================================
+# ENTRADA DEL DOMINIO
+# ==========================================================
+
+@dataclass(frozen=True)
+class EntradaProteccionesFV:
+    """
+    Entrada del dominio protecciones.
+
+    Fuente de verdad:
+        → corrientes ya calculadas
+    """
+
+    corrientes: ResultadoCorrientes
+    n_strings: int
+
+
+# ==========================================================
+# TABLA NEC 240.6
 # ==========================================================
 
 TAMANOS_OCPD_STD = [
@@ -33,15 +73,19 @@ TAMANOS_OCPD_STD = [
 ]
 
 
-def seleccionar_ocpd(i_requerida: float) -> int:
+def seleccionar_ocpd(i_diseno: float) -> int:
+    """
+    Selecciona el siguiente valor estándar NEC ≥ corriente
+    """
 
-    corriente = float(i_requerida)
+    if i_diseno <= 0:
+        raise ValueError("Corriente inválida para OCPD")
 
     for size in TAMANOS_OCPD_STD:
-        if corriente <= size:
-            return int(size)
+        if i_diseno <= size:
+            return size
 
-    return TAMANOS_OCPD_STD[-1]
+    raise ValueError("Corriente fuera de rango NEC 240.6")
 
 
 # ==========================================================
@@ -49,151 +93,156 @@ def seleccionar_ocpd(i_requerida: float) -> int:
 # ==========================================================
 
 @dataclass(frozen=True)
-class BreakerACResultado:
-
-    i_nom_a: float
+class OCPDResultado:
     i_diseno_a: float
     tamano_a: int
-    factor_aplicado: float
     norma: str
 
 
 @dataclass(frozen=True)
 class FusibleStringResultado:
-
     requerido: bool
-
-    i_min_a: Optional[float] = None
-    tamano_a: Optional[int] = None
-    factor_aplicado: Optional[float] = None
-
-    nota: Optional[str] = None
-    norma: Optional[str] = None
+    i_diseno_a: Optional[float]
+    tamano_a: Optional[int]
+    norma: Optional[str]
+    nota: Optional[str]
 
 
 @dataclass(frozen=True)
 class ProteccionesFVResultado:
+    ok: bool
+    errores: list[str]
 
-    breaker_ac: BreakerACResultado
+    ocpd_ac: OCPDResultado
+    ocpd_dc_array: OCPDResultado
     fusible_string: FusibleStringResultado
 
 
 # ==========================================================
-# BREAKER AC (SALIDA INVERSOR)
-# NEC 690.8 + 210.20(A)
+# CÁLCULOS
 # ==========================================================
 
-def calcular_breaker_ac(
-    iac_nom_a: float,
-    es_carga_continua: bool = True,
-    factor_continuo: float = 1.25
-) -> BreakerACResultado:
+def calcular_ocpd_ac(i_diseno_ac: float) -> OCPDResultado:
+    """
+    Breaker AC del inversor
+    NEC 690.8 / 210.20(A)
+    """
 
-    i_nom = float(iac_nom_a)
+    size = seleccionar_ocpd(i_diseno_ac)
 
-    if es_carga_continua:
-        i_diseno = i_nom * factor_continuo
-    else:
-        i_diseno = i_nom
-
-    breaker = seleccionar_ocpd(i_diseno)
-
-    return BreakerACResultado(
-        i_nom_a=round(i_nom, 3),
-        i_diseno_a=round(i_diseno, 3),
-        tamano_a=breaker,
-        factor_aplicado=factor_continuo if es_carga_continua else 1.0,
+    return OCPDResultado(
+        i_diseno_a=round(i_diseno_ac, 3),
+        tamano_a=size,
         norma="NEC 690.8 / 210.20(A)"
     )
 
 
-# ==========================================================
-# FUSIBLE DE STRING DC
-# NEC 690.9
-# ==========================================================
+def calcular_ocpd_dc_array(i_diseno_dc: float) -> OCPDResultado:
+    """
+    Protección lado DC (salida combinador / entrada inversor)
+    NEC 690.9
+    """
 
-def calcular_fusible_string(
-    *,
-    n_strings: int,
-    isc_mod_a: float,
-    has_combiner: Optional[bool] = None,
-    aplicar_factor_continuo: bool = True
-) -> FusibleStringResultado:
+    size = seleccionar_ocpd(i_diseno_dc)
 
-    ns = int(n_strings)
-
-    requiere = bool(has_combiner) if has_combiner is not None else (ns >= 3)
-
-    if not requiere:
-
-        return FusibleStringResultado(
-            requerido=False,
-            nota="Protección no requerida (<3 strings en paralelo)."
-        )
-
-    isc = float(isc_mod_a)
-
-    factor = 1.25
-
-    if aplicar_factor_continuo:
-        factor *= 1.25
-
-    i_min = isc * factor
-
-    return FusibleStringResultado(
-        requerido=True,
-        i_min_a=round(i_min, 3),
-        tamano_a=seleccionar_ocpd(i_min),
-        factor_aplicado=round(factor, 3),
+    return OCPDResultado(
+        i_diseno_a=round(i_diseno_dc, 3),
+        tamano_a=size,
         norma="NEC 690.9"
     )
 
 
+def calcular_fusible_string(
+    n_strings: int,
+    i_diseno_string: float
+) -> FusibleStringResultado:
+    """
+    Fusible por string (NEC 690.9)
+
+    Regla:
+        ≥ 3 strings → obligatorio
+    """
+
+    if n_strings < 3:
+        return FusibleStringResultado(
+            requerido=False,
+            i_diseno_a=None,
+            tamano_a=None,
+            norma=None,
+            nota="No requerido (<3 strings en paralelo)"
+        )
+
+    size = seleccionar_ocpd(i_diseno_string)
+
+    return FusibleStringResultado(
+        requerido=True,
+        i_diseno_a=round(i_diseno_string, 3),
+        tamano_a=size,
+        norma="NEC 690.9",
+        nota=None
+    )
+
+
 # ==========================================================
-# ORQUESTADOR PROTECCIONES FV
+# ORQUESTADOR
 # ==========================================================
 
-def dimensionar_protecciones_fv(
-    *,
-    iac_nom_a: float,
-    n_strings: int,
-    isc_mod_a: float,
-    has_combiner: Optional[bool] = None
+def ejecutar_protecciones_fv(
+    entrada: EntradaProteccionesFV
 ) -> ProteccionesFVResultado:
 
-    breaker_ac = calcular_breaker_ac(iac_nom_a)
+    errores: list[str] = []
 
-    fusible_string = calcular_fusible_string(
-        n_strings=n_strings,
-        isc_mod_a=isc_mod_a,
-        has_combiner=has_combiner
-    )
+    try:
+        corr = entrada.corrientes
 
-    return ProteccionesFVResultado(
-        breaker_ac=breaker_ac,
-        fusible_string=fusible_string
-    )
+        ocpd_ac = calcular_ocpd_ac(
+            corr.ac.i_diseno_a
+        )
+
+        ocpd_dc_array = calcular_ocpd_dc_array(
+            corr.dc_total.i_diseno_a
+        )
+
+        fusible_string = calcular_fusible_string(
+            entrada.n_strings,
+            corr.string.i_diseno_a
+        )
+
+        return ProteccionesFVResultado(
+            ok=True,
+            errores=[],
+            ocpd_ac=ocpd_ac,
+            ocpd_dc_array=ocpd_dc_array,
+            fusible_string=fusible_string
+        )
+
+    except Exception as e:
+
+        errores.append(str(e))
+
+        return ProteccionesFVResultado(
+            ok=False,
+            errores=errores,
+            ocpd_ac=None,
+            ocpd_dc_array=None,
+            fusible_string=None
+        )
 
 
 # ==========================================================
-# SALIDAS DEL ARCHIVO
+# USO ESPERADO
 # ==========================================================
 #
-# dimensionar_protecciones_fv()
+# entrada = EntradaProteccionesFV(
+#     corrientes=resultado_corrientes,
+#     n_strings=numero_strings
+# )
 #
-# Entrada:
-#   iac_nom_a
-#   n_strings
-#   isc_mod_a
+# resultado = ejecutar_protecciones_fv(entrada)
 #
-# Salida:
-#   ProteccionesFVResultado
-#
-# Campos:
-#   breaker_ac
-#   fusible_string
-#
-# Consumido por:
-#   electrical.paquete_nec
+# resultado.ocpd_ac.tamano_a
+# resultado.ocpd_dc_array.tamano_a
+# resultado.fusible_string.tamano_a
 #
 # ==========================================================
