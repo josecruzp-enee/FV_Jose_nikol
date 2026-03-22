@@ -193,17 +193,37 @@ def ejecutar_estudio(
 # ------------------------------------------------------
 # 3. ELÉCTRICO (RÁPIDO)
 # ------------------------------------------------------
+# ------------------------------------------------------
+# 3. ELÉCTRICO (RÁPIDO)
+# ------------------------------------------------------
 
 print("\n[3] CALCULOS ELECTRICOS")
 
-from electrical.conductores.corrientes import calcular_corrientes_dc
+from electrical.conductores.corrientes import calcular_corrientes, CorrientesInput
 from electrical.conductores.calculo_conductores import calcular_conductores
 from electrical.protecciones.protecciones import calcular_ocpd
 
 
-corrientes = calcular_corrientes_dc(sizing, strings)
+# ✅ CORRIENTES (CORRECTO CON INPUT TIPADO)
+corrientes_input = CorrientesInput(
+    paneles=strings,         # ResultadoPaneles
+    kw_ac=sizing.kw_ac,
+    vac=240,                 # ⚠️ ajusta según tu sistema real
+    fases=1,                 # ⚠️ o 3 si aplica
+    fp=1.0
+)
+
+corrientes = calcular_corrientes(corrientes_input)
+
+
+# ✅ CONDUCTORES
 conductores = calcular_conductores(datos, sizing, strings)
+
+
+# ✅ PROTECCIONES
 protecciones = calcular_ocpd(sizing, strings)
+
+
 print("\n--- RESULTADOS ELÉCTRICOS ---")
 
 # ----------------------------------------
@@ -229,6 +249,7 @@ print("value:", protecciones)
 
 # 👉 DEBUG DETALLADO (CLAVE)
 if hasattr(protecciones, "ok"):
+
     print("\n--- DETALLE PROTECCIONES ---")
     print("ok:", protecciones.ok)
     print("errores:", protecciones.errores)
