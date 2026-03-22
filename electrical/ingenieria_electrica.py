@@ -12,9 +12,7 @@ from electrical.protecciones.protecciones import (
     EntradaProteccionesFV,
 )
 from electrical.conductores.calculo_conductores import tramo_conductor
-
-from electrical.corrientes.resultado_corrientes import ResultadoCorrientes
-
+from electrical.conductores.corrientes import ResultadoCorrientes
 
 # ==========================================================
 # RESULTADO GLOBAL
