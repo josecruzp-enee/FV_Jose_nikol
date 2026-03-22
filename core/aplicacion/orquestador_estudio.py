@@ -191,7 +191,7 @@ def ejecutar_estudio(
     return resultado
 
 # ------------------------------------------------------
-# 3. ELÉCTRICO (RÁPIDO)
+# 3. ELÉCTRICO (AQUÍ VA TODO)
 # ------------------------------------------------------
 
 print("\n[3] CALCULOS ELECTRICOS")
@@ -200,10 +200,6 @@ from electrical.conductores.corrientes import calcular_corrientes, CorrientesInp
 from electrical.conductores.calculo_conductores import dimensionar_tramos_fv
 from electrical.protecciones.protecciones import calcular_protecciones, EntradaProtecciones
 
-
-# ----------------------------------------
-# CORRIENTES
-# ----------------------------------------
 corrientes_input = CorrientesInput(
     paneles=strings,
     kw_ac=sizing.kw_ac,
@@ -214,10 +210,6 @@ corrientes_input = CorrientesInput(
 
 corrientes = calcular_corrientes(corrientes_input)
 
-
-# ----------------------------------------
-# CONDUCTORES
-# ----------------------------------------
 conductores = dimensionar_tramos_fv(
     corrientes=corrientes,
     vmp_dc=600,
@@ -227,39 +219,9 @@ conductores = dimensionar_tramos_fv(
     fases=1
 )
 
-
-# ----------------------------------------
-# PROTECCIONES (AHORA CORRECTO)
-# ----------------------------------------
 entrada_prot = EntradaProtecciones(
     corrientes=corrientes,
     n_strings=len(strings.strings) if hasattr(strings, "strings") else 1
 )
 
 protecciones = calcular_protecciones(entrada_prot)
-
-
-# ----------------------------------------
-# DEBUG
-# ----------------------------------------
-print("\n--- RESULTADOS ELÉCTRICOS ---")
-
-print("\n[CORRIENTES]")
-print("value:", corrientes)
-
-print("\n[CONDUCTORES]")
-print("value:", conductores)
-
-print("\n[PROTECCIONES]")
-print("value:", protecciones)
-
-if hasattr(protecciones, "ok"):
-
-    print("\n--- DETALLE PROTECCIONES ---")
-    print("ok:", protecciones.ok)
-    print("errores:", protecciones.errores)
-    print("warnings:", protecciones.warnings)
-
-    print("\nOCPD AC:", protecciones.ocpd_ac.tamano_a)
-    print("OCPD DC:", protecciones.ocpd_dc_array.tamano_a)
-    print("FUSIBLE:", protecciones.fusible_string.requerido)
