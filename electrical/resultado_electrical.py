@@ -1,18 +1,24 @@
+from __future__ import annotations
 from dataclasses import dataclass
-from typing import List
 
-from electrical.conductores.corrientes import ResultadoCorrientes
-from electrical.protecciones.protecciones import ProteccionesFVResultado
-from electrical.conductores.calculo_conductores import TramosFV
+from electrical.paneles.resultado_paneles import ResultadoPaneles
+from electrical.corrientes.resultado_corrientes import ResultadoCorrientes
+from electrical.conductores.resultado_conductores import ResultadoConductores
+from electrical.protecciones.resultado_protecciones import ResultadoProtecciones
 
 
 @dataclass(frozen=True)
-class ResultadoElectrical:
+class ResultadoElectrico:
+    """
+    Resultado consolidado del sistema eléctrico FV.
+    """
 
     ok: bool
-    errores: List[str]
-    warnings: List[str]
 
+    paneles: ResultadoPaneles
     corrientes: ResultadoCorrientes
-    protecciones: ProteccionesFVResultado
-    conductores: TramosFV
+    conductores: ResultadoConductores
+    protecciones: ResultadoProtecciones
+
+    errores: list[str]
+    warnings: list[str]
