@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import List
 
 from electrical.paneles.resultado_paneles import ResultadoPaneles
-from electrical.corrientes.resultado_corrientes import ResultadoCorrientes
+from electrical.conductores.resultado_corrientes import ResultadoCorrientes
 from electrical.conductores.resultado_conductores import ResultadoConductores
 from electrical.protecciones.resultado_protecciones import ResultadoProtecciones
 
