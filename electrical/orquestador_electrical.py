@@ -1,8 +1,15 @@
 from __future__ import annotations
 
 from electrical.paneles.resultado_paneles import ResultadoPaneles
-from electrical.corrientes.calculo_corrientes import calcular_corrientes
+
+from electrical.conductores.corrientes import (
+    calcular_corrientes,
+    CorrientesInput,
+)
+
 from electrical.conductores.calculo_conductores import calcular_conductores
+from electrical.conductores.resultado_conductores import ResultadoConductores
+
 from electrical.protecciones.calculo_protecciones import calcular_protecciones
 from electrical.protecciones.entrada_protecciones import EntradaProtecciones
 
@@ -16,14 +23,15 @@ def ejecutar_electrical(
 ) -> ResultadoElectrico:
     """
     Orquestador principal del dominio electrical.
-    Flujo obligatorio:
-    paneles → corrientes → conductores → protecciones
+
+    Flujo:
+        paneles → corrientes → conductores → protecciones
     """
 
     try:
 
         # ==================================================
-        # 1. VALIDAR PANELes
+        # 1. VALIDACIÓN INICIAL
         # ==================================================
 
         if not paneles.ok:
@@ -38,7 +46,15 @@ def ejecutar_electrical(
         # 2. CORRIENTES
         # ==================================================
 
-        corrientes = calcular_corrientes(paneles)
+        corrientes_input = CorrientesInput(
+            paneles=paneles,
+            kw_ac=paneles.array.pdc_kw,   # ajustar si cambias modelo
+            vac=params_conductores.vac,
+            fases=params_conductores.fases,
+            fp=1.0,
+        )
+
+        corrientes = calcular_corrientes(corrientes_input)
 
         if not corrientes.ok:
             return ResultadoElectrico.build(
@@ -53,7 +69,6 @@ def ejecutar_electrical(
         # ==================================================
 
         conductores = calcular_conductores(
-            paneles=paneles,
             corrientes=corrientes,
             params=params_conductores,
         )
@@ -70,12 +85,12 @@ def ejecutar_electrical(
         # 4. PROTECCIONES
         # ==================================================
 
-        protecciones = calcular_protecciones(
-            EntradaProtecciones(
-                conductores=conductores,
-                corrientes=corrientes,
-            )
+        entrada_prot = EntradaProtecciones(
+            conductores=conductores,
+            corrientes=corrientes,
         )
+
+        protecciones = calcular_protecciones(entrada_prot)
 
         # ==================================================
         # 5. RESULTADO FINAL
@@ -99,11 +114,11 @@ def ejecutar_electrical(
 
 
 # ==================================================
-# 🔧 HELPERS DE ERROR (OBLIGATORIO PARA CONSISTENCIA)
+# HELPERS DE ERROR (CONSISTENTES EN TODO EL SISTEMA)
 # ==================================================
 
 def _corrientes_error(msg: str):
-    from electrical.corrientes.resultado_corrientes import ResultadoCorrientes
+    from electrical.conductores.resultado_corriente import ResultadoCorrientes
     return ResultadoCorrientes.error(msg)
 
 
