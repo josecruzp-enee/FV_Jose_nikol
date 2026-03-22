@@ -162,6 +162,8 @@ def _dimensionar_generador(panel, modo_dimensionado, n_paneles_manual, consumo_a
 # ==========================================================
 # INVERSOR (FIX)
 # ==========================================================
+from electrical.catalogos import get_inversor  # 👈 IMPORTANTE
+
 def _seleccionar_inversor(pdc, dc_ac_obj, eq):
 
     resultado_inv = ejecutar_inversor_desde_sizing(
@@ -171,37 +173,31 @@ def _seleccionar_inversor(pdc, dc_ac_obj, eq):
     )
 
     print("DEBUG resultado_inv:", resultado_inv)
-    print("TIPO:", type(resultado_inv))
 
-    if resultado_inv is None:
-        raise ValueError("No se pudo seleccionar inversor (None)")
+    if not isinstance(resultado_inv, dict):
+        raise ValueError(f"Formato inesperado en inversor: {resultado_inv}")
 
-    # Caso dict
-    if isinstance(resultado_inv, dict):
+    # 🔥 VALIDACIÓN
+    if "inversor_id" not in resultado_inv:
+        raise ValueError(f"Resultado inválido sin inversor_id: {resultado_inv}")
 
-        if "inversor" not in resultado_inv:
-            raise ValueError(f"Dict inválido sin inversor: {resultado_inv}")
+    inversor_id = resultado_inv["inversor_id"]
 
-        inversor = resultado_inv["inversor"]
-        kw_ac = float(resultado_inv.get("kw_ac", 0))
-        n_inversores = int(resultado_inv.get("n_inversores", 1))
+    # 🔥 CONVERSIÓN A OBJETO REAL
+    inversor = get_inversor(inversor_id)
 
-    else:
-        # Caso objeto (correcto)
-        if not hasattr(resultado_inv, "inversor"):
-            raise ValueError(f"Objeto inválido sin inversor: {resultado_inv}")
+    if inversor is None:
+        raise ValueError(f"Inversor no encontrado en catálogo: {inversor_id}")
 
-        inversor = resultado_inv.inversor
-        kw_ac = float(getattr(resultado_inv, "kw_ac", 0))
-        n_inversores = int(getattr(resultado_inv, "n_inversores", 1))
+    kw_ac = float(resultado_inv.get("kw_ac", 0))
+    n_inversores = int(resultado_inv.get("n_inversores", 1))
 
     if kw_ac <= 0:
         raise ValueError(f"kw_ac inválido: {kw_ac}")
 
-    pac_total_kw = kw_ac * n_inversores
+    pac_total_kw = float(resultado_inv.get("kw_ac_total", kw_ac * n_inversores))
 
     return inversor, kw_ac, n_inversores, pac_total_kw
-
 # ==========================================================
 # API PRINCIPAL
 # ==========================================================
