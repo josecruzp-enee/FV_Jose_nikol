@@ -175,3 +175,50 @@ def tramo_conductor(
         r_ohm_km=r,
         agotado_vd=(awg == tabla[-1]["awg"] and not cumple_vd),
     )
+
+from typing import Dict
+from .corrientes import ResultadoCorrientes
+
+
+def dimensionar_tramos_fv(
+    *,
+    corrientes: ResultadoCorrientes,
+    vmp_dc: float,
+    vac: float,
+    dist_dc_m: float,
+    dist_ac_m: float,
+    material_dc: str = "Cu",
+    material_ac: str = "Cu",
+    vd_obj_dc_pct: float = 2.0,
+    vd_obj_ac_pct: float = 2.0,
+    fases: int = 1,
+) -> Dict[str, ResultadoConductor]:
+
+    # ---------------- DC ----------------
+    tramo_dc = tramo_conductor(
+        nombre="DC_STRING_A_INV",
+        i_diseno_a=corrientes.dc_total.i_diseno_a,
+        v_base_v=vmp_dc if vmp_dc > 0 else 1.0,
+        l_m=dist_dc_m,
+        vd_obj_pct=vd_obj_dc_pct,
+        material=material_dc,
+        n_hilos=2,
+    )
+
+    # ---------------- AC ----------------
+    n_hilos_ac = 3 if fases == 3 else 2
+
+    tramo_ac = tramo_conductor(
+        nombre="AC_INV_A_TABLERO",
+        i_diseno_a=corrientes.ac.i_diseno_a,
+        v_base_v=vac if vac > 0 else 1.0,
+        l_m=dist_ac_m,
+        vd_obj_pct=vd_obj_ac_pct,
+        material=material_ac,
+        n_hilos=n_hilos_ac,
+    )
+
+    return {
+        "dc": tramo_dc,
+        "ac": tramo_ac,
+    }
