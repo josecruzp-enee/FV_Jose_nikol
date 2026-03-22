@@ -1,23 +1,24 @@
 from __future__ import annotations
 
-from typing import List
-
 from electrical.paneles.resultado_paneles import ResultadoPaneles
+from electrical.corrientes.calculo_corrientes import calcular_corrientes
 from electrical.conductores.calculo_conductores import calcular_conductores
 from electrical.protecciones.calculo_protecciones import calcular_protecciones
 from electrical.protecciones.entrada_protecciones import EntradaProtecciones
 
-from electrical.resultado_electrical import ResultadoElectrical
+from electrical.resultado_electrico import ResultadoElectrico
 
 
 def ejecutar_electrical(
     *,
     paneles: ResultadoPaneles,
     params_conductores,
-) -> ResultadoElectrical:
-
-    errores: List[str] = []
-    warnings: List[str] = []
+) -> ResultadoElectrico:
+    """
+    Orquestador principal del dominio electrical.
+    Flujo obligatorio:
+    paneles → corrientes → conductores → protecciones
+    """
 
     try:
 
@@ -26,58 +27,91 @@ def ejecutar_electrical(
         # ==================================================
 
         if not paneles.ok:
-            return ResultadoElectrical(
-                ok=False,
-                errores=paneles.errores,
-                warnings=paneles.warnings,
+            return ResultadoElectrico.build(
                 paneles=paneles,
-                conductores=None,
-                protecciones=None,
+                corrientes=_corrientes_error("Paneles inválidos"),
+                conductores=_conductores_error("Paneles inválidos"),
+                protecciones=_protecciones_error("Paneles inválidos"),
             )
 
         # ==================================================
-        # 2. CONDUCTORES (incluye NEC)
+        # 2. CORRIENTES
+        # ==================================================
+
+        corrientes = calcular_corrientes(paneles)
+
+        if not corrientes.ok:
+            return ResultadoElectrico.build(
+                paneles=paneles,
+                corrientes=corrientes,
+                conductores=_conductores_error("Corrientes inválidas"),
+                protecciones=_protecciones_error("Corrientes inválidas"),
+            )
+
+        # ==================================================
+        # 3. CONDUCTORES
         # ==================================================
 
         conductores = calcular_conductores(
             paneles=paneles,
-            params=params_conductores
+            corrientes=corrientes,
+            params=params_conductores,
         )
 
+        if not conductores.ok:
+            return ResultadoElectrico.build(
+                paneles=paneles,
+                corrientes=corrientes,
+                conductores=conductores,
+                protecciones=_protecciones_error("Conductores inválidos"),
+            )
+
         # ==================================================
-        # 3. PROTECCIONES
+        # 4. PROTECCIONES
         # ==================================================
 
         protecciones = calcular_protecciones(
-            EntradaProtecciones(conductores=conductores)
+            EntradaProtecciones(
+                conductores=conductores,
+                corrientes=corrientes,
+            )
         )
 
         # ==================================================
-        # RESULTADO FINAL
+        # 5. RESULTADO FINAL
         # ==================================================
 
-        errores.extend(conductores.errores)
-        errores.extend(protecciones.errores)
-
-        warnings.extend(conductores.warnings)
-        warnings.extend(protecciones.warnings)
-
-        return ResultadoElectrical(
-            ok=len(errores) == 0,
-            errores=errores,
-            warnings=warnings,
+        return ResultadoElectrico.build(
             paneles=paneles,
+            corrientes=corrientes,
             conductores=conductores,
             protecciones=protecciones,
         )
 
     except Exception as e:
 
-        return ResultadoElectrical(
-            ok=False,
-            errores=[str(e)],
-            warnings=[],
+        return ResultadoElectrico.build(
             paneles=paneles,
-            conductores=None,
-            protecciones=None,
+            corrientes=_corrientes_error(str(e)),
+            conductores=_conductores_error(str(e)),
+            protecciones=_protecciones_error(str(e)),
         )
+
+
+# ==================================================
+# 🔧 HELPERS DE ERROR (OBLIGATORIO PARA CONSISTENCIA)
+# ==================================================
+
+def _corrientes_error(msg: str):
+    from electrical.corrientes.resultado_corrientes import ResultadoCorrientes
+    return ResultadoCorrientes.error(msg)
+
+
+def _conductores_error(msg: str):
+    from electrical.conductores.resultado_conductores import ResultadoConductores
+    return ResultadoConductores.error(msg)
+
+
+def _protecciones_error(msg: str):
+    from electrical.protecciones.resultado_protecciones import ResultadoProtecciones
+    return ResultadoProtecciones.error(msg)
