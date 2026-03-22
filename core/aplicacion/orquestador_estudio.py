@@ -63,11 +63,13 @@ def ejecutar_estudio(
 
     print("\n[2] EJECUTANDO PANEL / STRINGS")
 
-    strings = deps.paneles.ejecutar(datos, sizing)
-    print(len(strings.strings))
-    print("\n--- DEBUG STRINGS ---")
-    print(strings)
-    print(getattr(strings, "strings", None))
+    resultado_paneles = deps.paneles.ejecutar(datos, sizing)
+
+    print("CANTIDAD DE STRINGS:", len(resultado_paneles.strings))
+
+    # VALIDACIÓN FUERTE
+    if not resultado_paneles.strings:
+        raise ValueError("Paneles no generó strings. Revisar cálculo.")
 
     # ------------------------------------------------------
     # 3. ELÉCTRICO
@@ -79,64 +81,52 @@ def ejecutar_estudio(
     from electrical.conductores.calculo_conductores import dimensionar_tramos_fv
     from electrical.protecciones.protecciones import calcular_protecciones, EntradaProtecciones
 
-    if not hasattr(strings, "strings") or not strings.strings:
+    # -------------------------
+    # CORRIENTES
+    # -------------------------
+    corrientes_input = CorrientesInput(
+        paneles=resultado_paneles,   # ✅ CORRECTO
+        kw_ac=sizing.kw_ac,
+        vac=240,
+        fases=1,
+        fp=1.0
+    )
 
-        print("⚠️ No hay strings → se omite cálculo eléctrico")
+    corrientes = calcular_corrientes(corrientes_input)
 
-        corrientes = None
-        conductores = None
-        protecciones = None
+    # -------------------------
+    # CONDUCTORES
+    # -------------------------
+    conductores = dimensionar_tramos_fv(
+        corrientes=corrientes,
+        vmp_dc=600,
+        vac=240,
+        dist_dc_m=15,
+        dist_ac_m=25,
+        fases=1
+    )
 
-    else:
+    # -------------------------
+    # PROTECCIONES
+    # -------------------------
+    entrada_prot = EntradaProtecciones(
+        corrientes=corrientes,
+        n_strings=len(resultado_paneles.strings)
+    )
 
-        # -------------------------
-        # CORRIENTES
-        # -------------------------
-        corrientes_input = CorrientesInput(
-            paneles=strings,
-            kw_ac=sizing.kw_ac,
-            vac=240,
-            fases=1,
-            fp=1.0
-        )
+    protecciones = calcular_protecciones(entrada_prot)
 
-        corrientes = calcular_corrientes(corrientes_input)
+    # DEBUG
+    print("\n--- RESULTADOS ELÉCTRICOS ---")
 
-        # -------------------------
-        # CONDUCTORES
-        # -------------------------
-        conductores = dimensionar_tramos_fv(
-            corrientes=corrientes,
-            vmp_dc=600,
-            vac=240,
-            dist_dc_m=15,
-            dist_ac_m=25,
-            fases=1
-        )
+    print("\n[CORRIENTES]")
+    print(corrientes)
 
-        # -------------------------
-        # PROTECCIONES
-        # -------------------------
-        entrada_prot = EntradaProtecciones(
-            corrientes=corrientes,
-            n_strings=len(strings.strings)
-        )
+    print("\n[CONDUCTORES]")
+    print(conductores)
 
-        protecciones = calcular_protecciones(entrada_prot)
-
-        # -------------------------
-        # DEBUG
-        # -------------------------
-        print("\n--- RESULTADOS ELÉCTRICOS ---")
-
-        print("\n[CORRIENTES]")
-        print(corrientes)
-
-        print("\n[CONDUCTORES]")
-        print(conductores)
-
-        print("\n[PROTECCIONES]")
-        print(protecciones)
+    print("\n[PROTECCIONES]")
+    print(protecciones)
 
     # ------------------------------------------------------
     # 4. ENERGÍA
@@ -147,7 +137,7 @@ def ejecutar_estudio(
     energia = deps.energia.ejecutar(
         datos,
         sizing,
-        strings,
+        resultado_paneles,
     )
 
     # ------------------------------------------------------
@@ -168,7 +158,7 @@ def ejecutar_estudio(
 
     resultado = ResultadoProyecto(
         sizing=sizing,
-        strings=strings,
+        strings=resultado_paneles,
         energia=energia,
         nec={
             "corrientes": corrientes,
