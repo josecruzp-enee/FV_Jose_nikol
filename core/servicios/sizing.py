@@ -162,7 +162,6 @@ def _dimensionar_generador(panel, modo_dimensionado, n_paneles_manual, consumo_a
 # ==========================================================
 # INVERSOR (FIX)
 # ==========================================================
-
 def _seleccionar_inversor(pdc, dc_ac_obj, eq):
 
     resultado_inv = ejecutar_inversor_desde_sizing(
@@ -171,10 +170,24 @@ def _seleccionar_inversor(pdc, dc_ac_obj, eq):
         inversor_id_forzado=_inv_id(eq),
     )
 
-    inversor = resultado_inv["inversor"]  # 🔥 FIX
+    if resultado_inv is None:
+        raise ValueError("No se pudo seleccionar inversor")
 
-    kw_ac = float(resultado_inv["kw_ac"])
-    n_inversores = int(resultado_inv.get("n_inversores", 1))
+    # 🔥 SOPORTA dict o dataclass (transitorio)
+    if isinstance(resultado_inv, dict):
+        if "inversor" not in resultado_inv:
+            raise ValueError(f"Resultado inválido de inversor: {resultado_inv}")
+
+        inversor = resultado_inv["inversor"]
+        kw_ac = float(resultado_inv["kw_ac"])
+        n_inversores = int(resultado_inv.get("n_inversores", 1))
+
+    else:
+        # 👉 caso correcto (dataclass)
+        inversor = resultado_inv.inversor
+        kw_ac = float(resultado_inv.kw_ac)
+        n_inversores = int(getattr(resultado_inv, "n_inversores", 1))
+
     pac_total_kw = kw_ac * n_inversores
 
     return inversor, kw_ac, n_inversores, pac_total_kw
