@@ -2,32 +2,29 @@ from __future__ import annotations
 
 """
 TRAMO CONDUCTOR — FV ENGINE
-===========================
 
 Motor de decisión final del conductor.
 
 Integra:
 
-    ✔ Corriente (corrientes)
+    ✔ Corrientes
     ✔ Ampacidad (NEC)
-    ✔ Caída de tensión (VD)
+    ✔ Caída de tensión
 
-Este módulo responde:
-
-    "¿Qué conductor cumple TODO?"
-
+NO usa dict
 """
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import List
 
+from .factores_nec import ampacidad_ajustada_nec, AmpacidadResultado
+from .caida_voltaje import caida_tension_pct, ajustar_calibre_por_vd, Conductor
 from .tablas_conductores import tabla_base_conductores
-from .factores_nec import ampacidad_ajustada_nec
-from .caida_voltaje import caida_tension_pct, ajustar_calibre_por_vd
+from .corrientes import ResultadoCorrientes
 
 
 # ==========================================================
-# RESULTADO TIPADO
+# RESULTADO
 # ==========================================================
 
 @dataclass(frozen=True)
@@ -35,33 +32,26 @@ class ResultadoConductor:
 
     nombre: str
 
-    # Entrada relevante
     i_diseno_a: float
     v_base_v: float
     l_m: float
 
-    # Resultado conductor
     calibre: str
     material: str
 
-    # Ampacidad
     ampacidad_base_a: float
     ampacidad_ajustada_a: float
 
-    # Factores
     fac_temp: float
     fac_ccc: float
 
-    # Caída de tensión
     vd_pct: float
     vd_obj_pct: float
 
-    # Evaluación
     cumple_ampacidad: bool
     cumple_vd: bool
     cumple: bool
 
-    # Extras
     r_ohm_km: float
     agotado_vd: bool
 
@@ -84,31 +74,31 @@ def tramo_conductor(
     aplicar_derating: bool = True,
 ) -> ResultadoConductor:
 
-    tabla = list(tabla_base_conductores(material))
+    tabla: List[Conductor] = list(tabla_base_conductores(material))
 
     # ------------------------------------------------------
-    # 1 Selección por ampacidad
+    # 1. Selección por ampacidad
     # ------------------------------------------------------
 
     for t in tabla:
 
-        amp_base = float(t["amp_a"])
+        amp_base = t.amp_a
 
-        amp_adj, f_t, f_c = ampacidad_ajustada_nec(
+        amp_res: AmpacidadResultado = ampacidad_ajustada_nec(
             amp_base,
             t_amb_c,
             ccc,
             aplicar=aplicar_derating,
         )
 
-        if i_diseno_a <= amp_adj:
-            awg = t["awg"]
+        if i_diseno_a <= amp_res.ampacidad_ajustada:
+            awg = t.awg
             break
     else:
-        awg = tabla[-1]["awg"]
+        awg = tabla[-1].awg
 
     # ------------------------------------------------------
-    # 2 Ajuste por VD
+    # 2. Ajuste por VD
     # ------------------------------------------------------
 
     awg = ajustar_calibre_por_vd(
@@ -122,15 +112,15 @@ def tramo_conductor(
     )
 
     # ------------------------------------------------------
-    # 3 Resultado final
+    # 3. Resultado final
     # ------------------------------------------------------
 
-    fila = next(t for t in tabla if t["awg"] == awg)
+    fila = next(t for t in tabla if t.awg == awg)
 
-    amp_base = float(fila["amp_a"])
-    r = float(fila["r_ohm_km"])
+    amp_base = fila.amp_a
+    r = fila.r_ohm_km
 
-    amp_adj, f_t, f_c = ampacidad_ajustada_nec(
+    amp_res = ampacidad_ajustada_nec(
         amp_base,
         t_amb_c,
         ccc,
@@ -145,40 +135,44 @@ def tramo_conductor(
         n_hilos=n_hilos,
     )
 
-    cumple_amp = amp_adj >= i_diseno_a
+    cumple_amp = amp_res.ampacidad_ajustada >= i_diseno_a
     cumple_vd = vd <= vd_obj_pct
 
     return ResultadoConductor(
-
         nombre=nombre,
-
         i_diseno_a=i_diseno_a,
         v_base_v=v_base_v,
         l_m=l_m,
-
-        calibre=str(awg),
+        calibre=awg,
         material=material,
-
         ampacidad_base_a=amp_base,
-        ampacidad_ajustada_a=amp_adj,
-
-        fac_temp=f_t,
-        fac_ccc=f_c,
-
+        ampacidad_ajustada_a=amp_res.ampacidad_ajustada,
+        fac_temp=amp_res.factor_temperatura,
+        fac_ccc=amp_res.factor_ccc,
         vd_pct=vd,
         vd_obj_pct=vd_obj_pct,
-
         cumple_ampacidad=cumple_amp,
         cumple_vd=cumple_vd,
         cumple=(cumple_amp and cumple_vd),
-
         r_ohm_km=r,
-        agotado_vd=(awg == tabla[-1]["awg"] and not cumple_vd),
+        agotado_vd=(awg == tabla[-1].awg and not cumple_vd),
     )
 
-from typing import Dict
-from .corrientes import ResultadoCorrientes
 
+# ==========================================================
+# RESULTADO AGRUPADO
+# ==========================================================
+
+@dataclass(frozen=True)
+class TramosFV:
+
+    dc: ResultadoConductor
+    ac: ResultadoConductor
+
+
+# ==========================================================
+# ORQUESTADOR FV
+# ==========================================================
 
 def dimensionar_tramos_fv(
     *,
@@ -192,9 +186,8 @@ def dimensionar_tramos_fv(
     vd_obj_dc_pct: float = 2.0,
     vd_obj_ac_pct: float = 2.0,
     fases: int = 1,
-) -> Dict[str, ResultadoConductor]:
+) -> TramosFV:
 
-    # ---------------- DC ----------------
     tramo_dc = tramo_conductor(
         nombre="DC_STRING_A_INV",
         i_diseno_a=corrientes.dc_total.i_diseno_a,
@@ -205,7 +198,6 @@ def dimensionar_tramos_fv(
         n_hilos=2,
     )
 
-    # ---------------- AC ----------------
     n_hilos_ac = 3 if fases == 3 else 2
 
     tramo_ac = tramo_conductor(
@@ -218,7 +210,7 @@ def dimensionar_tramos_fv(
         n_hilos=n_hilos_ac,
     )
 
-    return {
-        "dc": tramo_dc,
-        "ac": tramo_ac,
-    }
+    return TramosFV(
+        dc=tramo_dc,
+        ac=tramo_ac,
+    )
