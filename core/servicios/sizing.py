@@ -170,28 +170,37 @@ def _seleccionar_inversor(pdc, dc_ac_obj, eq):
         inversor_id_forzado=_inv_id(eq),
     )
 
-    if resultado_inv is None:
-        raise ValueError("No se pudo seleccionar inversor")
+    print("DEBUG resultado_inv:", resultado_inv)
+    print("TIPO:", type(resultado_inv))
 
-    # 🔥 SOPORTA dict o dataclass (transitorio)
+    if resultado_inv is None:
+        raise ValueError("No se pudo seleccionar inversor (None)")
+
+    # Caso dict
     if isinstance(resultado_inv, dict):
+
         if "inversor" not in resultado_inv:
-            raise ValueError(f"Resultado inválido de inversor: {resultado_inv}")
+            raise ValueError(f"Dict inválido sin inversor: {resultado_inv}")
 
         inversor = resultado_inv["inversor"]
-        kw_ac = float(resultado_inv["kw_ac"])
+        kw_ac = float(resultado_inv.get("kw_ac", 0))
         n_inversores = int(resultado_inv.get("n_inversores", 1))
 
     else:
-        # 👉 caso correcto (dataclass)
+        # Caso objeto (correcto)
+        if not hasattr(resultado_inv, "inversor"):
+            raise ValueError(f"Objeto inválido sin inversor: {resultado_inv}")
+
         inversor = resultado_inv.inversor
-        kw_ac = float(resultado_inv.kw_ac)
+        kw_ac = float(getattr(resultado_inv, "kw_ac", 0))
         n_inversores = int(getattr(resultado_inv, "n_inversores", 1))
+
+    if kw_ac <= 0:
+        raise ValueError(f"kw_ac inválido: {kw_ac}")
 
     pac_total_kw = kw_ac * n_inversores
 
     return inversor, kw_ac, n_inversores, pac_total_kw
-
 
 # ==========================================================
 # API PRINCIPAL
