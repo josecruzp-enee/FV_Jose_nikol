@@ -1,46 +1,38 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import List
 
 from electrical.conductores.corrientes import (
     calcular_corrientes,
     CorrientesInput,
+    ResultadoCorrientes,
 )
+
 from electrical.protecciones.protecciones import (
     ejecutar_protecciones_fv,
     EntradaProteccionesFV,
+    ProteccionesFVResultado,
 )
-from electrical.conductores.calculo_conductores import tramo_conductor
-from electrical.conductores.corrientes import ResultadoCorrientes
 
-# ==========================================================
-# RESULTADO GLOBAL
-# ==========================================================
+from electrical.conductores.calculo_conductores import (
+    tramo_conductor,
+    TramosFV,
+)
 
-@dataclass(frozen=True)
-class ResultadoElectrico:
-
-    ok: bool
-    errores: List[str]
-    warnings: List[str]
-
-    corrientes: ResultadoCorrientes
-    protecciones: object
-    conductores: list
+from electrical.resultado_electrical import ResultadoElectrical
 
 
 # ==========================================================
-# ORQUESTADOR
+# ORQUESTADOR ELÉCTRICO
 # ==========================================================
 
-def ejecutar_ingenieria_electrica(
+def ejecutar_electrical(
     *,
     datos_strings,
     datos_inversor,
     n_strings: int,
     params_conductores
-) -> ResultadoElectrico:
+) -> ResultadoElectrical:
 
     errores: List[str] = []
     warnings: List[str] = []
@@ -48,7 +40,7 @@ def ejecutar_ingenieria_electrica(
     try:
 
         # --------------------------------------------------
-        # 1. CORRIENTES (CORREGIDO)
+        # 1. CORRIENTES
         # --------------------------------------------------
 
         corrientes: ResultadoCorrientes = calcular_corrientes(
@@ -65,7 +57,7 @@ def ejecutar_ingenieria_electrica(
         # 2. PROTECCIONES
         # --------------------------------------------------
 
-        protecciones = ejecutar_protecciones_fv(
+        protecciones: ProteccionesFVResultado = ejecutar_protecciones_fv(
             EntradaProteccionesFV(
                 corrientes=corrientes,
                 n_strings=n_strings
@@ -76,35 +68,32 @@ def ejecutar_ingenieria_electrica(
         # 3. CONDUCTORES
         # --------------------------------------------------
 
-        conductores = []
-
-        # DC
-        conductores.append(
-            tramo_conductor(
-                nombre="DC",
-                i_diseno_a=corrientes.dc_total.i_diseno_a,
-                v_base_v=params_conductores.vdc,
-                l_m=params_conductores.l_dc,
-                vd_obj_pct=params_conductores.vd_dc,
-            )
+        tramo_dc = tramo_conductor(
+            nombre="DC",
+            i_diseno_a=corrientes.dc_total.i_diseno_a,
+            v_base_v=params_conductores.vdc,
+            l_m=params_conductores.l_dc,
+            vd_obj_pct=params_conductores.vd_dc,
         )
 
-        # AC
-        conductores.append(
-            tramo_conductor(
-                nombre="AC",
-                i_diseno_a=corrientes.ac.i_diseno_a,
-                v_base_v=params_conductores.vac,
-                l_m=params_conductores.l_ac,
-                vd_obj_pct=params_conductores.vd_ac,
-            )
+        tramo_ac = tramo_conductor(
+            nombre="AC",
+            i_diseno_a=corrientes.ac.i_diseno_a,
+            v_base_v=params_conductores.vac,
+            l_m=params_conductores.l_ac,
+            vd_obj_pct=params_conductores.vd_ac,
+        )
+
+        conductores = TramosFV(
+            dc=tramo_dc,
+            ac=tramo_ac
         )
 
         # --------------------------------------------------
-        # RESULTADO
+        # RESULTADO FINAL
         # --------------------------------------------------
 
-        return ResultadoElectrico(
+        return ResultadoElectrical(
             ok=True,
             errores=[],
             warnings=warnings,
@@ -117,11 +106,11 @@ def ejecutar_ingenieria_electrica(
 
         errores.append(str(e))
 
-        return ResultadoElectrico(
+        return ResultadoElectrical(
             ok=False,
             errores=errores,
             warnings=warnings,
             corrientes=None,
             protecciones=None,
-            conductores=[],
+            conductores=None,
         )
