@@ -5,22 +5,14 @@ MOTOR FÍSICO DE CAÍDA DE VOLTAJE — FV ENGINE
 
 Calcula caída de tensión y valida cumplimiento.
 
-NO usa dict
-SOLO dataclass
+✔ NO usa dict
+✔ USA modelo unificado (Conductor)
 """
 
-from dataclasses import dataclass
 from typing import List
 
-
-# ==========================================================
-# MODELO CONDUCTOR
-# ==========================================================
-
-@dataclass(frozen=True)
-class Conductor:
-    awg: str
-    r_ohm_km: float
+# 🔥 IMPORTANTE: modelo único
+from .modelos import Conductor
 
 
 # ==========================================================
@@ -103,77 +95,3 @@ def ajustar_calibre_por_vd(
 
     # Si ninguno cumple → mayor calibre disponible
     return tabla[-1].awg
-
-
-# ==========================================================
-# SALIDAS DEL ARCHIVO
-# ==========================================================
-#
-# FUNCIONES:
-# ----------------------------------------------------------
-# caida_tension_pct(...)
-# ajustar_calibre_por_vd(...)
-#
-#
-# ----------------------------------------------------------
-# ENTRADA
-# ----------------------------------------------------------
-#
-# v: float
-#     → voltaje del circuito
-#
-# i: float
-#     → corriente del circuito
-#
-# l_m: float
-#     → longitud del conductor
-#
-# r_ohm_km: float
-#     → resistencia del conductor
-#
-# n_hilos: float
-#     → camino eléctrico (2 DC, 1.732 trifásico)
-#
-#
-# ----------------------------------------------------------
-# PROCESO
-# ----------------------------------------------------------
-#
-# r_total = r * longitud * factor_camino
-#
-# vd = (I × R) / V
-#
-#
-# ----------------------------------------------------------
-# SALIDA
-# ----------------------------------------------------------
-#
-# vd_pct:
-#     → caída de tensión [%]
-#
-# awg_resultado:
-#     → calibre que cumple VD objetivo
-#
-#
-# ----------------------------------------------------------
-# USO EN FV ENGINE
-# ----------------------------------------------------------
-#
-# Corrientes
-#       ↓
-# tramo_conductor
-#       ↓
-# ajuste VD (este módulo)
-#
-#
-# ----------------------------------------------------------
-# PRINCIPIO
-# ----------------------------------------------------------
-#
-# Este módulo NO selecciona conductor final.
-#
-# SOLO valida:
-#
-#   "¿Este calibre cumple VD?"
-#
-# ==========================================================
