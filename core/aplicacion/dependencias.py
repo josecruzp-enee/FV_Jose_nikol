@@ -8,7 +8,7 @@ from electrical.conductores.corrientes import (
     calcular_corrientes,
     CorrientesInput,
 )
-from electrical.protecciones.calculo_protecciones import (
+from electrical.protecciones.protecciones import (
     calcular_protecciones,
     EntradaProtecciones,
 )
