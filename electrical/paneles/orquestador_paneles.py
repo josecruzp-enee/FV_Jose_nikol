@@ -1,22 +1,20 @@
 from __future__ import annotations
 from typing import List
 
-from .entrada_panel import EntradaPaneles
-from .dimensionado_paneles import dimensionar_paneles
-from .calculo_de_strings import calcular_strings_fv
-
-from .validacion_strings import (
-    validar_panel,
-    validar_inversor,
-    validar_parametros_generales,
-)
-
-from .resultado_paneles import (
+from electrical.paneles.calculo_de_strings import calcular_strings_fv
+from electrical.paneles.dimensionado_paneles import dimensionar_paneles
+from electrical.paneles.entrada_panel import EntradaPaneles
+from electrical.paneles.resultado_paneles import (
     ResultadoPaneles,
     ArrayFV,
     StringFV,
     RecomendacionStrings,
     PanelesMeta,
+)
+from electrical.paneles.validacion_strings import (
+    validar_panel,
+    validar_inversor,
+    validar_parametros_generales,
 )
 
 
