@@ -27,6 +27,7 @@ from dataclasses import dataclass, field
 from typing import List, Dict, Any
 
 from energy.resultado_energia import EnergiaResultado
+from electrical.modelos.inversor import InversorSpec
 
 
 # =========================================================
@@ -49,6 +50,9 @@ class MesEnergia:
 # RESULTADO DEL SIZING
 # =========================================================
 
+
+
+
 @dataclass(frozen=True)
 class ResultadoSizing:
     """
@@ -65,8 +69,9 @@ class ResultadoSizing:
     n_inversores: int
     paneles_por_inversor: int
 
-    energia_12m: List[MesEnergia]
+    inversor: InversorSpec   # 🔥 FIX CLAVE
 
+    energia_12m: List[MesEnergia]
 
 # =========================================================
 # INFORMACIÓN DE STRING FV
