@@ -4,7 +4,7 @@ from typing import List
 
 from electrical.paneles.resultado_paneles import ResultadoPaneles
 from electrical.conductores.resultado_corriente import ResultadoCorrientes
-from electrical.conductores.resultado_conductores import ResultadoConductores
+from electrical.conductores.resultado_corriente import ResultadoConductores
 from electrical.protecciones.resultado_protecciones import ResultadoProtecciones
 
 
