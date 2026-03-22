@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, asdict
-from typing import Any
+from typing import Any, Optional
 
 from core.dominio.contrato import ResultadoProyecto
 
@@ -14,14 +14,23 @@ from core.aplicacion.puertos import (
 )
 
 
+# ==========================================================
+# DEPENDENCIAS
+# ==========================================================
+
 @dataclass
 class DependenciasEstudio:
 
     sizing: PuertoSizing
     paneles: PuertoPaneles
     energia: PuertoEnergia
-    nec: PuertoNEC
-    finanzas: PuertoFinanzas
+    nec: Optional[PuertoNEC] = None  # ✅ NEC ahora opcional
+    finanzas: PuertoFinanzas = None
+
+
+# ==========================================================
+# ORQUESTADOR
+# ==========================================================
 
 def ejecutar_estudio(
     datos: Any,
@@ -59,7 +68,7 @@ def ejecutar_estudio(
     print("n_inversores:", getattr(sizing, "n_inversores", None))
 
     # ------------------------------------------------------
-    # 2. PANELES
+    # 2. PANELES / STRINGS
     # ------------------------------------------------------
 
     print("\n[2] EJECUTANDO PANEL / STRINGS")
@@ -76,7 +85,6 @@ def ejecutar_estudio(
     if isinstance(strings, dict):
 
         print("DICT DETECTADO")
-
         print("KEYS:", list(strings.keys()))
 
         if "strings" in strings:
@@ -89,7 +97,6 @@ def ejecutar_estudio(
                 print("primer string:", lista[0])
 
         else:
-
             print("NO EXISTE CLAVE 'strings'")
 
     elif hasattr(strings, "strings"):
@@ -97,38 +104,43 @@ def ejecutar_estudio(
         print("DATACLASS DETECTADA")
 
         print("n_strings_total:", getattr(strings, "n_strings_total", None))
-
         print("strings len:", len(strings.strings))
 
         if strings.strings:
             print("primer string:", strings.strings[0])
 
     else:
-
         print("FORMATO DESCONOCIDO")
 
     # ------------------------------------------------------
-    # 3. NEC
+    # 3. NEC (OPCIONAL)
     # ------------------------------------------------------
 
     print("\n[3] EJECUTANDO NEC")
 
-    try:
+    nec = None
 
-        nec = deps.nec.ejecutar(
-            datos,
-            sizing,
-            strings,
-        )
+    if deps.nec is not None:
 
-        print("NEC TYPE:", type(nec))
-        print("NEC VALUE:", nec)
+        try:
 
-    except Exception as e:
+            nec = deps.nec.ejecutar(
+                datos,
+                sizing,
+                strings,
+            )
 
-        print("\n*** ERROR EN NEC ***")
-        print("EXCEPTION:", e)
-        raise
+            print("NEC TYPE:", type(nec))
+            print("NEC VALUE:", nec)
+
+        except Exception as e:
+
+            print("\n*** ERROR EN NEC ***")
+            print("EXCEPTION:", e)
+            raise
+
+    else:
+        print("NEC no implementado — se omite")
 
     # ------------------------------------------------------
     # 4. ENERGÍA
