@@ -193,25 +193,22 @@ def ejecutar_estudio(
 # ------------------------------------------------------
 # 3. ELÉCTRICO (RÁPIDO)
 # ------------------------------------------------------
-# ------------------------------------------------------
-# 3. ELÉCTRICO (RÁPIDO)
-# ------------------------------------------------------
 
 print("\n[3] CALCULOS ELECTRICOS")
 
 from electrical.conductores.corrientes import calcular_corrientes, CorrientesInput
 from electrical.conductores.calculo_conductores import dimensionar_tramos_fv
-from electrical.protecciones.protecciones import calcular_ocpd
+from electrical.protecciones.protecciones import calcular_protecciones, EntradaProtecciones
 
 
 # ----------------------------------------
 # CORRIENTES
 # ----------------------------------------
 corrientes_input = CorrientesInput(
-    paneles=strings,         # ResultadoPaneles
+    paneles=strings,
     kw_ac=sizing.kw_ac,
-    vac=240,                 # ⚠️ ajusta según sistema real
-    fases=1,                 # ⚠️ o 3 si aplica
+    vac=240,
+    fases=1,
     fp=1.0
 )
 
@@ -219,11 +216,11 @@ corrientes = calcular_corrientes(corrientes_input)
 
 
 # ----------------------------------------
-# CONDUCTORES (USANDO FUNCIÓN REAL)
+# CONDUCTORES
 # ----------------------------------------
 conductores = dimensionar_tramos_fv(
     corrientes=corrientes,
-    vmp_dc=600,      # ⚠️ ajustar luego con datos reales
+    vmp_dc=600,
     vac=240,
     dist_dc_m=20,
     dist_ac_m=20,
@@ -232,37 +229,30 @@ conductores = dimensionar_tramos_fv(
 
 
 # ----------------------------------------
-# PROTECCIONES
+# PROTECCIONES (AHORA CORRECTO)
 # ----------------------------------------
-protecciones = calcular_ocpd(sizing, strings)
+entrada_prot = EntradaProtecciones(
+    corrientes=corrientes,
+    n_strings=len(strings.strings) if hasattr(strings, "strings") else 1
+)
+
+protecciones = calcular_protecciones(entrada_prot)
 
 
+# ----------------------------------------
+# DEBUG
+# ----------------------------------------
 print("\n--- RESULTADOS ELÉCTRICOS ---")
 
-# ----------------------------------------
-# CORRIENTES
-# ----------------------------------------
 print("\n[CORRIENTES]")
-print("type:", type(corrientes))
 print("value:", corrientes)
 
-# ----------------------------------------
-# CONDUCTORES
-# ----------------------------------------
 print("\n[CONDUCTORES]")
-print("type:", type(conductores))
 print("value:", conductores)
 
-# ----------------------------------------
-# PROTECCIONES
-# ----------------------------------------
 print("\n[PROTECCIONES]")
-print("type:", type(protecciones))
 print("value:", protecciones)
 
-# ----------------------------------------
-# DEBUG DETALLADO PROTECCIONES
-# ----------------------------------------
 if hasattr(protecciones, "ok"):
 
     print("\n--- DETALLE PROTECCIONES ---")
@@ -270,17 +260,6 @@ if hasattr(protecciones, "ok"):
     print("errores:", protecciones.errores)
     print("warnings:", protecciones.warnings)
 
-    if protecciones.ocpd_ac:
-        print("\nOCPD AC:")
-        print("  I diseño:", protecciones.ocpd_ac.i_diseno_a)
-        print("  Tamaño:", protecciones.ocpd_ac.tamano_a)
-
-    if protecciones.ocpd_dc_array:
-        print("\nOCPD DC ARRAY:")
-        print("  I diseño:", protecciones.ocpd_dc_array.i_diseno_a)
-        print("  Tamaño:", protecciones.ocpd_dc_array.tamano_a)
-
-    if protecciones.fusible_string:
-        print("\nFUSIBLE STRING:")
-        print("  requerido:", protecciones.fusible_string.requerido)
-        print("  tamaño:", protecciones.fusible_string.tamano_a)
+    print("\nOCPD AC:", protecciones.ocpd_ac.tamano_a)
+    print("OCPD DC:", protecciones.ocpd_dc_array.tamano_a)
+    print("FUSIBLE:", protecciones.fusible_string.requerido)
