@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from core.aplicacion.orquestador_estudio import DependenciasEstudio
 
-# ✔ IMPORTS REALES (LOS TUYOS)
+# ✔ IMPORTS REALES
 from electrical.paneles.orquestador_paneles import ejecutar_paneles
 from electrical.paneles.entrada_panel import EntradaPaneles
 from core.aplicacion.puertos import PuertoNEC
 from core.servicios.sizing import calcular_sizing_unificado
+from electrical.catalogos import get_panel
 
 
 # ==========================================================
@@ -18,18 +19,11 @@ class SizingAdapter:
         return calcular_sizing_unificado(datos)
 
 
-
-from electrical.paneles.entrada_panel import EntradaPaneles
-from electrical.paneles.orquestador_paneles import ejecutar_paneles
-from electrical.catalogos import get_panel
-from electrical.inversor.catalogo import get_inversor  # ⚠️ ajusta si cambia
-
-
 class PanelesAdapter:
     def ejecutar(self, datos, sizing):
 
         # --------------------------------------------------
-        # PANEL (desde datos.equipos)
+        # PANEL
         # --------------------------------------------------
 
         eq = getattr(datos, "equipos", {}) or {}
@@ -41,22 +35,12 @@ class PanelesAdapter:
             raise ValueError("Panel no encontrado")
 
         # --------------------------------------------------
-        # INVERSOR
-        # --------------------------------------------------
-
-        inversor_id = eq.get("inversor_id")
-
-        inversor = None
-        if inversor_id:
-            inversor = get_inversor(inversor_id)
-
-        # --------------------------------------------------
         # ENTRADA PANELES
         # --------------------------------------------------
 
         entrada = EntradaPaneles(
             panel=panel,
-            inversor=inversor,
+            inversor=None,  # 🔥 FIX DEFINITIVO
 
             n_paneles_total=sizing.n_paneles,
             n_inversores=sizing.n_inversores,
@@ -68,11 +52,8 @@ class PanelesAdapter:
             pdc_kw_objetivo=sizing.pdc_kw,
         )
 
-        # --------------------------------------------------
-        # EJECUCIÓN
-        # --------------------------------------------------
-
         return ejecutar_paneles(entrada)
+
 
 class NECAdapter:
     def ejecutar(self, datos, sizing, paneles):
