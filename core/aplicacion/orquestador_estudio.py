@@ -20,7 +20,6 @@ from core.aplicacion.puertos import (
 
 @dataclass
 class DependenciasEstudio:
-
     sizing: PuertoSizing
     paneles: PuertoPaneles
     energia: PuertoEnergia
@@ -49,13 +48,7 @@ def ejecutar_estudio(
 
     sizing = deps.sizing.ejecutar(datos)
 
-    print("TYPE sizing:", type(sizing))
-    print("VALUE sizing:", sizing)
-
     if getattr(sizing, "ok", True) is False:
-
-        print("ERROR: sizing retornó ok=False")
-
         return asdict(ResultadoProyecto(
             sizing=sizing,
             strings=None,
@@ -64,26 +57,20 @@ def ejecutar_estudio(
             financiero=None,
         ))
 
-    print("n_paneles:", getattr(sizing, "n_paneles", None))
-    print("n_inversores:", getattr(sizing, "n_inversores", None))
-
     # ------------------------------------------------------
     # 2. PANELES / STRINGS
     # ------------------------------------------------------
 
     print("\n[2] EJECUTANDO PANEL / STRINGS")
 
-    strings = deps.paneles.ejecutar(
-        datos,
-        sizing,
-    )
+    strings = deps.paneles.ejecutar(datos, sizing)
 
-    print("\n--- RESULTADO PANEL ---")
-    print("TYPE:", type(strings))
-    print("RAW VALUE:", strings)
+    print("\n--- DEBUG STRINGS ---")
+    print(strings)
+    print(getattr(strings, "strings", None))
 
     # ------------------------------------------------------
-    # 3. ELÉCTRICO (CORRECTO)
+    # 3. ELÉCTRICO
     # ------------------------------------------------------
 
     print("\n[3] CALCULOS ELECTRICOS")
@@ -92,46 +79,64 @@ def ejecutar_estudio(
     from electrical.conductores.calculo_conductores import dimensionar_tramos_fv
     from electrical.protecciones.protecciones import calcular_protecciones, EntradaProtecciones
 
-    # CORRIENTES
-    corrientes_input = CorrientesInput(
-        paneles=strings,
-        kw_ac=sizing.kw_ac,
-        vac=240,
-        fases=1,
-        fp=1.0
-    )
+    if not hasattr(strings, "strings") or not strings.strings:
 
-    corrientes = calcular_corrientes(corrientes_input)
+        print("⚠️ No hay strings → se omite cálculo eléctrico")
 
-    # CONDUCTORES
-    conductores = dimensionar_tramos_fv(
-        corrientes=corrientes,
-        vmp_dc=600,
-        vac=240,
-        dist_dc_m=20,
-        dist_ac_m=20,
-        fases=1
-    )
+        corrientes = None
+        conductores = None
+        protecciones = None
 
-    # PROTECCIONES
-    entrada_prot = EntradaProtecciones(
-        corrientes=corrientes,
-        n_strings=len(strings.strings) if hasattr(strings, "strings") and strings.strings else 1
-    )
+    else:
 
-    protecciones = calcular_protecciones(entrada_prot)
+        # -------------------------
+        # CORRIENTES
+        # -------------------------
+        corrientes_input = CorrientesInput(
+            paneles=strings,
+            kw_ac=sizing.kw_ac,
+            vac=240,
+            fases=1,
+            fp=1.0
+        )
 
-    # DEBUG
-    print("\n--- RESULTADOS ELÉCTRICOS ---")
+        corrientes = calcular_corrientes(corrientes_input)
 
-    print("\n[CORRIENTES]")
-    print(corrientes)
+        # -------------------------
+        # CONDUCTORES
+        # -------------------------
+        conductores = dimensionar_tramos_fv(
+            corrientes=corrientes,
+            vmp_dc=600,
+            vac=240,
+            dist_dc_m=15,
+            dist_ac_m=25,
+            fases=1
+        )
 
-    print("\n[CONDUCTORES]")
-    print(conductores)
+        # -------------------------
+        # PROTECCIONES
+        # -------------------------
+        entrada_prot = EntradaProtecciones(
+            corrientes=corrientes,
+            n_strings=len(strings.strings)
+        )
 
-    print("\n[PROTECCIONES]")
-    print(protecciones)
+        protecciones = calcular_protecciones(entrada_prot)
+
+        # -------------------------
+        # DEBUG
+        # -------------------------
+        print("\n--- RESULTADOS ELÉCTRICOS ---")
+
+        print("\n[CORRIENTES]")
+        print(corrientes)
+
+        print("\n[CONDUCTORES]")
+        print(conductores)
+
+        print("\n[PROTECCIONES]")
+        print(protecciones)
 
     # ------------------------------------------------------
     # 4. ENERGÍA
