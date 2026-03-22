@@ -121,7 +121,6 @@ class EnergiaAdapter:
 # ==========================================================
 # NEC
 # ==========================================================
-
 class NECAdapter:
 
     def ejecutar(self, datos, sizing, paneles):
@@ -131,32 +130,56 @@ class NECAdapter:
         if not paneles.strings:
             raise ValueError("No hay strings")
 
-        s0 = paneles.strings[0]
+        # --------------------------------------------------
+        # INVERSOR TIPADO
+        # --------------------------------------------------
 
-        entrada_nec = {
-            "electrico": {
-                "vac_ll": sf.get("vac", 240),
-                "fases": sf.get("fases", 1),
-                "fp": sf.get("fp", 1.0),
-            },
-            "potencia_dc_kw": paneles.array.pdc_kw,
-            "potencia_ac_kw": sizing.kw_ac,
-            "vdc_nom": sf.get("vdc_nom", 600),
-            "strings": {
-                "imp_string_a": s0.imp_string_a,
-                "isc_string_a": s0.isc_string_a,
-                "strings_por_mppt": 1,
-                "n_strings_total": paneles.array.n_strings_total,
-            },
-            "inversor": {
-                "kw_ac": sizing.kw_ac,
-                "v_ac_nom_v": sf.get("vac", 240),
-            },
-        }
+        class InversorInput:
+            def __init__(self, kw_ac, vac, fases, fp):
+                self.kw_ac = kw_ac
+                self.v_ac_nom_v = vac
+                self.fases = fases
+                self.fp = fp
 
-        return ejecutar_nec(entrada_nec, sizing, paneles)
+        inversor = InversorInput(
+            kw_ac=sizing.kw_ac,
+            vac=sf.get("vac", 240),
+            fases=sf.get("fases", 1),
+            fp=sf.get("fp", 1.0),
+        )
 
+        # --------------------------------------------------
+        # PARÁMETROS CONDUCTORES
+        # --------------------------------------------------
 
+        class ParamsConductores:
+            def __init__(self, vdc, vac, l_dc, l_ac, vd_dc, vd_ac):
+                self.vdc = vdc
+                self.vac = vac
+                self.l_dc = l_dc
+                self.l_ac = l_ac
+                self.vd_dc = vd_dc
+                self.vd_ac = vd_ac
+
+        params = ParamsConductores(
+            vdc=paneles.vmp_string_v,
+            vac=sf.get("vac", 240),
+            l_dc=sf.get("dist_dc_m", 10),
+            l_ac=sf.get("dist_ac_m", 10),
+            vd_dc=sf.get("vd_dc_pct", 2.0),
+            vd_ac=sf.get("vd_ac_pct", 2.0),
+        )
+
+        # --------------------------------------------------
+        # EJECUTAR INGENIERÍA ELÉCTRICA
+        # --------------------------------------------------
+
+        return ejecutar_ingenieria_electrica(
+            datos_strings=paneles,                 # ResultadoPaneles
+            datos_inversor=inversor,
+            n_strings=paneles.array.n_strings_total,
+            params_conductores=params,
+        )
 # ==========================================================
 # FINANZAS
 # ==========================================================
