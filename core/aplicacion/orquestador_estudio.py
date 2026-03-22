@@ -203,7 +203,47 @@ from electrical.protecciones.protecciones import calcular_ocpd
 corrientes = calcular_corrientes_dc(sizing, strings)
 conductores = calcular_conductores(datos, sizing, strings)
 protecciones = calcular_ocpd(sizing, strings)
+print("\n--- RESULTADOS ELÉCTRICOS ---")
 
-print("corrientes:", corrientes)
-print("conductores:", conductores)
-print("protecciones:", protecciones)
+# ----------------------------------------
+# CORRIENTES
+# ----------------------------------------
+print("\n[CORRIENTES]")
+print("type:", type(corrientes))
+print("value:", corrientes)
+
+# ----------------------------------------
+# CONDUCTORES
+# ----------------------------------------
+print("\n[CONDUCTORES]")
+print("type:", type(conductores))
+print("value:", conductores)
+
+# ----------------------------------------
+# PROTECCIONES
+# ----------------------------------------
+print("\n[PROTECCIONES]")
+print("type:", type(protecciones))
+print("value:", protecciones)
+
+# 👉 DEBUG DETALLADO (CLAVE)
+if hasattr(protecciones, "ok"):
+    print("\n--- DETALLE PROTECCIONES ---")
+    print("ok:", protecciones.ok)
+    print("errores:", protecciones.errores)
+    print("warnings:", protecciones.warnings)
+
+    if protecciones.ocpd_ac:
+        print("\nOCPD AC:")
+        print("  I diseño:", protecciones.ocpd_ac.i_diseno_a)
+        print("  Tamaño:", protecciones.ocpd_ac.tamano_a)
+
+    if protecciones.ocpd_dc_array:
+        print("\nOCPD DC ARRAY:")
+        print("  I diseño:", protecciones.ocpd_dc_array.i_diseno_a)
+        print("  Tamaño:", protecciones.ocpd_dc_array.tamano_a)
+
+    if protecciones.fusible_string:
+        print("\nFUSIBLE STRING:")
+        print("  requerido:", protecciones.fusible_string.requerido)
+        print("  tamaño:", protecciones.fusible_string.tamano_a)
