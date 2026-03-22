@@ -3,7 +3,7 @@ from typing import Protocol
 from core.dominio.contrato import ResultadoSizing
 from electrical.paneles.resultado_paneles import ResultadoPaneles
 from energy.contrato import EnergiaResultado
-from electrical.nec.contrato import ResultadoNEC
+from electrical.nec.orquestador_nec import ResultadoNEC
 
 
 class PuertoSizing(Protocol):
