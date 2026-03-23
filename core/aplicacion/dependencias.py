@@ -87,7 +87,7 @@ class PanelesAdapter:
             panel=panel,
             inversor=inversor,
             n_paneles_total=getattr(sizing, "n_paneles", None),
-            n_inversores=1,
+            n_inversores=getattr(sizing, "n_inversores", None),
             t_min_c=-10.0,
             t_oper_c=45.0,
         )
