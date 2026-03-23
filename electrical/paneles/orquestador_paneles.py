@@ -82,7 +82,7 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
 
         n_paneles = dim.n_paneles
         pdc_kw = dim.pdc_kw
-
+        
     # ------------------------------------------------------
     # STRINGS
     # ------------------------------------------------------
@@ -154,7 +154,8 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
     # ------------------------------------------------------
     # RESULTADO FINAL
     # ------------------------------------------------------
-
+    print("DEBUG PANEL:")
+    print("entrada.n_inversores:", entrada.n_inversores)
     return ResultadoPaneles(
         ok=True,
         topologia="string-centralizado",
