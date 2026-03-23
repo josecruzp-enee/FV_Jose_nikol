@@ -1,7 +1,8 @@
-# energy/contrato.py
-
 from dataclasses import dataclass, field
 from typing import List, Dict, Any
+
+# 🔥 IMPORTANTE: tipo fuerte
+from energy.clima.resultado_clima import ResultadoClima
 
 
 # ==========================================================
@@ -10,9 +11,12 @@ from typing import List, Dict, Any
 
 @dataclass(frozen=True)
 class EnergiaInput:
-    paneles: Any                 # ← objeto ResultadoPaneles (NO dict)
+    paneles: Any                 # ResultadoPaneles
     pac_nominal_kw: float
-    clima: Any
+
+    # 🔥 FIX REAL
+    clima: ResultadoClima
+
     tilt_deg: float
     azimut_deg: float
 
@@ -25,7 +29,9 @@ class EnergiaInput:
     def validar(self) -> List[str]:
         errores: List[str] = []
 
-        # PANELes (objeto)
+        # --------------------------------------------------
+        # PANELes
+        # --------------------------------------------------
         if self.paneles is None:
             errores.append("paneles requerido")
         else:
@@ -34,19 +40,35 @@ class EnergiaInput:
             if not hasattr(self.paneles, "array"):
                 errores.append("paneles sin atributo array")
 
+        # --------------------------------------------------
         # POTENCIA
+        # --------------------------------------------------
         if self.pac_nominal_kw <= 0:
             errores.append("pac_nominal_kw inválido")
 
+        # --------------------------------------------------
         # GEOMETRÍA
+        # --------------------------------------------------
         if self.tilt_deg is None:
             errores.append("tilt_deg requerido")
+
         if self.azimut_deg is None:
             errores.append("azimut_deg requerido")
 
-        # CLIMA
+        # --------------------------------------------------
+        # CLIMA (🔥 FIX IMPORTANTE)
+        # --------------------------------------------------
         if self.clima is None:
             errores.append("clima requerido")
+        else:
+            # ✔ estructura mínima obligatoria
+            if not hasattr(self.clima, "horas"):
+                errores.append("clima inválido: falta 'horas'")
+            else:
+                if not self.clima.horas:
+                    errores.append("clima vacío")
+                elif len(self.clima.horas) != 8760:
+                    errores.append("clima no tiene 8760 horas")
 
         return errores
 
