@@ -103,33 +103,41 @@ def _render_kpis(resultado_proyecto: dict) -> None:
 # ==========================================================
 # RESUMEN NEC
 # ==========================================================
-
-def _render_nec_resumen(resultado_proyecto: dict) -> None:
+def _render_nec_resumen(resultado_proyecto) -> None:
 
     st.subheader("Ingeniería eléctrica (NEC 2023)")
 
-    nec = resultado_proyecto.get("nec") or {}
-    strings = resultado_proyecto.get("strings") or {}
+    # 🔥 acceso correcto (dataclass)
+    nec = getattr(resultado_proyecto, "nec", None)
+    strings = getattr(resultado_proyecto, "strings", None)
 
-    paq = nec.get("paq")
+    paq = getattr(nec, "paq", None)
 
     if not paq:
-
         st.info("Sin paquete NEC disponible")
         return
 
-    resumen = paq.get("resumen_pdf") or {}
-    ocpd = paq.get("ocpd") or {}
+    # 🔥 objetos, no dicts
+    resumen = getattr(paq, "resumen_pdf", None)
+    ocpd = getattr(paq, "ocpd", None)
 
     c1, c2, c3, c4 = st.columns(4)
 
+    # =========================
+    # STRINGS
+    # =========================
+    lista_strings = getattr(strings, "strings", []) if strings else []
+
     c1.metric(
         "Strings",
-        len(strings.get("strings", []))
+        len(lista_strings)
     )
 
-    idc = resumen.get("idc_nom")
-    iac = resumen.get("iac_nom")
+    # =========================
+    # CORRIENTES
+    # =========================
+    idc = getattr(resumen, "idc_nom", None)
+    iac = getattr(resumen, "iac_nom", None)
 
     c2.metric(
         "I DC diseño",
@@ -141,17 +149,22 @@ def _render_nec_resumen(resultado_proyecto: dict) -> None:
         f"{float(iac):.2f} A" if isinstance(iac, (int, float)) else "—"
     )
 
-    breaker = ocpd.get("breaker_ac") if isinstance(ocpd, dict) else None
-    tam = breaker.get("tamano_a") if isinstance(breaker, dict) else None
+    # =========================
+    # BREAKER AC
+    # =========================
+    breaker = getattr(ocpd, "breaker_ac", None)
+    tam = getattr(breaker, "tamano_a", None)
 
     c4.metric(
         "Breaker AC",
         f"{int(tam)} A" if isinstance(tam, (int, float)) else "—"
     )
 
+    # =========================
+    # DEBUG
+    # =========================
     with st.expander("Ver paquete NEC (crudo)"):
-        st.json(paq)
-
+        st.write(paq)
 
 # ==========================================================
 # DEBUG MOTOR ENERGÍA
