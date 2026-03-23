@@ -70,58 +70,65 @@ def _ui_inputs_electricos(e: dict):
 # ==========================================================
 # ctx → DatosProyecto
 # ==========================================================
-
 def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
 
     dc = _asegurar_dict(ctx, "datos_cliente")
     c = _asegurar_dict(ctx, "consumo")
     sf = _asegurar_dict(ctx, "sistema_fv")
     eq = _asegurar_dict(ctx, "equipos")
+    e = _asegurar_dict(ctx, "electrico")  # 🔥 IMPORTANTE
 
     consumo = c.get("kwh_12m", [0] * 12)
 
     # 🔴 FIX EQUIPOS (OBLIGATORIO PARA SIZING)
     if "panel_id" not in eq:
-        eq["panel_id"] = "JA_550"  # ⚠️ usa un ID real de tu catálogo
+        eq["panel_id"] = "JA_550"  # usa un ID real
 
     if "inversor_id" not in eq:
-        eq["inversor_id"] = "HUAWEI_50K"  # ⚠️ usa uno real
+        eq["inversor_id"] = "HUAWEI_50K"  # usa uno real
 
     p = Datosproyecto(
 
         cliente=str(dc.get("cliente", "")),
         ubicacion=str(dc.get("ubicacion", "")),
 
-        # 🔴 COORDENADAS
+        # COORDENADAS
         lat=float(sf.get("latitud", 14.8)),
         lon=float(sf.get("longitud", -86.2)),
 
+        # CONSUMO
         consumo_12m=[float(x) for x in consumo],
         tarifa_energia=float(c.get("tarifa_energia_L_kwh", 0)),
         cargos_fijos=float(c.get("cargos_fijos_L_mes", 0)),
 
+        # PRODUCCIÓN FV
         prod_base_kwh_kwp_mes=float(sf.get("produccion_base_kwh_kwp_mes", 145)),
         factores_fv_12m=[float(x) for x in sf.get("factores_fv_12m", [1] * 12)],
-
         cobertura_objetivo=float(sf.get("cobertura_objetivo", 0.8)),
 
+        # COSTOS
         costo_usd_kwp=float(sf.get("costo_usd_kwp", 1200)),
         tcambio=float(sf.get("tcambio", 27)),
 
+        # FINANZAS
         tasa_anual=float(sf.get("tasa_anual", 0.08)),
         plazo_anios=int(sf.get("plazo_anios", 10)),
-
         porcentaje_financiado=float(sf.get("porcentaje_financiado", 1)),
 
+        # O&M
         om_anual_pct=float(sf.get("om_anual_pct", 0.01)),
 
-        instalacion_electrica=None
+        # 🔥 FIX CRÍTICO (AQUÍ ESTABA EL ERROR)
+        instalacion_electrica=dict(e)
     )
 
     # 🔴 IMPORTANTE: pasar equipos al dominio
     p.equipos = dict(eq)
 
     return p
+
+
+
 # ==========================================================
 # MOSTRAR SIZING
 # ==========================================================
