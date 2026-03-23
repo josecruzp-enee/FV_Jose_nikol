@@ -130,8 +130,8 @@ class EnergiaAdapter:
         # ==================================================
         # 🔥 FIX REAL: construir clima desde PVGIS
         # ==================================================
-        lat = getattr(datos, "latitud", None)
-        lon = getattr(datos, "longitud", None)
+        lat = datos.lat
+        lon = datos.lon
 
         if lat is None or lon is None:
             raise ValueError("DatosProyecto debe incluir latitud y longitud")
