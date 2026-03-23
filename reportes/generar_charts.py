@@ -9,7 +9,7 @@ matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
 
-from electrical.energia.irradiancia import (
+from energy.irradiancia import (
     hsp_12m_base,
     DIAS_MES
 )
