@@ -109,7 +109,8 @@ class ElectricalAdapter:
 
         if resultado is None:
             raise ValueError("Electrical devolvió None")
-
+        print("DEBUG ADAPTER:")
+        print("n_inversores sizing:", getattr(sizing, "n_inversores", None))
         return resultado
 
 
