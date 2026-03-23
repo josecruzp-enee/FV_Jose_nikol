@@ -156,7 +156,7 @@ def _mostrar_nec(nec):
         st.info("Sin resultados NEC.")
         return
 
-    st.json(nec)
+    st.write(nec) 
 
 
 # ==========================================================
