@@ -7,7 +7,7 @@ from electrical.conductores.corrientes import (
     CorrientesInput,
 )
 
-from electrical.conductores.calculo_conductores import calcular_conductores
+from electrical.conductores.calculo_conductores import dimensionar_tramos_fv as calcular_conductores
 from electrical.conductores.resultado_conductores import ResultadoConductores
 
 from electrical.protecciones.calculo_protecciones import calcular_protecciones
