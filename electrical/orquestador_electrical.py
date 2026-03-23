@@ -11,6 +11,8 @@ from electrical.conductores.calculo_conductores import (
     dimensionar_tramos_fv as calcular_conductores,
 )
 
+from electrical.conductores.resultado_conductores import ResultadoConductores
+
 from electrical.protecciones.protecciones import (
     calcular_protecciones,
     EntradaProtecciones,
@@ -89,9 +91,9 @@ def ejecutar_electrical(*args, **kwargs) -> ResultadoElectrico:
             )
 
         # ==================================================
-        # CONDUCTORES (🔥 FIX REAL AQUÍ)
+        # CONDUCTORES (FIX: wrap correcto)
         # ==================================================
-        conductores = calcular_conductores(
+        tramos = calcular_conductores(
             corrientes=corrientes,
             vmp_dc=paneles.array.vdc_nom,
             vac=vac,
@@ -100,16 +102,18 @@ def ejecutar_electrical(*args, **kwargs) -> ResultadoElectrico:
             fases=fases,
         )
 
-        if not conductores:
+        conductores = ResultadoConductores.build(tramos)
+
+        if not conductores.ok:
             return ResultadoElectrico.build(
                 paneles=paneles,
                 corrientes=corrientes,
-                conductores=_conductores_error("Conductores inválidos"),
+                conductores=conductores,
                 protecciones=_protecciones_error("Conductores inválidos"),
             )
 
         # ==================================================
-        # PROTECCIONES
+        # PROTECCIONES (FIX: n_strings correcto)
         # ==================================================
         entrada_prot = EntradaProtecciones(
             corrientes=corrientes,
@@ -136,6 +140,8 @@ def ejecutar_electrical(*args, **kwargs) -> ResultadoElectrico:
             conductores=_conductores_error(str(e)),
             protecciones=_protecciones_error(str(e)),
         )
+
+
 # ==================================================
 # HELPERS DE ERROR (CONSISTENTES)
 # ==================================================
