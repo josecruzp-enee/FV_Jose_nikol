@@ -86,15 +86,25 @@ def ejecutar_estudio(
     resultado_electrico = None
 
     if deps.nec:
-        resultado_electrico = deps.nec.ejecutar(
-            datos=datos,
-            paneles=resultado_paneles,
-        )
+        try:
+            resultado_electrico = deps.nec.ejecutar(
+                datos=datos,
+                paneles=resultado_paneles,
+            )
+        except Exception as e:
+            # 🔥 evita que reviente todo el flujo
+            return ResultadoProyecto(
+                sizing=sizing,
+                strings=resultado_paneles,
+                energia=None,
+                nec=None,
+                financiero=None,
+            )
 
         if resultado_electrico is None:
             raise ValueError("Electrical devolvió None")
 
-        if not resultado_electrico.ok:
+        if getattr(resultado_electrico, "ok", True) is False:
             return ResultadoProyecto(
                 sizing=sizing,
                 strings=resultado_paneles,
