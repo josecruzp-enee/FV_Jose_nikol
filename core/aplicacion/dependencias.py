@@ -22,8 +22,8 @@ from core.servicios.finanzas import ejecutar_finanzas
 
 # 🔥 PANEL DTO + CATÁLOGOS
 from electrical.paneles.entrada_panel import EntradaPaneles
-from electrical.catalogos.catalogo import obtener_panel
-from electrical.catalogos.catalogo import obtener_inversor
+from electrical.catalogos.catalogos import get_panel as obtener_panel
+from electrical.catalogos.catalogos import get_inversor as obtener_inversor
 
 # 🔥 ENERGÍA DTO
 from energy.contrato import EnergiaInput
