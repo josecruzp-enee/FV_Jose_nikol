@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from typing import Any, Optional
 
 from core.dominio.contrato import ResultadoProyecto
@@ -24,129 +24,138 @@ class DependenciasEstudio:
     paneles: PuertoPaneles
     energia: PuertoEnergia
     nec: Optional[PuertoNEC] = None
-    finanzas: PuertoFinanzas = None
+    finanzas: Optional[PuertoFinanzas] = None
 
 
 # ==========================================================
-# ORQUESTADOR LIMPIO
+# ORQUESTADOR
 # ==========================================================
 
 def ejecutar_estudio(
     datos: Any,
     deps: DependenciasEstudio,
-):
+) -> ResultadoProyecto:
 
     print("\n==============================")
     print("FV ENGINE — INICIO ESTUDIO")
     print("==============================")
 
-    try:
+    # ======================================================
+    # 1. SIZING
+    # ======================================================
+    print("\n[1] EJECUTANDO SIZING")
 
-        # ------------------------------------------------------
-        # 1. SIZING
-        # ------------------------------------------------------
+    sizing = deps.sizing.ejecutar(datos)
 
-        print("\n[1] EJECUTANDO SIZING")
+    if sizing is None:
+        raise ValueError("Sizing devolvió None")
 
-        sizing = deps.sizing.ejecutar(datos)
+    if getattr(sizing, "ok", True) is False:
+        return ResultadoProyecto(
+            sizing=sizing,
+            strings=None,
+            energia=None,
+            nec=None,
+            financiero=None,
+        )
 
-        if getattr(sizing, "ok", True) is False:
-            return ResultadoProyecto(
-                sizing=sizing,
-                strings=None,
-                energia=None,
-                nec=None,
-                financiero=None,
-            )
+    # ======================================================
+    # 2. PANELES / STRINGS
+    # ======================================================
+    print("\n[2] EJECUTANDO PANEL / STRINGS")
 
-        # ------------------------------------------------------
-        # 2. PANELES
-        # ------------------------------------------------------
+    resultado_paneles = deps.paneles.ejecutar(datos, sizing)
 
-        print("\n[2] EJECUTANDO PANEL / STRINGS")
+    if resultado_paneles is None:
+        raise ValueError("Paneles devolvió None")
 
-        resultado_paneles = deps.paneles.ejecutar(datos, sizing)
+    if not resultado_paneles.ok:
+        return ResultadoProyecto(
+            sizing=sizing,
+            strings=resultado_paneles,
+            energia=None,
+            nec=None,
+            financiero=None,
+        )
 
-        if not resultado_paneles.ok:
+    # ======================================================
+    # 3. ELECTRICAL (NEC)
+    # ======================================================
+    print("\n[3] CALCULOS ELECTRICOS")
+
+    resultado_electrico = None
+
+    if deps.nec:
+        resultado_electrico = deps.nec.ejecutar(
+            datos=datos,
+            paneles=resultado_paneles,
+        )
+
+        if resultado_electrico is None:
+            raise ValueError("Electrical devolvió None")
+
+        if not resultado_electrico.ok:
             return ResultadoProyecto(
                 sizing=sizing,
                 strings=resultado_paneles,
                 energia=None,
-                nec=None,
+                nec=resultado_electrico,
                 financiero=None,
             )
 
-        # ------------------------------------------------------
-        # 3. ELECTRICAL (CAJA NEGRA)
-        # ------------------------------------------------------
+    # ======================================================
+    # 4. ENERGÍA
+    # ======================================================
+    print("\n[4] EJECUTANDO ENERGIA")
 
-        print("\n[3] CALCULOS ELECTRICOS")
+    energia = deps.energia.ejecutar(
+        datos,
+        sizing,
+        resultado_paneles,
+    )
 
-        resultado_electrico = None
+    if energia is None:
+        raise ValueError("Energía devolvió None")
 
-        if deps.nec:
-            resultado_electrico = deps.nec.ejecutar(
-                datos=datos,
-                paneles=resultado_paneles,
-            )
-
-            if not resultado_electrico.ok:
-                return ResultadoProyecto(
-                    sizing=sizing,
-                    strings=resultado_paneles,
-                    energia=None,
-                    nec=resultado_electrico,
-                    financiero=None,
-                )
-
-        # ------------------------------------------------------
-        # 4. ENERGÍA
-        # ------------------------------------------------------
-
-        print("\n[4] EJECUTANDO ENERGIA")
-
-        energia = deps.energia.ejecutar(
-            datos,
-            sizing,
-            resultado_paneles,
+    if getattr(energia, "ok", True) is False:
+        return ResultadoProyecto(
+            sizing=sizing,
+            strings=resultado_paneles,
+            energia=energia,
+            nec=resultado_electrico,
+            financiero=None,
         )
 
-        # ------------------------------------------------------
-        # 5. FINANZAS
-        # ------------------------------------------------------
+    # ======================================================
+    # 5. FINANZAS (OPCIONAL)
+    # ======================================================
+    print("\n[5] EJECUTANDO FINANZAS")
 
-        print("\n[5] EJECUTANDO FINANZAS")
+    financiero = None
 
+    if deps.finanzas:
         financiero = deps.finanzas.ejecutar(
             datos,
             sizing,
             energia,
         )
 
-        # ------------------------------------------------------
-        # RESULTADO FINAL
-        # ------------------------------------------------------
+        if financiero is None:
+            raise ValueError("Finanzas devolvió None")
 
-        resultado = ResultadoProyecto(
-            sizing=sizing,
-            strings=resultado_paneles,
-            energia=energia,
-            nec=resultado_electrico,
-            financiero=financiero,
-        )
+    # ======================================================
+    # RESULTADO FINAL
+    # ======================================================
+    resultado = ResultadoProyecto(
+        sizing=sizing,
+        strings=resultado_paneles,
+        energia=energia,
+        nec=resultado_electrico,
+        financiero=financiero,
+    )
 
-        print("\n==============================")
-        print("FV ENGINE — FIN ESTUDIO")
-        print("==============================")
+    print("\n==============================")
+    print("FV ENGINE — FIN ESTUDIO")
+    print("==============================")
 
-        return resultado
-
-    except Exception as e:
-
-        return ResultadoProyecto(
-            sizing=None,
-            strings=None,
-            energia=None,
-            nec=None,
-            financiero=None,
-        )
+    return resultado
