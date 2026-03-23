@@ -82,12 +82,22 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
 
         n_paneles = dim.n_paneles
         pdc_kw = dim.pdc_kw
-        
+
+    # ------------------------------------------------------
+    # 🔥 VALIDACIÓN CRÍTICA DE INVERSORES
+    # ------------------------------------------------------
+
+    if entrada.n_inversores is None:
+        return _resultado_error(
+            errores=["n_inversores no definido desde core (sizing)"],
+            warnings=warnings
+        )
+
+    n_inversores = int(entrada.n_inversores)
+
     # ------------------------------------------------------
     # STRINGS
     # ------------------------------------------------------
-
-    n_inversores = int(entrada.n_inversores or 1)
 
     strings_res = calcular_strings_fv(
         n_paneles_total=n_paneles,
@@ -104,13 +114,19 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
     n_strings = strings_res.recomendacion.n_strings_total
 
     # ------------------------------------------------------
-    # ARRAY
+    # 🔥 CORRECCIÓN CLAVE: DISTRIBUCIÓN REAL
+    # ------------------------------------------------------
+
+    total_mppt = inversor.n_mppt * n_inversores
+
+    strings_por_mppt = max(1, n_strings // total_mppt)
+
+    # ------------------------------------------------------
+    # ARRAY (aún global, pero consistente)
     # ------------------------------------------------------
 
     idc_nom = panel.imp_a * n_strings
     isc_total = panel.isc_a * n_strings
-
-    strings_por_mppt = max(1, n_strings // inversor.n_mppt)
 
     array = ArrayFV(
         potencia_dc_w=pdc_kw * 1000,
@@ -152,10 +168,18 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
     )
 
     # ------------------------------------------------------
+    # DEBUG (temporal)
+    # ------------------------------------------------------
+
+    print("DEBUG PANEL:")
+    print("n_inversores:", n_inversores)
+    print("total_mppt:", total_mppt)
+    print("strings_por_mppt:", strings_por_mppt)
+
+    # ------------------------------------------------------
     # RESULTADO FINAL
     # ------------------------------------------------------
-    print("DEBUG PANEL:")
-    print("entrada.n_inversores:", entrada.n_inversores)
+
     return ResultadoPaneles(
         ok=True,
         topologia="string-centralizado",
