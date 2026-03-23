@@ -18,7 +18,7 @@ from core.servicios.sizing import calcular_sizing_unificado
 from electrical.paneles.orquestador_paneles import ejecutar_paneles
 from electrical.orquestador_electrical import ejecutar_electrical
 from energy.orquestador_energia import ejecutar_motor_energia as ejecutar_energia
-from core.finanzas.orquestador_finanzas import ejecutar_finanzas
+from core.servicios.finanzas import ejecutar_finanzas
 
 
 # ==========================================================
