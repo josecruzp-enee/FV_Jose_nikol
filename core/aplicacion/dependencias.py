@@ -20,6 +20,14 @@ from electrical.orquestador_electrical import ejecutar_electrical
 from energy.orquestador_energia import ejecutar_motor_energia as ejecutar_energia
 from core.servicios.finanzas import ejecutar_finanzas
 
+# 🔥 PANEL DTO + CATÁLOGOS
+from electrical.paneles.entrada_panel import EntradaPaneles
+from electrical.catalogos.catalogo_paneles import obtener_panel
+from electrical.catalogos.catalogo_inversores import obtener_inversor
+
+# 🔥 ENERGÍA DTO
+from energy.contrato import EnergiaInput
+
 
 # ==========================================================
 # DEPENDENCIAS
@@ -50,7 +58,41 @@ class SizingAdapter:
 
 class PanelesAdapter:
     def ejecutar(self, datos, sizing):
-        resultado = ejecutar_paneles(datos=datos, sizing=sizing)
+
+        if sizing is None:
+            raise ValueError("Sizing es None en PanelesAdapter")
+
+        if not hasattr(datos, "equipos") or not isinstance(datos.equipos, dict):
+            raise ValueError("datos.equipos no definido o inválido")
+
+        panel_id = datos.equipos.get("panel_id")
+        inversor_id = datos.equipos.get("inversor_id")
+
+        if not panel_id:
+            raise ValueError("panel_id no definido")
+
+        if not inversor_id:
+            raise ValueError("inversor_id no definido")
+
+        panel = obtener_panel(panel_id)
+        inversor = obtener_inversor(inversor_id)
+
+        if panel is None:
+            raise ValueError(f"Panel no encontrado: {panel_id}")
+
+        if inversor is None:
+            raise ValueError(f"Inversor no encontrado: {inversor_id}")
+
+        entrada = EntradaPaneles(
+            panel=panel,
+            inversor=inversor,
+            n_paneles_total=getattr(sizing, "n_paneles", None),
+            n_inversores=1,
+            t_min_c=-10.0,
+            t_oper_c=45.0,
+        )
+
+        resultado = ejecutar_paneles(entrada)
 
         if resultado is None:
             raise ValueError("Paneles devolvió None")
@@ -70,8 +112,27 @@ class ElectricalAdapter:
 
 class EnergiaAdapter:
     def ejecutar(self, datos, sizing, paneles):
-        # ⚠️ Aquí probablemente luego ajustarás contrato
-        resultado = ejecutar_energia(datos, sizing, paneles)
+
+        if paneles is None or not getattr(paneles, "ok", False):
+            raise ValueError("Paneles inválido para energía")
+
+        entrada = EnergiaInput(
+            paneles=paneles,
+            pac_nominal_kw=getattr(sizing, "kw_ac", 0),
+
+            # 🔥 puedes mejorar luego con clima real
+            clima=datos,
+
+            tilt_deg=15,
+            azimut_deg=180,
+
+            perdidas_dc_pct=0.05,
+            sombras_pct=0.02,
+            eficiencia_inversor=0.98,
+            perdidas_ac_pct=0.02,
+        )
+
+        resultado = ejecutar_energia(entrada)
 
         if resultado is None:
             raise ValueError("Energía devolvió None")
@@ -104,7 +165,7 @@ def construir_dependencias() -> DependenciasEstudio:
 
 
 # ==========================================================
-# ORQUESTADOR (🔥 CORREGIDO)
+# ORQUESTADOR
 # ==========================================================
 
 def ejecutar_estudio(
@@ -233,5 +294,4 @@ def ejecutar_estudio(
         print("\n🔥 ERROR REAL EN ORQUESTADOR 🔥")
         print(traceback.format_exc())
 
-        # 🔥 NO ocultamos el error
         raise
