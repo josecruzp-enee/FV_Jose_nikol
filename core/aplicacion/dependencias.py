@@ -13,7 +13,7 @@ from core.aplicacion.puertos import (
     PuertoFinanzas,
 )
 
-# 🔥 IMPORTS REALES DE TU PROYECTO
+# 🔥 IMPORTS REALES
 from core.servicios.sizing import calcular_sizing_unificado
 from electrical.paneles.orquestador_paneles import ejecutar_paneles
 from electrical.orquestador_electrical import ejecutar_electrical
@@ -35,50 +35,62 @@ class DependenciasEstudio:
 
 
 # ==========================================================
-# ADAPTERS INLINE (🔥 SIN carpeta adapters)
+# ADAPTERS
 # ==========================================================
 
 class SizingAdapter:
     def ejecutar(self, datos):
-        return calcular_sizing_unificado(datos)
+        resultado = calcular_sizing_unificado(datos)
+
+        if resultado is None:
+            raise ValueError("Sizing devolvió None desde servicio")
+
+        return resultado
 
 
 class PanelesAdapter:
     def ejecutar(self, datos, sizing):
-        return ejecutar_paneles(
-            datos=datos,
-            sizing=sizing,
-        )
+        resultado = ejecutar_paneles(datos=datos, sizing=sizing)
+
+        if resultado is None:
+            raise ValueError("Paneles devolvió None")
+
+        return resultado
 
 
 class ElectricalAdapter:
     def ejecutar(self, datos, paneles):
-        return ejecutar_electrical(
-            datos=datos,
-            paneles=paneles,
-        )
+        resultado = ejecutar_electrical(datos=datos, paneles=paneles)
+
+        if resultado is None:
+            raise ValueError("Electrical devolvió None")
+
+        return resultado
 
 
 class EnergiaAdapter:
     def ejecutar(self, datos, sizing, paneles):
-        return ejecutar_energia(
-            datos,
-            sizing,
-            paneles,
-        )
+        # ⚠️ Aquí probablemente luego ajustarás contrato
+        resultado = ejecutar_energia(datos, sizing, paneles)
+
+        if resultado is None:
+            raise ValueError("Energía devolvió None")
+
+        return resultado
 
 
 class FinanzasAdapter:
     def ejecutar(self, datos, sizing, energia):
-        return ejecutar_finanzas(
-            datos,
-            sizing,
-            energia,
-        )
+        resultado = ejecutar_finanzas(datos, sizing, energia)
+
+        if resultado is None:
+            raise ValueError("Finanzas devolvió None")
+
+        return resultado
 
 
 # ==========================================================
-# FACTORY (🔥 ESTE ERA EL FALTANTE)
+# FACTORY
 # ==========================================================
 
 def construir_dependencias() -> DependenciasEstudio:
@@ -92,7 +104,7 @@ def construir_dependencias() -> DependenciasEstudio:
 
 
 # ==========================================================
-# ORQUESTADOR
+# ORQUESTADOR (🔥 CORREGIDO)
 # ==========================================================
 
 def ejecutar_estudio(
@@ -109,10 +121,12 @@ def ejecutar_estudio(
         # ------------------------------------------------------
         # 1. SIZING
         # ------------------------------------------------------
-
         print("\n[1] EJECUTANDO SIZING")
 
         sizing = deps.sizing.ejecutar(datos)
+
+        if sizing is None:
+            raise ValueError("Sizing devolvió None")
 
         if getattr(sizing, "ok", True) is False:
             return ResultadoProyecto(
@@ -126,7 +140,6 @@ def ejecutar_estudio(
         # ------------------------------------------------------
         # 2. PANELES
         # ------------------------------------------------------
-
         print("\n[2] EJECUTANDO PANEL / STRINGS")
 
         resultado_paneles = deps.paneles.ejecutar(datos, sizing)
@@ -143,11 +156,11 @@ def ejecutar_estudio(
         # ------------------------------------------------------
         # 3. ELECTRICAL
         # ------------------------------------------------------
-
         print("\n[3] CALCULOS ELECTRICOS")
 
-        if deps.nec:
+        resultado_electrico = None
 
+        if deps.nec:
             resultado_electrico = deps.nec.ejecutar(
                 datos=datos,
                 paneles=resultado_paneles,
@@ -162,13 +175,9 @@ def ejecutar_estudio(
                     financiero=None,
                 )
 
-        else:
-            resultado_electrico = None
-
         # ------------------------------------------------------
         # 4. ENERGÍA
         # ------------------------------------------------------
-
         print("\n[4] EJECUTANDO ENERGIA")
 
         energia = deps.energia.ejecutar(
@@ -177,22 +186,32 @@ def ejecutar_estudio(
             resultado_paneles,
         )
 
+        if getattr(energia, "ok", True) is False:
+            return ResultadoProyecto(
+                sizing=sizing,
+                strings=resultado_paneles,
+                energia=energia,
+                nec=resultado_electrico,
+                financiero=None,
+            )
+
         # ------------------------------------------------------
         # 5. FINANZAS
         # ------------------------------------------------------
-
         print("\n[5] EJECUTANDO FINANZAS")
 
-        financiero = deps.finanzas.ejecutar(
-            datos,
-            sizing,
-            energia,
-        )
+        financiero = None
+
+        if deps.finanzas:
+            financiero = deps.finanzas.ejecutar(
+                datos,
+                sizing,
+                energia,
+            )
 
         # ------------------------------------------------------
         # RESULTADO FINAL
         # ------------------------------------------------------
-
         resultado = ResultadoProyecto(
             sizing=sizing,
             strings=resultado_paneles,
@@ -207,14 +226,12 @@ def ejecutar_estudio(
 
         return resultado
 
-    except Exception as e:
+    except Exception:
 
-        print("\n❌ ERROR EN ORQUESTADOR:", str(e))
+        import traceback
 
-        return ResultadoProyecto(
-            sizing=None,
-            strings=None,
-            energia=None,
-            nec=None,
-            financiero=None,
-        )
+        print("\n🔥 ERROR REAL EN ORQUESTADOR 🔥")
+        print(traceback.format_exc())
+
+        # 🔥 NO ocultamos el error
+        raise
