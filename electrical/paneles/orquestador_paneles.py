@@ -1,5 +1,6 @@
 from __future__ import annotations
 from typing import List
+from collections import Counter
 
 from electrical.paneles.calculo_de_strings import calcular_strings_fv
 from electrical.paneles.dimensionado_paneles import dimensionar_paneles
@@ -18,8 +19,11 @@ from electrical.paneles.validacion_strings import (
 )
 
 
-def _resultado_error(errores: List[str], warnings: List[str]) -> ResultadoPaneles:
+# =========================================================
+# ERROR
+# =========================================================
 
+def _resultado_error(errores: List[str], warnings: List[str]) -> ResultadoPaneles:
     return ResultadoPaneles(
         ok=False,
         topologia="error",
@@ -31,6 +35,64 @@ def _resultado_error(errores: List[str], warnings: List[str]) -> ResultadoPanele
         meta=PanelesMeta(0,0,0),
     )
 
+
+# =========================================================
+# HELPERS
+# =========================================================
+
+def _resolver_dimensionado(entrada, panel):
+    if entrada.n_paneles_total is not None:
+        n_paneles = entrada.n_paneles_total
+        pdc_kw = (n_paneles * panel.pmax_w) / 1000
+        return n_paneles, pdc_kw, None
+
+    dim = dimensionar_paneles(entrada)
+
+    if not dim.ok:
+        return None, None, dim.errores
+
+    return dim.n_paneles, dim.pdc_kw, None
+
+
+def _strings_por_mppt_real(strings_res):
+    conteo = Counter((s.inversor, s.mppt) for s in strings_res.strings)
+    return max(conteo.values()) if conteo else 0
+
+
+def _armar_array(panel, inversor, strings_res, n_paneles, pdc_kw, strings_por_mppt):
+    n_strings = strings_res.recomendacion.n_strings_total
+
+    return ArrayFV(
+        potencia_dc_w=pdc_kw * 1000,
+        vdc_nom=strings_res.recomendacion.vmp_string_v,
+        idc_nom=panel.imp_a * n_strings,
+        isc_total=panel.isc_a * n_strings,
+        voc_frio_array_v=strings_res.recomendacion.voc_string_v,
+        n_strings_total=n_strings,
+        n_paneles_total=n_paneles,
+        strings_por_mppt=strings_por_mppt,
+        n_mppt=inversor.n_mppt,
+        p_panel_w=panel.pmax_w,
+    )
+
+
+def _mapear_strings(strings_res):
+    return [
+        StringFV(
+            mppt=s.mppt,
+            n_series=s.n_series,
+            vmp_string_v=s.vmp_string_v,
+            voc_frio_string_v=s.voc_frio_string_v,
+            imp_string_a=s.imp_string_a,
+            isc_string_a=s.isc_string_a,
+        )
+        for s in strings_res.strings
+    ]
+
+
+# =========================================================
+# ORQUESTADOR
+# =========================================================
 
 def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
 
@@ -44,13 +106,12 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
     # VALIDACIÓN
     # ------------------------------------------------------
 
-    val = validar_panel(panel)
-    errores += val.errores
-    warnings += val.warnings
-
-    val = validar_inversor(inversor)
-    errores += val.errores
-    warnings += val.warnings
+    for val in (
+        validar_panel(panel),
+        validar_inversor(inversor),
+    ):
+        errores += val.errores
+        warnings += val.warnings
 
     if entrada.n_paneles_total is not None:
         val = validar_parametros_generales(
@@ -65,38 +126,28 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
         return _resultado_error(errores, warnings)
 
     # ------------------------------------------------------
-    # DIMENSIONADO (MANUAL vs AUTOMÁTICO)
+    # DIMENSIONADO
     # ------------------------------------------------------
 
-    if entrada.n_paneles_total is not None:
-        # 🔹 MODO MANUAL
-        n_paneles = entrada.n_paneles_total
-        pdc_kw = (n_paneles * panel.pmax_w) / 1000
+    n_paneles, pdc_kw, err = _resolver_dimensionado(entrada, panel)
 
-    else:
-        # 🔹 MODO AUTOMÁTICO
-        dim = dimensionar_paneles(entrada)
-
-        if not dim.ok:
-            return _resultado_error(dim.errores, warnings)
-
-        n_paneles = dim.n_paneles
-        pdc_kw = dim.pdc_kw
+    if err:
+        return _resultado_error(err, warnings)
 
     # ------------------------------------------------------
-    # 🔥 VALIDACIÓN CRÍTICA DE INVERSORES
+    # INVERSORES (CRÍTICO)
     # ------------------------------------------------------
 
     if entrada.n_inversores is None:
         return _resultado_error(
-            errores=["n_inversores no definido desde core (sizing)"],
-            warnings=warnings
+            ["n_inversores no definido desde core (sizing)"],
+            warnings
         )
 
     n_inversores = int(entrada.n_inversores)
 
     # ------------------------------------------------------
-    # STRINGS
+    # STRINGS (motor)
     # ------------------------------------------------------
 
     strings_res = calcular_strings_fv(
@@ -111,55 +162,26 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
     if not strings_res.ok:
         return _resultado_error(strings_res.errores, warnings)
 
-    n_strings = strings_res.recomendacion.n_strings_total
-
     # ------------------------------------------------------
-    # 🔥 CORRECCIÓN CLAVE: DISTRIBUCIÓN REAL
+    # 🔥 DISTRIBUCIÓN REAL (FIX REAL)
     # ------------------------------------------------------
 
-    total_mppt = inversor.n_mppt * n_inversores
-
-    strings_por_mppt = max(1, n_strings // total_mppt)
+    strings_por_mppt = _strings_por_mppt_real(strings_res)
 
     # ------------------------------------------------------
-    # ARRAY (aún global, pero consistente)
+    # ENSAMBLE
     # ------------------------------------------------------
 
-    idc_nom = panel.imp_a * n_strings
-    isc_total = panel.isc_a * n_strings
-
-    array = ArrayFV(
-        potencia_dc_w=pdc_kw * 1000,
-        vdc_nom=strings_res.recomendacion.vmp_string_v,
-        idc_nom=idc_nom,
-        isc_total=isc_total,
-        voc_frio_array_v=strings_res.recomendacion.voc_string_v,
-        n_strings_total=n_strings,
-        n_paneles_total=n_paneles,
-        strings_por_mppt=strings_por_mppt,
-        n_mppt=inversor.n_mppt,
-        p_panel_w=panel.pmax_w,
+    array = _armar_array(
+        panel,
+        inversor,
+        strings_res,
+        n_paneles,
+        pdc_kw,
+        strings_por_mppt,
     )
 
-    # ------------------------------------------------------
-    # STRINGS
-    # ------------------------------------------------------
-
-    strings = [
-        StringFV(
-            mppt=s.mppt,
-            n_series=s.n_series,
-            vmp_string_v=s.vmp_string_v,
-            voc_frio_string_v=s.voc_frio_string_v,
-            imp_string_a=s.imp_string_a,
-            isc_string_a=s.isc_string_a,
-        )
-        for s in strings_res.strings
-    ]
-
-    # ------------------------------------------------------
-    # META
-    # ------------------------------------------------------
+    strings = _mapear_strings(strings_res)
 
     meta = PanelesMeta(
         n_paneles_total=n_paneles,
@@ -168,16 +190,16 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
     )
 
     # ------------------------------------------------------
-    # DEBUG (temporal)
+    # DEBUG (puedes eliminar luego)
     # ------------------------------------------------------
 
     print("DEBUG PANEL:")
     print("n_inversores:", n_inversores)
-    print("total_mppt:", total_mppt)
-    print("strings_por_mppt:", strings_por_mppt)
+    print("strings_totales:", strings_res.recomendacion.n_strings_total)
+    print("strings_por_mppt_real:", strings_por_mppt)
 
     # ------------------------------------------------------
-    # RESULTADO FINAL
+    # RESULTADO
     # ------------------------------------------------------
 
     return ResultadoPaneles(
@@ -186,7 +208,7 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
         array=array,
         recomendacion=RecomendacionStrings(
             n_series=strings_res.recomendacion.n_series,
-            n_strings_total=n_strings,
+            n_strings_total=strings_res.recomendacion.n_strings_total,
             strings_por_mppt=strings_por_mppt,
             vmp_string_v=strings_res.recomendacion.vmp_string_v,
             voc_frio_string_v=strings_res.recomendacion.voc_string_v,
