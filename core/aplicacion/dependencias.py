@@ -102,7 +102,10 @@ class PanelesAdapter:
 
 class ElectricalAdapter:
     def ejecutar(self, datos, paneles):
-        resultado = ejecutar_electrical(datos, paneles)
+        resultado = ejecutar_electrical(
+            paneles=paneles,
+            params_conductores=datos,
+        )
 
         if resultado is None:
             raise ValueError("Electrical devolvió None")
