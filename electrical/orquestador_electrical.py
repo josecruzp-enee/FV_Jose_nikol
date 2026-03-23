@@ -7,18 +7,27 @@ from electrical.conductores.corrientes import (
     CorrientesInput,
 )
 
-from electrical.conductores.calculo_conductores import dimensionar_tramos_fv as calcular_conductores
-from electrical.conductores.resultado_conductores import ResultadoConductores
+from electrical.conductores.calculo_conductores import (
+    dimensionar_tramos_fv as calcular_conductores,
+)
 
-from electrical.protecciones.protecciones import calcular_protecciones
-from electrical.protecciones.protecciones import EntradaProtecciones
+from electrical.protecciones.protecciones import (
+    calcular_protecciones,
+    EntradaProtecciones,
+)
 
 from electrical.resultado_electrical import ResultadoElectrico
 
 
+# ==========================================================
+# ORQUESTADOR ELECTRICAL
+# ==========================================================
+
 def ejecutar_electrical(*args, **kwargs) -> ResultadoElectrico:
 
-    # 🔥 NORMALIZADOR (mata el error de una vez)
+    # ======================================================
+    # NORMALIZADOR DE ENTRADA
+    # ======================================================
     if args:
         if len(args) == 2:
             datos, paneles = args
@@ -30,7 +39,10 @@ def ejecutar_electrical(*args, **kwargs) -> ResultadoElectrico:
 
     try:
 
-        if not paneles.ok:
+        # ==================================================
+        # VALIDACIÓN PANEL
+        # ==================================================
+        if not paneles or not paneles.ok:
             return ResultadoElectrico.build(
                 paneles=paneles,
                 corrientes=_corrientes_error("Paneles inválidos"),
@@ -38,12 +50,35 @@ def ejecutar_electrical(*args, **kwargs) -> ResultadoElectrico:
                 protecciones=_protecciones_error("Paneles inválidos"),
             )
 
+        # ==================================================
+        # 🔥 EXTRAER PARAMETROS ELECTRICOS
+        # ==================================================
+        inst = getattr(params_conductores, "instalacion_electrica", None) or {}
+
+        vac = inst.get("vac")
+        fases = inst.get("fases")
+        fp = inst.get("fp", 1.0)
+        distancia_dc = inst.get("distancia_dc")
+        distancia_ac = inst.get("distancia_ac")
+
+        # ==================================================
+        # VALIDACIÓN ELÉCTRICA
+        # ==================================================
+        if vac is None:
+            raise ValueError("Falta 'vac' en instalacion_electrica")
+
+        if fases is None:
+            raise ValueError("Falta 'fases' en instalacion_electrica")
+
+        # ==================================================
+        # CORRIENTES
+        # ==================================================
         corrientes_input = CorrientesInput(
             paneles=paneles,
             kw_ac=paneles.array.pdc_kw,
-            vac=params_conductores.vac,
-            fases=params_conductores.fases,
-            fp=1.0,
+            vac=vac,
+            fases=fases,
+            fp=fp,
         )
 
         corrientes = calcular_corrientes(corrientes_input)
@@ -56,6 +91,11 @@ def ejecutar_electrical(*args, **kwargs) -> ResultadoElectrico:
                 protecciones=_protecciones_error("Corrientes inválidas"),
             )
 
+        # ==================================================
+        # CONDUCTORES
+        # ==================================================
+        # ⚠️ IMPORTANTE: si tu módulo espera atributos planos,
+        # podés pasar params_conductores, pero ya sabés que viene con dict interno
         conductores = calcular_conductores(
             corrientes=corrientes,
             params=params_conductores,
@@ -69,6 +109,9 @@ def ejecutar_electrical(*args, **kwargs) -> ResultadoElectrico:
                 protecciones=_protecciones_error("Conductores inválidos"),
             )
 
+        # ==================================================
+        # PROTECCIONES
+        # ==================================================
         entrada_prot = EntradaProtecciones(
             conductores=conductores,
             corrientes=corrientes,
@@ -76,6 +119,9 @@ def ejecutar_electrical(*args, **kwargs) -> ResultadoElectrico:
 
         protecciones = calcular_protecciones(entrada_prot)
 
+        # ==================================================
+        # RESULTADO FINAL
+        # ==================================================
         return ResultadoElectrico.build(
             paneles=paneles,
             corrientes=corrientes,
@@ -94,7 +140,7 @@ def ejecutar_electrical(*args, **kwargs) -> ResultadoElectrico:
 
 
 # ==================================================
-# HELPERS DE ERROR (CONSISTENTES EN TODO EL SISTEMA)
+# HELPERS DE ERROR (CONSISTENTES)
 # ==================================================
 
 def _corrientes_error(msg: str):
