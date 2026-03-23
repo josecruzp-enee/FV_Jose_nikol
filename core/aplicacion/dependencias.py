@@ -113,8 +113,7 @@ class ElectricalAdapter:
         return resultado
 
 
-from energy.contrato import EnergiaInput
-from energy.orquestador_energia import ejecutar_energia
+
 
 from energy.clima.lector_pvgis import (
     descargar_clima_pvgis,
