@@ -113,18 +113,45 @@ class ElectricalAdapter:
         return resultado
 
 
+from energy.contrato import EnergiaInput
+from energy.orquestador_energia import ejecutar_energia
+
+from energy.clima.lector_pvgis import (
+    descargar_clima_pvgis,
+    EntradaClimaPVGIS,
+)
+
+
 class EnergiaAdapter:
     def ejecutar(self, datos, sizing, paneles):
 
         if paneles is None or not getattr(paneles, "ok", False):
             raise ValueError("Paneles inválido para energía")
 
+        # ==================================================
+        # 🔥 FIX REAL: construir clima desde PVGIS
+        # ==================================================
+        lat = getattr(datos, "latitud", None)
+        lon = getattr(datos, "longitud", None)
+
+        if lat is None or lon is None:
+            raise ValueError("DatosProyecto debe incluir latitud y longitud")
+
+        clima = descargar_clima_pvgis(
+            EntradaClimaPVGIS(
+                lat=lat,
+                lon=lon,
+            )
+        )
+
+        # ==================================================
+        # INPUT ENERGÍA
+        # ==================================================
         entrada = EnergiaInput(
             paneles=paneles,
             pac_nominal_kw=getattr(sizing, "kw_ac", 0),
 
-            # 🔥 puedes mejorar luego con clima real
-            clima=datos,
+            clima=clima,   # ✅ ESTE ES EL CAMBIO CLAVE
 
             tilt_deg=15,
             azimut_deg=180,
