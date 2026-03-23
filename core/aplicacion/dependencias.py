@@ -13,6 +13,7 @@ from core.aplicacion.puertos import (
     PuertoFinanzas,
 )
 
+
 # ==========================================================
 # DEPENDENCIAS
 # ==========================================================
@@ -24,6 +25,27 @@ class DependenciasEstudio:
     energia: PuertoEnergia
     nec: Optional[PuertoNEC] = None
     finanzas: Optional[PuertoFinanzas] = None
+
+
+# ==========================================================
+# FACTORY (🔥 ESTE ES EL QUE TE FALTA)
+# ==========================================================
+
+from adapters.sizing_adapter import SizingAdapter
+from adapters.paneles_adapter import PanelesAdapter
+from adapters.electrical_adapter import ElectricalAdapter
+from adapters.energia_adapter import EnergiaAdapter
+from adapters.finanzas_adapter import FinanzasAdapter
+
+
+def construir_dependencias() -> DependenciasEstudio:
+    return DependenciasEstudio(
+        sizing=SizingAdapter(),
+        paneles=PanelesAdapter(),
+        energia=EnergiaAdapter(),
+        nec=ElectricalAdapter(),   # orquestador electrical
+        finanzas=FinanzasAdapter(),
+    )
 
 
 # ==========================================================
@@ -76,14 +98,13 @@ def ejecutar_estudio(
             )
 
         # ------------------------------------------------------
-        # 3. ELECTRICAL (CAJA NEGRA)
+        # 3. ELECTRICAL
         # ------------------------------------------------------
 
         print("\n[3] CALCULOS ELECTRICOS")
 
-        resultado_electrico = None
-
         if deps.nec:
+
             resultado_electrico = deps.nec.ejecutar(
                 datos=datos,
                 paneles=resultado_paneles,
@@ -97,6 +118,9 @@ def ejecutar_estudio(
                     nec=resultado_electrico,
                     financiero=None,
                 )
+
+        else:
+            resultado_electrico = None
 
         # ------------------------------------------------------
         # 4. ENERGÍA
@@ -116,14 +140,11 @@ def ejecutar_estudio(
 
         print("\n[5] EJECUTANDO FINANZAS")
 
-        financiero = None
-
-        if deps.finanzas:
-            financiero = deps.finanzas.ejecutar(
-                datos,
-                sizing,
-                energia,
-            )
+        financiero = deps.finanzas.ejecutar(
+            datos,
+            sizing,
+            energia,
+        )
 
         # ------------------------------------------------------
         # RESULTADO FINAL
@@ -154,24 +175,3 @@ def ejecutar_estudio(
             nec=None,
             financiero=None,
         )
-
-
-# ==========================================================
-# FACTORY DE DEPENDENCIAS (🔥 ESTO TE FALTABA)
-# ==========================================================
-
-from adapters.sizing_adapter import SizingAdapter
-from adapters.paneles_adapter import PanelesAdapter
-from adapters.electrical_adapter import ElectricalAdapter
-from adapters.energia_adapter import EnergiaAdapter
-from adapters.finanzas_adapter import FinanzasAdapter
-
-
-def construir_dependencias() -> DependenciasEstudio:
-    return DependenciasEstudio(
-        sizing=SizingAdapter(),
-        paneles=PanelesAdapter(),
-        energia=EnergiaAdapter(),
-        nec=ElectricalAdapter(),     # orquestador electrical
-        finanzas=FinanzasAdapter(),
-    )
