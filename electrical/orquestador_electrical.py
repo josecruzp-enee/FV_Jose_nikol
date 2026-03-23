@@ -13,7 +13,7 @@ from electrical.conductores.resultado_conductores import ResultadoConductores
 from electrical.protecciones.protecciones import calcular_protecciones
 from electrical.protecciones.protecciones import EntradaProtecciones
 
-from electrical.resultado_electrico import ResultadoElectrico
+from electrical.resultado_electrical import ResultadoElectrico
 
 
 def ejecutar_electrical(
