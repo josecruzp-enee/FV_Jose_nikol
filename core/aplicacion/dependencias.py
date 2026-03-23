@@ -13,6 +13,13 @@ from core.aplicacion.puertos import (
     PuertoFinanzas,
 )
 
+# 🔥 IMPORTS REALES DE TU PROYECTO
+from core.servicios.sizing import calcular_sizing_unificado
+from electrical.paneles.orquestador_paneles import ejecutar_paneles
+from electrical.orquestador_electrical import ejecutar_electrical
+from energy.orquestador_energia import ejecutar_energia
+from core.finanzas.orquestador_finanzas import ejecutar_finanzas
+
 
 # ==========================================================
 # DEPENDENCIAS
@@ -28,28 +35,64 @@ class DependenciasEstudio:
 
 
 # ==========================================================
-# FACTORY (🔥 ESTE ES EL QUE TE FALTA)
+# ADAPTERS INLINE (🔥 SIN carpeta adapters)
 # ==========================================================
 
-from adapters.sizing_adapter import SizingAdapter
-from adapters.paneles_adapter import PanelesAdapter
-from adapters.electrical_adapter import ElectricalAdapter
-from adapters.energia_adapter import EnergiaAdapter
-from adapters.finanzas_adapter import FinanzasAdapter
+class SizingAdapter:
+    def ejecutar(self, datos):
+        return calcular_sizing_unificado(datos)
 
+
+class PanelesAdapter:
+    def ejecutar(self, datos, sizing):
+        return ejecutar_paneles(
+            datos=datos,
+            sizing=sizing,
+        )
+
+
+class ElectricalAdapter:
+    def ejecutar(self, datos, paneles):
+        return ejecutar_electrical(
+            datos=datos,
+            paneles=paneles,
+        )
+
+
+class EnergiaAdapter:
+    def ejecutar(self, datos, sizing, paneles):
+        return ejecutar_energia(
+            datos,
+            sizing,
+            paneles,
+        )
+
+
+class FinanzasAdapter:
+    def ejecutar(self, datos, sizing, energia):
+        return ejecutar_finanzas(
+            datos,
+            sizing,
+            energia,
+        )
+
+
+# ==========================================================
+# FACTORY (🔥 ESTE ERA EL FALTANTE)
+# ==========================================================
 
 def construir_dependencias() -> DependenciasEstudio:
     return DependenciasEstudio(
         sizing=SizingAdapter(),
         paneles=PanelesAdapter(),
         energia=EnergiaAdapter(),
-        nec=ElectricalAdapter(),   # orquestador electrical
+        nec=ElectricalAdapter(),
         finanzas=FinanzasAdapter(),
     )
 
 
 # ==========================================================
-# ORQUESTADOR LIMPIO
+# ORQUESTADOR
 # ==========================================================
 
 def ejecutar_estudio(
