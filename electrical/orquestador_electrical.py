@@ -113,7 +113,7 @@ def ejecutar_electrical(*args, **kwargs) -> ResultadoElectrico:
         # ==================================================
         entrada_prot = EntradaProtecciones(
             corrientes=corrientes,
-            paneles=paneles,
+            n_strings=paneles.array.n_strings_total,
         )
 
         protecciones = calcular_protecciones(entrada_prot)
