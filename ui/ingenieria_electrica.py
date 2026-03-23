@@ -93,8 +93,8 @@ def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
         ubicacion=str(dc.get("ubicacion", "")),
 
         # COORDENADAS
-        latitud=float(sf.get("latitud", 14.8)),
-        longitud=float(sf.get("longitud", -86.2)),
+        lat=float(sf.get("latitud", 14.8)),
+        lon=float(sf.get("longitud", -86.2)),
 
         # CONSUMO
         consumo_12m=[float(x) for x in consumo],
