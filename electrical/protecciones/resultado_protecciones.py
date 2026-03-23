@@ -66,3 +66,19 @@ class ResultadoProtecciones:
     ocpd_ac: OCPDResultado
     ocpd_dc_array: OCPDResultado
     fusible_string: FusibleStringResultado
+
+    # =====================================================
+    # FACTORY DE ERROR (NECESARIO PARA ORQUESTADOR)
+    # =====================================================
+    @staticmethod
+    def error(msg: str) -> "ResultadoProtecciones":
+        return ResultadoProtecciones(
+            ok=False,
+            errores=[msg],
+            warnings=[],
+            ocpd_ac=OCPDResultado(0.0, 0, ""),
+            ocpd_dc_array=OCPDResultado(0.0, 0, ""),
+            fusible_string=FusibleStringResultado(
+                False, None, None, None, "error"
+            )
+        )
