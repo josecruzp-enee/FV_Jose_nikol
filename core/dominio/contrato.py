@@ -36,7 +36,7 @@ class ResultadoSizing:
     pdc_kw: float
 
     kw_ac: float
-
+    dc_ac_ratio: float 
     n_inversores: int
     paneles_por_inversor: int
 
