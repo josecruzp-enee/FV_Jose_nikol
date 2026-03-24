@@ -82,76 +82,41 @@ PVGIS_URL = "https://re.jrc.ec.europa.eu/api/seriescalc"
 # ==========================================================
 import math
 from typing import Tuple
+import math
 
-def _mapear_radiacion(h: dict, zenith_deg: float) -> Tuple[float, float, float]:
+def _mapear_radiacion(h: dict) -> Tuple[float, float, float]:
     """
-    Mapeo PVGIS → (GHI, DNI, DHI) con reconstrucción física robusta.
-
-    Nivel: PRO (tipo PVsyst simplificado)
-
-    - Usa zenith real
-    - Reconstruye DNI correctamente
-    - Maneja casos límite (noche, horizonte)
+    Mapeo PVGIS robusto SIN dependencia solar (arquitectura correcta)
     """
 
-    # --------------------------------------------------
     # GHI
-    # --------------------------------------------------
     ghi = h.get("G(h)")
     if ghi is None:
         ghi = h.get("G(i)", 0.0)
 
-    # --------------------------------------------------
     # DHI
-    # --------------------------------------------------
     dhi = h.get("Gd(h)", 0.0)
 
-    # --------------------------------------------------
-    # DNI directo (si existe)
-    # --------------------------------------------------
+    # DNI directo
     dni = (
         h.get("Gb(n)") or
         h.get("Gb(i)") or
         h.get("G(b)")
     )
 
-    # --------------------------------------------------
-    # GEOMETRÍA SOLAR
-    # --------------------------------------------------
-    zenith_rad = math.radians(zenith_deg)
-    cos_zen = math.cos(zenith_rad)
-
-    # --------------------------------------------------
-    # RECONSTRUCCIÓN DNI (FÍSICA REAL)
-    # --------------------------------------------------
+    # RECONSTRUCCIÓN SIMPLE (sin zenith)
     if dni is None:
-
-        if ghi > 0 and dhi >= 0 and cos_zen > 0.065:
-            # 0.065 ≈ zenith < 86° (evita explosiones cerca del horizonte)
-            dni = (ghi - dhi) / cos_zen
-            dni = max(dni, 0.0)
+        if ghi > 0 and dhi >= 0:
+            dni = max(ghi - dhi, 0.0)
         else:
             dni = 0.0
 
-    # --------------------------------------------------
-    # LIMPIEZA FÍSICA
-    # --------------------------------------------------
-
-    # Noche → todo cero
-    if zenith_deg >= 90:
-        return 0.0, 0.0, 0.0
-
-    # Evitar valores absurdos
-    dni = min(dni, 1400)   # límite físico razonable
+    # limpieza
     ghi = max(ghi, 0.0)
-    dhi = max(dhi, 0.0)
-
-    # Corrección consistencia básica
-    if dhi > ghi:
-        dhi = ghi
+    dhi = min(max(dhi, 0.0), ghi)
+    dni = max(dni, 0.0)
 
     return float(ghi), float(dni), float(dhi)
-
 
 # ==========================================================
 # FUNCIÓN PRINCIPAL
@@ -239,7 +204,7 @@ def descargar_clima_pvgis(
         except Exception:
             raise RuntimeError(f"Timestamp inválido: {h.get('time')}")
 
-        ghi, dni, dhi = _mapear_radiacion(h, solar.zenith_deg)
+        ghi, dni, dhi = _mapear_radiacion(h)
 
         if ghi < 0 or dni < 0 or dhi < 0:
             raise RuntimeError("Irradiancia negativa detectada")
