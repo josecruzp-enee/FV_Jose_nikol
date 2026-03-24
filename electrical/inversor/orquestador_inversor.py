@@ -1,8 +1,9 @@
 from typing import Dict, Any, Optional
 from itertools import product
-
-# Asumimos que ya existen:
-# get_inversor, ids_inversores, calcular_cantidad_inversores
+from electrical.catalogos.catalogos_yaml import (
+    get_inversor,
+    ids_inversores,
+)
 
 
 # ======================================================
