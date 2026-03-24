@@ -120,52 +120,59 @@ class ElectricalAdapter:
         return resultado
 
 class EnergiaAdapter:
+
     def ejecutar(self, datos, sizing, paneles):
 
         from energy.orquestador_energia import ejecutar_motor_energia
 
         # ==================================================
-        # VALIDACIÓN PANEL
+        # VALIDACIONES
         # ==================================================
         if paneles is None or not getattr(paneles, "ok", False):
             raise ValueError("Paneles inválido para energía")
 
-        # ==================================================
-        # VALIDACIÓN KW_AC (CRÍTICO)
-        # ==================================================
         kw_ac = getattr(sizing, "kw_ac", None)
-
         if not kw_ac or kw_ac <= 0:
             raise ValueError("kw_ac inválido para energía")
 
-        # ==================================================
-        # VALIDACIÓN LAT/LON
-        # ==================================================
         lat = getattr(datos, "lat", None)
         lon = getattr(datos, "lon", None)
 
         if lat is None or lon is None:
-            raise ValueError("Faltan lat/lon para cálculo de energía")
+            raise ValueError("Faltan lat/lon")
 
         # ==================================================
         # CLIMA
         # ==================================================
         clima = descargar_clima_pvgis(
-            EntradaClimaPVGIS(
-                lat=lat,
-                lon=lon,
-            )
+            EntradaClimaPVGIS(lat=lat, lon=lon)
         )
 
         if clima is None:
             raise ValueError("Clima no disponible")
 
         # ==================================================
+        # 🔥 TRADUCCIÓN (CLAVE)
+        # ==================================================
+
+        n_series = paneles.recomendacion.n_series
+        n_strings = paneles.array.n_strings_total
+        pdc_kw = paneles.array.potencia_dc_w / 1000
+
+        # 🔥 PANEL SPEC (DEBES OBTENERLO DE TU CATÁLOGO)
+        panel_spec = sizing.inversor  # ⚠️ ajusta según tu modelo real
+
+        # ==================================================
         # INPUT ENERGÍA
         # ==================================================
         entrada = EnergiaInput(
-            paneles=paneles,
+            n_series=n_series,
+            n_strings=n_strings,
+            pdc_kw=pdc_kw,
+
+            panel=panel_spec,
             pac_nominal_kw=kw_ac,
+
             clima=clima,
 
             tilt_deg=15,
@@ -177,19 +184,13 @@ class EnergiaAdapter:
             perdidas_ac_pct=0.02,
         )
 
-        print("DEBUG ENERGIA INPUT:", entrada)
-
         resultado = ejecutar_motor_energia(entrada)
 
-        print("DEBUG ENERGIA OUTPUT:", resultado)
-
-        if resultado is None:
-            raise ValueError("Energía devolvió None")
-
-        if not resultado.ok:
+        if not resultado or not resultado.ok:
             raise ValueError(f"Energía inválida: {resultado.errores}")
 
         return resultado
+
 
 class FinanzasAdapter:
     def ejecutar(self, datos, sizing, energia):
