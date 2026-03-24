@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, List, Any
+from typing import List
 
 import math
 import matplotlib
@@ -9,10 +9,8 @@ matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
 
-from energy.irradiancia import (
-    hsp_12m_base,
-    DIAS_MES
-)
+# ✅ fallback seguro (elimina dependencia rota)
+DIAS_MES = [31,28,31,30,31,30,31,31,30,31,30,31]
 
 from reportes.generar_string_fv import generar_string_fv
 
@@ -35,19 +33,23 @@ def _mkdir_charts(out_dir: str | None) -> Path:
 
 def _leer_pdc_kw(res):
 
-    sizing = (res or {}).get("sizing") or {}
+    sizing = res.get("sizing") if isinstance(res, dict) else getattr(res, "sizing", None)
+
+    if not sizing:
+        return 0.0
 
     kwp = getattr(sizing, "kwp_dc", None)
     if kwp:
         return float(kwp)
 
-    kwp = sizing.get("kwp_recomendado")
-    if kwp:
-        return float(kwp)
+    if isinstance(sizing, dict):
+        kwp = sizing.get("kwp_recomendado")
+        if kwp:
+            return float(kwp)
 
-    pdc_w = sizing.get("potencia_dc_w")
-    if pdc_w:
-        return float(pdc_w) / 1000.0
+        pdc_w = sizing.get("potencia_dc_w")
+        if pdc_w:
+            return float(pdc_w) / 1000.0
 
     return 0.0
 
@@ -59,7 +61,6 @@ def _leer_pdc_kw(res):
 def _chart_mensual(meses: List[str], energia: List[float], path: Path):
 
     plt.figure()
-
     plt.bar(meses, energia)
 
     plt.title("Generación FV mensual")
@@ -79,7 +80,6 @@ def _chart_mensual(meses: List[str], energia: List[float], path: Path):
 def _chart_diaria(meses: List[str], energia: List[float], path: Path):
 
     plt.figure()
-
     plt.bar(meses, energia)
 
     plt.title("Energía diaria promedio")
@@ -115,7 +115,6 @@ def _chart_potencia_horaria(pdc_kw: float, path: Path):
         potencia.append(p)
 
     plt.figure()
-
     plt.plot(horas, potencia, marker="o")
 
     plt.title("Perfil horario de potencia FV")
@@ -152,7 +151,6 @@ def _chart_energia_horaria(pdc_kw: float, path: Path):
         energia.append(e)
 
     plt.figure()
-
     plt.bar(horas, energia)
 
     plt.title("Energía generada por hora")
@@ -173,7 +171,6 @@ def _chart_energia_horaria(pdc_kw: float, path: Path):
 def _chart_anual(energia_anual: float, path: Path):
 
     plt.figure()
-
     plt.bar(["Anual"], [energia_anual])
 
     plt.title("Generación FV anual")
@@ -196,15 +193,44 @@ def generar_charts(
 
     base = _mkdir_charts(out_dir)
 
-    energia = getattr(res, "energia", None)
+    # ==========================================================
+    # 🔥 AUTO-EJECUTAR MOTOR ENERGÉTICO SI NO EXISTE
+    # ==========================================================
+
+    energia = None
+
+    if isinstance(res, dict):
+        energia = res.get("energia")
+    else:
+        energia = getattr(res, "energia", None)
+
+    if not energia:
+        try:
+            from energy.orquestador_energia import ejecutar_modelo_energetico
+
+            if isinstance(res, dict):
+                energia_calc = ejecutar_modelo_energetico(res)
+                res["energia"] = energia_calc
+                energia = energia_calc
+            else:
+                energia_calc = ejecutar_modelo_energetico(res)
+                setattr(res, "energia", energia_calc)
+                energia = energia_calc
+
+            print("✅ Motor energético ejecutado correctamente")
+
+        except Exception as e:
+            print("⚠️ No se pudo ejecutar motor energético:", e)
+            energia = None
+
+    # ==========================================================
+    # Procesamiento energía
+    # ==========================================================
 
     if energia:
-
         energia_mensual = list(getattr(energia, "energia_util_12m", []))
-
     else:
-
-        energia_mensual = [0]*12
+        energia_mensual = [0] * 12
 
     meses = [
         "Ene","Feb","Mar","Abr","May","Jun",
@@ -215,45 +241,46 @@ def generar_charts(
 
     paths = {}
 
+    # mensual
     p1 = base / "fv_energia_mensual.png"
     _chart_mensual(meses, energia_mensual, p1)
     paths["chart_energia_mensual"] = str(p1)
 
-    # energía diaria promedio
+    # diaria
     energia_diaria = [
-        e/d for e,d in zip(energia_mensual, DIAS_MES)
+        e/d if d else 0 for e,d in zip(energia_mensual, DIAS_MES)
     ]
 
     p2 = base / "fv_energia_diaria.png"
     _chart_diaria(meses, energia_diaria, p2)
     paths["chart_energia_diaria"] = str(p2)
 
+    # potencia
     pdc_kw = _leer_pdc_kw(res)
 
     p3 = base / "fv_potencia_horaria.png"
     _chart_potencia_horaria(pdc_kw, p3)
     paths["chart_potencia_horaria"] = str(p3)
 
+    # energía horaria
     p4 = base / "fv_energia_horaria.png"
     _chart_energia_horaria(pdc_kw, p4)
     paths["chart_energia_horaria"] = str(p4)
 
+    # anual
     p5 = base / "fv_energia_anual.png"
     _chart_anual(energia_anual, p5)
     paths["chart_anual"] = str(p5)
 
     # strings
     try:
-
-        strings_block = getattr(res, "strings", None)
-        strings = getattr(strings_block, "strings", [])
+        strings_block = res.get("strings") if isinstance(res, dict) else getattr(res, "strings", None)
+        strings = getattr(strings_block, "strings", []) if strings_block else []
 
         if strings:
-
             n_series = getattr(strings[0], "n_series", None)
 
             if n_series:
-
                 p6 = base / "string_fv.png"
 
                 generar_string_fv(
@@ -265,7 +292,6 @@ def generar_charts(
                 paths["string_fv"] = str(p6)
 
     except Exception as e:
-
         print("Error generando diagrama string FV:", e)
 
     return paths
