@@ -96,13 +96,13 @@ def build_page_3(
     story.append(Spacer(1, 10))
 
     # =====================================================
-    # LECTURA CONTRATO
+    # LECTURA SEGURA
     # =====================================================
 
-    financiero = leer(resultado, "financiero", {})
+    financiero = leer(resultado, "financiero", {}) or {}
 
-    capex = float(financiero.get("capex_L", 0.0))
-    cuota = float(financiero.get("cuota_mensual", 0.0))
+    capex = float(leer(financiero, "capex_L", 0.0))
+    cuota = float(leer(financiero, "cuota_mensual", 0.0))
 
     pct_fin = float(get_field(datos, "porcentaje_financiado", 1.0))
     pct_fin = max(0.0, min(1.0, pct_fin))
@@ -116,7 +116,7 @@ def build_page_3(
     # TABLA DEL MOTOR
     # =====================================================
 
-    anual = financiero.get("tabla_amortizacion")
+    anual = leer(financiero, "tabla_amortizacion", [])
 
     if not anual:
         anual = amortizacion_anual(
