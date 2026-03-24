@@ -170,7 +170,6 @@ def _calcular_ac(inv, inp):
 # ==========================================================
 # ORQUESTADOR PRINCIPAL
 # ==========================================================
-
 def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
 
     errores = inp.validar()
@@ -220,30 +219,47 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
         # ==================================================
         # VALIDACIÓN
         # ==================================================
-        if len(ac_final_kw) != 8760:
-            raise ValueError("Serie horaria inválida (no tiene 8760 horas)")
+        if len(ac_final_kw) not in (8760, 8784):
+            raise ValueError("Serie horaria inválida")
 
         # ==================================================
         # AGREGACIÓN
         # ==================================================
         energia_bruta_12m = agregar_energia_por_mes(dc_bruta_kw)
         energia_despues_perdidas_12m = agregar_energia_por_mes(ac_sin_clipping_kw)
-        energia_util_12m = agregar_energia_por_mes(ac_final_kw)
+        energia_util_12m_raw = agregar_energia_por_mes(ac_final_kw)
 
         energia_clipping_12m = [
-            d - u for d, u in zip(energia_despues_perdidas_12m, energia_util_12m)
+            d - u for d, u in zip(energia_despues_perdidas_12m, energia_util_12m_raw)
         ]
 
         energia_perdidas_12m = [
             b - d for b, d in zip(energia_bruta_12m, energia_despues_perdidas_12m)
         ]
 
+        # ==================================================
+        # ANUAL
+        # ==================================================
         energia_bruta_anual = sum(dc_bruta_kw)
         energia_despues_perdidas_anual = sum(ac_sin_clipping_kw)
         energia_util_anual = sum(ac_final_kw)
 
         energia_clipping_anual = energia_despues_perdidas_anual - energia_util_anual
         energia_perdidas_anual = energia_bruta_anual - energia_despues_perdidas_anual
+
+        # ==================================================
+        # VALIDACIÓN CONSISTENCIA
+        # ==================================================
+        if abs(sum(energia_util_12m_raw) - energia_util_anual) > 1e-3:
+            raise ValueError("Inconsistencia entre energía mensual y anual")
+
+        # ==================================================
+        # 🔥 ESTRUCTURA MEJORADA (SIN ROMPER NADA)
+        # ==================================================
+        energia_util_12m = [
+            {"mes": i + 1, "energia_kwh": e}
+            for i, e in enumerate(energia_util_12m_raw)
+        ]
 
         performance_ratio = (
             energia_util_anual / (poa_total_kwh * inp.pdc_kw)
@@ -256,21 +272,29 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
             pdc_instalada_kw=inp.pdc_kw,
             pac_nominal_kw=inp.pac_nominal_kw,
             dc_ac_ratio=inp.pdc_kw / inp.pac_nominal_kw,
+
             energia_bruta_12m=energia_bruta_12m,
             energia_perdidas_12m=energia_perdidas_12m,
             energia_despues_perdidas_12m=energia_despues_perdidas_12m,
             energia_clipping_12m=energia_clipping_12m,
+
+            # 🔥 AQUÍ ESTÁ EL CAMBIO
             energia_util_12m=energia_util_12m,
+
             energia_bruta_anual=energia_bruta_anual,
             energia_perdidas_anual=energia_perdidas_anual,
             energia_despues_perdidas_anual=energia_despues_perdidas_anual,
             energia_clipping_anual=energia_clipping_anual,
             energia_util_anual=energia_util_anual,
+
             energia_horaria_kwh=ac_final_kw,
+
             produccion_especifica_kwh_kwp=(
                 energia_util_anual / inp.pdc_kw if inp.pdc_kw > 0 else 0.0
             ),
+
             performance_ratio=performance_ratio,
+
             meta={
                 "modelo": "8760_fisico",
                 "pipeline": "clima→solar→dc→ac",
@@ -279,3 +303,4 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
 
     except Exception as e:
         return _resultado_error(inp, [str(e)])
+
