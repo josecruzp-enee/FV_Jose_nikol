@@ -44,18 +44,40 @@ def _as_float(x: Any, default: float = 0.0) -> float:
     except Exception:
         return float(default)
 
-
-def _inferir_n_paneles(res: Dict[str, Any]) -> int:
+def _inferir_n_paneles(res: Any) -> int:
     """
     Inferencia tolerante para layout (NO ingeniería).
-    Orden:
-      1) sizing.n_paneles
-      2) sizing.n_paneles_string (si alguien lo usa así)
-      3) res.n_paneles
-      4) heuristic: kwp_dc y panel_wp si están
+    Soporta:
+      • dict
+      • objeto (ResultadoProyecto)
     """
-    sizing = (res or {}).get("sizing") or {}
+
+    # =========================
+    # Obtener sizing (dict u objeto)
+    # =========================
+    if isinstance(res, dict):
+        sizing = res.get("sizing") or {}
+    else:
+        sizing = getattr(res, "sizing", None)
+
+    # =========================
+    # CASO OBJETO (nuevo sistema)
+    # =========================
+    if sizing and not isinstance(sizing, dict):
+
+        n = _as_int(getattr(sizing, "n_paneles", 0))
+        if n > 0:
+            return n
+
+        n = _as_int(getattr(sizing, "n_paneles_string", 0))
+        if n > 0:
+            return n
+
+    # =========================
+    # CASO DICT (compatibilidad)
+    # =========================
     if isinstance(sizing, dict):
+
         n = _as_int(sizing.get("n_paneles"), 0)
         if n > 0:
             return n
@@ -64,27 +86,47 @@ def _inferir_n_paneles(res: Dict[str, Any]) -> int:
         if n > 0:
             return n
 
-    n = _as_int((res or {}).get("n_paneles"), 0)
+    # =========================
+    # fallback: res.n_paneles
+    # =========================
+    if isinstance(res, dict):
+        n = _as_int(res.get("n_paneles"), 0)
+    else:
+        n = _as_int(getattr(res, "n_paneles", 0))
+
     if n > 0:
         return n
 
-    # Heurística SOLO para layout: n_paneles ≈ kwp_dc*1000/panel_wp
-    kwp = None
+    # =========================
+    # heurística
+    # =========================
     if isinstance(sizing, dict):
         kwp = sizing.get("kwp_dc") or sizing.get("kwp_recomendado")
+    else:
+        kwp = getattr(sizing, "kwp_dc", None) or getattr(sizing, "kwp_recomendado", None)
+
     if kwp is None:
-        kwp = (res or {}).get("kwp_dc")
+        if isinstance(res, dict):
+            kwp = res.get("kwp_dc")
+        else:
+            kwp = getattr(res, "kwp_dc", None)
 
     kwp = _as_float(kwp, 0.0)
     if kwp <= 0:
         return 0
 
-    # panel_wp: si existe en sizing/equipos, úsalo; si no, usa 550 como default visual
-    panel_wp = None
+    # panel_wp
     if isinstance(sizing, dict):
         panel_wp = sizing.get("panel_wp")
+    else:
+        panel_wp = getattr(sizing, "panel_wp", None)
+
     if panel_wp is None:
-        panel_wp = (res or {}).get("panel_wp")
+        if isinstance(res, dict):
+            panel_wp = res.get("panel_wp")
+        else:
+            panel_wp = getattr(res, "panel_wp", None)
+
     panel_wp = _as_float(panel_wp, 550.0)
     if panel_wp <= 0:
         panel_wp = 550.0
