@@ -188,7 +188,7 @@ class EnergiaAdapter:
             perdidas_ac_pct=getattr(datos, "perdidas_ac_pct", 0.02),
         )
 
-        resultado = ejecutar_motor_energia(entrada)
+        resultado = ejecutar_energia(entrada)
 
         if not resultado or not resultado.ok:
             raise ValueError(f"Energía inválida: {resultado.errores}")
