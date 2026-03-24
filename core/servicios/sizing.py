@@ -98,7 +98,6 @@ def _leer_consumo_y_cobertura(p: Datosproyecto):
 
     return consumo_anual, cobertura_obj
 
-
 def _leer_modo_dimensionado(p: Datosproyecto):
 
     sf = getattr(p, "sistema_fv", {}) or {}
@@ -108,6 +107,8 @@ def _leer_modo_dimensionado(p: Datosproyecto):
     ).strip().lower()
 
     n_paneles_manual = None
+    area_m2 = None
+    factor_ocupacion = None
 
     if modo_dimensionado == "manual":
 
@@ -120,25 +121,62 @@ def _leer_modo_dimensionado(p: Datosproyecto):
         except Exception:
             raise ValueError("n_paneles_manual inválido en modo manual")
 
-    return modo_dimensionado, n_paneles_manual
+    elif modo_dimensionado == "area":
 
+        try:
+            area_m2 = float(sf.get("area_disponible_m2"))
+            factor_ocupacion = float(sf.get("factor_ocupacion", 0.75))
+        except Exception:
+            raise ValueError("Datos de área inválidos")
+
+    return modo_dimensionado, n_paneles_manual, area_m2, factor_ocupacion
 
 # ==========================================================
 # Generador FV
 # ==========================================================
-
-def _dimensionar_generador(panel, modo_dimensionado, n_paneles_manual, consumo_anual, cobertura_obj):
+def _dimensionar_generador(
+    panel,
+    modo_dimensionado,
+    n_paneles_manual,
+    consumo_anual,
+    cobertura_obj,
+    area_m2=None,
+    factor_ocupacion=None
+):
 
     energia_por_kwp_anual = 1500.0
 
-    kwp_objetivo = (consumo_anual * cobertura_obj) / energia_por_kwp_anual
+    # =============================
+    # MODO CONSUMO
+    # =============================
+    if modo_dimensionado == "consumo":
+
+        kwp_objetivo = (consumo_anual * cobertura_obj) / energia_por_kwp_anual
+
+    # =============================
+    # MODO ÁREA
+    # =============================
+    elif modo_dimensionado == "area":
+
+        if area_m2 is None:
+            raise ValueError("Área no definida para modo area")
+
+        area_util = area_m2 * (factor_ocupacion or 0.75)
+
+        kwp_objetivo = area_util / 5  # regla m² → kWp
+
+    # =============================
+    # MODO MANUAL
+    # =============================
+    else:
+        kwp_objetivo = None
 
     from electrical.paneles.entrada_panel import EntradaPaneles
 
     entrada_panel = EntradaPaneles(
         panel=panel,
         inversor=None,
-        pdc_kw_objetivo=kwp_objetivo if modo_dimensionado == "auto" else None,
+        pdc_kw_objetivo=kwp_objetivo,
         t_min_c=10,
         t_oper_c=50,
         n_paneles_total=n_paneles_manual if modo_dimensionado == "manual" else None,
@@ -153,11 +191,7 @@ def _dimensionar_generador(panel, modo_dimensionado, n_paneles_manual, consumo_a
     n_pan = int(panel_sizing.n_paneles)
     pdc = float(panel_sizing.pdc_kw)
 
-    if n_pan <= 0 or pdc <= 0:
-        raise ValueError("Sizing resultó en sistema inválido")
-
     return kwp_req, n_pan, pdc
-
 
 # ==========================================================
 # INVERSOR (FIX)
@@ -210,14 +244,16 @@ def calcular_sizing_unificado(
 
     consumo_anual, cobertura_obj = _leer_consumo_y_cobertura(p)
 
-    modo_dimensionado, n_paneles_manual = _leer_modo_dimensionado(p)
+    modo_dimensionado, n_paneles_manual, area_m2, factor_ocupacion = _leer_modo_dimensionado(p)
 
     kwp_req, n_pan, pdc = _dimensionar_generador(
         panel,
         modo_dimensionado,
         n_paneles_manual,
         consumo_anual,
-        cobertura_obj
+        cobertura_obj,
+        area_m2,
+        factor_ocupacion
     )
 
     # 🔥 FIX: ahora trae inversor
