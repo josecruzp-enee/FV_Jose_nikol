@@ -30,21 +30,20 @@ def _leer_dict(obj, campo, default=None):
 # ==========================================================
 def crear_tabla_parametros_electricos(resultado, pal, content_w):
 
-    corr = _leer(resultado, "corrientes", None)
+    corr = getattr(resultado, "corrientes", None)
 
-    if not corr:
-        return None
+    # 🔥 SOLO valida existencia
+    if corr is None:
+        return Table([["SIN DATOS ELÉCTRICOS"]])
 
     def leer(nivel):
-
         d = getattr(corr, nivel, None)
-
         if not d:
-            return (0, 0)
+            return ("—", "—")
 
         return (
-            float(getattr(d, "i_operacion_a", 0)),
-            float(getattr(d, "i_diseno_a", 0)),
+            getattr(d, "i_operacion_a", "—"),
+            getattr(d, "i_diseno_a", "—"),
         )
 
     panel_nom, panel_dis = leer("panel")
@@ -54,52 +53,29 @@ def crear_tabla_parametros_electricos(resultado, pal, content_w):
     ac_nom, ac_dis = leer("ac")
 
     rows = [
-
         ["Nivel", "Corriente nominal", "Corriente diseño"],
-
-        ["Panel", f"{panel_nom:.2f} A", f"{panel_dis:.2f} A"],
-        ["String", f"{string_nom:.2f} A", f"{string_dis:.2f} A"],
-        ["MPPT", f"{mppt_nom:.2f} A", f"{mppt_dis:.2f} A"],
-        ["Entrada inversor DC", f"{dc_nom:.2f} A", f"{dc_dis:.2f} A"],
-        ["Salida inversor AC", f"{ac_nom:.2f} A", f"{ac_dis:.2f} A"],
+        ["Panel", f"{panel_nom}", f"{panel_dis}"],
+        ["String", f"{string_nom}", f"{string_dis}"],
+        ["MPPT", f"{mppt_nom}", f"{mppt_dis}"],
+        ["Entrada inversor DC", f"{dc_nom}", f"{dc_dis}"],
+        ["Salida inversor AC", f"{ac_nom}", f"{ac_dis}"],
     ]
 
-    colw = [
-        content_w * 0.40,
-        content_w * 0.30,
-        content_w * 0.30,
-    ]
-
-    tbl = Table(rows, colWidths=colw)
-
-    tbl.setStyle(TableStyle([
-        ("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),
-        ("BACKGROUND",(0,0),(-1,0),pal["SOFT"]),
-        ("TEXTCOLOR",(0,0),(-1,0),pal["PRIMARY"]),
-        ("ALIGN",(1,1),(2,-1),"RIGHT"),
-        ("GRID",(0,0),(-1,-1),0.3,pal["BORDER"]),
-        ("FONTSIZE",(0,0),(-1,-1),10),
-    ]))
-
-    return tbl
-
+    return Table(rows)
 
 # ==========================================================
 # TABLA 2 — DIMENSIONAMIENTO ELÉCTRICO (FIX)
 # ==========================================================
 def crear_tabla_dimensionamiento_nec(resultado, pal, content_w):
 
-    corr = _leer(resultado, "corrientes", None)
-    prot = _leer(resultado, "protecciones", None)
-    conductores = _leer(resultado, "conductores", None)
+    corr = getattr(resultado, "corrientes", None)
+    prot = getattr(resultado, "protecciones", None)
+    conductores = getattr(resultado, "conductores", None)
 
-    # 🔥 SOLO valida existencia
-    if not corr:
-        return Table([["ERROR", "No hay corrientes"]])
+    if corr is None:
+        return Table([["SIN DATOS ELÉCTRICOS"]])
 
-    # -------------------------------
-    # CONDUCTORES (SIN BLOQUEO)
-    # -------------------------------
+    # conductores (sin bloquear)
     cond = getattr(conductores, "tramos", []) if conductores else []
 
     cond_dc = "—"
@@ -107,71 +83,48 @@ def crear_tabla_dimensionamiento_nec(resultado, pal, content_w):
 
     for c in cond:
         nombre = getattr(c, "nombre", "")
-
         if "DC" in nombre:
-            cond_dc = f'{getattr(c,"calibre","—")} {getattr(c,"material","")}'.strip()
-
+            cond_dc = f'{getattr(c,"calibre","—")} {getattr(c,"material","")}'
         if "AC" in nombre:
-            cond_ac = f'{getattr(c,"calibre","—")} {getattr(c,"material","")}'.strip()
+            cond_ac = f'{getattr(c,"calibre","—")} {getattr(c,"material","")}'
 
-    # -------------------------------
-    # PROTECCIONES (SIN BLOQUEO)
-    # -------------------------------
     breaker_ac = getattr(prot, "ocpd_ac", None) if prot else None
     fusible_str = getattr(prot, "fusible_string", None) if prot else None
 
     rows = [
-        ["Circuito", "Corriente operación", "Corriente diseño NEC", "Protección", "Conductor"],
+        ["Circuito", "I operación", "I diseño", "Protección", "Conductor"],
     ]
 
-    orden = [
+    niveles = [
         ("panel", "Panel", None, None),
         ("string", "String", fusible_str, cond_dc),
         ("mppt", "MPPT", None, cond_dc),
-        ("dc_total", "Entrada inversor DC", None, cond_dc),
-        ("ac", "Salida inversor AC", breaker_ac, cond_ac),
+        ("dc_total", "DC Inversor", None, cond_dc),
+        ("ac", "AC Inversor", breaker_ac, cond_ac),
     ]
 
-    for key, nombre, p, c in orden:
-
+    for key, nombre, p, c in niveles:
         d = getattr(corr, key, None)
 
         if not d:
+            rows.append([nombre, "—", "—", "—", "—"])
             continue
 
-        i_op = float(getattr(d, "i_operacion_a", 0))
-        i_dis = float(getattr(d, "i_diseno_a", 0))
+        i_op = getattr(d, "i_operacion_a", "—")
+        i_dis = getattr(d, "i_diseno_a", "—")
 
-        proteccion = f'{getattr(p,"tamano_a","—")} A' if p else "—"
-        conductor = c if c else "—"
+        prot_txt = f'{getattr(p,"tamano_a","—")} A' if p else "—"
+        cond_txt = c if c else "—"
 
         rows.append([
             nombre,
-            f"{i_op:.2f} A",
-            f"{i_dis:.2f} A",
-            proteccion,
-            conductor
+            f"{i_op}",
+            f"{i_dis}",
+            prot_txt,
+            cond_txt
         ])
 
-    # 🔥 SI SOLO HAY HEADER → FORZAR VISUAL
-    if len(rows) == 1:
-        rows.append(["SIN DATOS", "-", "-", "-", "-"])
-
-    colw = [
-        content_w * 0.30,
-        content_w * 0.18,
-        content_w * 0.20,
-        content_w * 0.16,
-        content_w * 0.16,
-    ]
-
-    tbl = Table(rows, colWidths=colw)
-
-    tbl.setStyle(TableStyle([
-        ("GRID",(0,0),(-1,-1),0.3,pal["BORDER"]),
-    ]))
-
-    return tbl
+    return Table(rows)
 
 # ==========================================================
 # TABLA 3 — INDICADORES TÉCNICOS
