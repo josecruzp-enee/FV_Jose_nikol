@@ -36,30 +36,49 @@ def _ensure_pdf_path(paths: Dict[str, Any]) -> str:
     p.parent.mkdir(parents=True, exist_ok=True)
     return str(p)
 
+def generar_pdf_profesional(resultado_proyecto: Any, datos: Any, paths: Dict[str, Any]):
+    """
+    Soporta:
+      • objeto ResultadoProyecto
+      • dict legacy
+    """
 
-def generar_pdf_profesional(resultado_proyecto: dict, datos: Any, paths: Dict[str, Any]):
-    """
-    `resultado_proyecto` = objeto único del orquestador (ResultadoProyecto) o dict legacy.
-    `datos` = Datosproyecto (o equivalente) para datos del cliente/inputs.
-    `paths` = dict de rutas (pdf_path, charts_dir, layout_paneles, etc.)
-    """
     pal = pdf_palette()
     styles = pdf_styles()
 
+    # =========================
+    # DEBUG SEGURO
+    # =========================
     print("\n========== DEBUG PDF ==========")
-    print(resultado_proyecto.get("nec"))
+
+    if isinstance(resultado_proyecto, dict):
+        print(resultado_proyecto.get("nec"))
+    else:
+        print(getattr(resultado_proyecto, "nec", None))
+
     print("================================\n")
-    
+
     pdf_path = _ensure_pdf_path(paths)
 
     doc = SimpleDocTemplate(str(pdf_path), pagesize=letter)
 
     story = []
-    content_w = doc.width  # ✅ se pasa a páginas (no deberían recalcularlo)
+    content_w = doc.width
 
-    # ✅ Compat: páginas actuales pueden seguir esperando dict plano
-    resultado = resultado_proyecto
+    # =========================
+    # 🔥 OPCIÓN PRO (recomendada)
+    # Convertir a dict SOLO para páginas
+    # =========================
+    from dataclasses import asdict, is_dataclass
 
+    if not isinstance(resultado_proyecto, dict) and is_dataclass(resultado_proyecto):
+        resultado = asdict(resultado_proyecto)
+    else:
+        resultado = resultado_proyecto
+
+    # =========================
+    # BUILD PAGES
+    # =========================
     story += build_page_1(resultado, datos, paths, pal, styles, content_w)
     story += build_page_2(resultado, datos, paths, pal, styles, content_w)
     story += build_page_3(resultado, datos, paths, pal, styles, content_w)
