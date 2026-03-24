@@ -6,7 +6,6 @@ CONTRATO MAESTRO DE RESULTADOS — FV Engine
 
 from dataclasses import dataclass, field
 from typing import List, Dict, Any
-
 from energy.resultado_energia import EnergiaResultado
 from electrical.modelos.inversor import InversorSpec  # 🔥 FIX
 
@@ -27,9 +26,12 @@ class MesEnergia:
 # RESULTADO DEL SIZING
 # =========================================================
 
+
+
 @dataclass(frozen=True)
 class ResultadoSizing:
 
+    # 🔵 SIN DEFAULT
     n_paneles: int
 
     kwp_dc: float
@@ -37,13 +39,18 @@ class ResultadoSizing:
 
     kw_ac: float
     kw_ac_total: float
-    dc_ac_ratio: float 
+
+    dc_ac_ratio: float
+
     n_inversores: int
     paneles_por_inversor: int
-    sugerencias: List[Dict[str, Any]] = field(default_factory=list)
-    inversor: InversorSpec   # 🔥 FIX CLAVE
+
+    inversor: InversorSpec
 
     energia_12m: List[MesEnergia]
+
+    # 🟢 CON DEFAULT (SIEMPRE AL FINAL)
+    sugerencias: List[Dict[str, Any]] = field(default_factory=list)
 
 
 # =========================================================
