@@ -123,8 +123,6 @@ class EnergiaAdapter:
 
     def ejecutar(self, datos, sizing, paneles):
 
-        from energy.orquestador_energia import ejecutar_motor_energia
-
         # ==================================================
         # VALIDACIONES
         # ==================================================
@@ -152,18 +150,21 @@ class EnergiaAdapter:
             raise ValueError("Clima no disponible")
 
         # ==================================================
-        # 🔥 TRADUCCIÓN (CLAVE)
+        # 🔥 TRADUCCIÓN SISTEMA (SIN ACOPLAR DEMÁS DOMINIOS)
         # ==================================================
-
         n_series = paneles.recomendacion.n_series
         n_strings = paneles.array.n_strings_total
         pdc_kw = paneles.array.potencia_dc_w / 1000
 
-        # 🔥 PANEL SPEC (DEBES OBTENERLO DE TU CATÁLOGO)
-        panel_spec = sizing.inversor  # ⚠️ ajusta según tu modelo real
+        # ==================================================
+        # 🔥 FIX CRÍTICO: PANEL SPEC CORRECTO
+        # ==================================================
+        panel_spec = getattr(paneles, "panel", None)
+        if panel_spec is None:
+            raise ValueError("panel_spec no disponible desde paneles")
 
         # ==================================================
-        # INPUT ENERGÍA
+        # INPUT ENERGÍA (ALINEADO)
         # ==================================================
         entrada = EnergiaInput(
             n_series=n_series,
@@ -175,13 +176,14 @@ class EnergiaAdapter:
 
             clima=clima,
 
-            tilt_deg=15,
-            azimut_deg=180,
+            # 👉 flexibles pero backward-compatible
+            tilt_deg=getattr(datos, "tilt", 15),
+            azimut_deg=getattr(datos, "azimut", 180),
 
-            perdidas_dc_pct=0.05,
-            sombras_pct=0.02,
-            eficiencia_inversor=0.98,
-            perdidas_ac_pct=0.02,
+            perdidas_dc_pct=getattr(datos, "perdidas_dc_pct", 0.05),
+            sombras_pct=getattr(datos, "sombras_pct", 0.02),
+            eficiencia_inversor=getattr(datos, "eficiencia_inversor", 0.98),
+            perdidas_ac_pct=getattr(datos, "perdidas_ac_pct", 0.02),
         )
 
         resultado = ejecutar_motor_energia(entrada)
