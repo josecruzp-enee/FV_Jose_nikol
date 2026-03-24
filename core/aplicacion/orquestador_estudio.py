@@ -95,13 +95,7 @@ def ejecutar_estudio(
         except Exception as e:
             print("🔥 ERROR ELECTRICAL:", str(e))
             raise
-                sizing=sizing,
-                strings=resultado_paneles,
-                energia=None,
-                nec=None,
-                financiero=None,
-            )
-
+             
         if resultado_electrico is None:
             raise ValueError("Electrical devolvió None")
 
