@@ -277,6 +277,4 @@ def build_page_5(resultado, datos, paths, pal, styles, content_w):
 
     return story
 
-        story.append(Spacer(1, 12))
 
-    return story
