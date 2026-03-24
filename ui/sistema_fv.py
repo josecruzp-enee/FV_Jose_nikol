@@ -167,11 +167,9 @@ def _render_modo_dimensionado(sf: Dict[str, Any]):
     # =============================
     if sf["modo_dimensionado"] == "consumo":
 
-        sf["cobertura_pct"] = st.slider(
-            "Cobertura deseada (%)",
-            80,
-            int(sf.get("cobertura_pct", 100))
-        )
+        sf["cobertura_pct"] = 80
+
+        st.info("Sistema dimensionado al 80% del consumo anual"))
 
     # =============================
     # MODO ÁREA
