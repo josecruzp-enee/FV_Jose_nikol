@@ -143,17 +143,63 @@ def _render_modo_dimensionado(sf: Dict[str, Any]):
     st.markdown("### Dimensionamiento del sistema")
 
     modo = st.radio(
-        "Seleccione modo de dimensionamiento",
+        "¿Cómo deseas dimensionar el sistema?",
         [
-            "Automático (por cobertura)",
+            "Cobertura energética",
+            "Espacio físico disponible",
             "Manual (definir cantidad de paneles)",
         ],
-        index=0 if sf.get("modo_dimensionado") != "manual" else 1
+        index=0
     )
 
-    sf["modo_dimensionado"] = "manual" if "Manual" in modo else "auto"
+    # -----------------------------
+    # NORMALIZAR VALOR INTERNO
+    # -----------------------------
+    if "Cobertura" in modo:
+        sf["modo_dimensionado"] = "consumo"
+    elif "Espacio" in modo:
+        sf["modo_dimensionado"] = "area"
+    else:
+        sf["modo_dimensionado"] = "manual"
 
-    if sf["modo_dimensionado"] == "manual":
+    # =============================
+    # MODO COBERTURA
+    # =============================
+    if sf["modo_dimensionado"] == "consumo":
+
+        sf["cobertura_pct"] = st.slider(
+            "Cobertura deseada (%)",
+            80,
+            int(sf.get("cobertura_pct", 100))
+        )
+
+    # =============================
+    # MODO ÁREA
+    # =============================
+    elif sf["modo_dimensionado"] == "area":
+
+        sf["area_disponible_m2"] = st.number_input(
+            "Área disponible (m²)",
+            min_value=0.0,
+            value=float(sf.get("area_disponible_m2", 50.0))
+        )
+
+        sf["factor_ocupacion"] = st.slider(
+            "Factor de ocupación",
+            0.5,
+            0.9,
+            float(sf.get("factor_ocupacion", 0.75))
+        )
+
+        area_util = sf["area_disponible_m2"] * sf["factor_ocupacion"]
+        kwp_area = area_util / 5
+
+        st.info(f"Capacidad máxima estimada: {kwp_area:.2f} kWp")
+
+    # =============================
+    # MODO MANUAL
+    # =============================
+    elif sf["modo_dimensionado"] == "manual":
 
         sf["n_paneles_manual"] = st.number_input(
             "Cantidad de paneles",
@@ -161,7 +207,6 @@ def _render_modo_dimensionado(sf: Dict[str, Any]):
             max_value=2000,
             value=int(sf.get("n_paneles_manual", 10))
         )
-
 
 # ==========================================================
 
