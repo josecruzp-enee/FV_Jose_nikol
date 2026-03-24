@@ -2,161 +2,106 @@ from dataclasses import dataclass
 from typing import List, Dict, Any
 
 
-# ==========================================================
-# SALIDA DEL DOMINIO ENERGÍA
-# ==========================================================
-"""
-CONTRATO DE RESULTADO — DOMINIO ENERGÍA
-=======================================
-
-Define la estructura oficial del resultado del motor energético FV.
-
-Pipeline representado:
-
-    generación DC bruta
-            ↓
-    pérdidas del sistema (DC)
-            ↓
-    energía DC después de pérdidas
-            ↓
-    clipping del inversor
-            ↓
-    pérdidas AC
-            ↓
-    energía AC útil
-
-Todas las energías se expresan en kWh.
-
-Modelo soportado:
-    ✔ Simulación horaria 8760
-"""
-
-
-# ==========================================================
-# RESULTADO PRINCIPAL
-# ==========================================================
 @dataclass(frozen=True)
 class EnergiaResultado:
     """
-    Resultado final del cálculo energético del sistema FV.
+    Resultado final del cálculo energético del sistema FV (8760).
 
-    Este objeto es la salida única del dominio energía.
+    Flujo representado:
+
+        DC bruta
+            ↓
+        pérdidas DC
+            ↓
+        DC neta → inversor
+            ↓
+        AC sin clipping
+            ↓
+        clipping inversor
+            ↓
+        pérdidas AC
+            ↓
+        AC útil final
+
+    Todas las energías en kWh.
     """
 
-
-    # ------------------------------------------------------
-    # ESTADO DEL CÁLCULO
-    # ------------------------------------------------------
+    # ======================================================
+    # ESTADO
+    # ======================================================
     ok: bool
     errores: List[str]
 
-
-    # ------------------------------------------------------
-    # POTENCIA DEL SISTEMA
-    # ------------------------------------------------------
+    # ======================================================
+    # SISTEMA
+    # ======================================================
     pdc_instalada_kw: float
     pac_nominal_kw: float
-
-
-    # ------------------------------------------------------
-    # RELACIÓN DC / AC
-    # ------------------------------------------------------
     dc_ac_ratio: float
 
-
-    # ------------------------------------------------------
+    # ======================================================
     # ENERGÍA HORARIA (8760)
-    # ------------------------------------------------------
+    # ======================================================
     energia_horaria_kwh: List[float]
     """
-    Energía AC útil por hora.
+    Energía AC útil final por hora (post inversor y pérdidas AC).
 
-    ✔ Siempre representa la salida final del sistema (post inversor y pérdidas AC)
-
-    Longitud esperada:
-        8760
-
-    Unidad:
-        kWh
+    Longitud: 8760
+    Unidad: kWh
     """
 
+    # ======================================================
+    # ENERGÍA MENSUAL (kWh)
+    # ======================================================
 
-    # ------------------------------------------------------
-    # ENERGÍA MENSUAL (12 MESES)
-    # ------------------------------------------------------
+    # DC antes de pérdidas
     energia_bruta_12m: List[float]
-    energia_perdidas_12m: List[float]
+
+    # AC después de pérdidas (DC+AC) pero antes de clipping
     energia_despues_perdidas_12m: List[float]
+
+    # Pérdidas físicas (DC + AC)
+    energia_perdidas_12m: List[float]
+
+    # Pérdidas por clipping del inversor
     energia_clipping_12m: List[float]
+
+    # Energía final útil AC
     energia_util_12m: List[float]
-    """
-    Todas las listas deben tener longitud 12 (enero–diciembre).
-    """
 
-
-    # ------------------------------------------------------
-    # ENERGÍA ANUAL
-    # ------------------------------------------------------
+    # ======================================================
+    # ENERGÍA ANUAL (kWh)
+    # ======================================================
     energia_bruta_anual: float
-    energia_perdidas_anual: float
     energia_despues_perdidas_anual: float
+    energia_perdidas_anual: float
     energia_clipping_anual: float
     energia_util_anual: float
 
-
-    # ------------------------------------------------------
-    # INDICADORES ENERGÉTICOS
-    # ------------------------------------------------------
+    # ======================================================
+    # KPIs
+    # ======================================================
     produccion_especifica_kwh_kwp: float
     """
-    Producción específica:
-
-        energia_util_anual / pdc_instalada_kw
+    energia_util_anual / pdc_instalada_kw
     """
 
     performance_ratio: float
     """
-    Performance Ratio:
-
-        energia_util_anual / energia_bruta_anual
+    energia_util_anual / energia_bruta_anual
     """
 
-
-    # ------------------------------------------------------
+    # ======================================================
     # METADATA
-    # ------------------------------------------------------
+    # ======================================================
     meta: Dict[str, Any]
     """
     Información de trazabilidad del cálculo.
 
-    Campos recomendados:
-
+    Ejemplo:
     {
-        "motor": "8760",
-        "horas": 8760,
-        "fuente_clima": "...",
-        "tilt": float,
-        "azimut": float
+        "modelo": "8760_alineado",
+        "pipeline": "dc→perdidas→inv→ac",
+        "horas": 8760
     }
     """
-
-
-# ==========================================================
-# NOTA DE DISEÑO
-# ==========================================================
-"""
-Este contrato:
-
-✔ No contiene lógica
-✔ No contiene defaults
-✔ No contiene validaciones físicas
-
-Solo define estructura de salida.
-
-El orquestador es responsable de:
-    - coherencia de datos
-    - consistencia de longitudes
-    - cálculos físicos
-
-Esto mantiene el diseño limpio y escalable.
-"""
