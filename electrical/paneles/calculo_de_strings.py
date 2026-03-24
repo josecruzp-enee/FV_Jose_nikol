@@ -185,7 +185,6 @@ def distribuir_strings_por_inversor(
 # =========================================================
 # MOTOR PRINCIPAL
 # =========================================================
-
 def calcular_strings_fv(
     *,
     n_paneles_total: int,
@@ -227,7 +226,7 @@ def calcular_strings_fv(
     t_oper = t_oper_c if t_oper_c is not None else 55.0
 
     # ======================================================
-    # LIMITES ELÉCTRICOS
+    # LIMITES ELÉCTRICOS (VOLTAGE)
     # ======================================================
 
     n_min, n_max, voc_frio_panel, vmp_hot_panel = _bounds_por_voltaje(
@@ -272,12 +271,9 @@ def calcular_strings_fv(
         )
 
     # ======================================================
-    # 🔥 STRINGS CORREGIDO (MPPT GLOBAL)
+    # STRINGS DISPONIBLES POR PANELES
     # ======================================================
 
-    n_mppt_total = n_inversores * inversor.n_mppt
-
-    # strings posibles por paneles
     n_strings_por_paneles = n_paneles_total // n_series
 
     if n_strings_por_paneles <= 0:
@@ -291,24 +287,60 @@ def calcular_strings_fv(
             n_paneles_total=0
         )
 
-    # asegurar uso de todos los MPPT
-    n_strings_total = max(n_strings_por_paneles, n_mppt_total)
+    # ======================================================
+    # 🔥 LÍMITE REAL POR CORRIENTE (NEC)
+    # ======================================================
+
+    n_mppt_total = n_inversores * inversor.n_mppt
+
+    isc = panel.isc_a
+    corriente_string_diseno = isc * 1.25  # NEC 690.8
+
+    if corriente_string_diseno <= 0:
+        max_strings_por_mppt = 1
+    else:
+        max_strings_por_mppt = int(
+            inversor.imppt_max_a / corriente_string_diseno
+        )
+
+    max_strings_por_mppt = max(1, max_strings_por_mppt)
+
+    capacidad_total_strings = n_mppt_total * max_strings_por_mppt
+
+    # ======================================================
+    # LIMITACIÓN FINAL
+    # ======================================================
+
+    n_strings_total = min(n_strings_por_paneles, capacidad_total_strings)
+
+    # ======================================================
+    # WARNINGS
+    # ======================================================
+
+    if n_strings_por_paneles > capacidad_total_strings:
+        warnings.append(
+            "Strings limitados por corriente máxima de MPPT"
+        )
+
+    if max_strings_por_mppt < 2:
+        warnings.append(
+            "El inversor no permite 2 strings por MPPT bajo NEC"
+        )
+
+    if n_strings_total < n_mppt_total:
+        warnings.append(
+            f"Strings insuficientes para ocupar todos los MPPT ({n_strings_total}/{n_mppt_total})"
+        )
+
+    # ======================================================
+    # PANEL USAGE REAL
+    # ======================================================
 
     paneles_usados = n_strings_total * n_series
     resto = n_paneles_total - paneles_usados
 
     if resto > 0:
         warnings.append(f"{resto} panel(es) no utilizados")
-
-    if n_strings_por_paneles < n_mppt_total:
-        warnings.append(
-            f"Strings insuficientes para MPPT ({n_strings_por_paneles}/{n_mppt_total}) — ajustado automáticamente"
-        )
-
-    if paneles_usados > n_paneles_total:
-        warnings.append(
-            "Número de paneles insuficiente para llenar todos los MPPT"
-        )
 
     # ======================================================
     # DISTRIBUCIÓN
