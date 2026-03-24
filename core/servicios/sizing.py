@@ -225,13 +225,11 @@ def _seleccionar_inversor(pdc, dc_ac_obj, eq):
     if not isinstance(resultado_inv, dict):
         raise ValueError(f"Formato inesperado en inversor: {resultado_inv}")
 
-    # 🔥 VALIDACIÓN
     if "inversor_id" not in resultado_inv:
         raise ValueError(f"Resultado inválido sin inversor_id: {resultado_inv}")
 
     inversor_id = resultado_inv["inversor_id"]
 
-    # 🔥 CONVERSIÓN A OBJETO REAL
     inversor = get_inversor(inversor_id)
 
     if inversor is None:
@@ -245,7 +243,24 @@ def _seleccionar_inversor(pdc, dc_ac_obj, eq):
 
     pac_total_kw = float(resultado_inv.get("kw_ac_total", kw_ac * n_inversores))
 
+    # ==========================================================
+    # 🔥 VALIDACIÓN DC/AC (AQUÍ VA TODO)
+    # ==========================================================
+
+    dc_ac_ratio = pdc / pac_total_kw
+
+    print("DEBUG DC/AC:", dc_ac_ratio)
+
+    if not (1.1 <= dc_ac_ratio <= 1.3):
+        raise ValueError(
+            f"Inversor inválido: DC/AC = {dc_ac_ratio:.2f} "
+            f"(debe estar entre 1.1 y 1.3)"
+        )
+
+    # ==========================================================
+
     return inversor, kw_ac, n_inversores, pac_total_kw
+    
 # ==========================================================
 # API PRINCIPAL
 # ==========================================================
