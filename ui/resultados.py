@@ -61,15 +61,15 @@ def _get_resultado_proyecto(ctx):
 # KPIs PRINCIPALES
 # ==========================================================
 
-def _render_kpis(resultado_proyecto: dict) -> None:
+def _render_kpis(resultado_proyecto) -> None:
 
-    sizing = resultado_proyecto.get("sizing") or {}
-    financiero = resultado_proyecto.get("financiero") or {}
+    sizing = getattr(resultado_proyecto, "sizing", None)
+    financiero = getattr(resultado_proyecto, "financiero", None) or {}
 
     if not sizing or not financiero:
 
         st.error("Estructura de resultado_proyecto incompleta")
-        st.json(resultado_proyecto)
+        st.write(resultado_proyecto)
         return
 
     pdc_kw = float(getattr(sizing, "pdc_kw", 0.0))
@@ -91,8 +91,6 @@ def _render_kpis(resultado_proyecto: dict) -> None:
 
     if pdc_kw <= 0:
         st.warning("Sizing inválido")
-
-
 # ==========================================================
 # RESUMEN NEC
 # ==========================================================
@@ -178,7 +176,7 @@ def _render_debug_energia(resultado_proyecto: dict) -> None:
 
     st.markdown("### 🔎 DEBUG MOTOR ENERGÍA")
 
-    energia = resultado_proyecto.get("energia")
+    energia = getattr(resultado_proyecto, "energia", None)
 
     if energia is None:
         st.info("El motor energético no retornó datos.")
