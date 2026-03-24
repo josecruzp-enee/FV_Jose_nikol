@@ -28,23 +28,28 @@ def _leer_dict(obj, campo, default=None):
 # ==========================================================
 # TABLA 1 — PARÁMETROS ELÉCTRICOS
 # ==========================================================
-
 def crear_tabla_parametros_electricos(resultado, pal, content_w):
 
-    nec = _leer(resultado, "nec", {})
-    paquete = _leer_dict(nec, "paquete_nec", {})
-    corr = _leer_dict(paquete, "corrientes", {})
+    nec = _leer(resultado, "nec", None)
+
+    if not nec or not getattr(nec, "ok", False):
+        return None
+
+    corr = getattr(nec, "corrientes", None)
 
     if not corr:
         return None
 
     def leer(nivel):
 
-        d = corr.get(nivel, {})
+        d = getattr(corr, nivel, None)
+
+        if not d:
+            return (0, 0)
 
         return (
-            float(_leer(d, "i_operacion_a", 0)),
-            float(_leer(d, "i_diseno_a", 0)),
+            float(getattr(d, "i_operacion_a", 0)),
+            float(getattr(d, "i_diseno_a", 0)),
         )
 
     panel_nom, panel_dis = leer("panel")
@@ -73,59 +78,54 @@ def crear_tabla_parametros_electricos(resultado, pal, content_w):
     tbl = Table(rows, colWidths=colw)
 
     tbl.setStyle(TableStyle([
-
         ("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),
         ("BACKGROUND",(0,0),(-1,0),pal["SOFT"]),
         ("TEXTCOLOR",(0,0),(-1,0),pal["PRIMARY"]),
-
         ("ALIGN",(1,1),(2,-1),"RIGHT"),
-
         ("GRID",(0,0),(-1,-1),0.3,pal["BORDER"]),
         ("FONTSIZE",(0,0),(-1,-1),10),
-
     ]))
 
     return tbl
 
-
 # ==========================================================
 # TABLA 2 — DIMENSIONAMIENTO NEC
 # ==========================================================
-
 def crear_tabla_dimensionamiento_nec(resultado, pal, content_w):
 
-    nec = _leer(resultado, "nec", {})
-    paquete = _leer_dict(nec, "paquete_nec", {})
+    nec = _leer(resultado, "nec", None)
 
-    corr = _leer_dict(paquete, "corrientes", {})
-    prot = _leer_dict(paquete, "protecciones", None)
+    if not nec or not getattr(nec, "ok", False):
+        return None
 
-    conductores = _leer_dict(paquete, "conductores", {})
-    cond = _leer_dict(conductores, "circuitos", [])
+    corr = getattr(nec, "corrientes", None)
+    prot = getattr(nec, "protecciones", None)
+    conductores = getattr(nec, "conductores", None)
 
     if not corr:
         return None
+
+    cond = getattr(conductores, "tramos", []) if conductores else []
 
     cond_dc = "—"
     cond_ac = "—"
 
     for c in cond:
 
-        nombre = _leer(c, "nombre")
+        nombre = getattr(c, "nombre", "")
 
-        if nombre == "DC":
-            cond_dc = f'{_leer(c,"awg","—")} AWG'
+        if "DC" in nombre:
+            cond_dc = f'{getattr(c,"calibre","—")} {getattr(c,"material","")}'.strip()
 
-        if nombre == "AC":
-            cond_ac = f'{_leer(c,"awg","—")} AWG'
+        if "AC" in nombre:
+            cond_ac = f'{getattr(c,"calibre","—")} {getattr(c,"material","")}'.strip()
 
     breaker_ac = None
     fusible_str = None
 
-    if prot and not isinstance(prot, str):
-
-        breaker_ac = _leer(prot, "breaker_ac")
-        fusible_str = _leer(prot, "fusible_string")
+    if prot:
+        breaker_ac = getattr(prot, "ocpd_ac", None)
+        fusible_str = getattr(prot, "fusible_string", None)
 
     rows = [
 
@@ -145,15 +145,18 @@ def crear_tabla_dimensionamiento_nec(resultado, pal, content_w):
 
     for key, nombre, p, c in orden:
 
-        d = corr.get(key, {})
+        d = getattr(corr, key, None)
 
-        i_op = float(_leer(d, "i_operacion_a", 0))
-        i_dis = float(_leer(d, "i_diseno_a", 0))
+        if not d:
+            continue
+
+        i_op = float(getattr(d, "i_operacion_a", 0))
+        i_dis = float(getattr(d, "i_diseno_a", 0))
 
         proteccion = "—"
 
         if p:
-            proteccion = f'{_leer(p,"tamano_a","—")} A'
+            proteccion = f'{getattr(p,"tamano_a","—")} A'
 
         conductor = c if c else "—"
 
@@ -176,17 +179,13 @@ def crear_tabla_dimensionamiento_nec(resultado, pal, content_w):
     tbl = Table(rows, colWidths=colw)
 
     tbl.setStyle(TableStyle([
-
         ("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),
         ("BACKGROUND",(0,0),(-1,0),pal["SOFT"]),
         ("TEXTCOLOR",(0,0),(-1,0),pal["PRIMARY"]),
-
         ("ALIGN",(1,1),(2,-1),"RIGHT"),
         ("ALIGN",(3,1),(-1,-1),"CENTER"),
-
         ("GRID",(0,0),(-1,-1),0.3,pal["BORDER"]),
         ("FONTSIZE",(0,0),(-1,-1),10),
-
     ]))
 
     return tbl
