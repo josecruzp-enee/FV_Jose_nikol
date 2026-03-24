@@ -310,6 +310,7 @@ def calcular_sizing_unificado(
         pdc_kw=round(pdc, 3),
 
         kw_ac=pac_total_kw,
+        kw_ac_total=pac_total_kw, 
         n_inversores=n_inversores,
         paneles_por_inversor=paneles_por_inversor,
 
