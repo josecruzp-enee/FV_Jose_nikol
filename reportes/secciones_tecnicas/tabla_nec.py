@@ -106,10 +106,6 @@ def crear_tabla_dimensionamiento_nec(resultado, pal, content_w):
     if not corr:
         return None
 
-    # ------------------------------------------------------
-    # Buscar conductores
-    # ------------------------------------------------------
-
     cond_dc = "—"
     cond_ac = "—"
 
@@ -122,10 +118,6 @@ def crear_tabla_dimensionamiento_nec(resultado, pal, content_w):
 
         if nombre == "AC":
             cond_ac = f'{_leer(c,"awg","—")} AWG'
-
-    # ------------------------------------------------------
-    # Protecciones
-    # ------------------------------------------------------
 
     breaker_ac = None
     fusible_str = None
@@ -201,7 +193,7 @@ def crear_tabla_dimensionamiento_nec(resultado, pal, content_w):
 
 
 # ==========================================================
-# TABLA 3 — INDICADORES TÉCNICOS
+# TABLA 3 — INDICADORES TÉCNICOS (CORREGIDA)
 # ==========================================================
 
 def crear_tabla_indicadores(resultado, pal, content_w):
@@ -216,29 +208,41 @@ def crear_tabla_indicadores(resultado, pal, content_w):
     kwp_dc = _leer(sizing, "pdc_kw", 0)
 
     # ------------------------------------------------------
-    # Utilización paneles
+    # PANEL REALMENTE UTILIZADOS
     # ------------------------------------------------------
 
-    paneles_usados = n_paneles
-    utiliz_panel = 100 if n_paneles else 0
+    paneles_en_strings = sum(_leer(s, "n_series", 0) for s in strings)
+
+    utiliz_panel = (
+        paneles_en_strings / n_paneles * 100
+        if n_paneles else 0
+    )
 
     # ------------------------------------------------------
-    # MPPT
+    # MPPT REAL
     # ------------------------------------------------------
 
     n_inv = _leer(sizing, "n_inversores", 1)
-    mppt_por_inv = _leer(sizing, "mppt_por_inversor", 2)
+
+    inversor = _leer(sizing, "inversor", None)
+    mppt_por_inv = _leer(inversor, "n_mppt", 2)
 
     n_mppt_total = n_inv * mppt_por_inv
 
-    utiliz_mppt = (len(strings) / n_mppt_total * 100) if n_mppt_total else 0
+    strings_por_mppt = _leer(strings_block, "strings_por_mppt", 1)
+
+    capacidad_total_strings = n_mppt_total * strings_por_mppt
+
+    utiliz_mppt = (
+        len(strings) / capacidad_total_strings * 100
+        if capacidad_total_strings else 0
+    )
 
     # ------------------------------------------------------
     # DC / AC
     # ------------------------------------------------------
 
     relacion = kwp_dc / kw_ac if kw_ac else 0
-
     carga_inv = kwp_dc / n_inv if n_inv else 0
 
     rows = [
