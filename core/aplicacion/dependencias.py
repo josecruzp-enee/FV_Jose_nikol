@@ -122,11 +122,24 @@ class ElectricalAdapter:
 class EnergiaAdapter:
     def ejecutar(self, datos, sizing, paneles):
 
+        from energy.orquestador_energia import ejecutar_motor_energia
+
+        # ==================================================
+        # VALIDACIÓN PANEL
+        # ==================================================
         if paneles is None or not getattr(paneles, "ok", False):
             raise ValueError("Paneles inválido para energía")
 
         # ==================================================
-        # VALIDACIÓN SEGURA
+        # VALIDACIÓN KW_AC (CRÍTICO)
+        # ==================================================
+        kw_ac = getattr(sizing, "kw_ac", None)
+
+        if not kw_ac or kw_ac <= 0:
+            raise ValueError("kw_ac inválido para energía")
+
+        # ==================================================
+        # VALIDACIÓN LAT/LON
         # ==================================================
         lat = getattr(datos, "lat", None)
         lon = getattr(datos, "lon", None)
@@ -135,7 +148,7 @@ class EnergiaAdapter:
             raise ValueError("Faltan lat/lon para cálculo de energía")
 
         # ==================================================
-        # CLIMA PVGIS
+        # CLIMA
         # ==================================================
         clima = descargar_clima_pvgis(
             EntradaClimaPVGIS(
@@ -144,13 +157,15 @@ class EnergiaAdapter:
             )
         )
 
+        if clima is None:
+            raise ValueError("Clima no disponible")
+
         # ==================================================
         # INPUT ENERGÍA
         # ==================================================
         entrada = EnergiaInput(
             paneles=paneles,
-            pac_nominal_kw=getattr(sizing, "kw_ac", 0),
-
+            pac_nominal_kw=kw_ac,
             clima=clima,
 
             tilt_deg=15,
@@ -162,13 +177,19 @@ class EnergiaAdapter:
             perdidas_ac_pct=0.02,
         )
 
-        resultado = ejecutar_energia(entrada)
+        print("DEBUG ENERGIA INPUT:", entrada)
+
+        resultado = ejecutar_motor_energia(entrada)
+
+        print("DEBUG ENERGIA OUTPUT:", resultado)
 
         if resultado is None:
             raise ValueError("Energía devolvió None")
 
-        return resultado
+        if not resultado.ok:
+            raise ValueError(f"Energía inválida: {resultado.errores}")
 
+        return resultado
 
 class FinanzasAdapter:
     def ejecutar(self, datos, sizing, energia):
