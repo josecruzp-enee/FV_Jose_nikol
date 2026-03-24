@@ -265,4 +265,10 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
         )
 
     except Exception as e:
+        print("energia_util_anual:", energia_util_anual)
+        print("pdc_kw:", inp.pdc_kw)
+        print("produccion_especifica:", energia_util_anual / inp.pdc_kw)
+        print("poa_total_kwh:", poa_total_kwh)
+        print("PR:", performance_ratio)
+        print("====================================")
         return _resultado_error(inp, [str(e)])
