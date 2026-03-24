@@ -65,6 +65,49 @@ def formatear_configuracion(config):
 
     return " + ".join(partes)
 
+from math import ceil
+
+# ======================================================
+# CÁLCULO DE CANTIDAD DE INVERSORES
+# ======================================================
+def calcular_cantidad_inversores(
+    pdc_kw: float,
+    pac_inversor_kw: float,
+    dc_ac_obj: float,
+) -> Dict[str, float]:
+    """
+    Calcula número de inversores necesarios.
+
+    Retorna:
+        n_inversores
+        kw_ac
+        kw_ac_total
+        ratio_real
+        kw_ac_obj
+    """
+
+    if pac_inversor_kw <= 0:
+        raise ValueError("pac_inversor_kw inválido")
+
+    # Potencia AC objetivo
+    kw_ac_obj = pdc_kw / dc_ac_obj
+
+    # Número de inversores (siempre entero hacia arriba)
+    n_inversores = ceil(kw_ac_obj / pac_inversor_kw)
+
+    # Potencia total instalada
+    kw_ac_total = n_inversores * pac_inversor_kw
+
+    # Ratio real DC/AC
+    ratio_real = pdc_kw / kw_ac_total if kw_ac_total > 0 else 0
+
+    return {
+        "n_inversores": n_inversores,
+        "kw_ac": pac_inversor_kw,
+        "kw_ac_total": kw_ac_total,
+        "ratio_real": ratio_real,
+        "kw_ac_obj": kw_ac_obj,
+    }
 
 # ======================================================
 # API PRINCIPAL
