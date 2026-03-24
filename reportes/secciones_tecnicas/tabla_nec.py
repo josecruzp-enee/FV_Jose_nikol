@@ -93,22 +93,19 @@ def crear_tabla_dimensionamiento_nec(resultado, pal, content_w):
     prot = _leer(resultado, "protecciones", None)
     conductores = _leer(resultado, "conductores", None)
 
-    if not corr or not getattr(corr, "ok", False):
-        return None
+    # 🔥 SOLO valida existencia
+    if not corr:
+        return Table([["ERROR", "No hay corrientes"]])
 
     # -------------------------------
-    # CONDUCTORES
+    # CONDUCTORES (SIN BLOQUEO)
     # -------------------------------
-    cond = []
-
-    if conductores and getattr(conductores, "ok", False):
-        cond = getattr(conductores, "tramos", [])
+    cond = getattr(conductores, "tramos", []) if conductores else []
 
     cond_dc = "—"
     cond_ac = "—"
 
     for c in cond:
-
         nombre = getattr(c, "nombre", "")
 
         if "DC" in nombre:
@@ -118,29 +115,21 @@ def crear_tabla_dimensionamiento_nec(resultado, pal, content_w):
             cond_ac = f'{getattr(c,"calibre","—")} {getattr(c,"material","")}'.strip()
 
     # -------------------------------
-    # PROTECCIONES
+    # PROTECCIONES (SIN BLOQUEO)
     # -------------------------------
-    breaker_ac = None
-    fusible_str = None
-
-    if prot and getattr(prot, "ok", False):
-        breaker_ac = getattr(prot, "ocpd_ac", None)
-        fusible_str = getattr(prot, "fusible_string", None)
+    breaker_ac = getattr(prot, "ocpd_ac", None) if prot else None
+    fusible_str = getattr(prot, "fusible_string", None) if prot else None
 
     rows = [
-
         ["Circuito", "Corriente operación", "Corriente diseño NEC", "Protección", "Conductor"],
-
     ]
 
     orden = [
-
         ("panel", "Panel", None, None),
         ("string", "String", fusible_str, cond_dc),
         ("mppt", "MPPT", None, cond_dc),
         ("dc_total", "Entrada inversor DC", None, cond_dc),
         ("ac", "Salida inversor AC", breaker_ac, cond_ac),
-
     ]
 
     for key, nombre, p, c in orden:
@@ -153,11 +142,7 @@ def crear_tabla_dimensionamiento_nec(resultado, pal, content_w):
         i_op = float(getattr(d, "i_operacion_a", 0))
         i_dis = float(getattr(d, "i_diseno_a", 0))
 
-        proteccion = "—"
-
-        if p:
-            proteccion = f'{getattr(p,"tamano_a","—")} A'
-
+        proteccion = f'{getattr(p,"tamano_a","—")} A' if p else "—"
         conductor = c if c else "—"
 
         rows.append([
@@ -167,6 +152,10 @@ def crear_tabla_dimensionamiento_nec(resultado, pal, content_w):
             proteccion,
             conductor
         ])
+
+    # 🔥 SI SOLO HAY HEADER → FORZAR VISUAL
+    if len(rows) == 1:
+        rows.append(["SIN DATOS", "-", "-", "-", "-"])
 
     colw = [
         content_w * 0.30,
@@ -179,17 +168,10 @@ def crear_tabla_dimensionamiento_nec(resultado, pal, content_w):
     tbl = Table(rows, colWidths=colw)
 
     tbl.setStyle(TableStyle([
-        ("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),
-        ("BACKGROUND",(0,0),(-1,0),pal["SOFT"]),
-        ("TEXTCOLOR",(0,0),(-1,0),pal["PRIMARY"]),
-        ("ALIGN",(1,1),(2,-1),"RIGHT"),
-        ("ALIGN",(3,1),(-1,-1),"CENTER"),
         ("GRID",(0,0),(-1,-1),0.3,pal["BORDER"]),
-        ("FONTSIZE",(0,0),(-1,-1),10),
     ]))
 
     return tbl
-
 
 # ==========================================================
 # TABLA 3 — INDICADORES TÉCNICOS
