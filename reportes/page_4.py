@@ -25,12 +25,12 @@ def leer(obj, campo, default=None):
 # =========================================================
 # TABLA IMPACTO AÑO 1
 # =========================================================
-
 def tabla_impacto_mensual_anio1(resultado: Any, pal: dict, content_w: float):
 
-    financiero = leer(resultado, "financiero", {})
-    tabla_12m = financiero.get("tabla_12m", [])
-    cuota_m = float(financiero.get("cuota_mensual", 0.0))
+    financiero = leer(resultado, "financiero", {}) or {}
+
+    tabla_12m = leer(financiero, "tabla_12m", [])
+    cuota_m = float(leer(financiero, "cuota_mensual", 0.0))
 
     header = [
         "Mes",
