@@ -80,8 +80,8 @@ def p1_tabla_solucion_unica(datos, sizing, energia, financiero, pal, content_w):
     kwp = float(leer(sizing, "kwp_dc", leer(sizing, "pdc_kw", 0.0)))
     capex = float(financiero.get("capex_L", 0.0))
 
-    energia_12m = leer(energia, "energia_util_12m", [])
-    prod_anual = sum(energia_12m) if isinstance(energia_12m, list) else 0.0
+    energia_horaria = leer(energia, "energia_horaria_kwh", [])
+    prod_anual = sum(energia_horaria) if isinstance(energia_horaria, list) else 0.0
 
     n_paneles = int(leer(sizing, "n_paneles", 0))
 
