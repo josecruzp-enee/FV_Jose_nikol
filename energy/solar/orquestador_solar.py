@@ -19,7 +19,6 @@ Flujo:
 from dataclasses import dataclass
 
 from .entrada_solar import EntradaSolar
-from .posicion_solar import calcular_posicion_solar, SolarInput
 from .irradiancia_plano import calcular_irradiancia_plano, IrradianciaInput
 
 
@@ -71,6 +70,8 @@ def _validar(e: EntradaSolar) -> None:
 # ==========================================================
 
 def ejecutar_solar(entrada: EntradaSolar) -> SolarResultado:
+    
+    from .posicion_solar import calcular_posicion_solar, SolarInput
     """
     Ejecuta el modelo solar (componente físico).
 
