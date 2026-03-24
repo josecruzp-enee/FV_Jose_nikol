@@ -139,9 +139,7 @@ def _validate_inversor(iid: str, inv: Dict[str, Any]):
 def _paneles() -> Dict[str, PanelSpec]:
 
     doc = _read_yaml_cached(str(DATA_DIR / "paneles.yaml"))
-
     paneles = doc.get("paneles", {}) if isinstance(doc, dict) else {}
-
     out: Dict[str, PanelSpec] = {}
 
     for pid, p in paneles.items():
@@ -150,9 +148,13 @@ def _paneles() -> Dict[str, PanelSpec]:
 
         stc = p["stc"]
         co = p.get("coeficientes_pct_c", {})
+        termico = p.get("termico", {})
 
-        coef_voc = float(co.get("voc"))
-        coef_vmp = float(co.get("vmp", co.get("pmax", -0.34)))
+        # Normalización segura
+        coef_voc = float(co.get("voc", 0.0))
+        coef_pmax = float(co.get("pmax", 0.0))
+        coef_vmp = float(co.get("vmp", coef_pmax))
+        noct_c = float(termico.get("noct_c", 45.0))
 
         out[pid] = PanelSpec(
             pmax_w=float(stc["pmax_w"]),
@@ -162,10 +164,11 @@ def _paneles() -> Dict[str, PanelSpec]:
             isc_a=float(stc["isc_a"]),
             coef_voc_pct_c=coef_voc,
             coef_vmp_pct_c=coef_vmp,
+            coef_potencia_pct_c=coef_pmax,
+            noct_c=noct_c,
         )
 
     return out
-
 
 # ==========================================================
 # Carga inversores
