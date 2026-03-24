@@ -154,7 +154,6 @@ def _mostrar_nec(nec):
 # ==========================================================
 # RENDER PRINCIPAL
 # ==========================================================
-
 def render(ctx):
 
     e = _asegurar_dict(ctx, "electrico")
@@ -188,13 +187,42 @@ def render(ctx):
         _mostrar_sizing(resultado.sizing)
         _mostrar_nec(resultado.nec)
 
-    except Exception:
+    except Exception as e:
 
-        import traceback
+        msg = str(e)
 
-        st.error("Error en motor FV")
-        st.code(traceback.format_exc())
+        # ==========================================================
+        # 🔥 ERRORES DE NEGOCIO (DC/AC, etc.)
+        # ==========================================================
+        if "DC/AC" in msg:
+            st.error(msg)
 
+            # 🔧 SUGERENCIA AUTOMÁTICA
+            try:
+                datos = _datosproyecto_desde_ctx(ctx)
+                pdc = getattr(datos, "consumo_12m", None)
+
+                # mejor: usar sizing si existe
+                if hasattr(ctx, "resultado_proyecto") and ctx.resultado_proyecto:
+                    pdc = ctx.resultado_proyecto.sizing.pdc_kw
+
+                if pdc:
+                    pac_obj = pdc / 1.2
+                    st.info(f"Inversor recomendado ≈ {pac_obj:.1f} kW AC")
+
+            except Exception:
+                pass
+
+        # ==========================================================
+        # ⚠️ ERRORES TÉCNICOS
+        # ==========================================================
+        else:
+            import traceback
+            st.error("Error en motor FV")
+            st.code(traceback.format_exc())
+
+        # 🔥 IMPORTANTE: detener flujo
+        st.stop()
 
 # ==========================================================
 # VALIDACIÓN
