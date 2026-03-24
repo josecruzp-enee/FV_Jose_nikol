@@ -147,9 +147,9 @@ def _dimensionar_generador(
     energia_por_kwp_anual = 1500.0
 
     # =============================
-    # MODO CONSUMO
+    # MODO CONSUMO (incluye "auto")
     # =============================
-    if modo_dimensionado == "consumo":
+    if modo_dimensionado in ("consumo", "auto"):
 
         kwp_objetivo = (consumo_anual * cobertura_obj) / energia_por_kwp_anual
 
@@ -161,16 +161,27 @@ def _dimensionar_generador(
         if area_m2 is None:
             raise ValueError("Área no definida para modo area")
 
-        area_util = area_m2 * (factor_ocupacion or 0.75)
+        factor = factor_ocupacion or 0.75
+        area_util = area_m2 * factor
 
-        kwp_objetivo = area_util / 5  # regla m² → kWp
+        kwp_objetivo = area_util / 5  # m² → kWp
 
     # =============================
     # MODO MANUAL
     # =============================
-    else:
-        kwp_objetivo = None
+    elif modo_dimensionado == "manual":
 
+        kwp_objetivo = None  # se usa n_paneles_manual
+
+    # =============================
+    # ERROR
+    # =============================
+    else:
+        raise ValueError(f"Modo de dimensionado no soportado: {modo_dimensionado}")
+
+    # =============================
+    # DIMENSIONAMIENTO DE PANELES
+    # =============================
     from electrical.paneles.entrada_panel import EntradaPaneles
 
     entrada_panel = EntradaPaneles(
@@ -190,6 +201,9 @@ def _dimensionar_generador(
     kwp_req = float(panel_sizing.kwp_req)
     n_pan = int(panel_sizing.n_paneles)
     pdc = float(panel_sizing.pdc_kw)
+
+    if n_pan <= 0 or pdc <= 0:
+        raise ValueError("Sizing resultó en sistema inválido")
 
     return kwp_req, n_pan, pdc
 
