@@ -101,7 +101,9 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
 
             poa = max(0.0, solar.poa_total_wm2)
             poa_total_kwh += poa / 1000.0
-
+            print("DNI:", h.dni_wm2, "DHI:", h.dhi_wm2, "GHI:", h.ghi_wm2)
+            print("POA:", poa)
+            print("----------------------")
             # ==================================================
             # TÉRMICO
             # ==================================================
