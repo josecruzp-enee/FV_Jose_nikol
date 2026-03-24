@@ -158,11 +158,11 @@ def _ui_criterios(eq: dict) -> None:
             v = float(eq.get("sobredimension_dc_ac", 1.20))
         except Exception:
             v = 1.20
-        v = max(1.0, min(1.6, v))
+        v = max(1.1, min(1.3, v))
         eq["sobredimension_dc_ac"] = st.number_input(
             "Objetivo DC/AC",
-            min_value=1.0,
-            max_value=1.6,
+            min_value=1.1,
+            max_value=1.3,
             value=v,
             step=0.05,
             format="%.2f",
