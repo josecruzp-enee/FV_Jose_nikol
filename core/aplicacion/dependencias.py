@@ -106,18 +106,18 @@ class PanelesAdapter:
 
 
 class ElectricalAdapter:
-    def ejecutar(self, datos, paneles):
+    def ejecutar(self, datos, paneles, sizing):
 
         resultado = ejecutar_electrical(
+            datos=datos,
             paneles=paneles,
-            params_conductores=datos,
+            sizing=sizing,
         )
 
         if resultado is None:
             raise ValueError("Electrical devolvió None")
 
         return resultado
-
 
 class EnergiaAdapter:
     def ejecutar(self, datos, sizing, paneles):
