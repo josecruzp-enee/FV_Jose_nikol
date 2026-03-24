@@ -33,16 +33,17 @@ def ejecutar_electrical(*args, **kwargs) -> ResultadoElectrico:
     if args:
         if len(args) == 2:
             datos, paneles = args
+            kwargs["datos"] = datos
             kwargs["paneles"] = paneles
-            kwargs["params_conductores"] = datos
 
     paneles = kwargs.get("paneles")
-    params_conductores = kwargs.get("params_conductores")
+    datos = kwargs.get("datos")                 # 🔥 FIX
+    sizing = kwargs.get("sizing")               # 🔥 NUEVO
 
     try:
 
         # ==================================================
-        # VALIDACIÓN PANEL
+        # VALIDACIONES BASE
         # ==================================================
         if not paneles or not paneles.ok:
             return ResultadoElectrico.build(
@@ -52,10 +53,16 @@ def ejecutar_electrical(*args, **kwargs) -> ResultadoElectrico:
                 protecciones=_protecciones_error("Paneles inválidos"),
             )
 
+        if not sizing:
+            raise ValueError("Falta sizing en electrical")
+
+        if not paneles.strings:
+            raise ValueError("No hay strings definidos")
+
         # ==================================================
-        # EXTRAER PARAMETROS ELECTRICOS
+        # PARAMETROS ELECTRICOS
         # ==================================================
-        inst = getattr(params_conductores, "instalacion_electrica", None) or {}
+        inst = getattr(datos, "instalacion_electrica", None) or {}
 
         vac = inst.get("vac")
         fases = inst.get("fases", 1)
@@ -70,11 +77,11 @@ def ejecutar_electrical(*args, **kwargs) -> ResultadoElectrico:
             raise ValueError("Faltan distancias en instalacion_electrica")
 
         # ==================================================
-        # CORRIENTES
+        # CORRIENTES (FIX REAL)
         # ==================================================
         corrientes_input = CorrientesInput(
             paneles=paneles,
-            kw_ac=paneles.array.pdc_kw,
+            kw_ac=sizing.kw_ac,   # 🔥 FIX CRITICO
             vac=vac,
             fases=fases,
             fp=fp,
@@ -91,7 +98,7 @@ def ejecutar_electrical(*args, **kwargs) -> ResultadoElectrico:
             )
 
         # ==================================================
-        # CONDUCTORES (FIX: wrap correcto)
+        # CONDUCTORES
         # ==================================================
         tramos = calcular_conductores(
             corrientes=corrientes,
@@ -113,7 +120,7 @@ def ejecutar_electrical(*args, **kwargs) -> ResultadoElectrico:
             )
 
         # ==================================================
-        # PROTECCIONES (FIX: n_strings correcto)
+        # PROTECCIONES
         # ==================================================
         entrada_prot = EntradaProtecciones(
             corrientes=corrientes,
