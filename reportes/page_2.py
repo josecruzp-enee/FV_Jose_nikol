@@ -64,7 +64,7 @@ def build_page_2(resultado: Any, datos, paths, pal, styles, content_w):
     story.append(Spacer(1, 6))
 
     financiero = leer(resultado, "financiero", {})
-    ttabla_12m = leer(financiero, "tabla_12m", [])
+    tabla_12m = leer(financiero, "tabla_12m", [])
 
     header = ["Mes", "Consumo (kWh)", "FV útil (kWh)", "ENEE (kWh)"]
 
