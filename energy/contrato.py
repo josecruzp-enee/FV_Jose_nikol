@@ -23,7 +23,38 @@ class EnergiaInput:
     perdidas_ac_pct: float
 
     def validar(self):
-        return []
+    errores = []
+
+    # CLIMA (CRÍTICO)
+    if self.clima is None:
+        errores.append("Clima no definido")
+
+    elif not hasattr(self.clima, "horas") or not self.clima.horas:
+        errores.append("Clima sin datos horarios")
+
+    elif len(self.clima.horas) < 8000:
+        errores.append("Clima incompleto (no 8760)")
+
+    # CONFIGURACIÓN
+    if self.pdc_kw <= 0:
+        errores.append("pdc_kw inválido")
+
+    if self.pac_nominal_kw <= 0:
+        errores.append("pac_nominal_kw inválido")
+
+    if self.n_series <= 0 or self.n_strings <= 0:
+        errores.append("Configuración de strings inválida")
+
+    # PANEL
+    if self.panel is None:
+        errores.append("Panel no definido")
+
+    # GEOMETRÍA
+    if self.tilt_deg is None or self.azimut_deg is None:
+        errores.append("Geometría inválida")
+
+    return errores
+        
         
 @dataclass(frozen=True)
 class EnergiaResultado:
