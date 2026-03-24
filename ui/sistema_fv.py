@@ -169,7 +169,7 @@ def _render_modo_dimensionado(sf: Dict[str, Any]):
 
         sf["cobertura_pct"] = 80
 
-        st.info("Sistema dimensionado al 80% del consumo anual"))
+        st.info("Sistema dimensionado al 80% del consumo anual")
 
     # =============================
     # MODO ÁREA
