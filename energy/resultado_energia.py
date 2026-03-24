@@ -9,39 +9,44 @@ from typing import List, Dict, Any
 CONTRATO DE RESULTADO — DOMINIO ENERGÍA
 =======================================
 
-Define la estructura oficial de salida del cálculo energético
-del sistema fotovoltaico dentro de FV Engine.
+Define la estructura oficial del resultado del motor energético FV.
 
-Pipeline energético representado:
+Pipeline representado:
 
     generación DC bruta
             ↓
-    pérdidas del sistema
+    pérdidas del sistema (DC)
             ↓
-    energía después de pérdidas
+    energía DC después de pérdidas
             ↓
     clipping del inversor
+            ↓
+    pérdidas AC
             ↓
     energía AC útil
 
 Todas las energías se expresan en kWh.
 
 Modelo soportado:
-
-    ✔ Simulación física horaria (8760)
+    ✔ Simulación horaria 8760
 """
 
 
+# ==========================================================
+# RESULTADO PRINCIPAL
+# ==========================================================
 @dataclass(frozen=True)
 class EnergiaResultado:
     """
     Resultado final del cálculo energético del sistema FV.
+
+    Este objeto es la salida única del dominio energía.
     """
+
 
     # ------------------------------------------------------
     # ESTADO DEL CÁLCULO
     # ------------------------------------------------------
-
     ok: bool
     errores: List[str]
 
@@ -49,7 +54,6 @@ class EnergiaResultado:
     # ------------------------------------------------------
     # POTENCIA DEL SISTEMA
     # ------------------------------------------------------
-
     pdc_instalada_kw: float
     pac_nominal_kw: float
 
@@ -57,20 +61,20 @@ class EnergiaResultado:
     # ------------------------------------------------------
     # RELACIÓN DC / AC
     # ------------------------------------------------------
-
     dc_ac_ratio: float
 
 
     # ------------------------------------------------------
     # ENERGÍA HORARIA (8760)
     # ------------------------------------------------------
-
     energia_horaria_kwh: List[float]
     """
-    Energía AC producida por hora.
+    Energía AC útil por hora.
+
+    ✔ Siempre representa la salida final del sistema (post inversor y pérdidas AC)
 
     Longitud esperada:
-        8760 valores
+        8760
 
     Unidad:
         kWh
@@ -80,18 +84,19 @@ class EnergiaResultado:
     # ------------------------------------------------------
     # ENERGÍA MENSUAL (12 MESES)
     # ------------------------------------------------------
-
     energia_bruta_12m: List[float]
     energia_perdidas_12m: List[float]
     energia_despues_perdidas_12m: List[float]
     energia_clipping_12m: List[float]
     energia_util_12m: List[float]
+    """
+    Todas las listas deben tener longitud 12 (enero–diciembre).
+    """
 
 
     # ------------------------------------------------------
     # ENERGÍA ANUAL
     # ------------------------------------------------------
-
     energia_bruta_anual: float
     energia_perdidas_anual: float
     energia_despues_perdidas_anual: float
@@ -102,7 +107,6 @@ class EnergiaResultado:
     # ------------------------------------------------------
     # INDICADORES ENERGÉTICOS
     # ------------------------------------------------------
-
     produccion_especifica_kwh_kwp: float
     """
     Producción específica:
@@ -121,57 +125,38 @@ class EnergiaResultado:
     # ------------------------------------------------------
     # METADATA
     # ------------------------------------------------------
-
     meta: Dict[str, Any]
     """
     Información de trazabilidad del cálculo.
 
-    Ejemplo:
+    Campos recomendados:
 
     {
         "motor": "8760",
         "horas": 8760,
-        "fuente_clima": "PVGIS",
-        "tilt": 15,
-        "azimut": 180
+        "fuente_clima": "...",
+        "tilt": float,
+        "azimut": float
     }
     """
 
 
 # ==========================================================
-# ESTRUCTURA DEL RESULTADO
+# NOTA DE DISEÑO
 # ==========================================================
-
 """
-Este módulo produce un único objeto:
+Este contrato:
 
-EnergiaResultado
+✔ No contiene lógica
+✔ No contiene defaults
+✔ No contiene validaciones físicas
 
+Solo define estructura de salida.
 
-Estructura:
+El orquestador es responsable de:
+    - coherencia de datos
+    - consistencia de longitudes
+    - cálculos físicos
 
-EnergiaResultado
-    ├─ pdc_instalada_kw
-    ├─ pac_nominal_kw
-    ├─ dc_ac_ratio
-    │
-    ├─ energia_horaria_kwh (8760)
-    │
-    ├─ energia_bruta_12m
-    ├─ energia_perdidas_12m
-    ├─ energia_despues_perdidas_12m
-    ├─ energia_clipping_12m
-    ├─ energia_util_12m
-    │
-    ├─ energia_bruta_anual
-    ├─ energia_perdidas_anual
-    ├─ energia_despues_perdidas_anual
-    ├─ energia_clipping_anual
-    ├─ energia_util_anual
-    │
-    ├─ produccion_especifica_kwh_kwp
-    ├─ performance_ratio
-    │
-    ├─ errores
-    └─ meta
+Esto mantiene el diseño limpio y escalable.
 """
