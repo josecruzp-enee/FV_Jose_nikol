@@ -264,7 +264,6 @@ def _seleccionar_inversor(pdc, dc_ac_obj, eq):
 # ==========================================================
 # API PRINCIPAL
 # ==========================================================
-
 def calcular_sizing_unificado(
     p: Datosproyecto,
 ) -> ResultadoSizing:
@@ -285,7 +284,6 @@ def calcular_sizing_unificado(
         factor_ocupacion
     )
 
-    # 🔥 FIX: ahora trae inversor
     inversor, kw_ac, n_inversores, pac_total_kw = _seleccionar_inversor(
         pdc,
         dc_ac_obj,
@@ -294,6 +292,14 @@ def calcular_sizing_unificado(
 
     paneles_por_inversor = ceil(n_pan / n_inversores)
 
+    # ==========================================================
+    # 🔥 CÁLCULO FINAL DC/AC (guardar para UI/reportes)
+    # ==========================================================
+    dc_ac_ratio = pdc / pac_total_kw
+
+    # ==========================================================
+    # ⚡ ENERGÍA (pendiente implementar bien)
+    # ==========================================================
     energia_12m: List[MesEnergia] = []
 
     return ResultadoSizing(
@@ -305,7 +311,10 @@ def calcular_sizing_unificado(
         n_inversores=n_inversores,
         paneles_por_inversor=paneles_por_inversor,
 
-        inversor=inversor,   # 🔥 FIX FINAL
+        inversor=inversor,
+
+        # 🔥 NUEVO (CLAVE)
+        dc_ac_ratio=round(dc_ac_ratio, 3),
 
         energia_12m=energia_12m,
     )
