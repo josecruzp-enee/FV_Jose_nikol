@@ -93,6 +93,7 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
                     dni_wm2=h.dni_wm2,
                     dhi_wm2=h.dhi_wm2,
                     ghi_wm2=h.ghi_wm2,
+                    temp_amb_c=h.temp_amb_c,
                     tilt_deg=inp.tilt_deg,
                     azimuth_panel_deg=inp.azimut_deg
                 )
