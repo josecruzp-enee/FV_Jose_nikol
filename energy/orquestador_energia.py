@@ -190,14 +190,14 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
             ac_sin_clip = aplicar_perdidas_ac(
                 PerdidasACInput(
                     potencia_kw=inv.potencia_ac_sin_clip_kw,
-                    perdidas_ac_pct=inp.perdidas_ac_pct
+                    perdidas_ac_frac=inp.perdidas_ac_pct
                 )
             ).potencia_kw
 
             ac_final = aplicar_perdidas_ac(
                 PerdidasACInput(
                     potencia_kw=inv.potencia_ac_kw,
-                    perdidas_ac_pct=inp.perdidas_ac_pct
+                    perdidas_ac_frac=inp.perdidas_ac_pct
                 )
             ).potencia_kw
 
