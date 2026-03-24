@@ -37,10 +37,12 @@ def ejecutar_electrical(*args, **kwargs) -> ResultadoElectrico:
             kwargs["paneles"] = paneles
 
     paneles = kwargs.get("paneles")
-    datos = kwargs.get("datos")                 # 🔥 FIX
-    sizing = kwargs.get("sizing")               # 🔥 NUEVO
+    datos = kwargs.get("datos")
+    sizing = kwargs.get("sizing")
 
     try:
+
+        print("\n⚡ [ELECTRICAL] INICIO")
 
         # ==================================================
         # VALIDACIONES BASE
@@ -56,19 +58,37 @@ def ejecutar_electrical(*args, **kwargs) -> ResultadoElectrico:
         if not sizing:
             raise ValueError("Falta sizing en electrical")
 
-        if not paneles.strings:
+        if not getattr(paneles, "strings", None):
             raise ValueError("No hay strings definidos")
 
         # ==================================================
-        # PARAMETROS ELECTRICOS
+        # PARAMETROS ELECTRICOS (FIX CRITICO)
         # ==================================================
-        inst = getattr(datos, "instalacion_electrica", None) or {}
+        inst = getattr(datos, "instalacion_electrica", None)
 
-        vac = inst.get("vac")
-        fases = inst.get("fases", 1)
-        fp = inst.get("fp", 1.0)
-        dist_dc_m = inst.get("dist_dc_m")
-        dist_ac_m = inst.get("dist_ac_m")
+        if inst is None:
+            raise ValueError("No existe instalacion_electrica en datos")
+
+        # Soporte dict u objeto
+        if isinstance(inst, dict):
+            vac = inst.get("vac")
+            fases = inst.get("fases", 1)
+            fp = inst.get("fp", 1.0)
+            dist_dc_m = inst.get("dist_dc_m")
+            dist_ac_m = inst.get("dist_ac_m")
+        else:
+            vac = getattr(inst, "vac", None)
+            fases = getattr(inst, "fases", 1)
+            fp = getattr(inst, "fp", 1.0)
+            dist_dc_m = getattr(inst, "dist_dc_m", None)
+            dist_ac_m = getattr(inst, "dist_ac_m", None)
+
+        print("DEBUG INSTALACION:")
+        print(" - vac:", vac)
+        print(" - fases:", fases)
+        print(" - fp:", fp)
+        print(" - dist_dc_m:", dist_dc_m)
+        print(" - dist_ac_m:", dist_ac_m)
 
         if vac is None:
             raise ValueError("Falta 'vac' en instalacion_electrica")
@@ -77,17 +97,19 @@ def ejecutar_electrical(*args, **kwargs) -> ResultadoElectrico:
             raise ValueError("Faltan distancias en instalacion_electrica")
 
         # ==================================================
-        # CORRIENTES (FIX REAL)
+        # CORRIENTES
         # ==================================================
         corrientes_input = CorrientesInput(
             paneles=paneles,
-            kw_ac=sizing.kw_ac,   # 🔥 FIX CRITICO
+            kw_ac=sizing.kw_ac,
             vac=vac,
             fases=fases,
             fp=fp,
         )
 
         corrientes = calcular_corrientes(corrientes_input)
+
+        print("DEBUG CORRIENTES:", corrientes)
 
         if not corrientes.ok:
             return ResultadoElectrico.build(
@@ -111,6 +133,8 @@ def ejecutar_electrical(*args, **kwargs) -> ResultadoElectrico:
 
         conductores = ResultadoConductores.build(tramos)
 
+        print("DEBUG CONDUCTORES:", conductores)
+
         if not conductores.ok:
             return ResultadoElectrico.build(
                 paneles=paneles,
@@ -129,9 +153,13 @@ def ejecutar_electrical(*args, **kwargs) -> ResultadoElectrico:
 
         protecciones = calcular_protecciones(entrada_prot)
 
+        print("DEBUG PROTECCIONES:", protecciones)
+
         # ==================================================
         # RESULTADO FINAL
         # ==================================================
+        print("⚡ [ELECTRICAL] OK")
+
         return ResultadoElectrico.build(
             paneles=paneles,
             corrientes=corrientes,
@@ -140,6 +168,8 @@ def ejecutar_electrical(*args, **kwargs) -> ResultadoElectrico:
         )
 
     except Exception as e:
+
+        print("🔥 ERROR ELECTRICAL:", str(e))
 
         return ResultadoElectrico.build(
             paneles=paneles,
@@ -150,7 +180,7 @@ def ejecutar_electrical(*args, **kwargs) -> ResultadoElectrico:
 
 
 # ==================================================
-# HELPERS DE ERROR (CONSISTENTES)
+# HELPERS DE ERROR
 # ==================================================
 
 def _corrientes_error(msg: str):
