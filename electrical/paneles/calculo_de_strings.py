@@ -226,7 +226,10 @@ def calcular_strings_fv(
 
     t_oper = t_oper_c if t_oper_c is not None else 55.0
 
-    # LIMITES
+    # ======================================================
+    # LIMITES ELÉCTRICOS
+    # ======================================================
+
     n_min, n_max, voc_frio_panel, vmp_hot_panel = _bounds_por_voltaje(
         panel,
         inversor,
@@ -245,7 +248,10 @@ def calcular_strings_fv(
             n_paneles_total=0
         )
 
-    # SELECCION
+    # ======================================================
+    # SELECCIÓN DE SERIE
+    # ======================================================
+
     n_series = _seleccionar_n_series(
         n_min,
         n_max,
@@ -265,10 +271,16 @@ def calcular_strings_fv(
             n_paneles_total=0
         )
 
-    # STRINGS
-    n_strings_total = n_paneles_total // n_series
+    # ======================================================
+    # 🔥 STRINGS CORREGIDO (MPPT GLOBAL)
+    # ======================================================
 
-    if n_strings_total <= 0:
+    n_mppt_total = n_inversores * inversor.n_mppt
+
+    # strings posibles por paneles
+    n_strings_por_paneles = n_paneles_total // n_series
+
+    if n_strings_por_paneles <= 0:
         return StringsResultado(
             ok=False,
             errores=["No es posible formar strings"],
@@ -279,19 +291,39 @@ def calcular_strings_fv(
             n_paneles_total=0
         )
 
-    resto = n_paneles_total % n_series
+    # asegurar uso de todos los MPPT
+    n_strings_total = max(n_strings_por_paneles, n_mppt_total)
+
+    paneles_usados = n_strings_total * n_series
+    resto = n_paneles_total - paneles_usados
 
     if resto > 0:
         warnings.append(f"{resto} panel(es) no utilizados")
 
-    # DISTRIBUCION
+    if n_strings_por_paneles < n_mppt_total:
+        warnings.append(
+            f"Strings insuficientes para MPPT ({n_strings_por_paneles}/{n_mppt_total}) — ajustado automáticamente"
+        )
+
+    if paneles_usados > n_paneles_total:
+        warnings.append(
+            "Número de paneles insuficiente para llenar todos los MPPT"
+        )
+
+    # ======================================================
+    # DISTRIBUCIÓN
+    # ======================================================
+
     distribucion = distribuir_strings_por_inversor(
         n_strings_total,
         n_inversores,
         inversor.n_mppt
     )
 
-    # CALCULOS
+    # ======================================================
+    # CÁLCULOS ELÉCTRICOS
+    # ======================================================
+
     vmp_string = float(n_series * vmp_hot_panel)
     voc_frio_string = float(n_series * voc_frio_panel)
 
@@ -311,6 +343,10 @@ def calcular_strings_fv(
         for (inv, mppt) in distribucion
     ]
 
+    # ======================================================
+    # RESULTADO
+    # ======================================================
+
     return StringsResultado(
         ok=True,
         errores=errores,
@@ -328,7 +364,6 @@ def calcular_strings_fv(
         ),
         n_paneles_total=n_paneles_total
     )
-
 
 # ==========================================================
 # SALIDAS DEL ARCHIVO
