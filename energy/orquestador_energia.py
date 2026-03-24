@@ -6,19 +6,17 @@ from typing import List
 from energy.contrato import EnergiaResultado, EnergiaInput
 from energy.sistema.agregacion_8760 import agregar_energia_por_mes
 
-import streamlit as st
-
 
 # ==========================================================
 # RESULTADO ERROR
 # ==========================================================
-def _resultado_error(inp, errores):
+def _resultado_error(inp: EnergiaInput, errores: List[str]) -> EnergiaResultado:
 
     paneles = inp.paneles
 
-    pdc_kw = 0.0
+    pdc_kw: float = 0.0
     if paneles and hasattr(paneles, "array"):
-        pdc_kw = paneles.array.pdc_kw
+        pdc_kw = paneles.array.potencia_dc_w / 1000
 
     return EnergiaResultado(
         ok=False,
@@ -66,9 +64,29 @@ def _simular_estado_8760(inp: EnergiaInput):
 
 
 # ==========================================================
-# DC
+# NORMALIZACIÓN PANEL (🔥 CLAVE)
 # ==========================================================
-def _calcular_dc(inp, estado):
+def _normalizar_panel(panel):
+
+    return {
+        "p_nom": getattr(panel, "pmax_w", 0.0),
+        "vmp": getattr(panel, "vmp_v", 0.0),
+        "voc": getattr(panel, "voc_v", 0.0),
+        "imp": getattr(panel, "imp_a", 0.0),
+        "isc": getattr(panel, "isc_a", 0.0),
+
+        "coef_vmp": getattr(panel, "coef_vmp_pct_c", -0.3) / 100,
+        "coef_voc": getattr(panel, "coef_voc_pct_c", -0.3) / 100,
+        "coef_p": getattr(panel, "coef_potencia_pct_c", -0.35) / 100,
+
+        "noct": getattr(panel, "noct_c", 45.0),
+    }
+
+
+# ==========================================================
+# DC (ACTUAL - SIMPLE PERO CORRECTO)
+# ==========================================================
+def _calcular_dc(inp: EnergiaInput, estado) -> float:
 
     paneles = inp.paneles
 
@@ -81,9 +99,9 @@ def _calcular_dc(inp, estado):
     if not hasattr(paneles, "array"):
         raise ValueError("paneles sin atributo array")
 
-    pdc_kw = paneles.array.pdc_kw
-    poa = estado.poa_wm2
+    pdc_kw: float = paneles.array.potencia_dc_w / 1000
 
+    poa = getattr(estado, "poa_wm2", None)
     if poa is None:
         raise ValueError("estado sin poa_wm2")
 
@@ -93,9 +111,9 @@ def _calcular_dc(inp, estado):
 
 
 # ==========================================================
-# PÉRDIDAS DC (CORREGIDO)
+# PÉRDIDAS DC
 # ==========================================================
-def _aplicar_perdidas_dc(inp: EnergiaInput, potencia_dc_kw):
+def _aplicar_perdidas_dc(inp: EnergiaInput, potencia_dc_kw: List[float]):
 
     from energy.sistema.perdidas_fisicas import (
         aplicar_perdidas_fisicas, PerdidasInput
@@ -106,7 +124,6 @@ def _aplicar_perdidas_dc(inp: EnergiaInput, potencia_dc_kw):
         potencia_bruta_kw: List[float]
         potencia_neta_kw: List[float]
         perdidas_kw: List[float]
-        factor_total: float
 
     base = aplicar_perdidas_fisicas(
         PerdidasInput(
@@ -127,14 +144,13 @@ def _aplicar_perdidas_dc(inp: EnergiaInput, potencia_dc_kw):
         potencia_bruta_kw=potencia_dc_kw,
         potencia_neta_kw=potencia_neta,
         perdidas_kw=perdidas,
-        factor_total=base.factor_total,
     )
 
 
 # ==========================================================
 # INVERSOR
 # ==========================================================
-def _aplicar_inversor(inp: EnergiaInput, potencia_dc_kw):
+def _aplicar_inversor(inp: EnergiaInput, potencia_dc_kw: List[float]):
 
     from energy.sistema.modelo_energetico_inversor import (
         calcular_inversor_8760, Inversor8760Input
@@ -152,20 +168,12 @@ def _aplicar_inversor(inp: EnergiaInput, potencia_dc_kw):
 # ==========================================================
 # PÉRDIDAS AC
 # ==========================================================
-# ==========================================================
-# PÉRDIDAS AC (CORREGIDO - TRAZABLE)
-# ==========================================================
-def _aplicar_perdidas_ac(inp: EnergiaInput, potencia_ac_kw):
+def _aplicar_perdidas_ac(inp: EnergiaInput, potencia_ac_kw: List[float]):
 
     from energy.sistema.perdidas_ac import (
         aplicar_perdidas_ac, PerdidasACInput
     )
-    from dataclasses import dataclass
-    from typing import List
 
-    # ------------------------------------------------------
-    # CONTRATO CORRECTO
-    # ------------------------------------------------------
     @dataclass(frozen=True)
     class ResultadoAC:
         potencia_bruta_kw: List[float]
@@ -192,20 +200,16 @@ def _aplicar_perdidas_ac(inp: EnergiaInput, potencia_ac_kw):
         perdidas_kw=perdidas,
     )
 
+
 # ==========================================================
-# RESULTADO (CORREGIDO)
+# RESULTADO
 # ==========================================================
 def _construir_resultado(
-    inp,
-    dc_bruta_kw,
-    dc_neta_kw,
-    perdidas_dc_kw,
-    ac_bruta_kw,
-    clipping_kw,
-    ac_neta_kw,
-    perdidas_ac_kw,
-    energia_horaria_kwh,
-):
+    inp: EnergiaInput,
+    dc_bruta_kw: List[float],
+    ac_neta_kw: List[float],
+    clipping_kw: List[float],
+) -> EnergiaResultado:
 
     energia_bruta_12m = agregar_energia_por_mes(dc_bruta_kw)
     energia_final_12m = agregar_energia_por_mes(ac_neta_kw)
@@ -215,16 +219,7 @@ def _construir_resultado(
     energia_final_anual = sum(ac_neta_kw)
     energia_clipping_anual = sum(clipping_kw)
 
-    pdc_kw = inp.paneles.array.pdc_kw
-
-    produccion_especifica_kwh_kwp = (
-        energia_final_anual / pdc_kw if pdc_kw > 0 else 0.0
-    )
-
-    performance_ratio = (
-        energia_final_anual / energia_bruta_anual
-        if energia_bruta_anual > 0 else 0.0
-    )
+    pdc_kw = inp.paneles.array.potencia_dc_w / 1000
 
     return EnergiaResultado(
         ok=True,
@@ -234,7 +229,7 @@ def _construir_resultado(
         pac_nominal_kw=inp.pac_nominal_kw,
         dc_ac_ratio=pdc_kw / inp.pac_nominal_kw if inp.pac_nominal_kw else 0.0,
 
-        energia_horaria_kwh=energia_horaria_kwh,
+        energia_horaria_kwh=[p for p in ac_neta_kw],
 
         energia_bruta_12m=energia_bruta_12m,
         energia_perdidas_12m=[b - f for b, f in zip(energia_bruta_12m, energia_final_12m)],
@@ -248,10 +243,16 @@ def _construir_resultado(
         energia_clipping_anual=energia_clipping_anual,
         energia_util_anual=energia_final_anual,
 
-        produccion_especifica_kwh_kwp=produccion_especifica_kwh_kwp,
-        performance_ratio=performance_ratio,
+        produccion_especifica_kwh_kwp=(
+            energia_final_anual / pdc_kw if pdc_kw > 0 else 0.0
+        ),
 
-        meta={"motor": "8760"},
+        performance_ratio=(
+            energia_final_anual / energia_bruta_anual
+            if energia_bruta_anual > 0 else 0.0
+        ),
+
+        meta={"motor": "8760_estable"},
     )
 
 
@@ -277,16 +278,9 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
 
     r_ac = _aplicar_perdidas_ac(inp, inv.potencia_ac_kw)
 
-    energia_horaria_kwh = r_ac.potencia_neta_kw
-
     return _construir_resultado(
         inp=inp,
         dc_bruta_kw=potencia_dc_bruta,
-        dc_neta_kw=r_dc.potencia_neta_kw,
-        perdidas_dc_kw=r_dc.perdidas_kw,
-        ac_bruta_kw=inv.potencia_ac_kw,
-        clipping_kw=inv.clipping_kw,
         ac_neta_kw=r_ac.potencia_neta_kw,
-        perdidas_ac_kw=r_ac.perdidas_kw,
-        energia_horaria_kwh=energia_horaria_kwh,
+        clipping_kw=inv.clipping_kw,
     )
