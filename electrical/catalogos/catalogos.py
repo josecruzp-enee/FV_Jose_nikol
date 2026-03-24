@@ -68,6 +68,8 @@ _PANELES: Dict[str, Panel] = {
         isc_a=14.10,
         coef_voc_pct_c=-0.28,
         coef_vmp_pct_c=-0.34,
+        coef_potencia_pct_c=-0.35,
+        noct_c=45.0,
     )
 
 }
