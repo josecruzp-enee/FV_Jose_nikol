@@ -210,7 +210,8 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
         # ==================================================
         energia_bruta_12m = agregar_energia_por_mes(dc_bruta_kw)
         energia_despues_perdidas_12m = agregar_energia_por_mes(ac_sin_clipping_kw)
-        energia_util_12m = agregar_energia_por_mes(ac_final_kw)
+        ac_final_kwh = [p * 1.0 for p in ac_final_kw]  # convertir a energía
+        energia_util_12m = agregar_energia_por_mes(ac_final_kwh)
 
         energia_clipping_12m = [
             d - u for d, u in zip(energia_despues_perdidas_12m, energia_util_12m)
@@ -222,7 +223,7 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
 
         energia_bruta_anual = sum(dc_bruta_kw)
         energia_despues_perdidas_anual = sum(ac_sin_clipping_kw)
-        energia_util_anual = sum(ac_final_kw)
+        energia_util_anual = sum(ac_final_kwh)
 
         energia_clipping_anual = (
             energia_despues_perdidas_anual - energia_util_anual
