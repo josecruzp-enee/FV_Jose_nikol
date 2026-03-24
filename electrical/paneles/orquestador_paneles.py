@@ -59,7 +59,16 @@ def _strings_por_mppt_real(strings_res):
     return max(conteo.values()) if conteo else 0
 
 
-def _armar_array(panel, inversor, strings_res, n_paneles, pdc_kw, strings_por_mppt):
+# 🔥 FIX AQUÍ (único cambio real)
+def _armar_array(
+    panel,
+    inversor,
+    strings_res,
+    n_paneles,
+    pdc_kw,
+    strings_por_mppt,
+    n_inversores,  # 👈 NUEVO PARAMETRO (NO ROMPE)
+):
     n_strings = strings_res.recomendacion.n_strings_total
 
     return ArrayFV(
@@ -71,7 +80,7 @@ def _armar_array(panel, inversor, strings_res, n_paneles, pdc_kw, strings_por_mp
         n_strings_total=n_strings,
         n_paneles_total=n_paneles,
         strings_por_mppt=strings_por_mppt,
-        n_mppt=inversor.n_mppt,
+        n_mppt=inversor.n_mppt * n_inversores,  # ✅ FIX REAL
         p_panel_w=panel.pmax_w,
     )
 
@@ -163,7 +172,7 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
         return _resultado_error(strings_res.errores, warnings)
 
     # ------------------------------------------------------
-    # 🔥 DISTRIBUCIÓN REAL (FIX REAL)
+    # DISTRIBUCIÓN REAL
     # ------------------------------------------------------
 
     strings_por_mppt = _strings_por_mppt_real(strings_res)
@@ -179,6 +188,7 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
         n_paneles,
         pdc_kw,
         strings_por_mppt,
+        n_inversores,  # 👈 NUEVO
     )
 
     strings = _mapear_strings(strings_res)
@@ -190,7 +200,7 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
     )
 
     # ------------------------------------------------------
-    # DEBUG (puedes eliminar luego)
+    # DEBUG
     # ------------------------------------------------------
 
     print("DEBUG PANEL:")
