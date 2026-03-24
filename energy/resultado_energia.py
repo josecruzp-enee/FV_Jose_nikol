@@ -90,7 +90,12 @@ class EnergiaResultado:
     """
     energia_util_anual / energia_bruta_anual
     """
-
+    print("energia_util_anual:", energia_util_anual)
+    print("pdc_kw:", inp.pdc_kw)
+    print("produccion_especifica:", energia_util_anual / inp.pdc_kw)
+    print("poa_total_kwh:", poa_total_kwh)
+    print("PR:", performance_ratio)
+    print("====================================")
     # ======================================================
     # METADATA
     # ======================================================
