@@ -93,8 +93,8 @@ def ejecutar_estudio(
                 sizing=sizing,
             )
         except Exception as e:
-            # 🔥 evita que reviente todo el flujo
-            return ResultadoProyecto(
+            print("🔥 ERROR ELECTRICAL:", str(e))
+            raise
                 sizing=sizing,
                 strings=resultado_paneles,
                 energia=None,
