@@ -90,6 +90,7 @@ def ejecutar_estudio(
             resultado_electrico = deps.nec.ejecutar(
                 datos=datos,
                 paneles=resultado_paneles,
+                sizing=sizing,
             )
         except Exception as e:
             # 🔥 evita que reviente todo el flujo
