@@ -1,7 +1,10 @@
 from dataclasses import dataclass
 from typing import List, Dict, Any
 
-from dataclasses import dataclass
+
+# ======================================================
+# INPUT
+# ======================================================
 
 @dataclass
 class EnergiaInput:
@@ -23,39 +26,51 @@ class EnergiaInput:
     perdidas_ac_pct: float
 
     def validar(self):
-    errores = []
+        errores = []
 
-    # CLIMA (CRÍTICO)
-    if self.clima is None:
-        errores.append("Clima no definido")
+        # -----------------------------------------
+        # CLIMA (CRÍTICO)
+        # -----------------------------------------
+        if self.clima is None:
+            errores.append("Clima no definido")
 
-    elif not hasattr(self.clima, "horas") or not self.clima.horas:
-        errores.append("Clima sin datos horarios")
+        elif not hasattr(self.clima, "horas") or not self.clima.horas:
+            errores.append("Clima sin datos horarios")
 
-    elif len(self.clima.horas) < 8000:
-        errores.append("Clima incompleto (no 8760)")
+        elif len(self.clima.horas) < 8000:
+            errores.append("Clima incompleto (no 8760)")
 
-    # CONFIGURACIÓN
-    if self.pdc_kw <= 0:
-        errores.append("pdc_kw inválido")
+        # -----------------------------------------
+        # CONFIGURACIÓN
+        # -----------------------------------------
+        if self.pdc_kw <= 0:
+            errores.append("pdc_kw inválido")
 
-    if self.pac_nominal_kw <= 0:
-        errores.append("pac_nominal_kw inválido")
+        if self.pac_nominal_kw <= 0:
+            errores.append("pac_nominal_kw inválido")
 
-    if self.n_series <= 0 or self.n_strings <= 0:
-        errores.append("Configuración de strings inválida")
+        if self.n_series <= 0 or self.n_strings <= 0:
+            errores.append("Configuración de strings inválida")
 
-    # PANEL
-    if self.panel is None:
-        errores.append("Panel no definido")
+        # -----------------------------------------
+        # PANEL
+        # -----------------------------------------
+        if self.panel is None:
+            errores.append("Panel no definido")
 
-    # GEOMETRÍA
-    if self.tilt_deg is None or self.azimut_deg is None:
-        errores.append("Geometría inválida")
+        # -----------------------------------------
+        # GEOMETRÍA
+        # -----------------------------------------
+        if self.tilt_deg is None or self.azimut_deg is None:
+            errores.append("Geometría inválida")
 
-    return errores
-        
-        
+        return errores
+
+
+# ======================================================
+# RESULTADO
+# ======================================================
+
 @dataclass(frozen=True)
 class EnergiaResultado:
     ok: bool
@@ -70,27 +85,16 @@ class EnergiaResultado:
 
     # ======================================================
     # ENERGÍA HORARIA (8760)
-    # Siempre en kWh (1 valor = 1 hora integrada)
     # ======================================================
     energia_horaria_kwh: List[float]
 
     # ======================================================
     # ENERGÍA MENSUAL (kWh)
     # ======================================================
-
-    # Energía DC antes de pérdidas
     energia_bruta_12m: List[float]
-
-    # Energía después de pérdidas DC + AC (ANTES de clipping)
     energia_despues_perdidas_12m: List[float]
-
-    # Pérdidas físicas (DC + AC)
     energia_perdidas_12m: List[float]
-
-    # Pérdidas por clipping del inversor
     energia_clipping_12m: List[float]
-
-    # Energía final útil AC (después de TODO)
     energia_util_12m: List[float]
 
     # ======================================================
