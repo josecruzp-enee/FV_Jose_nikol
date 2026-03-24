@@ -114,21 +114,17 @@ def ejecutar_estudio(
     print(" - sizing:", sizing)
     print(" - paneles:", resultado_paneles)
 
-    try:
-        energia = deps.energia.ejecutar(
-            datos,
-            sizing,
-            resultado_paneles,
-        )
-    except Exception as e:
-        print("🔥 ERROR ENERGIA:", str(e))
-        energia = None
-
+    
+    energia = deps.energia.ejecutar(
+        datos,
+        sizing,
+        resultado_paneles,
+    )
     if energia is None:
-        print("⚠ Energía devolvió None")
+        raise ValueError("Energía devolvió None")
 
-    elif getattr(energia, "ok", True) is False:
-        print("⚠ Energía con errores")
+    if not getattr(energia, "ok", True):
+        raise ValueError(f"Energía inválida: {energia.errores}")
 
     # ======================================================
     # 5. FINANZAS (OPCIONAL)
