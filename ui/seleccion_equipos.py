@@ -138,6 +138,9 @@ def _ui_select_panel(eq: dict, panel_ids: List[str], panel_map: Dict[str, dict])
     )
 
 def _ui_select_inversor(eq: dict, inv_ids: List[str], inv_map: Dict[str, dict]) -> None:
+
+    st.markdown("### 🔌 Selección de inversor")
+
     eq["inversor_id"] = st.selectbox(
         "Inversor",
         options=inv_ids,
@@ -146,6 +149,18 @@ def _ui_select_inversor(eq: dict, inv_ids: List[str], inv_map: Dict[str, dict]) 
         f'{inv_map[iid]["marca"]} {inv_map[iid]["modelo"]} ({inv_map[iid]["kw_ac"]:.1f} kW)',
     )
 
+    # ======================================================
+    # 🔥 NUEVO: MOSTRAR SUGERENCIAS
+    # ======================================================
+    sugerencias = eq.get("sugerencias_inversor", [])
+
+    if sugerencias:
+        st.markdown("#### ⚡ Inversores recomendados")
+
+        for s in sugerencias:
+            st.write(
+                f"• {s['descripcion']} → {s['pac_total']:.1f} kW | DC/AC={s['dc_ac']}"
+            )
 # ==========================================================
 # CRITERIOS DE DISEÑO
 # ==========================================================
