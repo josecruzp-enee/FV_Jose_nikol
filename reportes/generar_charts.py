@@ -224,11 +224,33 @@ def generar_charts(
             energia = None
 
     # ==========================================================
+    # 🧠 FUNCIÓN ROBUSTA PARA EXTRAER ENERGÍA
+    # ==========================================================
+
+    def _extraer_energia(lista):
+        if not lista:
+            return [0] * 12
+
+        # Caso 1: lista de números
+        if isinstance(lista[0], (int, float)):
+            return lista
+
+        # Caso 2: lista de dicts
+        if isinstance(lista[0], dict):
+            for key in ("energia_kwh", "energia", "valor"):
+                if key in lista[0]:
+                    return [item.get(key, 0) for item in lista]
+
+        # fallback seguro
+        return [0] * 12
+
+    # ==========================================================
     # Procesamiento energía
     # ==========================================================
 
     if energia:
-        energia_mensual = list(getattr(energia, "energia_util_12m", []))
+        energia_raw = list(getattr(energia, "energia_util_12m", []))
+        energia_mensual = _extraer_energia(energia_raw)
     else:
         energia_mensual = [0] * 12
 
@@ -241,6 +263,10 @@ def generar_charts(
 
     paths = {}
 
+    # ==========================================================
+    # 📊 GRÁFICAS
+    # ==========================================================
+
     # mensual
     p1 = base / "fv_energia_mensual.png"
     _chart_mensual(meses, energia_mensual, p1)
@@ -248,7 +274,7 @@ def generar_charts(
 
     # diaria
     energia_diaria = [
-        e/d if d else 0 for e,d in zip(energia_mensual, DIAS_MES)
+        e/d if d else 0 for e, d in zip(energia_mensual, DIAS_MES)
     ]
 
     p2 = base / "fv_energia_diaria.png"
@@ -272,7 +298,10 @@ def generar_charts(
     _chart_anual(energia_anual, p5)
     paths["chart_anual"] = str(p5)
 
-    # strings
+    # ==========================================================
+    # 🔌 STRING FV
+    # ==========================================================
+
     try:
         strings_block = res.get("strings") if isinstance(res, dict) else getattr(res, "strings", None)
         strings = getattr(strings_block, "strings", []) if strings_block else []
