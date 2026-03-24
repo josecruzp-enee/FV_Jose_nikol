@@ -49,6 +49,8 @@ class PanelSpec:
     # coeficientes temperatura
     coef_voc_pct_c: float
     coef_vmp_pct_c: float
+    coef_potencia_pct_c: float   
+    noct_c: float                
 
 
 # ==========================================================
