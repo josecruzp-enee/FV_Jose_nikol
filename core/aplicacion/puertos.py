@@ -3,7 +3,7 @@ from typing import Protocol, Any
 from core.dominio.contrato import ResultadoSizing
 from electrical.paneles.resultado_paneles import ResultadoPaneles
 from electrical.resultado_electrical import ResultadoElectrico
-from energy.contrato import EnergiaResultado
+from energy.resultado_energia import EnergiaResultado
 
 
 # ==========================================================
