@@ -78,7 +78,7 @@ def p1_tabla_cliente(datos, sizing, fecha, pal, content_w):
 def p1_tabla_solucion_unica(datos, sizing, energia, financiero, pal, content_w):
 
     kwp = float(leer(sizing, "kwp_dc", leer(sizing, "pdc_kw", 0.0)))
-    capex = float(financiero.get("capex_L", 0.0))
+    capex = float(leer(financiero, "capex_L", 0.0))
 
     energia_horaria = leer(energia, "energia_horaria_kwh", [])
     prod_anual = sum(energia_horaria) if isinstance(energia_horaria, list) else 0.0
@@ -94,7 +94,7 @@ def p1_tabla_solucion_unica(datos, sizing, energia, financiero, pal, content_w):
     porcentaje_financiado = float(get_field(datos, "porcentaje_financiado", 0.0))
     cobertura_objetivo = float(get_field(datos, "cobertura_objetivo", 0.0))
 
-    evaluacion = financiero.get("evaluacion", {})
+    evaluacion = leer(financiero, "evaluacion", {}) or {}
 
     estado_txt = str(evaluacion.get("estado", "")).upper().strip()
     ds = float(evaluacion.get("dscr", 0.0))
@@ -159,7 +159,7 @@ def p1_tabla_decision(financiero, pal, content_w):
     story.append(section_bar("Decisión del cliente (mensual)", pal, content_w))
     story.append(Spacer(1, 6))
 
-    tabla = financiero.get("tabla_12m", [])
+    tabla = leer(financiero, "tabla_12m", [])
 
     if tabla:
 
@@ -171,12 +171,12 @@ def p1_tabla_decision(financiero, pal, content_w):
         pago_actual = 0.0
         pago_residual = 0.0
 
-    cuota = float(financiero.get("cuota_mensual", 0.0))
+    cuota = float(leer(financiero, "cuota_mensual", 0.0))
 
     pago_total = pago_residual + cuota
     ahorro = pago_actual - pago_total
 
-    plazo_anios = int(financiero.get("plazo_anios", 0))
+    plazo_anios = int(leer(financiero, "plazo_anios", 0))
 
     rows = [
 
@@ -215,9 +215,8 @@ def p1_tabla_decision(financiero, pal, content_w):
 
 def p1_conclusion(financiero, sizing, datos, pal, content_w):
 
-    evaluacion = financiero.get("evaluacion", {})
-
-    impacto = float(financiero.get("ahorro_mensual", 0.0))
+    evaluacion = leer(financiero, "evaluacion", {}) or {}
+    impacto = float(leer(financiero, "ahorro_mensual", 0.0))
     ds = float(evaluacion.get("dscr", 0.0))
     peor = float(evaluacion.get("peor_mes", 0.0))
     estado = str(evaluacion.get("estado", "")).upper()
