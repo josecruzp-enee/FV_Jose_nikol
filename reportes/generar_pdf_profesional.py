@@ -36,10 +36,13 @@ def _ensure_pdf_path(paths: Dict[str, Any]) -> str:
     p.parent.mkdir(parents=True, exist_ok=True)
     return str(p)
 
+from dataclasses import asdict, is_dataclass
+
+
 def generar_pdf_profesional(resultado_proyecto: Any, datos: Any, paths: Dict[str, Any]):
     """
     Soporta:
-      • objeto ResultadoProyecto
+      • ResultadoProyecto (objeto)
       • dict legacy
     """
 
@@ -47,15 +50,20 @@ def generar_pdf_profesional(resultado_proyecto: Any, datos: Any, paths: Dict[str
     styles = pdf_styles()
 
     # =========================
+    # 🔥 CONVERTIR SIEMPRE A DICT
+    # =========================
+    if is_dataclass(resultado_proyecto):
+        resultado = asdict(resultado_proyecto)
+    elif isinstance(resultado_proyecto, dict):
+        resultado = resultado_proyecto
+    else:
+        resultado = dict(resultado_proyecto.__dict__)
+
+    # =========================
     # DEBUG SEGURO
     # =========================
     print("\n========== DEBUG PDF ==========")
-
-    if isinstance(resultado_proyecto, dict):
-        print(resultado_proyecto.get("nec"))
-    else:
-        print(getattr(resultado_proyecto, "nec", None))
-
+    print(resultado.get("nec"))
     print("================================\n")
 
     pdf_path = _ensure_pdf_path(paths)
@@ -66,18 +74,7 @@ def generar_pdf_profesional(resultado_proyecto: Any, datos: Any, paths: Dict[str
     content_w = doc.width
 
     # =========================
-    # 🔥 OPCIÓN PRO (recomendada)
-    # Convertir a dict SOLO para páginas
-    # =========================
-    from dataclasses import asdict, is_dataclass
-
-    if not isinstance(resultado_proyecto, dict) and is_dataclass(resultado_proyecto):
-        resultado = asdict(resultado_proyecto)
-    else:
-        resultado = resultado_proyecto
-
-    # =========================
-    # BUILD PAGES
+    # BUILD PAGES (YA CON DICT)
     # =========================
     story += build_page_1(resultado, datos, paths, pal, styles, content_w)
     story += build_page_2(resultado, datos, paths, pal, styles, content_w)
