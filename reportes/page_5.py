@@ -202,9 +202,20 @@ def build_page_5(resultado, datos, paths, pal, styles, content_w):
 
     story = []
 
+    # =========================
+    # 🔥 BLINDAJE GLOBAL
+    # =========================
+    resultado = resultado or {}
+
+    # =========================
+    # STRINGS
+    # =========================
     strings_block = leer(resultado, "strings", None)
     strings = leer(strings_block, "strings", []) if strings_block else []
 
+    # =========================
+    # SECCIONES
+    # =========================
     _section_resumen(story, resultado, pal, styles, content_w)
     _section_distribucion_strings(story, strings, pal, styles, content_w)
     _section_config_strings(story, strings, pal, styles, content_w)
@@ -212,24 +223,31 @@ def build_page_5(resultado, datos, paths, pal, styles, content_w):
     _section_nec(story, resultado, pal, styles, content_w)
     _section_indicadores(story, resultado, pal, styles, content_w)
 
-    _section_potencia_horaria(story, paths, styles, content_w)
-    _section_energia_horaria(story, paths, styles, content_w)
-    _section_energia_mensual(story, paths, styles, content_w)
+    # =========================
+    # GRÁFICOS
+    # =========================
+    _section_potencia_horaria(story, paths or {}, styles, content_w)
+    _section_energia_horaria(story, paths or {}, styles, content_w)
+    _section_energia_mensual(story, paths or {}, styles, content_w)
 
-    insertar_layout_paneles(story, paths, styles, content_w)
+    insertar_layout_paneles(story, paths or {}, styles, content_w)
 
     story.append(PageBreak())
 
-    # =====================================================
-    # DIAGRAMA STRING FV
-    # =====================================================
+    # =========================
+    # STRING FV
+    # =========================
+    string_fv_path = None
 
-    if isinstance(paths, dict) and paths.get("string_fv") and Path(paths["string_fv"]).exists():
+    if isinstance(paths, dict):
+        string_fv_path = paths.get("string_fv")
+
+    if string_fv_path and Path(str(string_fv_path)).exists():
 
         story.append(Paragraph("Configuración del String Fotovoltaico", styles["Heading2"]))
         story.append(Spacer(1, 6))
 
-        img = Image(str(paths["string_fv"]), width=content_w, height=content_w * 0.28)
+        img = Image(str(string_fv_path), width=content_w, height=content_w * 0.28)
         img.hAlign = "CENTER"
 
         story.append(img)
@@ -254,6 +272,10 @@ def build_page_5(resultado, datos, paths, pal, styles, content_w):
                 styles["BodyText"]
             )
         )
+
+        story.append(Spacer(1, 12))
+
+    return story
 
         story.append(Spacer(1, 12))
 
