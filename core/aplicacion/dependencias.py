@@ -159,9 +159,11 @@ class EnergiaAdapter:
         # ==================================================
         # 🔥 FIX CRÍTICO: PANEL SPEC CORRECTO
         # ==================================================
-        panel_spec = getattr(paneles, "panel", None)
+        panel_id = datos.equipos.get("panel_id")
+        panel_spec = obtener_panel(panel_id)
+
         if panel_spec is None:
-            raise ValueError("panel_spec no disponible desde paneles")
+            raise ValueError(f"Panel no encontrado para energía: {panel_id}")
 
         # ==================================================
         # INPUT ENERGÍA (ALINEADO)
