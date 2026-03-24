@@ -5,7 +5,7 @@ from typing import List
 from energy.contrato import EnergiaInput, EnergiaResultado
 from energy.sistema.agregacion_8760 import agregar_energia_por_mes
 
-# 🔥 MODELOS UNITARIOS (LOS TUYOS)
+# 🔥 MODELOS UNITARIOS
 from energy.panel_energia.modelo_termico import (
     calcular_temperatura_celda, ModeloTermicoInput
 )
@@ -23,12 +23,9 @@ from energy.panel_energia.potencia_arreglo import (
 from energy.solar.posicion_solar import calcular_posicion_solar, SolarInput
 from energy.solar.irradiancia_plano import calcular_irradiancia_plano, IrradianciaInput
 
-# 🔥 SISTEMA
+# 🔥 SISTEMA (CORRECTOS)
+from energy.sistema.inversor import calcular_inversor, InversorInput
 from energy.sistema.perdidas_fisicas import aplicar_perdidas_fisicas, PerdidasInput
-from energy.sistema.modelo_energetico_inversor import (
-    calcular_inversor_8760, Inversor8760Input
-)
-from energy.sistema.perdidas_ac import aplicar_perdidas_ac, PerdidasACInput
 
 
 # ==========================================================
@@ -66,7 +63,7 @@ def _resultado_error(inp: EnergiaInput, errores: List[str]) -> EnergiaResultado:
 
 
 # ==========================================================
-# ORQUESTADOR 8760 REAL
+# ORQUESTADOR 8760 REAL (UNITARIO CORRECTO)
 # ==========================================================
 def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
 
@@ -79,20 +76,17 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
         horas = inp.clima.horas  # 8760
 
         dc_bruta_kw: List[float] = []
-        ac_kw: List[float] = []
         ac_final_kw: List[float] = []
         clipping_kw: List[float] = []
 
-        poa_total_kwh = 0.0  # para PR correcto
+        poa_total_kwh = 0.0
 
         # ==================================================
-        # LOOP 8760 (UNITARIO REAL)
+        # LOOP 8760
         # ==================================================
         for h in horas:
 
-            # ----------------------------------------------
             # 1. POSICIÓN SOLAR
-            # ----------------------------------------------
             pos = calcular_posicion_solar(
                 SolarInput(
                     latitud_deg=inp.clima.latitud,
@@ -101,9 +95,7 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
                 )
             )
 
-            # ----------------------------------------------
             # 2. POA
-            # ----------------------------------------------
             irr = calcular_irradiancia_plano(
                 IrradianciaInput(
                     dni=h.dni_wm2,
@@ -119,9 +111,7 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
             poa = max(0.0, irr.poa_total)
             poa_total_kwh += poa / 1000.0
 
-            # ----------------------------------------------
-            # 3. TEMPERATURA DE CELDA
-            # ----------------------------------------------
+            # 3. TEMPERATURA CELDA
             t_cell = calcular_temperatura_celda(
                 ModeloTermicoInput(
                     irradiancia_poa_wm2=poa,
@@ -130,29 +120,23 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
                 )
             ).temperatura_celda_c
 
-            # ----------------------------------------------
             # 4. PANEL
-            # ----------------------------------------------
             panel = calcular_potencia_panel(
                 PotenciaPanelInput(
                     irradiancia_poa_wm2=poa,
                     temperatura_celda_c=t_cell,
-
                     p_panel_w=inp.panel.pmax_w,
                     vmp_panel_v=inp.panel.vmp_v,
                     voc_panel_v=inp.panel.voc_v,
                     imp_panel_a=inp.panel.imp_a,
                     isc_panel_a=inp.panel.isc_a,
-
                     coef_potencia=inp.panel.coef_potencia_pct_c / 100,
                     coef_vmp=inp.panel.coef_vmp_pct_c / 100,
                     coef_voc=inp.panel.coef_voc_pct_c / 100,
                 )
             )
 
-            # ----------------------------------------------
             # 5. STRING
-            # ----------------------------------------------
             string = calcular_potencia_string(
                 PotenciaStringInput(
                     n_series=inp.n_series,
@@ -164,9 +148,7 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
                 )
             )
 
-            # ----------------------------------------------
             # 6. ARRAY
-            # ----------------------------------------------
             array = calcular_potencia_arreglo(
                 PotenciaArregloInput(
                     n_strings_total=inp.n_strings,
@@ -178,20 +160,20 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
                 )
             )
 
-            # ----------------------------------------------
-            # 7. DC BRUTA (kW)
-            # ----------------------------------------------
+            # 7. DC BRUTA
             dc_bruta_h = array.potencia_array_w / 1000.0
             dc_bruta_kw.append(dc_bruta_h)
 
-            # ----------------------------------------------
-            # 8. PÉRDIDAS DC (unitario)
-            # ----------------------------------------------
-            dc_neta_h = dc_bruta_h * (1 - inp.perdidas_dc_pct) * (1 - inp.sombras_pct)
+            # 8. PÉRDIDAS DC (unitario correcto)
+            dc_neta_h = aplicar_perdidas_fisicas(
+                PerdidasInput(
+                    potencia_kw=dc_bruta_h,
+                    perdidas_dc_pct=inp.perdidas_dc_pct,
+                    sombras_pct=inp.sombras_pct,
+                )
+            ).potencia_kw
 
-            # ----------------------------------------------
             # 9. INVERSOR (unitario)
-            # ----------------------------------------------
             inv = calcular_inversor(
                 InversorInput(
                     potencia_dc_kw=dc_neta_h,
@@ -200,15 +182,11 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
                 )
             )
 
-            ac_h = inv.potencia_ac_kw
-            ac_kw.append(ac_h)
-            clipping_kw.append(inv.clipping_kw)
+            # 10. PÉRDIDAS AC
+            ac_final_h = inv.potencia_ac_kw * (1 - inp.perdidas_ac_pct)
 
-            # ----------------------------------------------
-            # 10. PÉRDIDAS AC (unitario)
-            # ----------------------------------------------
-            ac_final_h = ac_h * (1 - inp.perdidas_ac_pct)
             ac_final_kw.append(ac_final_h)
+            clipping_kw.append(inv.clipping_kw)
 
         # ==================================================
         # AGREGACIÓN
