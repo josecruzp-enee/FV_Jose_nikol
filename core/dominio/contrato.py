@@ -36,10 +36,11 @@ class ResultadoSizing:
     pdc_kw: float
 
     kw_ac: float
+    kw_ac_total: float
     dc_ac_ratio: float 
     n_inversores: int
     paneles_por_inversor: int
-
+    sugerencias: List[Dict[str, Any]] = field(default_factory=list)
     inversor: InversorSpec   # 🔥 FIX CLAVE
 
     energia_12m: List[MesEnergia]
