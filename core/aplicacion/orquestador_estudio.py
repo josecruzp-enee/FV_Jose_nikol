@@ -92,44 +92,43 @@ def ejecutar_estudio(
                 paneles=resultado_paneles,
                 sizing=sizing,
             )
+
+            print("DEBUG ELECTRICAL:", resultado_electrico)
+
         except Exception as e:
             print("🔥 ERROR ELECTRICAL:", str(e))
-            raise
-             
-        if resultado_electrico is None:
-            raise ValueError("Electrical devolvió None")
+            resultado_electrico = None  # ⚠ no romper flujo
 
-        if getattr(resultado_electrico, "ok", True) is False:
-            return ResultadoProyecto(
-                sizing=sizing,
-                strings=resultado_paneles,
-                energia=None,
-                nec=resultado_electrico,
-                financiero=None,
-            )
+        if resultado_electrico is None:
+            print("⚠ Electrical devolvió None")
+
+        elif getattr(resultado_electrico, "ok", True) is False:
+            print("⚠ Electrical con errores, se continúa flujo")
 
     # ======================================================
     # 4. ENERGÍA
     # ======================================================
     print("\n[4] EJECUTANDO ENERGIA")
 
-    energia = deps.energia.ejecutar(
-        datos,
-        sizing,
-        resultado_paneles,
-    )
+    print("DEBUG INPUT ENERGIA:")
+    print(" - sizing:", sizing)
+    print(" - paneles:", resultado_paneles)
+
+    try:
+        energia = deps.energia.ejecutar(
+            datos,
+            sizing,
+            resultado_paneles,
+        )
+    except Exception as e:
+        print("🔥 ERROR ENERGIA:", str(e))
+        energia = None
 
     if energia is None:
-        raise ValueError("Energía devolvió None")
+        print("⚠ Energía devolvió None")
 
-    if getattr(energia, "ok", True) is False:
-        return ResultadoProyecto(
-            sizing=sizing,
-            strings=resultado_paneles,
-            energia=energia,
-            nec=resultado_electrico,
-            financiero=None,
-        )
+    elif getattr(energia, "ok", True) is False:
+        print("⚠ Energía con errores")
 
     # ======================================================
     # 5. FINANZAS (OPCIONAL)
@@ -138,15 +137,16 @@ def ejecutar_estudio(
 
     financiero = None
 
-    if deps.finanzas:
-        financiero = deps.finanzas.ejecutar(
-            datos,
-            sizing,
-            energia,
-        )
-
-        if financiero is None:
-            raise ValueError("Finanzas devolvió None")
+    if deps.finanzas and energia is not None:
+        try:
+            financiero = deps.finanzas.ejecutar(
+                datos,
+                sizing,
+                energia,
+            )
+        except Exception as e:
+            print("🔥 ERROR FINANZAS:", str(e))
+            financiero = None
 
     # ======================================================
     # RESULTADO FINAL
