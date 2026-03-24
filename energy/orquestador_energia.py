@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from typing import List
 
-from energy.contrato import EnergiaInput, EnergiaResultado
+from energy.contrato import EnergiaInput
+from energy.resultado_energia import EnergiaResultado
 from energy.sistema.agregacion_8760 import agregar_energia_por_mes
 
 # MODELOS
