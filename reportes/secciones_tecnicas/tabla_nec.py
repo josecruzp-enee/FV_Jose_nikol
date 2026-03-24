@@ -26,18 +26,13 @@ def _leer_dict(obj, campo, default=None):
 
 
 # ==========================================================
-# TABLA 1 — PARÁMETROS ELÉCTRICOS
+# TABLA 1 — PARÁMETROS ELÉCTRICOS (FIX)
 # ==========================================================
 def crear_tabla_parametros_electricos(resultado, pal, content_w):
 
-    nec = _leer(resultado, "nec", None)
+    corr = _leer(resultado, "corrientes", None)
 
-    if not nec or not getattr(nec, "ok", False):
-        return None
-
-    corr = getattr(nec, "corrientes", None)
-
-    if not corr:
+    if not corr or not getattr(corr, "ok", False):
         return None
 
     def leer(nivel):
@@ -88,24 +83,26 @@ def crear_tabla_parametros_electricos(resultado, pal, content_w):
 
     return tbl
 
+
 # ==========================================================
-# TABLA 2 — DIMENSIONAMIENTO NEC
+# TABLA 2 — DIMENSIONAMIENTO ELÉCTRICO (FIX)
 # ==========================================================
 def crear_tabla_dimensionamiento_nec(resultado, pal, content_w):
 
-    nec = _leer(resultado, "nec", None)
+    corr = _leer(resultado, "corrientes", None)
+    prot = _leer(resultado, "protecciones", None)
+    conductores = _leer(resultado, "conductores", None)
 
-    if not nec or not getattr(nec, "ok", False):
+    if not corr or not getattr(corr, "ok", False):
         return None
 
-    corr = getattr(nec, "corrientes", None)
-    prot = getattr(nec, "protecciones", None)
-    conductores = getattr(nec, "conductores", None)
+    # -------------------------------
+    # CONDUCTORES
+    # -------------------------------
+    cond = []
 
-    if not corr:
-        return None
-
-    cond = getattr(conductores, "tramos", []) if conductores else []
+    if conductores and getattr(conductores, "ok", False):
+        cond = getattr(conductores, "tramos", [])
 
     cond_dc = "—"
     cond_ac = "—"
@@ -120,10 +117,13 @@ def crear_tabla_dimensionamiento_nec(resultado, pal, content_w):
         if "AC" in nombre:
             cond_ac = f'{getattr(c,"calibre","—")} {getattr(c,"material","")}'.strip()
 
+    # -------------------------------
+    # PROTECCIONES
+    # -------------------------------
     breaker_ac = None
     fusible_str = None
 
-    if prot:
+    if prot and getattr(prot, "ok", False):
         breaker_ac = getattr(prot, "ocpd_ac", None)
         fusible_str = getattr(prot, "fusible_string", None)
 
@@ -192,9 +192,8 @@ def crear_tabla_dimensionamiento_nec(resultado, pal, content_w):
 
 
 # ==========================================================
-# TABLA 3 — INDICADORES TÉCNICOS (CORREGIDA)
+# TABLA 3 — INDICADORES TÉCNICOS
 # ==========================================================
-
 def crear_tabla_indicadores(resultado, pal, content_w):
 
     sizing = _leer(resultado, "sizing", None)
@@ -206,10 +205,9 @@ def crear_tabla_indicadores(resultado, pal, content_w):
     kw_ac = _leer(sizing, "kw_ac", 0)
     kwp_dc = _leer(sizing, "pdc_kw", 0)
 
-    # ------------------------------------------------------
-    # PANEL REALMENTE UTILIZADOS
-    # ------------------------------------------------------
-
+    # -------------------------------
+    # PANEL UTILIZADOS
+    # -------------------------------
     paneles_en_strings = sum(_leer(s, "n_series", 0) for s in strings)
 
     utiliz_panel = (
@@ -217,10 +215,9 @@ def crear_tabla_indicadores(resultado, pal, content_w):
         if n_paneles else 0
     )
 
-    # ------------------------------------------------------
-    # MPPT REAL
-    # ------------------------------------------------------
-
+    # -------------------------------
+    # MPPT
+    # -------------------------------
     n_inv = _leer(sizing, "n_inversores", 1)
 
     inversor = _leer(sizing, "inversor", None)
@@ -237,10 +234,9 @@ def crear_tabla_indicadores(resultado, pal, content_w):
         if capacidad_total_strings else 0
     )
 
-    # ------------------------------------------------------
+    # -------------------------------
     # DC / AC
-    # ------------------------------------------------------
-
+    # -------------------------------
     relacion = kwp_dc / kw_ac if kw_ac else 0
     carga_inv = kwp_dc / n_inv if n_inv else 0
 
