@@ -22,8 +22,7 @@ from energy.panel_energia.potencia_arreglo import (
 
 from energy.solar.posicion_solar import calcular_posicion_solar, SolarInput
 from energy.solar.irradiancia_plano import calcular_irradiancia_plano, IrradianciaInput
-
-from energy.sistema.inversor import calcular_inversor, InversorInput
+from energy.sistema.modelo_energetico_inversor import calcular_inversor,InversorInput
 from energy.sistema.perdidas_fisicas import aplicar_perdidas_fisicas, PerdidasInput
 from energy.sistema.perdidas_ac import aplicar_perdidas_ac, PerdidasACInput
 
