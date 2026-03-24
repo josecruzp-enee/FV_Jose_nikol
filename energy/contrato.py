@@ -1,7 +1,30 @@
 from dataclasses import dataclass
 from typing import List, Dict, Any
 
+from dataclasses import dataclass
 
+@dataclass
+class EnergiaInput:
+    n_series: int
+    n_strings: int
+    pdc_kw: float
+
+    panel: any
+    pac_nominal_kw: float
+
+    clima: any
+
+    tilt_deg: float
+    azimut_deg: float
+
+    perdidas_dc_pct: float
+    sombras_pct: float
+    eficiencia_inversor: float
+    perdidas_ac_pct: float
+
+    def validar(self):
+        return []
+        
 @dataclass(frozen=True)
 class EnergiaResultado:
     ok: bool
