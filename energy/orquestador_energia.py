@@ -79,9 +79,14 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
         horas = inp.clima.horas  # 8760
 
         dc_bruta_kw: List[float] = []
+        ac_kw: List[float] = []
+        ac_final_kw: List[float] = []
+        clipping_kw: List[float] = []
+
+        poa_total_kwh = 0.0  # para PR correcto
 
         # ==================================================
-        # LOOP 8760 (AQUÍ ESTÁ LA MAGIA)
+        # LOOP 8760 (UNITARIO REAL)
         # ==================================================
         for h in horas:
 
@@ -112,6 +117,7 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
             )
 
             poa = max(0.0, irr.poa_total)
+            poa_total_kwh += poa / 1000.0
 
             # ----------------------------------------------
             # 3. TEMPERATURA DE CELDA
@@ -175,45 +181,37 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
             # ----------------------------------------------
             # 7. DC BRUTA (kW)
             # ----------------------------------------------
-            dc_bruta_kw.append(array.potencia_array_w / 1000.0)
+            dc_bruta_h = array.potencia_array_w / 1000.0
+            dc_bruta_kw.append(dc_bruta_h)
 
-        # ==================================================
-        # 8. PÉRDIDAS DC
-        # ==================================================
-        dc_neta_kw = aplicar_perdidas_fisicas(
-            PerdidasInput(
-                potencia_kw=dc_bruta_kw,
-                perdidas_dc_pct=inp.perdidas_dc_pct,
-                sombras_pct=inp.sombras_pct,
+            # ----------------------------------------------
+            # 8. PÉRDIDAS DC (unitario)
+            # ----------------------------------------------
+            dc_neta_h = dc_bruta_h * (1 - inp.perdidas_dc_pct) * (1 - inp.sombras_pct)
+
+            # ----------------------------------------------
+            # 9. INVERSOR (unitario)
+            # ----------------------------------------------
+            inv = calcular_inversor(
+                InversorInput(
+                    potencia_dc_kw=dc_neta_h,
+                    p_ac_nominal_kw=inp.pac_nominal_kw,
+                    eficiencia_nominal=inp.eficiencia_inversor,
+                )
             )
-        ).potencia_kw
+
+            ac_h = inv.potencia_ac_kw
+            ac_kw.append(ac_h)
+            clipping_kw.append(inv.clipping_kw)
+
+            # ----------------------------------------------
+            # 10. PÉRDIDAS AC (unitario)
+            # ----------------------------------------------
+            ac_final_h = ac_h * (1 - inp.perdidas_ac_pct)
+            ac_final_kw.append(ac_final_h)
 
         # ==================================================
-        # 9. INVERSOR
-        # ==================================================
-        inv = calcular_inversor_8760(
-            Inversor8760Input(
-                potencia_dc_kw=dc_neta_kw,
-                p_ac_nominal_kw=inp.pac_nominal_kw,
-                eficiencia_nominal=inp.eficiencia_inversor,
-            )
-        )
-
-        ac_kw = inv.potencia_ac_kw
-        clipping_kw = inv.clipping_kw
-
-        # ==================================================
-        # 10. PÉRDIDAS AC
-        # ==================================================
-        ac_final_kw = aplicar_perdidas_ac(
-            PerdidasACInput(
-                potencia_kw=ac_kw,
-                perdidas_ac_pct=inp.perdidas_ac_pct,
-            )
-        ).potencia_kw
-
-        # ==================================================
-        # 11. AGREGACIÓN
+        # AGREGACIÓN
         # ==================================================
         energia_bruta_12m = agregar_energia_por_mes(dc_bruta_kw)
         energia_util_12m = agregar_energia_por_mes(ac_final_kw)
@@ -222,6 +220,15 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
         energia_bruta_anual = sum(dc_bruta_kw)
         energia_util_anual = sum(ac_final_kw)
         energia_clipping_anual = sum(clipping_kw)
+
+        # ==================================================
+        # PR CORRECTO
+        # ==================================================
+        performance_ratio = (
+            energia_util_anual /
+            (poa_total_kwh * inp.pdc_kw)
+            if poa_total_kwh > 0 else 0.0
+        )
 
         # ==================================================
         # RESULTADO FINAL
@@ -254,13 +261,10 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
                 energia_util_anual / inp.pdc_kw if inp.pdc_kw > 0 else 0.0
             ),
 
-            performance_ratio=(
-                energia_util_anual / energia_bruta_anual
-                if energia_bruta_anual > 0 else 0.0
-            ),
+            performance_ratio=performance_ratio,
 
             meta={
-                "modelo": "8760_real",
+                "modelo": "8760_real_unitario",
                 "pipeline": "clima→poa→temp→panel→string→array→dc→inv→ac"
             }
         )
