@@ -48,21 +48,14 @@ def _validar_ctx(ctx) -> bool:
 # OBTENER RESULTADO
 # ==========================================================
 
-def _get_resultado_proyecto(ctx) -> Dict[str, Any]:
+def _get_resultado_proyecto(ctx):
 
     rp = getattr(ctx, "resultado_proyecto", None)
 
     if rp is None:
         raise ValueError("resultado_proyecto inexistente")
 
-    if isinstance(rp, dict):
-        return rp
-
-    if hasattr(rp, "__dict__"):
-        return rp.__dict__
-
-    raise ValueError("resultado_proyecto inválido")
-
+    return rp  # 🔥 devolver el objeto completo
 
 # ==========================================================
 # KPIs PRINCIPALES
