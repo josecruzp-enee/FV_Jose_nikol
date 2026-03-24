@@ -69,7 +69,20 @@ def build_resumen_tecnico(resultado, pal, styles, content_w):
     n_inversores = int(leer(sizing,"n_inversores",1))
 
     # ------------------------------------------------------
-    # Strings
+    # ARRAY (FUENTE REAL)
+    # ------------------------------------------------------
+
+    array = leer(strings_block, "array", None)
+
+    if array:
+        n_strings = int(leer(array, "n_strings_total", 0))
+        panel_wp = float(leer(array, "p_panel_w", 0))
+    else:
+        n_strings = 0
+        panel_wp = (kwp_dc*1000)/n_paneles if n_paneles else 0
+
+    # ------------------------------------------------------
+    # STRINGS
     # ------------------------------------------------------
 
     strings = leer(strings_block,"strings",[]) if strings_block else []
@@ -94,21 +107,12 @@ def build_resumen_tecnico(resultado, pal, styles, content_w):
 
         n_series = vmp = voc = imp = isc = 0
 
-    n_strings = len(strings)
-
     # ------------------------------------------------------
     # NEC
     # ------------------------------------------------------
 
-    if isinstance(nec, dict):
-        paquete = nec.get("paquete_nec",{})
-    else:
-        paquete = leer(nec,"paquete_nec",{})
-
-    if isinstance(paquete, dict):
-        corr = paquete.get("corrientes",{})
-    else:
-        corr = leer(paquete,"corrientes",{})
+    paquete = leer(nec,"paquete_nec",{})
+    corr = leer(paquete,"corrientes",{})
 
     panel_i = leer(leer(corr,"panel",{}),"i_operacion_a",imp)
     string_i = leer(leer(corr,"string",{}),"i_operacion_a",imp)
@@ -117,10 +121,7 @@ def build_resumen_tecnico(resultado, pal, styles, content_w):
     # Parámetros derivados
     # ------------------------------------------------------
 
-    panel_wp = (kwp_dc*1000)/n_paneles if n_paneles else 0
-
     potencia_inversor = kw_ac/n_inversores if n_inversores else 0
-
     relacion_dc_ac = kwp_dc/kw_ac if kw_ac else 0
 
     paneles_usados = n_paneles
