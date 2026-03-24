@@ -259,7 +259,8 @@ def _seleccionar_inversor(pdc, dc_ac_obj, eq):
 
     # ==========================================================
 
-    return inversor, kw_ac, n_inversores, pac_total_kw
+    sugerencias = resultado_inv.get("sugerencias", [])
+    return inversor, kw_ac, n_inversores, pac_total_kw, sugerencias
     
 # ==========================================================
 # API PRINCIPAL
@@ -284,13 +285,14 @@ def calcular_sizing_unificado(
         factor_ocupacion
     )
 
-    inversor, kw_ac, n_inversores, pac_total_kw = _seleccionar_inversor(
+    inversor, kw_ac, n_inversores, pac_total_kw, sugerencias = _seleccionar_inversor(
         pdc,
         dc_ac_obj,
         eq
     )
 
     paneles_por_inversor = ceil(n_pan / n_inversores)
+    eq["sugerencias_inversor"] = sugerencias
 
     # ==========================================================
     # 🔥 CÁLCULO FINAL DC/AC (guardar para UI/reportes)
