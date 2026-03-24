@@ -32,7 +32,7 @@ def crear_tabla_parametros_electricos(resultado, pal, content_w):
 
     corr = _leer(resultado, "corrientes", None)
 
-    if not corr or not getattr(corr, "ok", False):
+    if not corr:
         return None
 
     def leer(nivel):
