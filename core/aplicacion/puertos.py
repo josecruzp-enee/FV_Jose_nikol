@@ -27,7 +27,13 @@ class PuertoPaneles(Protocol):
 # ==========================================================
 
 class PuertoNEC(Protocol):
-    def ejecutar(self, *, datos: Any, paneles: ResultadoPaneles) -> ResultadoElectrico: ...
+    def ejecutar(
+        self,
+        *,
+        datos: Any,
+        paneles: ResultadoPaneles,
+        sizing: ResultadoSizing,  
+    ) -> ResultadoElectrico: ...
 
 
 # ==========================================================
