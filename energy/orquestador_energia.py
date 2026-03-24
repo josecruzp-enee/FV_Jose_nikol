@@ -20,9 +20,11 @@ from energy.panel_energia.potencia_arreglo import (
     calcular_potencia_arreglo, PotenciaArregloInput
 )
 
-from energy.solar.posicion_solar import calcular_posicion_solar, SolarInput
-from energy.solar.irradiancia_plano import calcular_irradiancia_plano, IrradianciaInput
-from energy.sistema.modelo_energetico_inversor import calcular_inversor,InversorInput
+# 🔥 USAR TU ORQUESTADOR SOLAR
+from energy.solar.orquestador_solar import ejecutar_solar
+from energy.solar.entrada_solar import EntradaSolar
+
+from energy.sistema.modelo_energetico_inversor import calcular_inversor, InversorInput
 from energy.sistema.perdidas_fisicas import aplicar_perdidas_fisicas, PerdidasInput
 from energy.sistema.perdidas_ac import aplicar_perdidas_ac, PerdidasACInput
 
@@ -34,28 +36,22 @@ def _resultado_error(inp: EnergiaInput, errores: List[str]) -> EnergiaResultado:
     return EnergiaResultado(
         ok=False,
         errores=errores,
-
         pdc_instalada_kw=inp.pdc_kw,
         pac_nominal_kw=inp.pac_nominal_kw,
         dc_ac_ratio=0.0,
-
         energia_bruta_12m=[],
         energia_perdidas_12m=[],
         energia_despues_perdidas_12m=[],
         energia_clipping_12m=[],
         energia_util_12m=[],
-
         energia_bruta_anual=0.0,
         energia_perdidas_anual=0.0,
         energia_despues_perdidas_anual=0.0,
         energia_clipping_anual=0.0,
         energia_util_anual=0.0,
-
         energia_horaria_kwh=[],
-
         produccion_especifica_kwh_kwp=0.0,
         performance_ratio=0.0,
-
         meta={}
     )
 
@@ -71,6 +67,10 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
 
     try:
 
+        # 🔥 VALIDACIÓN CRÍTICA (esto te faltaba)
+        if not inp.clima or not inp.clima.horas:
+            raise Exception("Clima vacío o no definido")
+
         horas = inp.clima.horas
 
         dc_bruta_kw: List[float] = []
@@ -82,32 +82,28 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
 
         for h in horas:
 
-            # POSICIÓN SOLAR
-            pos = calcular_posicion_solar(
-                SolarInput(
-                    latitud_deg=inp.clima.latitud,
-                    longitud_deg=inp.clima.longitud,
-                    fecha_hora=h.timestamp
+            # ==================================================
+            # 🔥 USAR ORQUESTADOR SOLAR (NO DUPLICAR)
+            # ==================================================
+            solar = ejecutar_solar(
+                EntradaSolar(
+                    lat=inp.clima.latitud,
+                    lon=inp.clima.longitud,
+                    fecha_hora=h.timestamp,
+                    dni_wm2=h.dni_wm2,
+                    dhi_wm2=h.dhi_wm2,
+                    ghi_wm2=h.ghi_wm2,
+                    tilt_deg=inp.tilt_deg,
+                    azimuth_panel_deg=inp.azimut_deg
                 )
             )
 
-            # POA
-            irr = calcular_irradiancia_plano(
-                IrradianciaInput(
-                    dni=h.dni_wm2,
-                    dhi=h.dhi_wm2,
-                    ghi=h.ghi_wm2,
-                    solar_zenith_deg=pos.zenith_deg,
-                    solar_azimuth_deg=pos.azimuth_deg,
-                    panel_tilt_deg=inp.tilt_deg,
-                    panel_azimuth_deg=inp.azimut_deg
-                )
-            )
-
-            poa = max(0.0, irr.poa_total)
+            poa = max(0.0, solar.poa_total_wm2)
             poa_total_kwh += poa / 1000.0
 
-            # TEMPERATURA
+            # ==================================================
+            # TÉRMICO
+            # ==================================================
             t_cell = calcular_temperatura_celda(
                 ModeloTermicoInput(
                     irradiancia_poa_wm2=poa,
@@ -116,7 +112,9 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
                 )
             ).temperatura_celda_c
 
+            # ==================================================
             # PANEL
+            # ==================================================
             panel = calcular_potencia_panel(
                 PotenciaPanelInput(
                     irradiancia_poa_wm2=poa,
@@ -132,7 +130,9 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
                 )
             )
 
+            # ==================================================
             # STRING
+            # ==================================================
             string = calcular_potencia_string(
                 PotenciaStringInput(
                     n_series=inp.n_series,
@@ -144,7 +144,9 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
                 )
             )
 
+            # ==================================================
             # ARRAY
+            # ==================================================
             array = calcular_potencia_arreglo(
                 PotenciaArregloInput(
                     n_strings_total=inp.n_strings,
@@ -156,11 +158,12 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
                 )
             )
 
-            # DC BRUTA
+            # ==================================================
+            # DC
+            # ==================================================
             dc_bruta = array.potencia_array_w / 1000.0
             dc_bruta_kw.append(dc_bruta)
 
-            # DC NETA
             dc_neta = aplicar_perdidas_fisicas(
                 PerdidasInput(
                     potencia_kw=dc_bruta,
@@ -169,7 +172,9 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
                 )
             ).potencia_kw
 
+            # ==================================================
             # INVERSOR
+            # ==================================================
             inv = calcular_inversor(
                 InversorInput(
                     potencia_dc_kw=dc_neta,
@@ -178,7 +183,9 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
                 )
             )
 
-            # AC SIN CLIPPING (post pérdidas AC)
+            # ==================================================
+            # AC
+            # ==================================================
             ac_sin_clip = aplicar_perdidas_ac(
                 PerdidasACInput(
                     potencia_kw=inv.potencia_ac_sin_clip_kw,
@@ -186,7 +193,6 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
                 )
             ).potencia_kw
 
-            # AC FINAL
             ac_final = aplicar_perdidas_ac(
                 PerdidasACInput(
                     potencia_kw=inv.potencia_ac_kw,
@@ -233,34 +239,27 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
         return EnergiaResultado(
             ok=True,
             errores=[],
-
             pdc_instalada_kw=inp.pdc_kw,
             pac_nominal_kw=inp.pac_nominal_kw,
             dc_ac_ratio=inp.pdc_kw / inp.pac_nominal_kw,
-
             energia_bruta_12m=energia_bruta_12m,
             energia_perdidas_12m=energia_perdidas_12m,
             energia_despues_perdidas_12m=energia_despues_perdidas_12m,
             energia_clipping_12m=energia_clipping_12m,
             energia_util_12m=energia_util_12m,
-
             energia_bruta_anual=energia_bruta_anual,
             energia_perdidas_anual=energia_perdidas_anual,
             energia_despues_perdidas_anual=energia_despues_perdidas_anual,
             energia_clipping_anual=energia_clipping_anual,
             energia_util_anual=energia_util_anual,
-
             energia_horaria_kwh=ac_final_kw,
-
             produccion_especifica_kwh_kwp=(
                 energia_util_anual / inp.pdc_kw if inp.pdc_kw > 0 else 0.0
             ),
-
             performance_ratio=performance_ratio,
-
             meta={
                 "modelo": "8760_fisico",
-                "pipeline": "dc→dc_loss→inv→ac_loss",
+                "pipeline": "clima→solar→dc→ac",
             }
         )
 
