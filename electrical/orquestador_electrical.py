@@ -64,7 +64,7 @@ def ejecutar_electrical(*args, **kwargs) -> ResultadoElectrico:
         # ==================================================
         # PARAMETROS ELECTRICOS (FIX CRITICO)
         # ==================================================
-        inst = getattr(datos, "instalacion_electrica", None)
+        inst = getattr(datos, "electrico", None) or getattr(datos, "instalacion_electrica", None)
 
         if inst is None:
             raise ValueError("No existe instalacion_electrica en datos")
