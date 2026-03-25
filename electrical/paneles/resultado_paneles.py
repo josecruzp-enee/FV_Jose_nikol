@@ -82,10 +82,14 @@ class PanelesMeta:
 # RESULTADO FINAL
 # =========================================================
 
+from electrical.modelos.paneles import PanelSpec  # 👈 IMPORTANTE
+
 @dataclass(frozen=True)
 class ResultadoPaneles:
     ok: bool
     topologia: str
+
+    panel: PanelSpec   # 🔥 ESTA LÍNEA NUEVA
 
     array: ArrayFV
     recomendacion: RecomendacionStrings
