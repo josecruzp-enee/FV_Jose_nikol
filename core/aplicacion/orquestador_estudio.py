@@ -214,4 +214,4 @@ def ejecutar_estudio(
     print("FV ENGINE — FIN ESTUDIO")
     print("==============================")
 
-    return resultado resultado
+    return resultado
