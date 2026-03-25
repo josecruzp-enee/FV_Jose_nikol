@@ -5,7 +5,6 @@ from electrical.paneles.resultado_paneles import ResultadoPaneles
 from electrical.resultado_electrical import ResultadoElectrico
 from energy.resultado_energia import EnergiaResultado
 
-# 🔥 NUEVO CONTRATO
 from electrical.paneles.entrada_panel import EntradaPaneles
 
 
@@ -18,7 +17,7 @@ class PuertoSizing(Protocol):
 
 
 # ==========================================================
-# PANELES (🔥 CORREGIDO)
+# PANELES
 # ==========================================================
 
 class PuertoPaneles(Protocol):
