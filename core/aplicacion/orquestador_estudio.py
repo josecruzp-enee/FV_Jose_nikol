@@ -156,9 +156,9 @@ def ejecutar_estudio(
 
     resultado_electrico = None
 
-    if deps.nec:
+    if deps.electrical:
         try:
-            resultado_electrico = deps.nec.ejecutar(
+            resultado_electrico = deps.electrical.ejecutar(
                 datos=datos,
                 paneles=resultado_paneles,
                 sizing=sizing,
