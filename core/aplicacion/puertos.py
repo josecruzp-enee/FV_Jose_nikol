@@ -25,10 +25,10 @@ class PuertoPaneles(Protocol):
 
 
 # ==========================================================
-# ELECTRICAL (NEC)
+# ELECTRICAL (ANTES NEC)
 # ==========================================================
 
-class PuertoNEC(Protocol):
+class PuertoElectrical(Protocol):
     def ejecutar(
         self,
         *,
