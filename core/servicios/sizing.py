@@ -305,6 +305,7 @@ def calcular_sizing_unificado(p: Datosproyecto) -> ResultadoSizing:
         paneles_por_inversor=paneles_por_inversor,
 
         inversor=inv,
+        panel=panel,
         dc_ac_ratio=round(dc_ac_ratio, 3),
 
         energia_12m=energia_12m,
