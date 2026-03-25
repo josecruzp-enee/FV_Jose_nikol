@@ -112,6 +112,9 @@ def calcular_cantidad_inversores(
 # ======================================================
 # API PRINCIPAL
 # ======================================================
+
+from typing import Optional, Dict, Any
+
 def ejecutar_inversor_desde_sizing(
     *,
     pdc_kw: float,
@@ -126,31 +129,32 @@ def ejecutar_inversor_desde_sizing(
         raise ValueError("dc_ac_obj inválido")
 
     # --------------------------------------------------
-    # INVERSOR FORZADO (modo manual)
+    # INVERSOR FORZADO (modo manual con fallback)
     # --------------------------------------------------
     if inversor_id_forzado:
 
         inv = get_inversor(inversor_id_forzado)
 
-        if inv is None:
-            raise ValueError("Inversor forzado no encontrado")
+        if inv is not None:
+            pac = float(inv.kw_ac)
 
-        pac = float(inv.kw_ac)
+            calc = calcular_cantidad_inversores(
+                pdc_kw=pdc_kw,
+                pac_inversor_kw=pac,
+                dc_ac_obj=dc_ac_obj,
+            )
 
-        calc = calcular_cantidad_inversores(
-            pdc_kw=pdc_kw,
-            pac_inversor_kw=pac,
-            dc_ac_obj=dc_ac_obj,
-        )
+            return {
+                "inversor_id": inversor_id_forzado,
+                **calc,
+                "sugerencias": []
+            }
 
-        return {
-            "inversor_id": inversor_id_forzado,
-            **calc,
-            "sugerencias": []  # 🔥 consistente
-        }
+        # 🔥 FALLBACK AUTOMÁTICO
+        print(f"[WARN] Inversor '{inversor_id_forzado}' no encontrado. Usando selección automática.")
 
     # --------------------------------------------------
-    # SELECCIÓN AUTOMÁTICA (ACTUAL)
+    # SELECCIÓN AUTOMÁTICA
     # --------------------------------------------------
     mejor_total = None
     mejor_resultado = None
@@ -181,11 +185,22 @@ def ejecutar_inversor_desde_sizing(
             mejor_resultado = calc
             mejor_id = iid
 
+    # --------------------------------------------------
+    # SI NO HAY NINGÚN INVERSOR VÁLIDO
+    # --------------------------------------------------
     if mejor_resultado is None:
-        raise RuntimeError("No se pudo seleccionar un inversor válido")
+        print("[WARN] No se encontró ningún inversor válido")
+
+        return {
+            "inversor_id": None,
+            "kw_ac_total": 0,
+            "n_inversores": 0,
+            "dc_ac": 0,
+            "sugerencias": []
+        }
 
     # --------------------------------------------------
-    # 🔥 NUEVO: GENERAR SUGERENCIAS
+    # GENERAR SUGERENCIAS
     # --------------------------------------------------
     sugerencias = sugerir_configuraciones_inversor(pdc_kw, dc_ac_obj)
 
@@ -204,5 +219,5 @@ def ejecutar_inversor_desde_sizing(
     return {
         "inversor_id": mejor_id,
         **mejor_resultado,
-        "sugerencias": sugerencias_fmt  # 🔥 NUEVO
+        "sugerencias": sugerencias_fmt
     }
