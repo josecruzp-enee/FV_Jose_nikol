@@ -163,14 +163,39 @@ def _mostrar_sizing(sizing, sistema_fv):
 
 def _mostrar_nec(nec):
 
-    st.subheader("Ingeniería eléctrica (NEC)")
+    st.subheader("Ingeniería eléctrica")
 
     if not nec:
-        st.info("Sin resultados NEC.")
+        st.info("Sin resultados eléctricos.")
         return
 
-    st.write(nec)
+    # ======================================================
+    # RESUMEN GENERAL
+    # ======================================================
+    if hasattr(nec, "resumen"):
+        st.write("### Resumen")
+        st.write(nec.resumen)
 
+    # ======================================================
+    # CORRIENTES
+    # ======================================================
+    if hasattr(nec, "corrientes") and nec.corrientes:
+        st.write("### Corrientes")
+        st.write(nec.corrientes)
+
+    # ======================================================
+    # CONDUCTORES
+    # ======================================================
+    if hasattr(nec, "conductores") and nec.conductores:
+        st.write("### Conductores")
+        st.write(nec.conductores)
+
+    # ======================================================
+    # PROTECCIONES
+    # ======================================================
+    if hasattr(nec, "protecciones") and nec.protecciones:
+        st.write("### Protecciones")
+        st.write(nec.protecciones)
 
 # ==========================================================
 # RENDER PRINCIPAL
