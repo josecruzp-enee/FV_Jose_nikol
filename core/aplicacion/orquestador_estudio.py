@@ -14,7 +14,6 @@ from core.aplicacion.puertos import (
 )
 
 from electrical.paneles.entrada_panel import EntradaPaneles
-from core.aplicacion.multizona import ejecutar_multizona
 
 
 # ==========================================================
@@ -25,144 +24,119 @@ class DependenciasEstudio:
     sizing: PuertoSizing
     paneles: PuertoPaneles
     energia: PuertoEnergia
-    nec: Optional[PuertoNEC] = None
+    electrical: Optional[PuertoNEC] = None
     finanzas: Optional[PuertoFinanzas] = None
 
 
 # ==========================================================
-# ORQUESTADOR
+# ORQUESTADOR PRINCIPAL
 # ==========================================================
-def ejecutar_estudio(
-    datos: Any,
-    deps: DependenciasEstudio,
-):
-
-    print("\n==============================")
-    print("FV ENGINE — INICIO ESTUDIO")
-    print("==============================")
+def ejecutar_estudio(datos: Any, deps: DependenciasEstudio):
 
     try:
+        sizing = _ejecutar_sizing(datos, deps)
 
-        # ------------------------------------------------------
-        # 1. SIZING
-        # ------------------------------------------------------
-        print("\n[1] EJECUTANDO SIZING")
+        if not getattr(sizing, "ok", True):
+            return ResultadoProyecto(sizing=sizing, strings=None, energia=None, nec=None, financiero=None)
 
-        sizing = deps.sizing.ejecutar(datos)
+        entrada_paneles = _construir_entrada_paneles(datos, sizing)
 
-        if sizing is None:
-            raise ValueError("Sizing devolvió None")
+        paneles = _ejecutar_paneles(entrada_paneles, deps)
 
-        if getattr(sizing, "ok", True) is False:
-            return ResultadoProyecto(
-                sizing=sizing,
-                strings=None,
-                energia=None,
-                nec=None,
-                financiero=None,
-            )
+        if not paneles.ok:
+            return ResultadoProyecto(sizing=sizing, strings=paneles, energia=None, nec=None, financiero=None)
 
-        # ------------------------------------------------------
-        # 2. PANEL / STRINGS
-        # ------------------------------------------------------
-        print("\n[2] EJECUTANDO PANEL / STRINGS")
+        energia = _ejecutar_energia(datos, sizing, paneles, deps)
 
-        # 🔥 IMPORTANTE: asegúrate que entrada_paneles exista arriba en tu código
-        resultado_paneles = deps.paneles.ejecutar(entrada_paneles)
+        if not getattr(energia, "ok", True):
+            return ResultadoProyecto(sizing=sizing, strings=paneles, energia=energia, nec=None, financiero=None)
 
-        if resultado_paneles is None:
-            raise ValueError("Paneles devolvió None")
+        electrico = _ejecutar_electrical(datos, sizing, paneles, deps)
 
-        if not resultado_paneles.ok:
-            return ResultadoProyecto(
-                sizing=sizing,
-                strings=resultado_paneles,
-                energia=None,
-                nec=None,
-                financiero=None,
-            )
+        financiero = _ejecutar_finanzas(datos, sizing, energia, deps)
 
-        # ------------------------------------------------------
-        # 3. ENERGÍA
-        # ------------------------------------------------------
-        print("\n[3] EJECUTANDO ENERGIA")
-
-        energia = deps.energia.ejecutar(
-            datos,
-            sizing,
-            resultado_paneles,
-        )
-
-        if energia is None:
-            raise ValueError("Energía devolvió None")
-
-        if getattr(energia, "ok", True) is False:
-            return ResultadoProyecto(
-                sizing=sizing,
-                strings=resultado_paneles,
-                energia=energia,
-                nec=None,
-                financiero=None,
-            )
-
-        # ------------------------------------------------------
-        # 4. ELECTRICAL (CORREGIDO)
-        # ------------------------------------------------------
-        print("\n[4] CALCULOS ELECTRICOS")
-
-        resultado_electrico = None
-
-        if deps.electrical:
-            try:
-                resultado_electrico = deps.electrical.ejecutar(
-                    datos=datos,
-                    paneles=resultado_paneles,
-                    sizing=sizing,
-                )
-
-                if resultado_electrico is None:
-                    raise ValueError("Electrical devolvió None")
-
-            except Exception as e:
-                print("🔥 ERROR ELECTRICAL:", str(e))
-                resultado_electrico = None
-
-        # ------------------------------------------------------
-        # 5. FINANZAS
-        # ------------------------------------------------------
-        print("\n[5] EJECUTANDO FINANZAS")
-
-        financiero = None
-
-        if deps.finanzas:
-            financiero = deps.finanzas.ejecutar(
-                datos,
-                sizing,
-                energia,
-            )
-
-        # ------------------------------------------------------
-        # RESULTADO FINAL
-        # ------------------------------------------------------
-        resultado = ResultadoProyecto(
+        return ResultadoProyecto(
             sizing=sizing,
-            strings=resultado_paneles,
+            strings=paneles,
             energia=energia,
-            nec=resultado_electrico,
+            nec=electrico,
             financiero=financiero,
         )
 
-        print("\n==============================")
-        print("FV ENGINE — FIN ESTUDIO")
-        print("==============================")
-
-        return resultado
-
     except Exception:
-
         import traceback
-
-        print("\n🔥 ERROR REAL EN ORQUESTADOR 🔥")
         print(traceback.format_exc())
-
         raise
+
+
+# ==========================================================
+# FUNCIONES INTERNAS
+# ==========================================================
+
+def _ejecutar_sizing(datos, deps):
+    sizing = deps.sizing.ejecutar(datos)
+
+    if sizing is None:
+        raise ValueError("Sizing devolvió None")
+
+    return sizing
+
+
+def _construir_entrada_paneles(datos, sizing):
+
+    equipos = getattr(datos, "equipos", {}) or {}
+    panel = equipos.get("panel")
+    inversor = sizing.inversor
+
+    if panel is None:
+        raise ValueError("Panel no definido")
+
+    return EntradaPaneles(
+        panel=panel,
+        inversor=inversor,
+        n_inversores=sizing.n_inversores,
+        n_paneles_total=sizing.n_paneles,
+    )
+
+
+def _ejecutar_paneles(entrada_paneles, deps):
+
+    resultado = deps.paneles.ejecutar(entrada_paneles)
+
+    if resultado is None:
+        raise ValueError("Paneles devolvió None")
+
+    return resultado
+
+
+def _ejecutar_energia(datos, sizing, paneles, deps):
+
+    energia = deps.energia.ejecutar(datos, sizing, paneles)
+
+    if energia is None:
+        raise ValueError("Energía devolvió None")
+
+    return energia
+
+
+def _ejecutar_electrical(datos, sizing, paneles, deps):
+
+    if not deps.electrical:
+        return None
+
+    try:
+        return deps.electrical.ejecutar(
+            datos=datos,
+            paneles=paneles,
+            sizing=sizing,
+        )
+    except Exception:
+        return None
+
+
+def _ejecutar_finanzas(datos, sizing, energia, deps):
+
+    if not deps.finanzas:
+        return None
+
+    return deps.finanzas.ejecutar(datos, sizing, energia)
