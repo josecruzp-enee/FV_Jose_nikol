@@ -43,8 +43,8 @@ class DependenciasEstudio:
     sizing: PuertoSizing
     paneles: PuertoPaneles
     energia: PuertoEnergia
-    nec: Optional[PuertoNEC] = None
-    finanzas: Optional[PuertoFinanzas] = None
+    electrical: ElectricalAdapter   
+    finanzas: PuertoFinanzas
 
 
 # ==========================================================
