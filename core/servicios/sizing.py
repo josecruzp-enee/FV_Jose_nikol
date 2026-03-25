@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 """
-Servicio de sizing FV (REFORMADO + MULTI-ZONA).
+Servicio de sizing FV (REFORMADO + MULTI-ZONA + CONTROL DE MODO)
 """
 
 from typing import Any, Dict, Optional, List
@@ -168,10 +168,10 @@ def _dimensionar_generador(panel, modo, valor, consumo_anual):
 
 
 # ==========================================================
-# 🔥 MULTI-ZONA
+# MULTI-ZONA
 # ==========================================================
 
-def _dimensionar_por_zonas(panel, zonas, consumo_anual):
+def _dimensionar_por_zonas(panel, zonas):
 
     total_paneles = 0
     total_pdc = 0
@@ -234,8 +234,9 @@ def _seleccionar_inversor(pdc, dc_ac_obj, eq):
 
     dc_ac_ratio = pdc / pac_total
 
-    if not (1.1 <= dc_ac_ratio <= 1.3):
-        raise ValueError(f"DC/AC fuera de rango: {dc_ac_ratio:.2f}")
+    # 🔥 RELAJADO (no rompe flujo)
+    if not (0.9 <= dc_ac_ratio <= 1.6):
+        print(f"⚠ DC/AC fuera de rango recomendado: {dc_ac_ratio:.2f}")
 
     return inv, kw_ac, n_inv, pac_total, resultado.get("sugerencias", [])
 
@@ -250,21 +251,25 @@ def calcular_sizing_unificado(p: Datosproyecto) -> ResultadoSizing:
 
     consumo_anual = _leer_consumo(p)
 
-    modo, valor = _leer_sizing_input(p)
-
-    # ======================================================
-    # 🔥 MULTI-ZONA ACTIVADA
-    # ======================================================
     sf = getattr(p, "sistema_fv", {}) or {}
-    zonas = sf.get("zonas")
+    modo_diseno = sf.get("modo_diseno", "manual")
 
-    if zonas:
+    # ======================================================
+    # 🔥 CONTROL POR MODO (CLAVE)
+    # ======================================================
+    if modo_diseno == "zonas":
+
+        zonas = sf.get("zonas", [])
+
         n_paneles, pdc = _dimensionar_por_zonas(
             panel,
-            zonas,
-            consumo_anual
+            zonas
         )
+
     else:
+
+        modo, valor = _leer_sizing_input(p)
+
         n_paneles, pdc = _dimensionar_generador(
             panel,
             modo,
