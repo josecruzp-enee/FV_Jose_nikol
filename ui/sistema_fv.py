@@ -1,3 +1,7 @@
+# ==========================================================
+# UI — SISTEMA FV (LIMPIO + MULTI-MODO)
+# ==========================================================
+
 from __future__ import annotations
 from typing import Any, Dict, List, Tuple
 
@@ -17,19 +21,14 @@ def _defaults_sistema_fv() -> Dict[str, Any]:
         "latitud": 14.8,
         "longitud": -86.2,
 
+        "modo_diseno": "manual",  # 🔥 NUEVO
+
         "sizing_input": {
             "modo": "consumo",
             "valor": 80.0
         },
 
-        "tipo_superficie": "Un plano (suelo/losa/estructura)",
-
-        "azimut_deg": 180,
-        "inclinacion_deg": 15,
-
-        "azimut_a_deg": 90,
-        "azimut_b_deg": 270,
-        "reparto_pct_a": 50.0,
+        "zonas": [],
 
         "sombras_pct": 0.0,
         "perdidas_sistema_pct": 15.0,
@@ -68,10 +67,7 @@ def _compass_plot(azimut: float):
 
     rad = np.deg2rad(90 - azimut)
 
-    x = np.cos(rad)
-    y = np.sin(rad)
-
-    ax.arrow(0, 0, x, y, head_width=0.08, head_length=0.12)
+    ax.arrow(0, 0, np.cos(rad), np.sin(rad), head_width=0.08)
 
     ax.set_xlim(-1.3, 1.3)
     ax.set_ylim(-1.3, 1.3)
@@ -81,107 +77,76 @@ def _compass_plot(azimut: float):
     return fig
 
 
-def _roof_plot(tipo, az_a, az_b=None):
-
-    fig, ax = plt.subplots(figsize=(3, 2))
-
-    if tipo == "Un plano (suelo/losa/estructura)":
-
-        ax.plot([0, 4], [0, 0], linewidth=4)
-        ax.arrow(2, 0, 0.8, 0, head_width=0.2)
-
-    else:
-
-        ax.plot([0, 2], [0, 1], linewidth=3)
-        ax.plot([2, 4], [1, 0], linewidth=3)
-
-        ax.arrow(1, 0.5, 0.7, 0, head_width=0.15)
-        ax.arrow(3, 0.5, -0.7, 0, head_width=0.15)
-
-    ax.axis("off")
-    return fig
-
-
 # ==========================================================
-# UI — DIMENSIONAMIENTO
+# MODO DE DISEÑO
 # ==========================================================
 
-def _render_modo_dimensionado(sf: Dict[str, Any]):
+def _render_selector_modo(sf):
 
-    st.markdown("### Dimensionamiento del sistema")
+    st.markdown("### Modo de diseño")
 
     modo = st.radio(
-        "¿Cómo deseas dimensionar el sistema?",
+        "¿Cómo deseas definir el sistema?",
+        [
+            "Definir tamaño del sistema",
+            "Definir por zonas (techos/superficies)"
+        ],
+        index=0 if sf["modo_diseno"] == "manual" else 1
+    )
+
+    if "zonas" in modo:
+        sf["modo_diseno"] = "zonas"
+    else:
+        sf["modo_diseno"] = "manual"
+
+
+# ==========================================================
+# SIZING CLÁSICO
+# ==========================================================
+
+def _render_modo_dimensionado(sf):
+
+    st.markdown("### Dimensionamiento")
+
+    modo = st.radio(
+        "Método",
         [
             "Cobertura energética",
             "Espacio físico disponible",
             "Potencia objetivo",
-            "Manual (definir cantidad de paneles)",
+            "Manual (paneles)"
         ],
-        index=0
     )
 
     if "Cobertura" in modo:
 
-        valor = st.slider(
-            "Cobertura del consumo (%)",
-            min_value=10,
-            max_value=150,
-            value=int(sf["sizing_input"]["valor"]),
-            step=5
-        )
-
-        st.caption(f"Valor seleccionado: {valor}%")
-
+        valor = st.slider("Cobertura (%)", 10, 150, 80)
         sf["sizing_input"] = {"modo": "consumo", "valor": float(valor)}
 
     elif "Espacio" in modo:
 
-        valor = st.number_input(
-            "Área disponible (m²)",
-            min_value=1.0,
-            max_value=10000.0,
-            value=20.0
-        )
-
+        valor = st.number_input("Área (m²)", 1.0, 10000.0, 20.0)
         sf["sizing_input"] = {"modo": "area", "valor": float(valor)}
 
     elif "Potencia" in modo:
 
-        valor = st.number_input(
-            "Potencia objetivo (kW)",
-            min_value=0.1,
-            max_value=1000.0,
-            value=5.0
-        )
-
+        valor = st.number_input("Potencia (kW)", 0.1, 1000.0, 5.0)
         sf["sizing_input"] = {"modo": "potencia", "valor": float(valor)}
 
     else:
 
-        valor = st.number_input(
-            "Cantidad de paneles",
-            min_value=1,
-            max_value=10000,
-            value=10
-        )
-
+        valor = st.number_input("Número de paneles", 1, 10000, 10)
         sf["sizing_input"] = {"modo": "manual", "valor": int(valor)}
 
 
 # ==========================================================
-# UI — GEOMETRÍA
+# MULTI-ZONA
 # ==========================================================
-def _render_geometria(sf: Dict[str, Any]):
 
-    st.markdown("### Geometría del sistema")
+def _render_zonas(sf):
 
-    if "zonas" not in sf:
-        sf["zonas"] = []
+    st.markdown("### Zonas de instalación")
 
-    # ==========================================
-    # BOTÓN AGREGAR ZONA
-    # ==========================================
     if st.button("➕ Agregar zona"):
         sf["zonas"].append({
             "nombre": f"Zona {len(sf['zonas']) + 1}",
@@ -190,80 +155,41 @@ def _render_geometria(sf: Dict[str, Any]):
             "inclinacion": 15.0,
         })
 
-    # ==========================================
-    # EDITAR ZONAS
-    # ==========================================
-    zonas_validas = []
+    nuevas = []
 
     for i, z in enumerate(sf["zonas"]):
 
         with st.expander(f"Zona {i+1}", expanded=True):
 
-            z["nombre"] = st.text_input(
-                "Nombre",
-                value=z.get("nombre", f"Zona {i+1}"),
-                key=f"nombre_{i}"
-            )
+            z["nombre"] = st.text_input("Nombre", z["nombre"], key=f"n{i}")
+            z["area"] = st.number_input("Área", 1.0, 10000.0, z["area"], key=f"a{i}")
+            z["inclinacion"] = st.number_input("Inclinación", 0.0, 60.0, z["inclinacion"], key=f"i{i}")
+            z["azimut"] = st.number_input("Azimut", 0.0, 360.0, z["azimut"], key=f"az{i}")
 
-            z["area"] = st.number_input(
-                "Área (m²)",
-                min_value=1.0,
-                max_value=10000.0,
-                value=float(z.get("area", 20.0)),
-                key=f"area_{i}"
-            )
+            st.pyplot(_compass_plot(z["azimut"]))
 
-            z["inclinacion"] = st.number_input(
-                "Inclinación (°)",
-                min_value=0.0,
-                max_value=60.0,
-                value=float(z.get("inclinacion", 15.0)),
-                key=f"inc_{i}"
-            )
-
-            z["azimut"] = st.number_input(
-                "Azimut (°)",
-                min_value=0.0,
-                max_value=360.0,
-                value=float(z.get("azimut", 180.0)),
-                key=f"az_{i}"
-            )
-
-            col1, col2 = st.columns(2)
-
-            with col1:
-                st.pyplot(_compass_plot(z["azimut"]))
-
-            with col2:
-                st.pyplot(_roof_plot("Un plano", z["azimut"]))
-
-            # botón eliminar
-            if st.button(f"❌ Eliminar zona {i+1}", key=f"del_{i}"):
+            if st.button("Eliminar", key=f"d{i}"):
                 continue
 
-            zonas_validas.append(z)
+            nuevas.append(z)
 
-    sf["zonas"] = zonas_validas
+    sf["zonas"] = nuevas
+
 
 # ==========================================================
-# UI — CONDICIONES
+# CONDICIONES
 # ==========================================================
 
-def _render_condiciones(sf: Dict[str, Any]):
+def _render_condiciones(sf):
 
     st.markdown("### Condiciones")
 
-    sf["sombras_pct"] = st.number_input(
-        "Sombras (%)", 0.0, 30.0, float(sf["sombras_pct"])
-    )
-
-    sf["perdidas_sistema_pct"] = st.number_input(
-        "Pérdidas (%)", 5.0, 30.0, float(sf["perdidas_sistema_pct"])
-    )
+    sf["sombras_pct"] = st.number_input("Sombras (%)", 0.0, 30.0, sf["sombras_pct"])
+    sf["perdidas_sistema_pct"] = st.number_input("Pérdidas (%)", 5.0, 30.0, sf["perdidas_sistema_pct"])
 
 
 # ==========================================================
-# RENDER
+# RENDER PRINCIPAL
 # ==========================================================
 
 def render(ctx):
@@ -272,12 +198,13 @@ def render(ctx):
 
     sf = _get_sf(ctx)
 
-    sf["modo_simulacion"] = "8760"
+    _render_selector_modo(sf)
 
-    st.info("Modo de simulación: Ingeniería (8760 horario)")
+    if sf["modo_diseno"] == "manual":
+        _render_modo_dimensionado(sf)
+    else:
+        _render_zonas(sf)
 
-    _render_modo_dimensionado(sf)
-    _render_geometria(sf)
     _render_condiciones(sf)
 
     ctx.sistema_fv = sf
@@ -291,15 +218,16 @@ def validar(ctx) -> Tuple[bool, List[str]]:
 
     sf = _get_sf(ctx)
 
-    errores: List[str] = []
+    errores = []
 
-    entrada = sf.get("sizing_input", {})
+    if sf["modo_diseno"] == "manual":
 
-    if entrada.get("modo") == "manual":
-        if int(entrada.get("valor", 0)) <= 0:
+        if int(sf["sizing_input"].get("valor", 0)) <= 0:
             errores.append("Cantidad de paneles inválida.")
 
-    if float(sf.get("inclinacion_deg", 0)) < 0:
-        errores.append("Inclinación inválida.")
+    else:
+
+        if not sf.get("zonas"):
+            errores.append("Debe definir al menos una zona.")
 
     return len(errores) == 0, errores
