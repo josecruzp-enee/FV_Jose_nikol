@@ -6,6 +6,22 @@ from core.dominio.modelo import Datosproyecto
 from core.dominio.contrato import ResultadoSizing
 from energy.resultado_energia import EnergiaResultado
 
+def _normalizar_energia(energia):
+
+    if isinstance(energia, list) and len(energia) > 0:
+
+        if isinstance(energia[0], (int, float)):
+            return energia
+
+        if isinstance(energia[0], dict):
+
+            if "energia" in energia[0]:
+                return [float(x["energia"]) for x in energia]
+
+            if "valor" in energia[0]:
+                return [float(x["valor"]) for x in energia]
+
+    return energia
 
 # ==========================================================
 # 🔵 CAPEX
@@ -61,6 +77,7 @@ def simular_12_meses(
     om_mensual_val: float,
 ) -> List[Dict[str, float]]:
 
+    energia_fv_12m = _normalizar_energia(energia_fv_12m)
     if len(consumo_12m) != 12:
         raise ValueError("consumo_12m debe tener 12 valores")
 
