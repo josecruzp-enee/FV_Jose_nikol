@@ -29,9 +29,6 @@ from electrical.resultado_electrical import ResultadoElectrico
 
 def ejecutar_electrical(*args, **kwargs) -> ResultadoElectrico:
 
-    # ======================================================
-    # NORMALIZADOR DE ENTRADA
-    # ======================================================
     if args:
         if len(args) == 2:
             datos, paneles = args
@@ -61,7 +58,7 @@ def ejecutar_electrical(*args, **kwargs) -> ResultadoElectrico:
             raise ValueError("Falta sizing en electrical")
 
         # ==================================================
-        # 🔥 STRINGS AUTOMÁTICO (NUEVO)
+        # 🔥 STRINGS AUTOMÁTICO
         # ==================================================
         panel_obj = getattr(paneles, "panel", None) or getattr(paneles, "panel_spec", None)
 
@@ -80,12 +77,36 @@ def ejecutar_electrical(*args, **kwargs) -> ResultadoElectrico:
         if not strings["ok"]:
             raise ValueError(strings.get("error", "Error en cálculo de strings"))
 
-        # Inyectar strings
-        paneles.strings = strings
+        # ==================================================
+        # 🔥 INYECTAR Y SINCRONIZAR ARRAY
+        # ==================================================
+        paneles.strings = strings["strings"]
 
-        # Actualizar array si existe
-        if hasattr(paneles, "array"):
-            paneles.array.n_strings_total = strings["n_strings"]
+        array = paneles.array
+        panel = panel_obj
+
+        n_strings = strings["n_strings"]
+        strings_por_mppt = strings["strings_por_mppt"]
+        paneles_por_string = strings["paneles_por_string"]
+
+        imp = panel.imp_a
+        isc = panel.isc_a
+        vmp = panel.vmp_v
+
+        array.n_strings_total = n_strings
+        array.strings_por_mppt = strings_por_mppt
+
+        array.idc_nom = n_strings * imp
+        array.isc_total = n_strings * isc
+
+        array.vdc_nom = paneles_por_string * vmp
+
+        print("DEBUG ARRAY:")
+        print(" - n_strings:", array.n_strings_total)
+        print(" - strings_por_mppt:", array.strings_por_mppt)
+        print(" - idc_nom:", array.idc_nom)
+        print(" - isc_total:", array.isc_total)
+        print(" - vdc_nom:", array.vdc_nom)
 
         # ==================================================
         # PARAMETROS ELECTRICOS
@@ -107,13 +128,6 @@ def ejecutar_electrical(*args, **kwargs) -> ResultadoElectrico:
             fp = getattr(inst, "fp", 1.0)
             dist_dc_m = getattr(inst, "dist_dc_m", None)
             dist_ac_m = getattr(inst, "dist_ac_m", None)
-
-        print("DEBUG INSTALACION:")
-        print(" - vac:", vac)
-        print(" - fases:", fases)
-        print(" - fp:", fp)
-        print(" - dist_dc_m:", dist_dc_m)
-        print(" - dist_ac_m:", dist_ac_m)
 
         if vac is None:
             raise ValueError("Falta 'vac' en instalacion_electrica")
@@ -157,8 +171,6 @@ def ejecutar_electrical(*args, **kwargs) -> ResultadoElectrico:
         )
 
         conductores = ResultadoConductores.build(tramos)
-
-        print("DEBUG CONDUCTORES:", conductores)
 
         if not conductores.ok:
             return ResultadoElectrico.build(
