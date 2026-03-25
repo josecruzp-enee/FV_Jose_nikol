@@ -171,5 +171,5 @@ def generar_layout_paneles(
         spine.set_visible(False)
 
     fig.tight_layout()
-    fig.savefig(out_path, dpi=200, bbox_inches="tight")
+    fig.savefig(out_path, dpi=110, bbox_inches="tight")
     plt.close(fig)
