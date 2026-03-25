@@ -198,24 +198,15 @@ def _section_energia_mensual(story, paths, styles, content_w):
 # PAGE 5
 # =========================================================
 
-def build_page_5(resultado, datos, paths, pal, styles, content_w):
+def build_page_5(resultado, datos, paths, pal, styles, content_w, safe_image):
 
     story = []
 
-    # =========================
-    # 🔥 BLINDAJE GLOBAL
-    # =========================
     resultado = resultado or {}
 
-    # =========================
-    # STRINGS
-    # =========================
     strings_block = leer(resultado, "strings", None)
     strings = leer(strings_block, "strings", []) if strings_block else []
 
-    # =========================
-    # SECCIONES
-    # =========================
     _section_resumen(story, resultado, pal, styles, content_w)
     _section_distribucion_strings(story, strings, pal, styles, content_w)
     _section_config_strings(story, strings, pal, styles, content_w)
@@ -223,14 +214,12 @@ def build_page_5(resultado, datos, paths, pal, styles, content_w):
     _section_nec(story, resultado, pal, styles, content_w)
     _section_indicadores(story, resultado, pal, styles, content_w)
 
-    # =========================
-    # GRÁFICOS
-    # =========================
     _section_potencia_horaria(story, paths or {}, styles, content_w)
     _section_energia_horaria(story, paths or {}, styles, content_w)
     _section_energia_mensual(story, paths or {}, styles, content_w)
 
-    insertar_layout_paneles(story, paths or {}, styles, content_w)
+    # 🔥 IMPORTANTE: pasar safe_image aquí también
+    insertar_layout_paneles(story, paths or {}, styles, content_w, safe_image)
 
     story.append(PageBreak())
 
@@ -247,10 +236,13 @@ def build_page_5(resultado, datos, paths, pal, styles, content_w):
         story.append(Paragraph("Configuración del String Fotovoltaico", styles["Heading2"]))
         story.append(Spacer(1, 6))
 
-        img = Image(str(string_fv_path), width=content_w, height=content_w * 0.28)
-        img.hAlign = "CENTER"
+        # 🔥 CAMBIO CLAVE AQUÍ
+        img = safe_image(str(string_fv_path), max_w=content_w, max_h=300)
 
-        story.append(img)
+        if img:
+            img.hAlign = "CENTER"
+            story.append(img)
+
         story.append(Spacer(1, 12))
 
         story.append(
@@ -276,5 +268,3 @@ def build_page_5(resultado, datos, paths, pal, styles, content_w):
         story.append(Spacer(1, 12))
 
     return story
-
-
