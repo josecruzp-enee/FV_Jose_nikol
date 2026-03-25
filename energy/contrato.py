@@ -20,10 +20,11 @@ class EnergiaInput:
     tilt_deg: float
     azimut_deg: float
 
-    perdidas_dc_pct: float
-    sombras_pct: float
+    # 🔥 CAMBIO AQUÍ
+    perdidas_dc_frac: float
+    sombras_frac: float
     eficiencia_inversor: float
-    perdidas_ac_pct: float
+    perdidas_ac_frac: float
 
     def validar(self):
         errores = []
@@ -63,6 +64,20 @@ class EnergiaInput:
         # -----------------------------------------
         if self.tilt_deg is None or self.azimut_deg is None:
             errores.append("Geometría inválida")
+
+        # -----------------------------------------
+        # 🔥 VALIDACIÓN DE FRACCIONES
+        # -----------------------------------------
+        for nombre, valor in [
+            ("perdidas_dc_frac", self.perdidas_dc_frac),
+            ("sombras_frac", self.sombras_frac),
+            ("perdidas_ac_frac", self.perdidas_ac_frac),
+        ]:
+            if not (0 <= valor <= 1):
+                errores.append(f"{nombre} debe estar entre 0 y 1")
+
+        if not (0 < self.eficiencia_inversor <= 1):
+            errores.append("eficiencia_inversor inválida (0–1)")
 
         return errores
 
