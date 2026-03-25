@@ -45,6 +45,16 @@ def _get_resultado_proyecto(ctx):
 # ==========================================================
 def _tabla(titulo: str, data: dict):
 
+    filas = ""
+
+    for k, v in data.items():
+        filas += f"""
+        <tr>
+            <td style="padding:8px; color:#9CA3AF;">{k}</td>
+            <td style="padding:8px; text-align:right; font-weight:bold;">{v}</td>
+        </tr>
+        """
+
     html = f"""
     <div style="
         border-radius:12px;
@@ -55,20 +65,12 @@ def _tabla(titulo: str, data: dict):
     ">
         <h4 style="margin-bottom:12px;">{titulo}</h4>
         <table style="width:100%; border-collapse: collapse;">
+            {filas}
+        </table>
+    </div>
     """
 
-    for k, v in data.items():
-        html += f"""
-        <tr>
-            <td style="padding:8px; color:#9CA3AF;">{k}</td>
-            <td style="padding:8px; text-align:right; font-weight:bold;">{v}</td>
-        </tr>
-        """
-
-    html += "</table></div>"
-
     st.markdown(html, unsafe_allow_html=True)
-
 
 # ==========================================================
 # 📊 DATOS DEL PROYECTO
