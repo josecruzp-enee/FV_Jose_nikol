@@ -8,8 +8,8 @@ from core.dominio.contrato import ResultadoProyecto
 from core.aplicacion.puertos import (
     PuertoSizing,
     PuertoPaneles,
+    PuertoElectrical,
     PuertoEnergia,
-    PuertoNEC,
     PuertoFinanzas,
 )
 
@@ -24,7 +24,7 @@ class DependenciasEstudio:
     sizing: PuertoSizing
     paneles: PuertoPaneles
     energia: PuertoEnergia
-    electrical: Optional[PuertoNEC] = None
+    electrical: Optional[PuertoElectrical]
     finanzas: Optional[PuertoFinanzas] = None
 
 
@@ -34,32 +34,68 @@ class DependenciasEstudio:
 def ejecutar_estudio(datos: Any, deps: DependenciasEstudio):
 
     try:
+        # --------------------------------------------------
+        # 1. SIZING
+        # --------------------------------------------------
         sizing = _ejecutar_sizing(datos, deps)
 
         if not getattr(sizing, "ok", True):
-            return ResultadoProyecto(sizing=sizing, strings=None, energia=None, nec=None, financiero=None)
+            return ResultadoProyecto(
+                sizing=sizing,
+                strings=None,
+                energia=None,
+                electrical=None,
+                financiero=None
+            )
 
+        # --------------------------------------------------
+        # 2. PANELES
+        # --------------------------------------------------
         entrada_paneles = _construir_entrada_paneles(datos, sizing)
 
         paneles = _ejecutar_paneles(entrada_paneles, deps)
 
         if not paneles.ok:
-            return ResultadoProyecto(sizing=sizing, strings=paneles, energia=None, nec=None, financiero=None)
+            return ResultadoProyecto(
+                sizing=sizing,
+                strings=paneles,
+                energia=None,
+                electrical=None,
+                financiero=None
+            )
 
+        # --------------------------------------------------
+        # 3. ENERGÍA
+        # --------------------------------------------------
         energia = _ejecutar_energia(datos, sizing, paneles, deps)
 
         if not getattr(energia, "ok", True):
-            return ResultadoProyecto(sizing=sizing, strings=paneles, energia=energia, nec=None, financiero=None)
+            return ResultadoProyecto(
+                sizing=sizing,
+                strings=paneles,
+                energia=energia,
+                electrical=None,
+                financiero=None
+            )
 
+        # --------------------------------------------------
+        # 4. ELECTRICAL
+        # --------------------------------------------------
         electrico = _ejecutar_electrical(datos, sizing, paneles, deps)
 
+        # --------------------------------------------------
+        # 5. FINANZAS
+        # --------------------------------------------------
         financiero = _ejecutar_finanzas(datos, sizing, energia, deps)
 
+        # --------------------------------------------------
+        # RESULTADO FINAL
+        # --------------------------------------------------
         return ResultadoProyecto(
             sizing=sizing,
             strings=paneles,
             energia=energia,
-            nec=electrico,
+            electrical=electrico,
             financiero=financiero,
         )
 
@@ -145,6 +181,8 @@ def _ejecutar_electrical(datos, sizing, paneles, deps):
     print("⚡ RESULTADO ELECTRICAL:", resultado)
 
     return resultado
+
+
 def _ejecutar_finanzas(datos, sizing, energia, deps):
 
     if not deps.finanzas:
