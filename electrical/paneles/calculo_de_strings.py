@@ -1,22 +1,3 @@
-from __future__ import annotations
-
-"""
-MOTOR DE CÁLCULO DE STRINGS FV — VERSION TIPADA
-==============================================
-
-Este módulo calcula la configuración eléctrica del generador FV:
-
-    - número de módulos en serie
-    - número de strings
-    - distribución por MPPT
-    - voltajes
-    - corrientes
-
-REGLA:
-    NO usa dict
-    SOLO usa dataclass
-"""
-
 from dataclasses import dataclass
 from math import ceil, floor
 from typing import List, Optional
@@ -26,19 +7,16 @@ from electrical.modelos.inversor import InversorSpec
 
 
 # =========================================================
-# RESULTADOS TIPADOS
+# RESULTADOS
 # =========================================================
 
 @dataclass(frozen=True)
 class StringCalc:
     inversor: int
     mppt: int
-
     n_series: int
-
     vmp_string_v: float
     voc_frio_string_v: float
-
     imp_string_a: float
     isc_string_a: float
 
@@ -47,7 +25,6 @@ class StringCalc:
 class RecomendacionCalc:
     n_series: int
     n_strings_total: int
-
     vmp_string_v: float
     voc_string_v: float
 
@@ -61,130 +38,94 @@ class BoundsCalc:
 @dataclass(frozen=True)
 class StringsResultado:
     ok: bool
-
     errores: List[str]
     warnings: List[str]
-
     strings: List[StringCalc]
-
     recomendacion: RecomendacionCalc
     bounds: BoundsCalc
-
     n_paneles_total: int
 
 
 # =========================================================
-# MODELOS DE TEMPERATURA
+# TEMPERATURA (CORRECTO QUE ESTÉ AQUÍ)
 # =========================================================
 
-def _voc_frio(
-    voc_stc: float,
-    coef_voc_pct_c: float,
-    t_min_c: float,
-    t_stc_c: float = 25.0
-) -> float:
-    return voc_stc * (1 + (coef_voc_pct_c / 100.0) * (t_min_c - t_stc_c))
+def _voc_frio(voc, coef, t_min):
+    return voc * (1 + coef / 100 * (t_min - 25))
 
 
-def _vmp_temp(
-    vmp_stc: float,
-    coef_vmp_pct_c: float,
-    t_oper_c: float,
-    t_stc_c: float = 25.0
-) -> float:
-    return vmp_stc * (1 + (coef_vmp_pct_c / 100.0) * (t_oper_c - t_stc_c))
+def _vmp_temp(vmp, coef, t_oper):
+    return vmp * (1 + coef / 100 * (t_oper - 25))
 
 
 # =========================================================
-# LIMITES
+# LIMITES SOLO VOLTAJE
 # =========================================================
 
-def _bounds_por_voltaje(
-    panel: PanelSpec,
-    inv: InversorSpec,
-    t_min_c: float,
-    t_oper_c: float
-):
-    voc_frio_panel = _voc_frio(panel.voc_v, panel.coef_voc_pct_c, t_min_c)
-    vmp_hot_panel = _vmp_temp(panel.vmp_v, panel.coef_vmp_pct_c, t_oper_c)
+def _bounds(panel, inv, t_min, t_oper):
+    voc = _voc_frio(panel.voc_v, panel.coef_voc_pct_c, t_min)
+    vmp = _vmp_temp(panel.vmp_v, panel.coef_vmp_pct_c, t_oper)
 
-    max_por_vdc = floor(inv.vdc_max_v / voc_frio_panel)
-    min_por_mppt = ceil(inv.mppt_min_v / vmp_hot_panel)
-    max_por_mppt = floor(inv.mppt_max_v / vmp_hot_panel)
+    n_min = ceil(inv.mppt_min_v / vmp)
+    n_max = floor(inv.vdc_max_v / voc)
 
-    n_min = max(1, min_por_mppt)
-    n_max = min(max_por_vdc, max_por_mppt)
-
-    return n_min, n_max, voc_frio_panel, vmp_hot_panel
+    return max(1, n_min), max(1, n_max), voc, vmp
 
 
 # =========================================================
-# SELECCION
+# SELECCIÓN ROBUSTA
 # =========================================================
 
-def _seleccionar_n_series(
-    n_min: int,
-    n_max: int,
-    vmp_hot_panel: float,
-    inversor: InversorSpec,
-    n_paneles_total: int
-):
-    mid = (inversor.mppt_min_v + inversor.mppt_max_v) / 2
+def _seleccionar(n_min, n_max, vmp, inv, n_total):
 
-    best_ns = None
+    target = (inv.mppt_min_v + inv.mppt_max_v) / 2
+
+    best = None
     best_score = float("inf")
 
     for n in range(n_min, n_max + 1):
 
-        vmp_string = n * vmp_hot_panel
-        error_v = abs(vmp_string - mid)
+        n_strings = n_total // n
+        if n_strings < 1:
+            continue
 
-        strings = n_paneles_total // n
-        paneles_usados = strings * n
-        sobrantes = n_paneles_total - paneles_usados
+        sobrantes = n_total - (n_strings * n)
+        v_string = n * vmp
 
-        score = error_v 
+        error_v = abs(v_string - target)
+
+        # 🔥 penaliza desperdicio
+        score = error_v + sobrantes * 100
 
         if score < best_score:
             best_score = score
-            best_ns = n
+            best = n
 
-    return best_ns
+    return best
 
 
 # =========================================================
-# DISTRIBUCION
+# DISTRIBUCIÓN SIMPLE
 # =========================================================
 
-def distribuir_strings_por_inversor(
-    n_strings_total,
-    n_inversores,
-    mppt_por_inversor
-):
+def _distribuir(n_strings, n_inv, n_mppt):
+
     posiciones = []
+    carga = [(i, m, 0) for i in range(1, n_inv+1) for m in range(1, n_mppt+1)]
 
-    total_mppt = n_inversores * mppt_por_inversor
-
-    # Inicializa contadores por MPPT
-    carga = [(inv, mppt, 0) 
-             for inv in range(1, n_inversores + 1)
-             for mppt in range(1, mppt_por_inversor + 1)]
-
-    for _ in range(n_strings_total):
-        # seleccionar el MPPT con menor carga
+    for _ in range(n_strings):
         carga.sort(key=lambda x: x[2])
-        inv, mppt, count = carga[0]
-
-        posiciones.append((inv, mppt))
-
-        # actualizar carga
-        carga[0] = (inv, mppt, count + 1)
+        i, m, c = carga[0]
+        posiciones.append((i, m))
+        carga[0] = (i, m, c + 1)
 
     return posiciones
 
+
 # =========================================================
-# MOTOR PRINCIPAL
+# FUNCIÓN PRINCIPAL
 # =========================================================
+
 def calcular_strings_fv(
     *,
     n_paneles_total: int,
@@ -192,377 +133,64 @@ def calcular_strings_fv(
     inversor: InversorSpec,
     n_inversores: int,
     t_min_c: float,
-    dos_aguas: bool = False,
-    objetivo_dc_ac: Optional[float] = None,
-    pdc_kw_objetivo: Optional[float] = None,
-    t_oper_c: Optional[float] = None,
+    t_oper_c: Optional[float] = 55.0,
 ) -> StringsResultado:
 
-    errores: List[str] = []
-    warnings: List[str] = []
-
     if n_paneles_total <= 0:
-        return StringsResultado(
-            ok=False,
-            errores=["n_paneles_total inválido"],
-            warnings=[],
-            strings=[],
-            recomendacion=RecomendacionCalc(0, 0, 0.0, 0.0),
-            bounds=BoundsCalc(0, 0),
-            n_paneles_total=0
-        )
+        return StringsResultado(False, ["Paneles inválidos"], [], [], RecomendacionCalc(0,0,0,0), BoundsCalc(0,0), 0)
 
-    if n_inversores <= 0:
-        return StringsResultado(
-            ok=False,
-            errores=["n_inversores inválido"],
-            warnings=[],
-            strings=[],
-            recomendacion=RecomendacionCalc(0, 0, 0.0, 0.0),
-            bounds=BoundsCalc(0, 0),
-            n_paneles_total=0
-        )
-
-    t_oper = t_oper_c if t_oper_c is not None else 55.0
-
-    # ======================================================
-    # LIMITES ELÉCTRICOS (VOLTAGE)
-    # ======================================================
-
-    n_min, n_max, voc_frio_panel, vmp_hot_panel = _bounds_por_voltaje(
-        panel,
-        inversor,
-        t_min_c,
-        t_oper
-    )
+    # límites eléctricos
+    n_min, n_max, voc_panel, vmp_panel = _bounds(panel, inversor, t_min_c, t_oper_c)
 
     if n_max < n_min:
-        return StringsResultado(
-            ok=False,
-            errores=["No existe número válido de módulos en serie"],
-            warnings=[],
-            strings=[],
-            recomendacion=RecomendacionCalc(0, 0, 0.0, 0.0),
-            bounds=BoundsCalc(0, 0),
-            n_paneles_total=0
-        )
+        return StringsResultado(False, ["No hay rango válido de serie"], [], [], RecomendacionCalc(0,0,0,0), BoundsCalc(0,0), 0)
 
-    # ======================================================
-    # SELECCIÓN DE SERIE
-    # ======================================================
-
-    n_series = _seleccionar_n_series(
-        n_min,
-        n_max,
-        vmp_hot_panel,
-        inversor,
-        n_paneles_total
-    )
+    # selección
+    n_series = _seleccionar(n_min, n_max, vmp_panel, inversor, n_paneles_total)
 
     if not n_series:
-        return StringsResultado(
-            ok=False,
-            errores=["Serie inválida calculada"],
-            warnings=[],
-            strings=[],
-            recomendacion=RecomendacionCalc(0, 0, 0.0, 0.0),
-            bounds=BoundsCalc(0, 0),
-            n_paneles_total=0
-        )
+        return StringsResultado(False, ["No se pudo seleccionar serie"], [], [], RecomendacionCalc(0,0,0,0), BoundsCalc(0,0), 0)
 
-    # ======================================================
-    # STRINGS DISPONIBLES POR PANELES
-    # ======================================================
+    # strings
+    n_strings = n_paneles_total // n_series
 
-    n_strings_por_paneles = n_paneles_total // n_series
+    if n_strings < 1:
+        return StringsResultado(False, ["No es posible formar strings"], [], [], RecomendacionCalc(0,0,0,0), BoundsCalc(0,0), 0)
 
-    if n_strings_por_paneles <= 0:
-        return StringsResultado(
-            ok=False,
-            errores=["No es posible formar strings"],
-            warnings=[],
-            strings=[],
-            recomendacion=RecomendacionCalc(0, 0, 0.0, 0.0),
-            bounds=BoundsCalc(0, 0),
-            n_paneles_total=0
-        )
+    # distribución
+    distrib = _distribuir(n_strings, n_inversores, inversor.n_mppt)
 
-    # ======================================================
-    # 🔥 LÍMITE REAL POR CORRIENTE (NEC)
-    # ======================================================
+    # parámetros eléctricos del string (FÍSICOS, NO NEC)
+    vmp_string = n_series * vmp_panel
+    voc_string = n_series * voc_panel
 
-    n_mppt_total = n_inversores * inversor.n_mppt
-
+    imp = panel.imp_a
     isc = panel.isc_a
-    corriente_string_diseno = isc * 1.25  # NEC 690.8
-
-    if corriente_string_diseno <= 0:
-        max_strings_por_mppt = 1
-    else:
-        max_strings_por_mppt = int(
-            inversor.imppt_max_a / corriente_string_diseno
-        )
-
-    max_strings_por_mppt = max(1, max_strings_por_mppt)
-
-    capacidad_total_strings = n_mppt_total * max_strings_por_mppt
-
-    # ======================================================
-    # LIMITACIÓN FINAL
-    # ======================================================
-
-    n_strings_total = min(n_strings_por_paneles, capacidad_total_strings)
-
-    # ======================================================
-    # WARNINGS
-    # ======================================================
-
-    if n_strings_por_paneles > capacidad_total_strings:
-        warnings.append(
-            "Strings limitados por corriente máxima de MPPT"
-        )
-
-    if max_strings_por_mppt < 2:
-        warnings.append(
-            "El inversor no permite 2 strings por MPPT bajo NEC"
-        )
-
-    if n_strings_total < n_mppt_total:
-        warnings.append(
-            f"Strings insuficientes para ocupar todos los MPPT ({n_strings_total}/{n_mppt_total})"
-        )
-
-    # ======================================================
-    # PANEL USAGE REAL
-    # ======================================================
-
-    paneles_usados = n_strings_total * n_series
-    resto = n_paneles_total - paneles_usados
-
-    if resto > 0:
-        warnings.append(f"{resto} panel(es) no utilizados")
-
-    # ======================================================
-    # DISTRIBUCIÓN
-    # ======================================================
-
-    distribucion = distribuir_strings_por_inversor(
-        n_strings_total,
-        n_inversores,
-        inversor.n_mppt
-    )
-
-    # ======================================================
-    # CÁLCULOS ELÉCTRICOS
-    # ======================================================
-
-    vmp_string = float(n_series * vmp_hot_panel)
-    voc_frio_string = float(n_series * voc_frio_panel)
-
-    imp_string = float(panel.imp_a)
-    isc_string = float(panel.isc_a)
 
     strings = [
         StringCalc(
-            inversor=inv,
-            mppt=mppt,
+            inversor=i,
+            mppt=m,
             n_series=n_series,
             vmp_string_v=vmp_string,
-            voc_frio_string_v=voc_frio_string,
-            imp_string_a=imp_string,
-            isc_string_a=isc_string,
+            voc_frio_string_v=voc_string,
+            imp_string_a=imp,
+            isc_string_a=isc,
         )
-        for (inv, mppt) in distribucion
+        for (i, m) in distrib
     ]
-
-    # ======================================================
-    # RESULTADO
-    # ======================================================
 
     return StringsResultado(
         ok=True,
-        errores=errores,
-        warnings=warnings,
+        errores=[],
+        warnings=[],
         strings=strings,
         recomendacion=RecomendacionCalc(
             n_series=n_series,
-            n_strings_total=n_strings_total,
+            n_strings_total=n_strings,
             vmp_string_v=vmp_string,
-            voc_string_v=voc_frio_string
+            voc_string_v=voc_string
         ),
-        bounds=BoundsCalc(
-            n_min=n_min,
-            n_max=n_max
-        ),
+        bounds=BoundsCalc(n_min, n_max),
         n_paneles_total=n_paneles_total
     )
-
-# ==========================================================
-# SALIDAS DEL ARCHIVO
-# ==========================================================
-#
-# FUNCIÓN PRINCIPAL:
-# ----------------------------------------------------------
-# calcular_strings_fv()
-#
-#
-# ----------------------------------------------------------
-# ENTRADA (CONTRATO)
-# ----------------------------------------------------------
-#
-# n_paneles_total : int
-#     → número total de paneles del sistema
-#
-# panel : PanelSpec
-#     → datos eléctricos del módulo FV
-#         - vmp_v
-#         - voc_v
-#         - imp_a
-#         - isc_a
-#         - coeficientes térmicos
-#
-# inversor : InversorSpec
-#     → restricciones eléctricas del inversor
-#         - vdc_max_v
-#         - mppt_min_v
-#         - mppt_max_v
-#         - n_mppt
-#
-# n_inversores : int
-#     → cantidad de inversores en el sistema
-#
-# t_min_c : float
-#     → temperatura mínima (para Voc en frío)
-#
-# t_oper_c : float (opcional)
-#     → temperatura de operación (para Vmp)
-#
-# dos_aguas : bool
-#     → configuración física del sistema (no afecta cálculo base)
-#
-# objetivo_dc_ac / pdc_kw_objetivo
-#     → parámetros de diseño (no usados directamente aquí)
-#
-#
-# ----------------------------------------------------------
-# PROCESO (QUÉ CALCULA)
-# ----------------------------------------------------------
-#
-# Este módulo calcula:
-#
-#   1. Límites eléctricos por voltaje:
-#       - mínimo y máximo número de módulos en serie
-#
-#   2. Selección óptima de n_series:
-#       - centrado en ventana MPPT
-#       - minimizando desperdicio de paneles
-#
-#   3. Número total de strings:
-#       n_strings_total = n_paneles_total / n_series
-#
-#   4. Distribución:
-#       - strings por inversor
-#       - strings por MPPT
-#
-#   5. Parámetros eléctricos:
-#       - Vmp string
-#       - Voc frío string
-#       - corriente de string
-#
-#
-# ----------------------------------------------------------
-# SALIDA
-# ----------------------------------------------------------
-#
-# StringsResultado
-#
-# Campos:
-#
-#   ok : bool
-#       → estado del cálculo
-#
-#   errores : list[str]
-#       → errores críticos (detienen cálculo)
-#
-#   warnings : list[str]
-#       → advertencias (ej: paneles sobrantes)
-#
-#   strings : list[StringCalc]
-#       → detalle por string:
-#           - inversor
-#           - mppt
-#           - n_series
-#           - vmp_string_v
-#           - voc_frio_string_v
-#           - imp_string_a
-#           - isc_string_a
-#
-#   recomendacion : RecomendacionCalc
-#       → resumen del sistema:
-#           - n_series
-#           - n_strings_total
-#           - voltajes
-#
-#   bounds : BoundsCalc
-#       → límites eléctricos:
-#           - n_min
-#           - n_max
-#
-#   n_paneles_total : int
-#       → paneles utilizados
-#
-#
-# ----------------------------------------------------------
-# UBICACIÓN EN LA ARQUITECTURA
-# ----------------------------------------------------------
-#
-# Carpeta:
-#   electrical/paneles/
-#
-# Rol:
-#   Motor de cálculo eléctrico de strings
-#
-#
-# ----------------------------------------------------------
-# FLUJO DEL SISTEMA
-# ----------------------------------------------------------
-#
-# EntradaPaneles
-#       ↓
-# dimensionar_paneles
-#       ↓
-# calcular_strings_fv   ← ESTE MÓDULO
-#       ↓
-# ResultadoPaneles
-#       ↓
-# NEC / Corrientes / Conductores
-#
-#
-# ----------------------------------------------------------
-# PRINCIPIOS
-# ----------------------------------------------------------
-#
-# ✔ NO usa dict
-# ✔ SOLO usa dataclass
-# ✔ NO calcula NEC
-# ✔ NO calcula energía
-# ✔ SOLO define el generador FV
-#
-#
-# ----------------------------------------------------------
-# CONSUMIDO POR
-# ----------------------------------------------------------
-#
-# electrical.paneles.orquestador_paneles
-#
-#
-# ----------------------------------------------------------
-# NOTA DE DISEÑO
-# ----------------------------------------------------------
-#
-# Este módulo define el comportamiento eléctrico base del sistema.
-#
-# Todo lo que sigue (corrientes, NEC, conductores)
-# depende directamente de este resultado.
-#
-# ==========================================================
