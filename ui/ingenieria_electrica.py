@@ -241,6 +241,8 @@ def render(ctx):
         deps = construir_dependencias()
 
         resultado = ejecutar_estudio(datos, deps)
+        st.write("DEBUG RESULTADO COMPLETO:", resultado)
+        st.write("DEBUG ELECTRICO:", getattr(resultado, "nec", None))
 
         ctx.resultado_proyecto = resultado
 
