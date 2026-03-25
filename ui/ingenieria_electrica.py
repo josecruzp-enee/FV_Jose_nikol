@@ -6,7 +6,6 @@ FV Engine
 """
 
 from typing import List, Tuple
-import pandas as pd
 import streamlit as st
 
 from core.dominio.modelo import Datosproyecto
@@ -70,6 +69,7 @@ def _ui_inputs_electricos(e: dict):
 # ==========================================================
 # ctx → DatosProyecto
 # ==========================================================
+
 def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
 
     dc = _asegurar_dict(ctx, "datos_cliente")
@@ -113,27 +113,48 @@ def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
         instalacion_electrica=dict(e)
     )
 
-    # 🔴 ya lo tenías
+    # Equipos
     p.equipos = dict(eq)
 
-    # 🔥 ESTE ES EL FIX IMPORTANTE
+    # 🔥 SISTEMA FV (clave)
     p.sistema_fv = dict(sf)
 
     return p
 
+
 # ==========================================================
-# MOSTRAR SIZING
+# MOSTRAR SIZING (MEJORADO)
 # ==========================================================
 
-def _mostrar_sizing(sizing):
+def _mostrar_sizing(sizing, sistema_fv):
 
     st.subheader("Sizing del sistema FV")
+
+    modo = sistema_fv.get("modo_diseno", "manual")
+
+    if modo == "zonas":
+        st.info("Modo: Diseño por zonas")
+    else:
+        st.info("Modo: Diseño por cantidad / consumo")
 
     c1, c2, c3 = st.columns(3)
 
     c1.metric("Paneles", sizing.n_paneles)
     c2.metric("Potencia DC", f"{sizing.pdc_kw} kWp")
     c3.metric("Potencia AC", f"{sizing.kw_ac} kW")
+
+    # 🔥 MOSTRAR ZONAS
+    if modo == "zonas":
+
+        st.markdown("### Zonas consideradas")
+
+        for z in sistema_fv.get("zonas", []):
+            st.write(
+                f"- {z.get('nombre')}: "
+                f"{z.get('area')} m² | "
+                f"{z.get('azimut')}° | "
+                f"{z.get('inclinacion')}°"
+            )
 
 
 # ==========================================================
@@ -148,12 +169,13 @@ def _mostrar_nec(nec):
         st.info("Sin resultados NEC.")
         return
 
-    st.write(nec) 
+    st.write(nec)
 
 
 # ==========================================================
 # RENDER PRINCIPAL
 # ==========================================================
+
 def render(ctx):
 
     e = _asegurar_dict(ctx, "electrico")
@@ -184,27 +206,23 @@ def render(ctx):
 
         st.success("Ingeniería generada correctamente.")
 
-        _mostrar_sizing(resultado.sizing)
+        _mostrar_sizing(resultado.sizing, datos.sistema_fv)
         _mostrar_nec(resultado.nec)
 
     except Exception as e:
 
         msg = str(e)
 
-        # ==========================================================
-        # 🔥 ERRORES DE NEGOCIO (DC/AC, etc.)
-        # ==========================================================
         if "DC/AC" in msg:
             st.error(msg)
 
-            # 🔧 SUGERENCIA AUTOMÁTICA
             try:
                 datos = _datosproyecto_desde_ctx(ctx)
-                pdc = getattr(datos, "consumo_12m", None)
 
-                # mejor: usar sizing si existe
                 if hasattr(ctx, "resultado_proyecto") and ctx.resultado_proyecto:
                     pdc = ctx.resultado_proyecto.sizing.pdc_kw
+                else:
+                    pdc = None
 
                 if pdc:
                     pac_obj = pdc / 1.2
@@ -213,16 +231,13 @@ def render(ctx):
             except Exception:
                 pass
 
-        # ==========================================================
-        # ⚠️ ERRORES TÉCNICOS
-        # ==========================================================
         else:
             import traceback
             st.error("Error en motor FV")
             st.code(traceback.format_exc())
 
-        # 🔥 IMPORTANTE: detener flujo
         st.stop()
+
 
 # ==========================================================
 # VALIDACIÓN
