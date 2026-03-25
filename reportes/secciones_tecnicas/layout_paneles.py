@@ -35,6 +35,14 @@ def insertar_layout_paneles(story, paths, styles, content_w, safe_image=None):
 
             img.hAlign = "CENTER"
 
+            from reportlab.platypus import PageBreak
+            story.append(Spacer(1, 12))
+
+            # título opcional
+            story.append(PageBreak())
+            story.append(Paragraph("Layout de paneles", styles["Heading2"]))
+            story.append(Spacer(1, 6))
+
             story.append(img)
 
         except Exception:
