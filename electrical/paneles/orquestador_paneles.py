@@ -232,6 +232,7 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
 
     return ResultadoPaneles(
         ok=True,
+        panel=panel, 
         topologia=topologia,
         array=array,
         recomendacion=RecomendacionStrings(
