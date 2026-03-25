@@ -152,9 +152,16 @@ def calcular_strings_fv(
     # =============================
     return {
         "ok": True,
-        "n_series": mejor["n_series"],
-        "n_strings_total": mejor["n_strings_total"],
+
+        # 🔥 COMPATIBLE CON ORQUESTADOR
+        "paneles_por_string": mejor["n_series"],
+        "n_strings": mejor["n_strings_total"],
         "strings_por_mppt": strings_por_mppt,
         "strings": strings_list,
+
+        # 🔎 OPCIONAL (para debugging / futuro)
+        "n_series": mejor["n_series"],
+        "n_strings_total": mejor["n_strings_total"],
+
         "warnings": warnings,
     }
