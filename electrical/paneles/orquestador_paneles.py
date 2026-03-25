@@ -131,7 +131,7 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
         warnings += val.warnings
 
     if errores:
-        return _resultado_error(errores, warnings)
+        return _resultado_error(panel, errores, warnings)
 
     # ------------------------------------------------------
     # DIMENSIONADO
@@ -140,7 +140,7 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
     n_paneles, pdc_kw, err = _resolver_dimensionado(entrada, panel)
 
     if err:
-        return _resultado_error(err, warnings)
+        return _resultado_error(panel, err, warnings)
 
     # ------------------------------------------------------
     # INVERSORES
@@ -148,6 +148,7 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
 
     if entrada.n_inversores is None:
         return _resultado_error(
+            panel,
             ["n_inversores no definido desde core (sizing)"],
             warnings
         )
@@ -168,7 +169,7 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
     )
 
     if not strings_res.ok:
-        return _resultado_error(strings_res.errores, warnings)
+        return _resultado_error(panel, strings_res.errores, warnings)
 
     # ------------------------------------------------------
     # DISTRIBUCIÓN
@@ -194,12 +195,11 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
         n_inversores,
     )
 
-    # 🔥 VALIDACIONES CRÍTICAS
     if array.n_mppt <= 0:
-        return _resultado_error(["n_mppt inválido"], warnings)
+        return _resultado_error(panel, ["n_mppt inválido"], warnings)
 
     if array.n_strings_total <= 0:
-        return _resultado_error(["n_strings_total inválido"], warnings)
+        return _resultado_error(panel, ["n_strings_total inválido"], warnings)
 
     if array.n_strings_total < array.n_mppt:
         warnings.append(
@@ -214,25 +214,17 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
         n_inversores=n_inversores,
     )
 
-    # ------------------------------------------------------
-    # DEBUG
-    # ------------------------------------------------------
-
     print("\nDEBUG PANEL FINAL:")
     print("n_inversores:", n_inversores)
     print("n_strings:", array.n_strings_total)
     print("n_mppt:", array.n_mppt)
     print("strings/mppt:", array.strings_por_mppt)
 
-    # ------------------------------------------------------
-    # RESULTADO
-    # ------------------------------------------------------
-
     topologia = "string" if n_inversores > 1 else "centralizado"
 
     return ResultadoPaneles(
         ok=True,
-        panel=panel, 
+        panel=panel,
         topologia=topologia,
         array=array,
         recomendacion=RecomendacionStrings(
