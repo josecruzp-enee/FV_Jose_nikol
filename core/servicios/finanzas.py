@@ -15,10 +15,12 @@ def _normalizar_energia(energia):
 
     for x in energia:
 
+        # caso 1: número directo
         if isinstance(x, (int, float)):
             resultado.append(float(x))
             continue
 
+        # caso 2: dict
         if isinstance(x, dict):
 
             if "valor" in x:
@@ -29,10 +31,13 @@ def _normalizar_energia(energia):
                 resultado.append(float(x["energia"]))
                 continue
 
+            if "energia_kwh" in x:  # 🔥 ESTE ES TU CASO REAL
+                resultado.append(float(x["energia_kwh"]))
+                continue
+
         raise ValueError(f"Formato inválido en energía: {x}")
 
     return resultado
-
 # ==========================================================
 # 🔵 CAPEX
 # ==========================================================
