@@ -1,62 +1,79 @@
-from typing import Protocol, Any
+from __future__ import annotations
 
-from core.dominio.contrato import ResultadoSizing
+"""
+ADAPTER PANELES
+===============
+
+Responsabilidad:
+    Traducir el puerto (EntradaPaneles) hacia el motor real de cálculo.
+
+Principios:
+    ✔ No contiene lógica de negocio
+    ✔ No reconstruye inversor
+    ✔ No modifica datos
+    ✔ Solo delega
+
+Arquitectura:
+    Core → PuertoPaneles → Adapter → ejecutar_paneles → motor strings
+"""
+
+from electrical.paneles.entrada_panel import EntradaPaneles
+from electrical.paneles.orquestador_paneles import ejecutar_paneles
 from electrical.paneles.resultado_paneles import ResultadoPaneles
-from electrical.resultado_electrical import ResultadoElectrico
-from energy.resultado_energia import EnergiaResultado
 
 
-# ==========================================================
-# SIZING
-# ==========================================================
+class PanelesAdapter:
+    """
+    Implementación concreta del PuertoPaneles.
+    """
 
-class PuertoSizing(Protocol):
-    def ejecutar(self, datos: Any) -> ResultadoSizing: ...
+    def ejecutar(self, entrada: EntradaPaneles) -> ResultadoPaneles:
+        """
+        Ejecuta el cálculo de paneles/strings.
 
+        Parámetros:
+            entrada: EntradaPaneles
+                - panel
+                - inversor
+                - n_inversores
+                - condiciones térmicas
+                - n_paneles_total
 
-# ==========================================================
-# PANELES
-# ==========================================================
+        Retorna:
+            ResultadoPaneles
+        """
 
-class PuertoPaneles(Protocol):
-    def ejecutar(self, datos: Any, sizing: ResultadoSizing) -> ResultadoPaneles: ...
+        # ==================================================
+        # VALIDACIÓN BÁSICA (defensiva, no lógica de negocio)
+        # ==================================================
+        if entrada is None:
+            raise ValueError("EntradaPaneles es None")
 
+        if entrada.inversor is None:
+            raise ValueError("EntradaPaneles sin inversor")
 
-# ==========================================================
-# ELECTRICAL (NEC)
-# ==========================================================
+        if entrada.n_inversores is None:
+            raise ValueError("EntradaPaneles sin n_inversores")
 
-class PuertoNEC(Protocol):
-    def ejecutar(
-        self,
-        *,
-        datos: Any,
-        paneles: ResultadoPaneles,
-        sizing: ResultadoSizing,  
-    ) -> ResultadoElectrico: ...
+        if entrada.panel is None:
+            raise ValueError("EntradaPaneles sin panel")
 
+        # ==================================================
+        # DEBUG (opcional pero útil en producción)
+        # ==================================================
+        print("\n🔌 [ADAPTER PANELES]")
+        print(" - inversor kw_ac:", getattr(entrada.inversor, "kw_ac", None))
+        print(" - n_inversores:", entrada.n_inversores)
 
-# ==========================================================
-# ENERGÍA
-# ==========================================================
+        # ==================================================
+        # DELEGACIÓN AL MOTOR REAL
+        # ==================================================
+        resultado = ejecutar_paneles(entrada)
 
-class PuertoEnergia(Protocol):
-    def ejecutar(
-        self,
-        datos: Any,
-        sizing: ResultadoSizing,
-        paneles: ResultadoPaneles
-    ) -> EnergiaResultado: ...
+        # ==================================================
+        # VALIDACIÓN DE SALIDA
+        # ==================================================
+        if resultado is None:
+            raise ValueError("ejecutar_paneles devolvió None")
 
-
-# ==========================================================
-# FINANZAS
-# ==========================================================
-
-class PuertoFinanzas(Protocol):
-    def ejecutar(
-        self,
-        datos: Any,
-        sizing: ResultadoSizing,
-        energia: EnergiaResultado
-    ): ...
+        return resultado
