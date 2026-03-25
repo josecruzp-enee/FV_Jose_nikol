@@ -1,7 +1,5 @@
 from pathlib import Path
-from reportlab.platypus import Paragraph, Spacer, Image
-
-
+from reportlab.platypus import Paragraph, Spacer, Image, PageBreak
 
 
 # ==========================================================
@@ -25,22 +23,37 @@ def insertar_layout_paneles(story, paths, styles, content_w, safe_image=None):
 
         try:
 
+            # ==================================================
             # 🔥 USAR safe_image SI EXISTE
+            # ==================================================
             if safe_image:
-                img = safe_image(str(layout), max_w=content_w)
+                img = safe_image(str(layout), max_w=content_w, max_h=600)
+
             else:
                 img = Image(str(layout))
-                img.drawWidth = content_w
-                img.drawHeight = img.imageHeight * (content_w / img.imageWidth)
+
+                # 🔥 ESCALADO SEGURO (CLAVE PARA EVITAR ERROR)
+                max_w = content_w
+                max_h = 600  # menor que el frame (≈636)
+
+                w = img.imageWidth
+                h = img.imageHeight
+
+                scale = min(max_w / w, max_h / h)
+
+                img.drawWidth = w * scale
+                img.drawHeight = h * scale
 
             img.hAlign = "CENTER"
 
-            from reportlab.platypus import PageBreak
-            story.append(Spacer(1, 12))
-
-            # título opcional
+            # ==================================================
+            # 🔥 FORZAR NUEVA PÁGINA (MEJOR PRESENTACIÓN)
+            # ==================================================
             story.append(PageBreak())
-            story.append(Paragraph("Layout de paneles", styles["Heading2"]))
+
+            story.append(
+                Paragraph("Layout de paneles fotovoltaicos", styles["Heading2"])
+            )
             story.append(Spacer(1, 6))
 
             story.append(img)
