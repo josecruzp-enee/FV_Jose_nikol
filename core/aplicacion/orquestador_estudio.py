@@ -81,14 +81,13 @@ def ejecutar_estudio(
     print("DEBUG PANEL:")
     print(" - panel_id:", panel_id)
     print(" - pmax_w:", getattr(panel, "pmax_w", None))
-
+    
+    sf = getattr(datos, "sistema_fv", {}) or {}
     entrada_paneles = EntradaPaneles(
         panel=panel,
         inversor=sizing.inversor,
         n_inversores=sizing.n_inversores,
         n_paneles_total=getattr(sizing, "n_paneles", None),
-        t_min_c=datos.clima.t_min,
-        t_oper_c=getattr(datos.clima, "t_oper", 55),
     )
 
     print("DEBUG ENTRADA PANELES:")
