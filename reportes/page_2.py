@@ -28,7 +28,7 @@ def leer(obj, campo, default=None):
 # LAYOUT DE PANELES
 # =========================================================
 
-def _append_layout_paneles(story, paths, styles, content_w):
+def _append_layout_paneles(story, paths, styles, content_w, safe_image):
 
     layout = paths.get("layout_paneles")
 
@@ -36,18 +36,22 @@ def _append_layout_paneles(story, paths, styles, content_w):
 
         story.append(Spacer(1, 10))
 
-        img = Image(str(layout), width=content_w, height=content_w * 0.55)
-        img.hAlign = "CENTER"
+        # 🔥 USO SEGURO
+        img = safe_image(str(layout), max_w=content_w, max_h=400)
 
-        story.append(img)
-        story.append(Spacer(1, 8))
+        if img:
+            img.hAlign = "CENTER"
+            story.append(img)
+            story.append(Spacer(1, 8))
+        else:
+            story.append(Paragraph("Error cargando layout de paneles.", styles["BodyText"]))
+            story.append(Spacer(1, 8))
 
     else:
 
         story.append(Spacer(1, 6))
         story.append(Paragraph("Layout de paneles no disponible.", styles["BodyText"]))
         story.append(Spacer(1, 8))
-
 
 # =========================================================
 # PAGE 2
