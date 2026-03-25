@@ -22,7 +22,7 @@ from electrical.protecciones.protecciones import (
 
 from electrical.resultado_electrical import ResultadoElectrico
 
-# 🔥 NUEVO
+# 🔥 VALIDADOR
 from electrical.validacion_fv import validar_sistema_fv
 
 
@@ -78,7 +78,12 @@ def ejecutar_electrical(*args, **kwargs) -> ResultadoElectrico:
         print("DEBUG STRINGS:", strings)
 
         if not strings["ok"]:
-            raise ValueError(strings.get("error", "Error en cálculo de strings"))
+            return ResultadoElectrico.build(
+                paneles=paneles,
+                corrientes=_corrientes_error("Error en cálculo de strings"),
+                conductores=_conductores_error("Error en cálculo de strings"),
+                protecciones=_protecciones_error("Error en cálculo de strings"),
+            )
 
         # ==================================================
         # 🔥 INYECTAR Y SINCRONIZAR ARRAY
@@ -112,7 +117,7 @@ def ejecutar_electrical(*args, **kwargs) -> ResultadoElectrico:
         print(" - vdc_nom:", array.vdc_nom)
 
         # ==================================================
-        # 🔥 VALIDACIÓN GLOBAL FV (NUEVO)
+        # 🔥 VALIDACIÓN GLOBAL FV (CORREGIDO)
         # ==================================================
         val = validar_sistema_fv(
             panel=panel,
@@ -122,7 +127,16 @@ def ejecutar_electrical(*args, **kwargs) -> ResultadoElectrico:
         )
 
         if not val["ok"]:
-            raise ValueError(val["errores"])
+            print("❌ VALIDACIÓN FV FALLIDA:")
+            for err in val["errores"]:
+                print(" -", err)
+
+            return ResultadoElectrico.build(
+                paneles=paneles,
+                corrientes=_corrientes_error("Validación FV fallida"),
+                conductores=_conductores_error("Validación FV fallida"),
+                protecciones=_protecciones_error("Validación FV fallida"),
+            )
 
         if val["warnings"]:
             print("⚠ WARNINGS FV:")
