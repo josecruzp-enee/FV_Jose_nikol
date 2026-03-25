@@ -70,10 +70,16 @@ def ejecutar_estudio(
     equipos = getattr(datos, "equipos", {}) or {}
     panel_id = equipos.get("panel_id")
 
+    print("DEBUG panel_id:", panel_id)
+
     if not panel_id:
         raise ValueError("No se definió panel_id en datos.equipos")
 
     panel = get_panel(panel_id)
+
+    # 🔥 FIX CRÍTICO
+    if panel is None:
+        raise ValueError(f"Panel no encontrado en catálogo: {panel_id}")
 
     sf = getattr(datos, "sistema_fv", {}) or {}
 
@@ -208,4 +214,4 @@ def ejecutar_estudio(
     print("FV ENGINE — FIN ESTUDIO")
     print("==============================")
 
-    return resultado
+    return resultado resultado
