@@ -17,8 +17,11 @@ def _defaults_sistema_fv() -> Dict[str, Any]:
         "latitud": 14.8,
         "longitud": -86.2,
 
-        "modo_dimensionado": "auto",
-        "n_paneles_manual": 10,
+        # NUEVO INPUT NORMALIZADO
+        "sizing_input": {
+            "modo": "consumo",
+            "valor": 80.0
+        },
 
         "tipo_superficie": "Un plano (suelo/losa/estructura)",
 
@@ -49,7 +52,7 @@ def _get_sf(ctx) -> Dict[str, Any]:
 
 
 # ==========================================================
-# BRÚJULA DE ORIENTACIÓN
+# GRÁFICOS
 # ==========================================================
 
 def _compass_plot(azimut: float):
@@ -69,30 +72,15 @@ def _compass_plot(azimut: float):
     x = np.cos(rad)
     y = np.sin(rad)
 
-    ax.arrow(
-        0,
-        0,
-        x,
-        y,
-        head_width=0.08,
-        head_length=0.12,
-        fc="orange",
-        ec="orange",
-        linewidth=2
-    )
+    ax.arrow(0, 0, x, y, head_width=0.08, head_length=0.12)
 
     ax.set_xlim(-1.3, 1.3)
     ax.set_ylim(-1.3, 1.3)
-
     ax.set_aspect("equal")
     ax.axis("off")
 
     return fig
 
-
-# ==========================================================
-# DIBUJO DEL TECHO
-# ==========================================================
 
 def _roof_plot(tipo, az_a, az_b=None):
 
@@ -101,42 +89,24 @@ def _roof_plot(tipo, az_a, az_b=None):
     if tipo == "Un plano (suelo/losa/estructura)":
 
         ax.plot([0, 4], [0, 0], linewidth=4)
+        ax.arrow(2, 0, 0.8, 0, head_width=0.2)
 
-        ax.arrow(
-            2,
-            0,
-            0.8,
-            0,
-            head_width=0.2,
-            head_length=0.2,
-            fc="orange",
-            ec="orange"
-        )
-
-        ax.text(2, -0.5, "Paneles")
-
-    elif tipo == "Techo dos aguas":
+    else:
 
         ax.plot([0, 2], [0, 1], linewidth=3)
         ax.plot([2, 4], [1, 0], linewidth=3)
 
-        ax.arrow(1, 0.5, 0.7, 0, head_width=0.15, fc="orange")
-        ax.arrow(3, 0.5, -0.7, 0, head_width=0.15, fc="orange")
-
-        ax.text(1, 0.9, "Agua A")
-        ax.text(3, 0.9, "Agua B")
-
-    ax.set_xlim(-0.5, 4.5)
-    ax.set_ylim(-1, 2)
+        ax.arrow(1, 0.5, 0.7, 0, head_width=0.15)
+        ax.arrow(3, 0.5, -0.7, 0, head_width=0.15)
 
     ax.axis("off")
-
     return fig
 
 
 # ==========================================================
-# SUBSECCIONES UI
+# UI — DIMENSIONAMIENTO (REFORMADO)
 # ==========================================================
+
 def _render_modo_dimensionado(sf: Dict[str, Any]):
 
     st.markdown("### Dimensionamiento del sistema")
@@ -152,82 +122,100 @@ def _render_modo_dimensionado(sf: Dict[str, Any]):
         index=0
     )
 
-    # -----------------------------
-    # NORMALIZAR VALOR INTERNO
-    # -----------------------------
     if "Cobertura" in modo:
-        sf["modo_dimensionado"] = "consumo"
+
+        valor = st.slider("Cobertura (%)", 10, 150, int(sf["sizing_input"]["valor"]))
+
+        sf["sizing_input"] = {"modo": "consumo", "valor": float(valor)}
+
     elif "Espacio" in modo:
-        sf["modo_dimensionado"] = "area"
+
+        valor = st.number_input("Área disponible (m²)", 1.0, 10000.0, 20.0)
+
+        sf["sizing_input"] = {"modo": "area", "valor": float(valor)}
+
     elif "Potencia" in modo:
-        sf["modo_dimensionado"] = "potencia"
+
+        valor = st.number_input("Potencia objetivo (kW)", 0.1, 1000.0, 5.0)
+
+        sf["sizing_input"] = {"modo": "potencia", "valor": float(valor)}
+
     else:
-        sf["modo_dimensionado"] = "manual"
 
-    # =============================
-    # MODO COBERTURA
-    # =============================
-    if sf["modo_dimensionado"] == "consumo":
+        valor = st.number_input("Cantidad de paneles", 1, 10000, 10)
 
-        sf["cobertura_pct"] = 80
-        st.info("Sistema dimensionado al 80% del consumo anual")
+        sf["sizing_input"] = {"modo": "manual", "valor": int(valor)}
 
-    # =============================
-    # MODO ÁREA
-    # =============================
-    elif sf["modo_dimensionado"] == "area":
 
-        sf["area_m2"] = st.number_input(
-            "Área disponible (m²)",
-            min_value=1.0,
-            value=20.0
+# ==========================================================
+# UI — GEOMETRÍA
+# ==========================================================
+
+def _render_geometria(sf: Dict[str, Any]):
+
+    st.markdown("### Geometría del sistema")
+
+    sf["tipo_superficie"] = st.selectbox(
+        "Tipo de superficie",
+        [
+            "Un plano (suelo/losa/estructura)",
+            "Techo dos aguas",
+        ],
+    )
+
+    if sf["tipo_superficie"] == "Un plano (suelo/losa/estructura)":
+
+        sf["inclinacion_deg"] = st.number_input(
+            "Inclinación (°)", 0.0, 60.0, float(sf["inclinacion_deg"])
         )
 
-    # =============================
-    # MODO POTENCIA
-    # =============================
-    elif sf["modo_dimensionado"] == "potencia":
-
-        sf["potencia_kw"] = st.number_input(
-            "Potencia objetivo (kW)",
-            min_value=0.1,
-            value=5.0
+        sf["azimut_deg"] = st.number_input(
+            "Azimut (°)", 0.0, 360.0, float(sf["azimut_deg"])
         )
 
-    # =============================
-    # MODO MANUAL
-    # =============================
-    elif sf["modo_dimensionado"] == "manual":
+        st.pyplot(_compass_plot(sf["azimut_deg"]))
+        st.pyplot(_roof_plot(sf["tipo_superficie"], sf["azimut_deg"]))
 
-        sf["n_paneles"] = st.number_input(
-            "Cantidad de paneles",
-            min_value=1,
-            value=10
+    else:
+
+        sf["azimut_a_deg"] = st.number_input(
+            "Azimut Agua A", 0.0, 360.0, float(sf["azimut_a_deg"])
         )
 
+        sf["azimut_b_deg"] = st.number_input(
+            "Azimut Agua B", 0.0, 360.0, float(sf["azimut_b_deg"])
+        )
+
+        sf["reparto_pct_a"] = st.slider(
+            "Reparto Agua A (%)", 0.0, 100.0, float(sf["reparto_pct_a"])
+        )
+
+        st.pyplot(_roof_plot(
+            sf["tipo_superficie"],
+            sf["azimut_a_deg"],
+            sf["azimut_b_deg"]
+        ))
+
+
+# ==========================================================
+# UI — CONDICIONES
 # ==========================================================
 
 def _render_condiciones(sf: Dict[str, Any]):
 
-    st.markdown("### Condiciones de instalación")
+    st.markdown("### Condiciones")
 
     sf["sombras_pct"] = st.number_input(
-        "Sombras (%)",
-        0.0,
-        30.0,
-        float(sf.get("sombras_pct", 0.0))
+        "Sombras (%)", 0.0, 30.0, float(sf["sombras_pct"])
     )
 
     sf["perdidas_sistema_pct"] = st.number_input(
-        "Pérdidas del sistema (%)",
-        5.0,
-        30.0,
-        float(sf.get("perdidas_sistema_pct", 15.0))
+        "Pérdidas (%)", 5.0, 30.0, float(sf["perdidas_sistema_pct"])
     )
 
 
 # ==========================================================
-# API DEL PASO
+# RENDER
 # ==========================================================
 
 def render(ctx):
@@ -236,23 +224,16 @@ def render(ctx):
 
     sf = _get_sf(ctx)
 
-    # --------------------------------------------------
-    # MODO FIJO (8760)
-    # --------------------------------------------------
-
     sf["modo_simulacion"] = "8760"
 
     st.info("Modo de simulación: Ingeniería (8760 horario)")
-
-    # --------------------------------------------------
-    # RESTO UI
-    # --------------------------------------------------
 
     _render_modo_dimensionado(sf)
     _render_geometria(sf)
     _render_condiciones(sf)
 
     ctx.sistema_fv = sf
+
 
 # ==========================================================
 # VALIDACIÓN
@@ -264,14 +245,13 @@ def validar(ctx) -> Tuple[bool, List[str]]:
 
     errores: List[str] = []
 
-    if sf.get("modo_dimensionado") == "manual":
+    entrada = sf.get("sizing_input", {})
 
-        if int(sf.get("n_paneles_manual", 0)) <= 0:
-
+    if entrada.get("modo") == "manual":
+        if int(entrada.get("valor", 0)) <= 0:
             errores.append("Cantidad de paneles inválida.")
 
-    if int(sf.get("inclinacion_deg", 0)) < 0:
-
+    if float(sf.get("inclinacion_deg", 0)) < 0:
         errores.append("Inclinación inválida.")
 
     return len(errores) == 0, errores
