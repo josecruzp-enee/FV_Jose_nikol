@@ -94,24 +94,35 @@ def _render_kpis(resultado_proyecto) -> None:
 # ==========================================================
 # RESUMEN NEC
 # ==========================================================
-def _render_nec_resumen(resultado_proyecto) -> None:
+# ==========================================================
+# RESUMEN ELÉCTRICO (ANTES NEC)
+# ==========================================================
+def _render_resumen_electrico(resultado_proyecto) -> None:
 
-    st.subheader("Ingeniería eléctrica (NEC 2023)")
+    st.subheader("Resumen de ingeniería eléctrica")
 
-    # 🔥 acceso correcto (dataclass)
-    nec = getattr(resultado_proyecto, "nec", None)
+    # 🔥 acceso correcto
+    electrical = getattr(resultado_proyecto, "nec", None)  # ⚠ luego puedes renombrar a "electrical"
     strings = getattr(resultado_proyecto, "strings", None)
 
-    paq = getattr(nec, "paq", None)
-
-    if not paq:
-        st.info("Sin paquete NEC disponible")
+    # =========================
+    # VALIDACIÓN
+    # =========================
+    if not electrical:
+        st.warning("No existe resultado eléctrico")
         return
 
-    # 🔥 objetos, no dicts
-    resumen = getattr(paq, "resumen_pdf", None)
-    ocpd = getattr(paq, "ocpd", None)
+    if not getattr(electrical, "ok", False):
+        errores = getattr(electrical, "errores", [])
+        st.error("No se pudo generar la ingeniería eléctrica")
+        if errores:
+            for e in errores:
+                st.write(f"- {e}")
+        return
 
+    # =========================
+    # LAYOUT PRINCIPAL
+    # =========================
     c1, c2, c3, c4 = st.columns(4)
 
     # =========================
@@ -119,62 +130,79 @@ def _render_nec_resumen(resultado_proyecto) -> None:
     # =========================
     lista_strings = getattr(strings, "strings", []) if strings else []
 
-    c1.metric(
-        "Strings",
-        len(lista_strings)
-    )
+    c1.metric("Strings", len(lista_strings))
 
     # =========================
     # CORRIENTES
     # =========================
-    idc = getattr(resumen, "idc_nom", None)
-    iac = getattr(resumen, "iac_nom", None)
+    corr = getattr(electrical, "corrientes", {}) or {}
+
+    idc = corr.get("idc_total")
+    iac = corr.get("iac")
 
     c2.metric(
-        "I DC diseño",
-        f"{float(idc):.2f} A" if isinstance(idc, (int, float)) else "—"
+        "I DC",
+        f"{idc:.2f} A" if isinstance(idc, (int, float)) else "—"
     )
 
     c3.metric(
-        "I AC diseño",
-        f"{float(iac):.2f} A" if isinstance(iac, (int, float)) else "—"
+        "I AC",
+        f"{iac:.2f} A" if isinstance(iac, (int, float)) else "—"
     )
 
     # =========================
-    # BREAKER AC
+    # PROTECCIONES
     # =========================
-    breaker = getattr(ocpd, "breaker_ac", None)
-    tam = getattr(breaker, "tamano_a", None)
+    prot = getattr(electrical, "protecciones", {}) or {}
+
+    breaker = prot.get("breaker_ac")
 
     c4.metric(
         "Breaker AC",
-        f"{int(tam)} A" if isinstance(tam, (int, float)) else "—"
+        f"{int(breaker)} A" if isinstance(breaker, (int, float)) else "—"
     )
 
     # =========================
-    # DEBUG
+    # DETALLE CONDUCTORES
     # =========================
-    with st.expander("Ver paquete NEC (crudo)"):
-        st.write(paq)
+    st.markdown("#### 🧵 Conductores")
 
-# ==========================================================
-# DEBUG MOTOR ENERGÍA
-# ==========================================================
+    cond = getattr(electrical, "conductores", {}) or {}
 
+    col_dc, col_ac = st.columns(2)
+
+    dc = cond.get("dc", {})
+    ac = cond.get("ac", {})
+
+    col_dc.write("**DC**")
+    col_dc.write(f"Calibre: {dc.get('calibre', '—')}")
+    col_dc.write(f"Ampacidad: {dc.get('ampacidad', '—')} A")
+
+    col_ac.write("**AC**")
+    col_ac.write(f"Calibre: {ac.get('calibre', '—')}")
+    col_ac.write(f"Ampacidad: {ac.get('ampacidad', '—')} A")
+
+    # =========================
+    # DETALLE PROTECCIONES
+    # =========================
+    st.markdown("#### ⚠ Protecciones")
+
+    col_p1, col_p2 = st.columns(2)
+
+    col_p1.write(f"Fusible string: {prot.get('fusible_string', '—')} A")
+    col_p2.write(f"Breaker AC: {prot.get('breaker_ac', '—')} A")
+
+    # =========================
+    # DEBUG (CLAVE PARA TI)
+    # =========================
+    with st.expander("🔎 Ver resultado eléctrico completo"):
+        st.write(electrical)
 # ==========================================================
 # DEBUG MOTOR ENERGÍA
 # ==========================================================
 
 def _render_debug_energia(resultado_proyecto: dict) -> None:
-    """
-    Muestra información de depuración del motor energético.
-
-    Detecta automáticamente el tipo de motor usado:
-        • HSP mensual
-        • simulación 8760
-    """
-
-    st.markdown("### 🔎 DEBUG MOTOR ENERGÍA")
+    
 
     energia = getattr(resultado_proyecto, "energia", None)
 
@@ -368,7 +396,7 @@ def render(ctx) -> None:
 
     st.divider()
 
-    _render_nec_resumen(resultado_proyecto)
+    _render_resumen_electrico(resultado_proyecto)
 
     st.divider()
 
