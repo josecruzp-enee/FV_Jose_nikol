@@ -204,10 +204,9 @@ def construir_dependencias() -> DependenciasEstudio:
         sizing=SizingAdapter(),
         paneles=PanelesAdapter(),
         energia=EnergiaAdapter(),
-        nec=ElectricalAdapter(),
+        electrical=ElectricalAdapter(),
         finanzas=FinanzasAdapter(),
     )
-
 
 # ==========================================================
 # ORQUESTADOR (ORDEN CORRECTO)
