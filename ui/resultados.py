@@ -2,7 +2,7 @@ from __future__ import annotations
 
 """
 PASO 6 — RESULTADOS Y PROPUESTA
-FV Engine (UI limpia profesional)
+FV Engine (UI profesional con tablas)
 """
 
 import copy
@@ -11,14 +11,14 @@ from typing import List, Tuple
 import streamlit as st
 
 from ui.state_helpers import is_result_stale
-from ui.rutas import money_L, num, preparar_salida
+from ui.rutas import preparar_salida
 
 from reportes.generar_pdf_profesional import generar_pdf_profesional
 from reportes.imagenes import generar_artefactos
 
 
 # ==========================================================
-# VALIDACIÓN CONTEXTO
+# VALIDACIÓN
 # ==========================================================
 def _validar_ctx(ctx) -> bool:
 
@@ -33,9 +33,6 @@ def _validar_ctx(ctx) -> bool:
     return True
 
 
-# ==========================================================
-# RESULTADO
-# ==========================================================
 def _get_resultado_proyecto(ctx):
     rp = getattr(ctx, "resultado_proyecto", None)
     if rp is None:
@@ -44,158 +41,174 @@ def _get_resultado_proyecto(ctx):
 
 
 # ==========================================================
-# BLOQUE 1 — DATOS DEL PROYECTO
+# 🎨 TABLA BONITA
 # ==========================================================
-def _render_datos_proyecto(ctx) -> None:
+def _tabla(titulo: str, data: dict):
 
-    st.subheader("Datos del proyecto")
+    html = f"""
+    <div style="
+        border-radius:12px;
+        padding:16px;
+        background:#111827;
+        margin-bottom:16px;
+        border:1px solid #374151;
+    ">
+        <h4 style="margin-bottom:12px;">{titulo}</h4>
+        <table style="width:100%; border-collapse: collapse;">
+    """
 
-    datos = getattr(ctx, "datos_proyecto", None)
+    for k, v in data.items():
+        html += f"""
+        <tr>
+            <td style="padding:8px; color:#9CA3AF;">{k}</td>
+            <td style="padding:8px; text-align:right; font-weight:bold;">{v}</td>
+        </tr>
+        """
 
-    col1, col2, col3 = st.columns(3)
+    html += "</table></div>"
 
-    col1.metric("Ubicación", getattr(datos, "ubicacion", "—"))
-    col2.metric(
-        "Consumo anual",
-        f"{getattr(datos, 'consumo_anual_kwh', 0):,.0f} kWh"
-    )
-    col3.metric(
-        "Tarifa",
-        f"L {getattr(datos, 'tarifa', 0):.2f}/kWh"
-    )
-
-
-# ==========================================================
-# BLOQUE 2 — DIMENSIONAMIENTO
-# ==========================================================
-def _render_dimensionamiento(rp) -> None:
-
-    st.subheader("Dimensionamiento del sistema")
-
-    sizing = getattr(rp, "sizing", None)
-
-    c1, c2, c3, c4 = st.columns(4)
-
-    c1.metric("Paneles", getattr(sizing, "n_paneles", 0))
-    c2.metric("Potencia DC", f"{getattr(sizing, 'pdc_kw', 0):.2f} kW")
-    c3.metric("Potencia AC", f"{getattr(sizing, 'kw_ac', 0):.2f} kW")
-    c4.metric("DC/AC", f"{getattr(sizing, 'dc_ac_ratio', 0):.2f}")
+    st.markdown(html, unsafe_allow_html=True)
 
 
 # ==========================================================
-# BLOQUE 3 — EQUIPOS
+# 📊 DATOS DEL PROYECTO
 # ==========================================================
-def _render_equipos(rp) -> None:
+def _render_datos_proyecto(ctx):
 
-    st.subheader("Equipos del sistema")
+    d = ctx.datos_proyecto
 
-    sizing = getattr(rp, "sizing", None)
-    inv = getattr(sizing, "inversor", None)
-
-    col1, col2 = st.columns(2)
-
-    col1.write("**Inversor**")
-    col1.write(f"Potencia: {getattr(inv, 'kw_ac', 0)} kW")
-    col1.write(f"MPPT: {getattr(inv, 'n_mppt', 0)}")
-
-    col2.write("**Parámetros eléctricos**")
-    col2.write(f"Vdc máx: {getattr(inv, 'vdc_max_v', 0)} V")
-    col2.write(
-        f"Rango MPPT: {getattr(inv, 'mppt_min_v', 0)} - "
-        f"{getattr(inv, 'mppt_max_v', 0)} V"
-    )
+    _tabla("📊 Datos del proyecto", {
+        "Ubicación": getattr(d, "ubicacion", "—"),
+        "Consumo anual": f"{getattr(d, 'consumo_anual_kwh', 0):,.0f} kWh",
+        "Tarifa": f"L {getattr(d, 'tarifa', 0):.2f}/kWh",
+    })
 
 
 # ==========================================================
-# BLOQUE 4 — CORRIENTES
+# ⚡ DIMENSIONAMIENTO
 # ==========================================================
-def _render_corrientes(rp) -> None:
+def _render_dimensionamiento(rp):
 
-    st.subheader("Corrientes del sistema")
+    s = rp.sizing
 
-    electrical = getattr(rp, "nec", None)
+    _tabla("⚡ Dimensionamiento", {
+        "Paneles": s.n_paneles,
+        "Potencia DC": f"{s.pdc_kw:.2f} kW",
+        "Potencia AC": f"{s.kw_ac:.2f} kW",
+        "Relación DC/AC": f"{s.dc_ac_ratio:.2f}",
+    })
 
-    if not electrical or not getattr(electrical, "ok", False):
+
+# ==========================================================
+# 🔌 EQUIPOS
+# ==========================================================
+def _render_equipos(rp):
+
+    inv = rp.sizing.inversor
+
+    _tabla("🔌 Inversor", {
+        "Potencia": f"{inv.kw_ac} kW",
+        "MPPT": inv.n_mppt,
+        "Voltaje DC máximo": f"{inv.vdc_max_v} V",
+        "Rango MPPT": f"{inv.mppt_min_v} - {inv.mppt_max_v} V",
+    })
+
+
+# ==========================================================
+# ⚡ CORRIENTES
+# ==========================================================
+def _render_corrientes(rp):
+
+    e = rp.nec
+
+    if not e or not e.ok:
         st.warning("Sin resultados eléctricos")
         return
 
-    corr = getattr(electrical, "corrientes", {}) or {}
+    c = e.corrientes
 
-    c1, c2, c3 = st.columns(3)
-
-    c1.metric("I string", f"{corr.get('string', 0):.2f} A")
-    c2.metric("I DC total", f"{corr.get('idc_total', 0):.2f} A")
-    c3.metric("I AC", f"{corr.get('iac', 0):.2f} A")
-
-
-# ==========================================================
-# BLOQUE 5 — CONDUCTORES
-# ==========================================================
-def _render_conductores(rp) -> None:
-
-    st.subheader("Conductores")
-
-    electrical = getattr(rp, "nec", None)
-
-    cond = getattr(electrical, "conductores", {}) or {}
-
-    dc = cond.get("dc", {})
-    ac = cond.get("ac", {})
-
-    c1, c2 = st.columns(2)
-
-    c1.metric("Conductor DC", dc.get("calibre", "—"))
-    c1.write(f"Ampacidad: {dc.get('ampacidad', '—')} A")
-
-    c2.metric("Conductor AC", ac.get("calibre", "—"))
-    c2.write(f"Ampacidad: {ac.get('ampacidad', '—')} A")
+    _tabla("⚡ Corrientes", {
+        "Corriente string": f"{c.imp_string:.2f} A",
+        "Corriente DC total": f"{c.idc_total:.2f} A",
+        "Corriente AC": f"{c.iac:.2f} A",
+    })
 
 
 # ==========================================================
-# BLOQUE 6 — PROTECCIONES
+# 🧵 CONDUCTORES
 # ==========================================================
-def _render_protecciones(rp) -> None:
+def _render_conductores(rp):
 
-    st.subheader("Protecciones")
+    e = rp.nec
 
-    electrical = getattr(rp, "nec", None)
+    if not e or not e.ok:
+        st.warning("Sin conductores")
+        return
 
-    prot = getattr(electrical, "protecciones", {}) or {}
+    cond = e.conductores
 
-    c1, c2 = st.columns(2)
+    if not cond or not cond.ok:
+        st.warning("Conductores no disponibles")
+        return
 
-    c1.metric("Fusible string", f"{prot.get('fusible_string', '—')} A")
-    c2.metric("Breaker AC", f"{prot.get('breaker_ac', '—')} A")
+    tramos = cond.tramos
+
+    if not tramos:
+        st.warning("Sin tramos")
+        return
+
+    t = tramos[0]
+
+    dc = getattr(t, "dc", None)
+    ac = getattr(t, "ac", None)
+
+    _tabla("🧵 Conductores DC", {
+        "Calibre": getattr(dc, "calibre", "—") if dc else "—",
+        "Ampacidad": f"{getattr(dc, 'ampacidad', '—')} A" if dc else "—",
+    })
+
+    _tabla("🧵 Conductores AC", {
+        "Calibre": getattr(ac, "calibre", "—") if ac else "—",
+        "Ampacidad": f"{getattr(ac, 'ampacidad', '—')} A" if ac else "—",
+    })
 
 
 # ==========================================================
-# BOTÓN PDF
+# ⚠ PROTECCIONES
 # ==========================================================
-def _ui_boton_pdf(disabled: bool = False) -> bool:
+def _render_protecciones(rp):
 
-    st.markdown("#### Generar propuesta (PDF)")
+    e = rp.nec
 
-    col_a, col_b = st.columns([1, 2])
+    if not e or not e.ok:
+        st.warning("Sin protecciones")
+        return
 
-    with col_a:
-        run = st.button("Generar PDF", type="primary", disabled=disabled)
+    p = e.protecciones
 
-    with col_b:
-        st.caption("Genera PDF profesional del proyecto")
-
-    return bool(run)
+    _tabla("⚠ Protecciones", {
+        "Fusible string": f"{getattr(p, 'fusible_string', '—')} A",
+        "Breaker AC": f"{getattr(p, 'breaker_ac', '—')} A",
+    })
 
 
 # ==========================================================
-# PIPELINE PDF
+# PDF
 # ==========================================================
-def _ejecutar_pipeline_pdf(ctx, resultado_proyecto) -> None:
+def _ui_boton_pdf(disabled=False):
+
+    st.markdown("### 📄 Generar propuesta")
+
+    return st.button("Generar PDF", type="primary", disabled=disabled)
+
+
+def _ejecutar_pipeline_pdf(ctx, rp):
 
     paths = preparar_salida("salidas")
 
     try:
         arte = generar_artefactos(
-            res=resultado_proyecto,
+            res=rp,
             out_dir=paths.get("out_dir", "salidas"),
             vista_resultados={},
             dos_aguas=True,
@@ -208,7 +221,7 @@ def _ejecutar_pipeline_pdf(ctx, resultado_proyecto) -> None:
         datos_pdf = dict(getattr(ctx.datos_proyecto, "__dict__", {}))
 
         pdf_path = generar_pdf_profesional(
-            resultado_proyecto,
+            rp,
             datos_pdf,
             paths,
         )
@@ -225,15 +238,14 @@ def _ejecutar_pipeline_pdf(ctx, resultado_proyecto) -> None:
 
     except Exception as e:
         st.exception(e)
-        st.error("Error generando PDF")
 
 
 # ==========================================================
 # RENDER PRINCIPAL
 # ==========================================================
-def render(ctx) -> None:
+def render(ctx):
 
-    st.markdown("### Resultados del sistema FV")
+    st.markdown("## ⚡ Resultados del sistema FV")
 
     if not _validar_ctx(ctx):
         return
@@ -241,27 +253,16 @@ def render(ctx) -> None:
     rp = _get_resultado_proyecto(ctx)
 
     _render_datos_proyecto(ctx)
-    st.divider()
-
     _render_dimensionamiento(rp)
-    st.divider()
-
     _render_equipos(rp)
-    st.divider()
-
     _render_corrientes(rp)
-    st.divider()
-
     _render_conductores(rp)
-    st.divider()
-
     _render_protecciones(rp)
-    st.divider()
 
     stale = is_result_stale(ctx)
 
     if stale:
-        st.warning("Resultados desactualizados. Recalcular.")
+        st.warning("Resultados desactualizados")
 
     if not _ui_boton_pdf(disabled=stale):
         return
@@ -274,12 +275,12 @@ def render(ctx) -> None:
 # ==========================================================
 def validar(ctx) -> Tuple[bool, List[str]]:
 
-    errores: List[str] = []
+    errores = []
 
     if getattr(ctx, "resultado_proyecto", None) is None:
-        errores.append("Debe ejecutar el cálculo primero.")
+        errores.append("Debe ejecutar cálculo")
 
     if is_result_stale(ctx):
-        errores.append("Resultados desactualizados.")
+        errores.append("Resultados desactualizados")
 
     return (len(errores) == 0), errores
