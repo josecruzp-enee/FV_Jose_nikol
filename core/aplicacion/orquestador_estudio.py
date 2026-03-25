@@ -131,18 +131,20 @@ def _ejecutar_energia(datos, sizing, paneles, deps):
 def _ejecutar_electrical(datos, sizing, paneles, deps):
 
     if not deps.electrical:
+        print("⚠ No hay módulo electrical")
         return None
 
-    try:
-        return deps.electrical.ejecutar(
-            datos=datos,
-            paneles=paneles,
-            sizing=sizing,
-        )
-    except Exception:
-        return None
+    print("🔥 LLAMANDO ELECTRICAL")
 
+    resultado = deps.electrical.ejecutar(
+        datos=datos,
+        paneles=paneles,
+        sizing=sizing,
+    )
 
+    print("⚡ RESULTADO ELECTRICAL:", resultado)
+
+    return resultado
 def _ejecutar_finanzas(datos, sizing, energia, deps):
 
     if not deps.finanzas:
