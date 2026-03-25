@@ -8,7 +8,7 @@ FV Engine
 from typing import List, Tuple
 import streamlit as st
 
-from core.dominio.modelo import Datosproyecto
+from core.dominio.modelo import Datosproyecto, InstalacionElectrica
 from core.aplicacion.orquestador_estudio import ejecutar_estudio
 from core.aplicacion.dependencias import construir_dependencias
 
@@ -110,20 +110,24 @@ def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
 
         om_anual_pct=float(sf.get("om_anual_pct", 0.01)),
 
-        instalacion_electrica=dict(e)
+        # 🔥 FIX CLAVE (TIPADO FUERTE)
+        instalacion_electrica=InstalacionElectrica(
+            vac=float(e.get("vac", 240.0)),
+            fases=int(e.get("fases", 1)),
+            fp=float(e.get("fp", 1.0)),
+            dist_dc_m=float(e.get("dist_dc_m", 15.0)),
+            dist_ac_m=float(e.get("dist_ac_m", 25.0)),
+        )
     )
 
-    # Equipos
     p.equipos = dict(eq)
-
-    # 🔥 SISTEMA FV (clave)
     p.sistema_fv = dict(sf)
 
     return p
 
 
 # ==========================================================
-# MOSTRAR SIZING (MEJORADO)
+# MOSTRAR SIZING
 # ==========================================================
 
 def _mostrar_sizing(sizing, sistema_fv):
@@ -135,7 +139,7 @@ def _mostrar_sizing(sizing, sistema_fv):
     if modo == "zonas":
         st.info("Modo: Diseño por zonas")
     else:
-        st.info("Modo: Diseño por cantidad / consumo")
+        st.info("Modo: Diseño automático/manual")
 
     c1, c2, c3 = st.columns(3)
 
@@ -143,9 +147,7 @@ def _mostrar_sizing(sizing, sistema_fv):
     c2.metric("Potencia DC", f"{sizing.pdc_kw} kWp")
     c3.metric("Potencia AC", f"{sizing.kw_ac} kW")
 
-    # 🔥 MOSTRAR ZONAS
     if modo == "zonas":
-
         st.markdown("### Zonas consideradas")
 
         for z in sistema_fv.get("zonas", []):
@@ -158,11 +160,11 @@ def _mostrar_sizing(sizing, sistema_fv):
 
 
 # ==========================================================
-# MOSTRAR NEC
+# MOSTRAR ELECTRICAL
 # ==========================================================
+
 def _safe_show(obj):
     import pandas as pd
-    import streamlit as st
 
     try:
         if isinstance(obj, dict):
@@ -173,45 +175,44 @@ def _safe_show(obj):
             st.write(str(obj))
             return
 
-        df = df.astype(str)   # 🔥 CLAVE: evita error Arrow
+        df = df.astype(str)
         st.dataframe(df, width="stretch")
 
     except Exception:
         st.write(str(obj))
 
 
-def _mostrar_nec(nec):
-
-    import streamlit as st
+def _mostrar_electrical(electrical):
 
     st.subheader("Ingeniería eléctrica")
 
-    if nec is None:
+    if electrical is None:
         st.info("Sin resultados eléctricos.")
         return
 
-    if not getattr(nec, "ok", False):
+    if not getattr(electrical, "ok", False):
         st.error("Error en cálculo eléctrico")
 
-        for err in getattr(nec, "errores", []):
+        for err in getattr(electrical, "errores", []):
             st.write(f"• {err}")
 
         return
 
     st.success("Cálculo eléctrico correcto")
 
-    # 🔥 RESULTADOS
-    if hasattr(nec, "corrientes"):
+    if hasattr(electrical, "corrientes"):
         st.write("### Corrientes")
-        _safe_show(nec.corrientes)
+        _safe_show(electrical.corrientes)
 
-    if hasattr(nec, "conductores"):
+    if hasattr(electrical, "conductores"):
         st.write("### Conductores")
-        _safe_show(nec.conductores)
+        _safe_show(electrical.conductores)
 
-    if hasattr(nec, "protecciones"):
+    if hasattr(electrical, "protecciones"):
         st.write("### Protecciones")
-        _safe_show(nec.protecciones)
+        _safe_show(electrical.protecciones)
+
+
 # ==========================================================
 # RENDER PRINCIPAL
 # ==========================================================
@@ -241,44 +242,22 @@ def render(ctx):
         deps = construir_dependencias()
 
         resultado = ejecutar_estudio(datos, deps)
-        st.write("DEBUG RESULTADO COMPLETO:", resultado)
-        st.write("DEBUG ELECTRICO:", getattr(resultado, "nec", None))
 
         ctx.resultado_proyecto = resultado
 
         st.success("Ingeniería generada correctamente.")
 
         _mostrar_sizing(resultado.sizing, datos.sistema_fv)
-        resultado_electrico = getattr(resultado, "nec", None) or getattr(resultado, "electrical", None)
-        _mostrar_nec(resultado_electrico)
+
+        resultado_electrico = getattr(resultado, "electrical", None)
+
+        _mostrar_electrical(resultado_electrico)
 
     except Exception as e:
 
-        msg = str(e)
-
-        if "DC/AC" in msg:
-            st.error(msg)
-
-            try:
-                datos = _datosproyecto_desde_ctx(ctx)
-
-                if hasattr(ctx, "resultado_proyecto") and ctx.resultado_proyecto:
-                    pdc = ctx.resultado_proyecto.sizing.pdc_kw
-                else:
-                    pdc = None
-
-                if pdc:
-                    pac_obj = pdc / 1.2
-                    st.info(f"Inversor recomendado ≈ {pac_obj:.1f} kW AC")
-
-            except Exception:
-                pass
-
-        else:
-            import traceback
-            st.error("Error en motor FV")
-            st.code(traceback.format_exc())
-
+        import traceback
+        st.error("Error en motor FV")
+        st.code(traceback.format_exc())
         st.stop()
 
 
