@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from electrical.paneles.resultado_paneles import ResultadoPaneles
 
+from electrical.paneles.string_auto import calcular_strings_fv  # 🔥 NUEVO
+
 from electrical.conductores.corrientes import (
     calcular_corrientes,
     CorrientesInput,
@@ -58,18 +60,41 @@ def ejecutar_electrical(*args, **kwargs) -> ResultadoElectrico:
         if not sizing:
             raise ValueError("Falta sizing en electrical")
 
-        if not getattr(paneles, "strings", None):
-            raise ValueError("No hay strings definidos")
+        # ==================================================
+        # 🔥 STRINGS AUTOMÁTICO (NUEVO)
+        # ==================================================
+        panel_obj = getattr(paneles, "panel", None) or getattr(paneles, "panel_spec", None)
+
+        if panel_obj is None:
+            raise ValueError("No se pudo obtener panel desde ResultadoPaneles")
+
+        strings = calcular_strings_fv(
+            n_paneles_total=sizing.n_paneles,
+            panel=panel_obj,
+            inversor=sizing.inversor,
+            t_min_c=10
+        )
+
+        print("DEBUG STRINGS:", strings)
+
+        if not strings["ok"]:
+            raise ValueError(strings.get("error", "Error en cálculo de strings"))
+
+        # Inyectar strings
+        paneles.strings = strings
+
+        # Actualizar array si existe
+        if hasattr(paneles, "array"):
+            paneles.array.n_strings_total = strings["n_strings"]
 
         # ==================================================
-        # PARAMETROS ELECTRICOS (FIX CRITICO)
+        # PARAMETROS ELECTRICOS
         # ==================================================
         inst = getattr(datos, "electrico", None) or getattr(datos, "instalacion_electrica", None)
 
         if inst is None:
             raise ValueError("No existe instalacion_electrica en datos")
 
-        # Soporte dict u objeto
         if isinstance(inst, dict):
             vac = inst.get("vac")
             fases = inst.get("fases", 1)
