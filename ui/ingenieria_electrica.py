@@ -169,31 +169,30 @@ def _mostrar_nec(nec):
         st.info("Sin resultados eléctricos.")
         return
 
-    # ======================================================
-    # RESUMEN GENERAL
-    # ======================================================
-    if hasattr(nec, "resumen"):
-        st.write("### Resumen")
-        st.write(nec.resumen)
+    # 🔥 NUEVO: VALIDAR ESTADO REAL
+    if not getattr(nec, "ok", False):
+        st.error("Error en cálculo eléctrico")
+
+        if hasattr(nec, "errores") and nec.errores:
+            for err in nec.errores:
+                st.write(f"• {err}")
+
+        return
 
     # ======================================================
-    # CORRIENTES
+    # RESULTADOS OK
     # ======================================================
-    if hasattr(nec, "corrientes") and nec.corrientes:
+    st.success("Cálculo eléctrico correcto")
+
+    if hasattr(nec, "corrientes"):
         st.write("### Corrientes")
         st.write(nec.corrientes)
 
-    # ======================================================
-    # CONDUCTORES
-    # ======================================================
-    if hasattr(nec, "conductores") and nec.conductores:
+    if hasattr(nec, "conductores"):
         st.write("### Conductores")
         st.write(nec.conductores)
 
-    # ======================================================
-    # PROTECCIONES
-    # ======================================================
-    if hasattr(nec, "protecciones") and nec.protecciones:
+    if hasattr(nec, "protecciones"):
         st.write("### Protecciones")
         st.write(nec.protecciones)
 
