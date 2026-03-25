@@ -23,16 +23,18 @@ from electrical.paneles.validacion_strings import (
 # ERROR
 # =========================================================
 
-def _resultado_error(errores: List[str], warnings: List[str]) -> ResultadoPaneles:
+def _resultado_error(panel, errores, warnings):
+
     return ResultadoPaneles(
         ok=False,
+        panel=panel,
         topologia="error",
-        array=ArrayFV(0,0,0,0,0,0,0,0,0,0),
-        recomendacion=RecomendacionStrings(0,0,0,0,0),
+        array=None,
+        recomendacion=None,
         strings=[],
-        warnings=warnings,
-        errores=errores,
-        meta=PanelesMeta(0,0,0),
+        warnings=warnings or [],
+        errores=errores or [],
+        meta=PanelesMeta(0, 0, 0),
     )
 
 
