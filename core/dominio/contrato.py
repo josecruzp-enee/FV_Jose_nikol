@@ -28,12 +28,13 @@ class MesEnergia:
 
 
 
+from electrical.modelos.paneles import PanelSpec  # 🔥
+
 @dataclass(frozen=True)
 class ResultadoSizing:
 
-    # 🔵 SIN DEFAULT
+    # 🔵 EXISTENTE
     n_paneles: int
-
     kwp_dc: float
     pdc_kw: float
 
@@ -47,9 +48,11 @@ class ResultadoSizing:
 
     inversor: InversorSpec
 
+    # 🔥 NUEVO
+    panel: PanelSpec
+
     energia_12m: List[MesEnergia]
 
-    # 🟢 CON DEFAULT (SIEMPRE AL FINAL)
     sugerencias: List[Dict[str, Any]] = field(default_factory=list)
 
 
