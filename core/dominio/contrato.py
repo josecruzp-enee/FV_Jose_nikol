@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 """
-CONTRATO MAESTRO DE RESULTADOS — FV Engine
+CONTRATO MAESTRO DE RESULTADOS — FV Engine (ALINEADO A ELECTRICAL)
 """
 
 from dataclasses import dataclass, field
 from typing import List, Dict, Any
+
 from energy.resultado_energia import EnergiaResultado
-from electrical.modelos.inversor import InversorSpec  # 🔥 FIX
+from electrical.modelos.inversor import InversorSpec
+from electrical.modelos.paneles import PanelSpec
+from electrical.resultado_electrical import ResultadoElectrico
 
 
 # =========================================================
@@ -26,14 +29,9 @@ class MesEnergia:
 # RESULTADO DEL SIZING
 # =========================================================
 
-
-
-from electrical.modelos.paneles import PanelSpec  # 🔥
-
 @dataclass(frozen=True)
 class ResultadoSizing:
 
-    # 🔵 EXISTENTE
     n_paneles: int
     kwp_dc: float
     pdc_kw: float
@@ -47,8 +45,6 @@ class ResultadoSizing:
     paneles_por_inversor: int
 
     inversor: InversorSpec
-
-    # 🔥 NUEVO
     panel: PanelSpec
 
     energia_12m: List[MesEnergia]
@@ -93,38 +89,6 @@ class ResultadoStrings:
     voc_string_v: float
 
     strings: List[StringInfo]
-
-
-# =========================================================
-# RESULTADO NEC
-# =========================================================
-
-@dataclass(frozen=True)
-class NECInversor:
-
-    inversor: int
-
-    idc_nom: float
-    iac_nom: float
-
-
-@dataclass(frozen=True)
-class NECResumen:
-
-    inversores: List[NECInversor]
-
-    vdc_nom: float
-    vac_nom: float
-
-
-@dataclass(frozen=True)
-class ResultadoNEC:
-
-    ok: bool
-
-    resumen: NECResumen
-
-    paq: Dict[str, Any]
 
 
 # =========================================================
@@ -190,7 +154,9 @@ class ResultadoProyecto:
     sizing: ResultadoSizing
     strings: ResultadoStrings
     energia: EnergiaResultado
-    nec: ResultadoNEC
+
+    electrical: ResultadoElectrico  # 🔥 NUEVO (REEMPLAZA NEC)
+
     financiero: ResultadoFinanciero
 
     ok: bool = True
