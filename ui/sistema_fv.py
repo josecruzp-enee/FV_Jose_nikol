@@ -140,71 +140,102 @@ def _roof_plot(tipo, az_a, az_b=None):
 
 def _render_modo_dimensionado(sf: Dict[str, Any]):
 
-    st.markdown("### Dimensionamiento del sistema")
 
-    modo = st.radio(
-        "¿Cómo deseas dimensionar el sistema?",
-        [
-            "Cobertura energética",
-            "Espacio físico disponible",
-            "Manual (definir cantidad de paneles)",
-        ],
-        index=0
+st.markdown("### Dimensionamiento del sistema")
+
+modo = st.radio(
+    "¿Cómo deseas dimensionar el sistema?",
+    [
+        "Cobertura energética",
+        "Espacio físico disponible",
+        "Potencia objetivo",
+        "Manual (definir cantidad de paneles)",
+    ],
+    index=0
+)
+
+# -----------------------------
+# NORMALIZAR VALOR INTERNO
+# -----------------------------
+if "Cobertura" in modo:
+    sf["modo_dimensionado"] = "consumo"
+
+elif "Espacio" in modo:
+    sf["modo_dimensionado"] = "area"
+
+elif "Potencia" in modo:
+    sf["modo_dimensionado"] = "potencia"
+
+else:
+    sf["modo_dimensionado"] = "manual"
+
+# =============================
+# MODO COBERTURA
+# =============================
+if sf["modo_dimensionado"] == "consumo":
+
+    sf["cobertura_pct"] = st.slider(
+        "Cobertura del consumo (%)",
+        50.0,
+        120.0,
+        float(sf.get("cobertura_pct", 80.0))
     )
 
-    # -----------------------------
-    # NORMALIZAR VALOR INTERNO
-    # -----------------------------
-    if "Cobertura" in modo:
-        sf["modo_dimensionado"] = "consumo"
-    elif "Espacio" in modo:
-        sf["modo_dimensionado"] = "area"
-    else:
-        sf["modo_dimensionado"] = "manual"
+    st.info(
+        f"Sistema dimensionado al {sf['cobertura_pct']:.0f}% del consumo anual"
+    )
 
-    # =============================
-    # MODO COBERTURA
-    # =============================
-    if sf["modo_dimensionado"] == "consumo":
+# =============================
+# MODO ÁREA
+# =============================
+elif sf["modo_dimensionado"] == "area":
 
-        sf["cobertura_pct"] = 80
+    sf["area_disponible_m2"] = st.number_input(
+        "Área disponible (m²)",
+        min_value=1.0,
+        value=float(sf.get("area_disponible_m2", 50.0))
+    )
 
-        st.info("Sistema dimensionado al 80% del consumo anual")
+    sf["factor_ocupacion"] = st.slider(
+        "Factor de ocupación",
+        0.5,
+        0.9,
+        float(sf.get("factor_ocupacion", 0.75))
+    )
 
-    # =============================
-    # MODO ÁREA
-    # =============================
-    elif sf["modo_dimensionado"] == "area":
+    area_util = sf["area_disponible_m2"] * sf["factor_ocupacion"]
+    kwp_area = area_util / 5
 
-        sf["area_disponible_m2"] = st.number_input(
-            "Área disponible (m²)",
-            min_value=0.0,
-            value=float(sf.get("area_disponible_m2", 50.0))
-        )
+    st.info(f"Capacidad máxima estimada: {kwp_area:.2f} kWp")
 
-        sf["factor_ocupacion"] = st.slider(
-            "Factor de ocupación",
-            0.5,
-            0.9,
-            float(sf.get("factor_ocupacion", 0.75))
-        )
+# =============================
+# MODO POTENCIA
+# =============================
+elif sf["modo_dimensionado"] == "potencia":
 
-        area_util = sf["area_disponible_m2"] * sf["factor_ocupacion"]
-        kwp_area = area_util / 5
+    sf["kwp_objetivo"] = st.number_input(
+        "Potencia objetivo (kWp)",
+        min_value=0.5,
+        max_value=1000.0,
+        value=float(sf.get("kwp_objetivo", 5.0))
+    )
 
-        st.info(f"Capacidad máxima estimada: {kwp_area:.2f} kWp")
+    st.info(
+        f"Sistema definido a {sf['kwp_objetivo']:.2f} kWp DC"
+    )
 
-    # =============================
-    # MODO MANUAL
-    # =============================
-    elif sf["modo_dimensionado"] == "manual":
+# =============================
+# MODO MANUAL
+# =============================
+elif sf["modo_dimensionado"] == "manual":
 
-        sf["n_paneles_manual"] = st.number_input(
-            "Cantidad de paneles",
-            min_value=1,
-            max_value=2000,
-            value=int(sf.get("n_paneles_manual", 10))
-        )
+    sf["n_paneles_manual"] = st.number_input(
+        "Cantidad de paneles",
+        min_value=1,
+        max_value=2000,
+        value=int(sf.get("n_paneles_manual", 10))
+    )
+
 
 # ==========================================================
 
