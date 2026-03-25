@@ -9,7 +9,7 @@ from core.aplicacion.puertos import (
     PuertoSizing,
     PuertoPaneles,
     PuertoEnergia,
-    PuertoElectrical,   # 🔥 CAMBIO
+    PuertoElectrical,
     PuertoFinanzas,
 )
 
@@ -42,7 +42,7 @@ class DependenciasEstudio:
     sizing: PuertoSizing
     paneles: PuertoPaneles
     energia: PuertoEnergia
-    electrical: Optional[PuertoElectrical]   # 🔥 FIX
+    electrical: Optional[PuertoElectrical]
     finanzas: Optional[PuertoFinanzas]
 
 
@@ -105,6 +105,9 @@ class EnergiaAdapter:
 
         panel_spec = obtener_panel(datos.equipos.get("panel_id"))
 
+        # =========================
+        # FIX: INPUT COMPLETO
+        # =========================
         entrada = EnergiaInput(
             n_series=n_series,
             n_strings=n_strings,
@@ -112,6 +115,14 @@ class EnergiaAdapter:
             panel=panel_spec,
             pac_nominal_kw=sizing.kw_ac,
             clima=clima,
+
+            # 🔥 CAMPOS FALTANTES
+            tilt_deg=getattr(datos, "tilt_deg", 15),
+            azimut_deg=getattr(datos, "azimut_deg", 180),
+            perdidas_dc_frac=getattr(datos, "perdidas_dc_frac", 0.14),
+            sombras_frac=getattr(datos, "sombras_frac", 0.0),
+            eficiencia_inversor=getattr(datos, "eficiencia_inversor", 0.97),
+            perdidas_ac_frac=getattr(datos, "perdidas_ac_frac", 0.02),
         )
 
         resultado = ejecutar_energia(entrada)
@@ -146,7 +157,7 @@ def construir_dependencias() -> DependenciasEstudio:
         sizing=SizingAdapter(),
         paneles=PanelesAdapter(),
         energia=EnergiaAdapter(),
-        electrical=ElectricalAdapter(),   # 🔥
+        electrical=ElectricalAdapter(),
         finanzas=FinanzasAdapter(),
     )
 
@@ -162,20 +173,33 @@ def ejecutar_estudio(
 
     try:
 
+        # ==================================================
         # 1. SIZING
+        # ==================================================
         sizing = deps.sizing.ejecutar(datos)
 
-        # 2. PANELES
+        # ==================================================
+        # 2. PANELES (FIX: entrada definida)
+        # ==================================================
+        entrada_paneles = EntradaPaneles(
+            datos=datos,
+            sizing=sizing,
+        )
+
         resultado_paneles = deps.paneles.ejecutar(entrada_paneles)
 
+        # ==================================================
         # 3. ENERGÍA
+        # ==================================================
         energia = deps.energia.ejecutar(
             datos,
             sizing,
             resultado_paneles,
         )
 
+        # ==================================================
         # 4. ELECTRICAL
+        # ==================================================
         resultado_electrico = None
 
         if deps.electrical:
@@ -185,7 +209,9 @@ def ejecutar_estudio(
                 sizing=sizing,
             )
 
+        # ==================================================
         # 5. FINANZAS
+        # ==================================================
         financiero = None
 
         if deps.finanzas:
@@ -195,11 +221,14 @@ def ejecutar_estudio(
                 energia,
             )
 
+        # ==================================================
+        # RESULTADO FINAL
+        # ==================================================
         return ResultadoProyecto(
             sizing=sizing,
             strings=resultado_paneles,
             energia=energia,
-            electrical=resultado_electrico,  # 🔥 CAMBIO CLAVE
+            electrical=resultado_electrico,
             financiero=financiero,
         )
 
