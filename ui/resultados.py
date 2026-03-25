@@ -50,8 +50,8 @@ def _tabla(titulo: str, data: dict):
     for k, v in data.items():
         filas += f"""
         <tr>
-            <td style="padding:8px; color:#9CA3AF;">{k}</td>
-            <td style="padding:8px; text-align:right; font-weight:bold;">{v}</td>
+            <td>{k}</td>
+            <td style="text-align:right;"><b>{v}</b></td>
         </tr>
         """
 
@@ -62,11 +62,17 @@ def _tabla(titulo: str, data: dict):
         background:#111827;
         margin-bottom:16px;
         border:1px solid #374151;
+        color:white;
     ">
+
         <h4 style="margin-bottom:12px;">{titulo}</h4>
+
         <table style="width:100%; border-collapse: collapse;">
-            {filas}
+            <tbody>
+                {filas}
+            </tbody>
         </table>
+
     </div>
     """
 
