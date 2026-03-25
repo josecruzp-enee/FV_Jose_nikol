@@ -1,79 +1,65 @@
-from __future__ import annotations
+from typing import Protocol, Any
 
-"""
-ADAPTER PANELES
-===============
-
-Responsabilidad:
-    Traducir el puerto (EntradaPaneles) hacia el motor real de cálculo.
-
-Principios:
-    ✔ No contiene lógica de negocio
-    ✔ No reconstruye inversor
-    ✔ No modifica datos
-    ✔ Solo delega
-
-Arquitectura:
-    Core → PuertoPaneles → Adapter → ejecutar_paneles → motor strings
-"""
-
-from electrical.paneles.entrada_panel import EntradaPaneles
-from electrical.paneles.orquestador_paneles import ejecutar_paneles
+from core.dominio.contrato import ResultadoSizing
 from electrical.paneles.resultado_paneles import ResultadoPaneles
+from electrical.resultado_electrical import ResultadoElectrico
+from energy.resultado_energia import EnergiaResultado
+
+# 🔥 NUEVO CONTRATO
+from electrical.paneles.entrada_panel import EntradaPaneles
 
 
-class PanelesAdapter:
-    """
-    Implementación concreta del PuertoPaneles.
-    """
+# ==========================================================
+# SIZING
+# ==========================================================
 
-    def ejecutar(self, entrada: EntradaPaneles) -> ResultadoPaneles:
-        """
-        Ejecuta el cálculo de paneles/strings.
+class PuertoSizing(Protocol):
+    def ejecutar(self, datos: Any) -> ResultadoSizing: ...
 
-        Parámetros:
-            entrada: EntradaPaneles
-                - panel
-                - inversor
-                - n_inversores
-                - condiciones térmicas
-                - n_paneles_total
 
-        Retorna:
-            ResultadoPaneles
-        """
+# ==========================================================
+# PANELES (🔥 CORREGIDO)
+# ==========================================================
 
-        # ==================================================
-        # VALIDACIÓN BÁSICA (defensiva, no lógica de negocio)
-        # ==================================================
-        if entrada is None:
-            raise ValueError("EntradaPaneles es None")
+class PuertoPaneles(Protocol):
+    def ejecutar(self, entrada: EntradaPaneles) -> ResultadoPaneles: ...
 
-        if entrada.inversor is None:
-            raise ValueError("EntradaPaneles sin inversor")
 
-        if entrada.n_inversores is None:
-            raise ValueError("EntradaPaneles sin n_inversores")
+# ==========================================================
+# ELECTRICAL (NEC)
+# ==========================================================
 
-        if entrada.panel is None:
-            raise ValueError("EntradaPaneles sin panel")
+class PuertoNEC(Protocol):
+    def ejecutar(
+        self,
+        *,
+        datos: Any,
+        paneles: ResultadoPaneles,
+        sizing: ResultadoSizing,
+    ) -> ResultadoElectrico: ...
 
-        # ==================================================
-        # DEBUG (opcional pero útil en producción)
-        # ==================================================
-        print("\n🔌 [ADAPTER PANELES]")
-        print(" - inversor kw_ac:", getattr(entrada.inversor, "kw_ac", None))
-        print(" - n_inversores:", entrada.n_inversores)
 
-        # ==================================================
-        # DELEGACIÓN AL MOTOR REAL
-        # ==================================================
-        resultado = ejecutar_paneles(entrada)
+# ==========================================================
+# ENERGÍA
+# ==========================================================
 
-        # ==================================================
-        # VALIDACIÓN DE SALIDA
-        # ==================================================
-        if resultado is None:
-            raise ValueError("ejecutar_paneles devolvió None")
+class PuertoEnergia(Protocol):
+    def ejecutar(
+        self,
+        datos: Any,
+        sizing: ResultadoSizing,
+        paneles: ResultadoPaneles
+    ) -> EnergiaResultado: ...
 
-        return resultado
+
+# ==========================================================
+# FINANZAS
+# ==========================================================
+
+class PuertoFinanzas(Protocol):
+    def ejecutar(
+        self,
+        datos: Any,
+        sizing: ResultadoSizing,
+        energia: EnergiaResultado
+    ): ...
