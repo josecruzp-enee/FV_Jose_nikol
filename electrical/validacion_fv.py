@@ -1,5 +1,5 @@
 # ==========================================================
-# VALIDADOR FV (SIMPLE Y CENTRALIZADO)
+# VALIDADOR FV (CORREGIDO - NIVEL INGENIERÍA)
 # ==========================================================
 
 def validar_sistema_fv(panel, inversor, array, strings):
@@ -8,15 +8,27 @@ def validar_sistema_fv(panel, inversor, array, strings):
     warnings = []
 
     # ======================================================
-    # 1. VOC FRÍO (LÍMITE DURO)
+    # 1. VOC FRÍO (CRÍTICO - NEC)
     # ======================================================
-    if array.vdc_nom > inversor.vmax_dc_v:
-        errores.append(
-            f"Voc ({array.vdc_nom:.2f} V) excede Vdc_max del inversor ({inversor.vmax_dc_v} V)"
-        )
+    try:
+        voc_panel = getattr(panel, "voc_v", None)
+        n_paneles = int(array.vdc_nom / panel.vmp_v) if panel.vmp_v else 0
+
+        if voc_panel and n_paneles:
+            # Factor típico frío (puedes hacerlo dinámico luego)
+            factor_frio = 1.25
+            voc_frio = voc_panel * n_paneles * factor_frio
+
+            if voc_frio > inversor.vmax_dc_v:
+                errores.append(
+                    f"Voc frío ({voc_frio:.2f} V) excede Vdc_max ({inversor.vmax_dc_v} V)"
+                )
+
+    except Exception:
+        warnings.append("No se pudo validar Voc frío")
 
     # ======================================================
-    # 2. RANGO MPPT
+    # 2. RANGO MPPT (Vmp)
     # ======================================================
     if not (inversor.mppt_min_v <= array.vdc_nom <= inversor.mppt_max_v):
         warnings.append(
@@ -33,7 +45,7 @@ def validar_sistema_fv(panel, inversor, array, strings):
         )
 
     # ======================================================
-    # 4. CORRIENTE MPPT (BÁSICO)
+    # 4. CORRIENTE MPPT
     # ======================================================
     try:
         if strings:
