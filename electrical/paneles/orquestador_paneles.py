@@ -59,7 +59,6 @@ def _strings_por_mppt_real(strings_res):
     return max(conteo.values()) if conteo else 0
 
 
-# 🔥 FIX AQUÍ (único cambio real)
 def _armar_array(
     panel,
     inversor,
@@ -67,7 +66,7 @@ def _armar_array(
     n_paneles,
     pdc_kw,
     strings_por_mppt,
-    n_inversores,  # 👈 NUEVO PARAMETRO (NO ROMPE)
+    n_inversores,
 ):
     n_strings = strings_res.recomendacion.n_strings_total
 
@@ -80,7 +79,7 @@ def _armar_array(
         n_strings_total=n_strings,
         n_paneles_total=n_paneles,
         strings_por_mppt=strings_por_mppt,
-        n_mppt=inversor.n_mppt * n_inversores,  # ✅ FIX REAL
+        n_mppt=inversor.n_mppt * n_inversores,
         p_panel_w=panel.pmax_w,
     )
 
@@ -144,7 +143,7 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
         return _resultado_error(err, warnings)
 
     # ------------------------------------------------------
-    # INVERSORES (CRÍTICO)
+    # INVERSORES
     # ------------------------------------------------------
 
     if entrada.n_inversores is None:
@@ -172,10 +171,14 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
         return _resultado_error(strings_res.errores, warnings)
 
     # ------------------------------------------------------
-    # DISTRIBUCIÓN REAL
+    # DISTRIBUCIÓN
     # ------------------------------------------------------
 
     strings_por_mppt = _strings_por_mppt_real(strings_res)
+
+    if strings_por_mppt <= 0:
+        strings_por_mppt = 1
+        warnings.append("strings_por_mppt ajustado a 1")
 
     # ------------------------------------------------------
     # ENSAMBLE
@@ -188,8 +191,20 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
         n_paneles,
         pdc_kw,
         strings_por_mppt,
-        n_inversores,  # 👈 NUEVO
+        n_inversores,
     )
+
+    # 🔥 VALIDACIONES CRÍTICAS
+    if array.n_mppt <= 0:
+        return _resultado_error(["n_mppt inválido"], warnings)
+
+    if array.n_strings_total <= 0:
+        return _resultado_error(["n_strings_total inválido"], warnings)
+
+    if array.n_strings_total < array.n_mppt:
+        warnings.append(
+            f"Strings insuficientes para MPPT ({array.n_strings_total}/{array.n_mppt})"
+        )
 
     strings = _mapear_strings(strings_res)
 
@@ -203,18 +218,21 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
     # DEBUG
     # ------------------------------------------------------
 
-    print("DEBUG PANEL:")
+    print("\nDEBUG PANEL FINAL:")
     print("n_inversores:", n_inversores)
-    print("strings_totales:", strings_res.recomendacion.n_strings_total)
-    print("strings_por_mppt_real:", strings_por_mppt)
+    print("n_strings:", array.n_strings_total)
+    print("n_mppt:", array.n_mppt)
+    print("strings/mppt:", array.strings_por_mppt)
 
     # ------------------------------------------------------
     # RESULTADO
     # ------------------------------------------------------
 
+    topologia = "string" if n_inversores > 1 else "centralizado"
+
     return ResultadoPaneles(
         ok=True,
-        topologia="string-centralizado",
+        topologia=topologia,
         array=array,
         recomendacion=RecomendacionStrings(
             n_series=strings_res.recomendacion.n_series,
