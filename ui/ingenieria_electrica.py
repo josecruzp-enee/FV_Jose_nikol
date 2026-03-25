@@ -160,105 +160,58 @@ def _mostrar_sizing(sizing, sistema_fv):
 # ==========================================================
 # MOSTRAR NEC
 # ==========================================================
+def _safe_show(obj):
+    import pandas as pd
+    import streamlit as st
+
+    try:
+        if isinstance(obj, dict):
+            df = pd.DataFrame([obj])
+        elif isinstance(obj, list):
+            df = pd.DataFrame(obj)
+        else:
+            st.write(str(obj))
+            return
+
+        df = df.astype(str)   # 🔥 CLAVE: evita error Arrow
+        st.dataframe(df, width="stretch")
+
+    except Exception:
+        st.write(str(obj))
+
 
 def _mostrar_nec(nec):
+
     import streamlit as st
 
     st.subheader("Ingeniería eléctrica")
 
-    # --------------------------------------------
-    # 1) No hay objeto
-    # --------------------------------------------
     if nec is None:
         st.info("Sin resultados eléctricos.")
         return
 
-    # --------------------------------------------
-    # 2) Hubo error en el cálculo (caso REAL)
-    # --------------------------------------------
     if not getattr(nec, "ok", False):
         st.error("Error en cálculo eléctrico")
 
-        errores = getattr(nec, "errores", []) or []
-        if errores:
-            st.write("### Detalle de errores")
-            for err in errores:
-                st.write(f"• {err}")
-
-        warnings = getattr(nec, "warnings", []) or []
-        if warnings:
-            st.warning("Advertencias")
-            for w in warnings:
-                st.write(f"• {w}")
+        for err in getattr(nec, "errores", []):
+            st.write(f"• {err}")
 
         return
 
-    # --------------------------------------------
-    # 3) OK → mostrar resultados
-    # --------------------------------------------
     st.success("Cálculo eléctrico correcto")
 
-    # Resumen corto (si existe)
-    if hasattr(nec, "resumen"):
-        st.write("### Resumen")
-        st.write(nec.resumen)
-
-    # -------------------------
-    # Corrientes
-    # -------------------------
-    if hasattr(nec, "corrientes") and nec.corrientes:
-        st.write("### Corrientes")
-        try:
-            st.write(nec.corrientes)
-        except Exception:
-            st.write(str(nec.corrientes))
-
-    # -------------------------
-    # Conductores
-    # -------------------------
-    if hasattr(nec, "conductores") and nec.conductores:
-        st.write("### Conductores")
-        try:
-            st.write(nec.conductores)
-        except Exception:
-            st.write(str(nec.conductores))
-
-    # -------------------------
-    # Protecciones
-    # -------------------------
-    if hasattr(nec, "protecciones") and nec.protecciones:
-        st.write("### Protecciones")
-        try:
-            st.write(nec.protecciones)
-        except Exception:
-            st.write(str(nec.protecciones))
-
-    # --------------------------------------------
-    # 4) Warnings (aunque esté OK)
-    # --------------------------------------------
-    warnings = getattr(nec, "warnings", []) or []
-    if warnings:
-        st.warning("Advertencias")
-        for w in warnings:
-            st.write(f"• {w}")
-
-    # ======================================================
-    # RESULTADOS OK
-    # ======================================================
-    st.success("Cálculo eléctrico correcto")
-
+    # 🔥 RESULTADOS
     if hasattr(nec, "corrientes"):
         st.write("### Corrientes")
-        st.write(nec.corrientes)
+        _safe_show(nec.corrientes)
 
     if hasattr(nec, "conductores"):
         st.write("### Conductores")
-        st.write(nec.conductores)
+        _safe_show(nec.conductores)
 
     if hasattr(nec, "protecciones"):
         st.write("### Protecciones")
-        st.write(nec.protecciones)
-
+        _safe_show(nec.protecciones)
 # ==========================================================
 # RENDER PRINCIPAL
 # ==========================================================
@@ -294,7 +247,8 @@ def render(ctx):
         st.success("Ingeniería generada correctamente.")
 
         _mostrar_sizing(resultado.sizing, datos.sistema_fv)
-        _mostrar_nec(resultado.nec)
+        resultado_electrico = getattr(resultado, "nec", None) or getattr(resultado, "electrical", None)
+        _mostrar_nec(resultado_electrico)
 
     except Exception as e:
 
