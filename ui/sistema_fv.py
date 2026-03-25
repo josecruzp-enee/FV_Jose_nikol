@@ -17,7 +17,6 @@ def _defaults_sistema_fv() -> Dict[str, Any]:
         "latitud": 14.8,
         "longitud": -86.2,
 
-        # NUEVO INPUT NORMALIZADO
         "sizing_input": {
             "modo": "consumo",
             "valor": 80.0
@@ -104,7 +103,7 @@ def _roof_plot(tipo, az_a, az_b=None):
 
 
 # ==========================================================
-# UI — DIMENSIONAMIENTO (REFORMADO)
+# UI — DIMENSIONAMIENTO
 # ==========================================================
 
 def _render_modo_dimensionado(sf: Dict[str, Any]):
@@ -124,25 +123,48 @@ def _render_modo_dimensionado(sf: Dict[str, Any]):
 
     if "Cobertura" in modo:
 
-        valor = st.slider("Cobertura (%)", 10, 150, int(sf["sizing_input"]["valor"]))
+        valor = st.slider(
+            "Cobertura del consumo (%)",
+            min_value=10,
+            max_value=150,
+            value=int(sf["sizing_input"]["valor"]),
+            step=5
+        )
+
+        st.caption(f"Valor seleccionado: {valor}%")
 
         sf["sizing_input"] = {"modo": "consumo", "valor": float(valor)}
 
     elif "Espacio" in modo:
 
-        valor = st.number_input("Área disponible (m²)", 1.0, 10000.0, 20.0)
+        valor = st.number_input(
+            "Área disponible (m²)",
+            min_value=1.0,
+            max_value=10000.0,
+            value=20.0
+        )
 
         sf["sizing_input"] = {"modo": "area", "valor": float(valor)}
 
     elif "Potencia" in modo:
 
-        valor = st.number_input("Potencia objetivo (kW)", 0.1, 1000.0, 5.0)
+        valor = st.number_input(
+            "Potencia objetivo (kW)",
+            min_value=0.1,
+            max_value=1000.0,
+            value=5.0
+        )
 
         sf["sizing_input"] = {"modo": "potencia", "valor": float(valor)}
 
     else:
 
-        valor = st.number_input("Cantidad de paneles", 1, 10000, 10)
+        valor = st.number_input(
+            "Cantidad de paneles",
+            min_value=1,
+            max_value=10000,
+            value=10
+        )
 
         sf["sizing_input"] = {"modo": "manual", "valor": int(valor)}
 
@@ -173,8 +195,15 @@ def _render_geometria(sf: Dict[str, Any]):
             "Azimut (°)", 0.0, 360.0, float(sf["azimut_deg"])
         )
 
-        st.pyplot(_compass_plot(sf["azimut_deg"]))
-        st.pyplot(_roof_plot(sf["tipo_superficie"], sf["azimut_deg"]))
+        if st.checkbox("Mostrar orientación", value=True):
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+                st.pyplot(_compass_plot(sf["azimut_deg"]))
+
+            with col2:
+                st.pyplot(_roof_plot(sf["tipo_superficie"], sf["azimut_deg"]))
 
     else:
 
@@ -190,11 +219,13 @@ def _render_geometria(sf: Dict[str, Any]):
             "Reparto Agua A (%)", 0.0, 100.0, float(sf["reparto_pct_a"])
         )
 
-        st.pyplot(_roof_plot(
-            sf["tipo_superficie"],
-            sf["azimut_a_deg"],
-            sf["azimut_b_deg"]
-        ))
+        if st.checkbox("Mostrar orientación", value=True):
+
+            st.pyplot(_roof_plot(
+                sf["tipo_superficie"],
+                sf["azimut_a_deg"],
+                sf["azimut_b_deg"]
+            ))
 
 
 # ==========================================================
