@@ -251,7 +251,7 @@ def p1_conclusion(financiero, sizing, datos, pal, content_w):
 # ORQUESTADOR DE LA PÁGINA
 # =========================================================
 
-def build_page_1(resultado: Dict[str, Any], datos, paths, pal, styles, content_w):
+def build_page_1(resultado, datos, paths, pal, styles, content_w, safe_image):
 
     story = []
 
