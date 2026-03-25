@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, Optional
+import copy
 
 from core.dominio.contrato import ResultadoProyecto
 
@@ -25,6 +26,33 @@ class DependenciasEstudio:
     energia: PuertoEnergia
     nec: Optional[PuertoNEC] = None
     finanzas: Optional[PuertoFinanzas] = None
+
+
+# ==========================================================
+# 🔥 HELPER: INYECTAR INVERSOR REAL EN DATOS
+# ==========================================================
+
+def _inyectar_inversor_en_datos(datos, sizing):
+    """
+    Inyecta inversor y n_inversores en datos SIN romper estructura existente.
+    """
+    try:
+        datos_fix = copy.deepcopy(datos)
+
+        # 🔥 inyección estándar
+        setattr(datos_fix, "inversor", sizing.inversor)
+        setattr(datos_fix, "n_inversores", sizing.n_inversores)
+
+        # opcional: algunos adapters usan esto
+        if hasattr(datos_fix, "sistema"):
+            setattr(datos_fix.sistema, "inversor", sizing.inversor)
+            setattr(datos_fix.sistema, "n_inversores", sizing.n_inversores)
+
+        return datos_fix
+
+    except Exception as e:
+        print("⚠ No se pudo inyectar inversor en datos:", str(e))
+        return datos  # fallback seguro
 
 
 # ==========================================================
@@ -60,11 +88,22 @@ def ejecutar_estudio(
         )
 
     # ======================================================
-    # 2. PANELES / STRINGS
+    # 🔥 2. PREPARAR DATOS CORRECTOS PARA PANELES
     # ======================================================
-    print("\n[2] EJECUTANDO PANEL / STRINGS")
+    print("\n[2] PREPARANDO DATOS PARA PANELES")
 
-    resultado_paneles = deps.paneles.ejecutar(datos, sizing)
+    datos_paneles = _inyectar_inversor_en_datos(datos, sizing)
+
+    print("DEBUG INYECCIÓN:")
+    print(" - inversor:", getattr(datos_paneles, "inversor", None))
+    print(" - n_inversores:", getattr(datos_paneles, "n_inversores", None))
+
+    # ======================================================
+    # 3. PANELES / STRINGS
+    # ======================================================
+    print("\n[3] EJECUTANDO PANEL / STRINGS")
+
+    resultado_paneles = deps.paneles.ejecutar(datos_paneles, sizing)
 
     if resultado_paneles is None:
         raise ValueError("Paneles devolvió None")
@@ -79,9 +118,9 @@ def ejecutar_estudio(
         )
 
     # ======================================================
-    # 3. ELECTRICAL (NEC)
+    # 4. ELECTRICAL (NEC)
     # ======================================================
-    print("\n[3] CALCULOS ELECTRICOS")
+    print("\n[4] CALCULOS ELECTRICOS")
 
     resultado_electrico = None
 
@@ -97,7 +136,7 @@ def ejecutar_estudio(
 
         except Exception as e:
             print("🔥 ERROR ELECTRICAL:", str(e))
-            resultado_electrico = None  # ⚠ no romper flujo
+            resultado_electrico = None
 
         if resultado_electrico is None:
             print("⚠ Electrical devolvió None")
@@ -106,20 +145,20 @@ def ejecutar_estudio(
             print("⚠ Electrical con errores, se continúa flujo")
 
     # ======================================================
-    # 4. ENERGÍA
+    # 5. ENERGÍA
     # ======================================================
-    print("\n[4] EJECUTANDO ENERGIA")
+    print("\n[5] EJECUTANDO ENERGIA")
 
     print("DEBUG INPUT ENERGIA:")
     print(" - sizing:", sizing)
     print(" - paneles:", resultado_paneles)
 
-    
     energia = deps.energia.ejecutar(
         datos,
         sizing,
         resultado_paneles,
     )
+
     if energia is None:
         raise ValueError("Energía devolvió None")
 
@@ -127,9 +166,9 @@ def ejecutar_estudio(
         raise ValueError(f"Energía inválida: {energia.errores}")
 
     # ======================================================
-    # 5. FINANZAS (OPCIONAL)
+    # 6. FINANZAS
     # ======================================================
-    print("\n[5] EJECUTANDO FINANZAS")
+    print("\n[6] EJECUTANDO FINANZAS")
 
     financiero = None
 
