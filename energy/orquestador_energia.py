@@ -133,7 +133,7 @@ def _aplicar_perdidas_dc(dc_bruta, inp):
     return aplicar_perdidas_fisicas(
         PerdidasInput(
             potencia_kw=dc_bruta,
-            perdidas_dc_frac=inp.perdidas_dc_frac
+            perdidas_dc_frac=inp.perdidas_dc_frac,
             sombras_frac=inp.sombras_frac,
         )
     ).potencia_kw
