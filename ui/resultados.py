@@ -37,7 +37,7 @@ def _get_resultado_proyecto(ctx):
 
 
 # ==========================================================
-# TABLA STREAMLIT (SIN HTML)
+# TABLA STREAMLIT
 # ==========================================================
 def _tabla(titulo: str, data: dict):
 
@@ -96,39 +96,43 @@ def _render_equipos(rp):
 
 
 # ==========================================================
-# CORRIENTES
+# CORRIENTES (🔥 CORREGIDO)
 # ==========================================================
 def _render_corrientes(rp):
 
     e = rp.nec
 
-    if not e or not e.ok:
+    if e is None:
         st.warning("Sin resultados eléctricos")
         return
 
-    c = e.corrientes
+    c = getattr(e, "corrientes", None)
+
+    if not c:
+        st.warning("Corrientes no disponibles")
+        return
 
     _tabla("⚡ Corrientes", {
-        "Corriente string": f"{c.imp_string:.2f} A",
-        "Corriente DC total": f"{c.idc_total:.2f} A",
-        "Corriente AC": f"{c.iac:.2f} A",
+        "Corriente string": f"{getattr(c, 'imp_string', 0):.2f} A",
+        "Corriente DC total": f"{getattr(c, 'idc_total', 0):.2f} A",
+        "Corriente AC": f"{getattr(c, 'iac', 0):.2f} A",
     })
 
 
 # ==========================================================
-# CONDUCTORES
+# CONDUCTORES (🔥 CORREGIDO)
 # ==========================================================
 def _render_conductores(rp):
 
     e = rp.nec
 
-    if not e or not e.ok:
+    if e is None:
         st.warning("Sin conductores")
         return
 
-    cond = e.conductores
+    cond = getattr(e, "conductores", None)
 
-    if not cond or not cond.ok:
+    if not cond or not getattr(cond, "tramos", None):
         st.warning("Conductores no disponibles")
         return
 
@@ -149,17 +153,21 @@ def _render_conductores(rp):
 
 
 # ==========================================================
-# PROTECCIONES
+# PROTECCIONES (🔥 CORREGIDO)
 # ==========================================================
 def _render_protecciones(rp):
 
     e = rp.nec
 
-    if not e or not e.ok:
+    if e is None:
         st.warning("Sin protecciones")
         return
 
-    p = e.protecciones
+    p = getattr(e, "protecciones", None)
+
+    if not p:
+        st.warning("Protecciones no disponibles")
+        return
 
     _tabla("⚠ Protecciones", {
         "Fusible string": f"{getattr(p, 'fusible_string', '—')} A",
