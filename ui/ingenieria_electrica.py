@@ -162,22 +162,85 @@ def _mostrar_sizing(sizing, sistema_fv):
 # ==========================================================
 
 def _mostrar_nec(nec):
+    import streamlit as st
 
     st.subheader("Ingeniería eléctrica")
 
-    if not nec:
+    # --------------------------------------------
+    # 1) No hay objeto
+    # --------------------------------------------
+    if nec is None:
         st.info("Sin resultados eléctricos.")
         return
 
-    # 🔥 NUEVO: VALIDAR ESTADO REAL
+    # --------------------------------------------
+    # 2) Hubo error en el cálculo (caso REAL)
+    # --------------------------------------------
     if not getattr(nec, "ok", False):
         st.error("Error en cálculo eléctrico")
 
-        if hasattr(nec, "errores") and nec.errores:
-            for err in nec.errores:
+        errores = getattr(nec, "errores", []) or []
+        if errores:
+            st.write("### Detalle de errores")
+            for err in errores:
                 st.write(f"• {err}")
 
+        warnings = getattr(nec, "warnings", []) or []
+        if warnings:
+            st.warning("Advertencias")
+            for w in warnings:
+                st.write(f"• {w}")
+
         return
+
+    # --------------------------------------------
+    # 3) OK → mostrar resultados
+    # --------------------------------------------
+    st.success("Cálculo eléctrico correcto")
+
+    # Resumen corto (si existe)
+    if hasattr(nec, "resumen"):
+        st.write("### Resumen")
+        st.write(nec.resumen)
+
+    # -------------------------
+    # Corrientes
+    # -------------------------
+    if hasattr(nec, "corrientes") and nec.corrientes:
+        st.write("### Corrientes")
+        try:
+            st.write(nec.corrientes)
+        except Exception:
+            st.write(str(nec.corrientes))
+
+    # -------------------------
+    # Conductores
+    # -------------------------
+    if hasattr(nec, "conductores") and nec.conductores:
+        st.write("### Conductores")
+        try:
+            st.write(nec.conductores)
+        except Exception:
+            st.write(str(nec.conductores))
+
+    # -------------------------
+    # Protecciones
+    # -------------------------
+    if hasattr(nec, "protecciones") and nec.protecciones:
+        st.write("### Protecciones")
+        try:
+            st.write(nec.protecciones)
+        except Exception:
+            st.write(str(nec.protecciones))
+
+    # --------------------------------------------
+    # 4) Warnings (aunque esté OK)
+    # --------------------------------------------
+    warnings = getattr(nec, "warnings", []) or []
+    if warnings:
+        st.warning("Advertencias")
+        for w in warnings:
+            st.write(f"• {w}")
 
     # ======================================================
     # RESULTADOS OK
