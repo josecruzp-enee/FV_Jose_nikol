@@ -8,20 +8,30 @@ from energy.resultado_energia import EnergiaResultado
 
 def _normalizar_energia(energia):
 
-    if isinstance(energia, list) and len(energia) > 0:
+    if not isinstance(energia, list):
+        raise ValueError("energia debe ser lista")
 
-        if isinstance(energia[0], (int, float)):
-            return energia
+    resultado = []
 
-        if isinstance(energia[0], dict):
+    for x in energia:
 
-            if "energia" in energia[0]:
-                return [float(x["energia"]) for x in energia]
+        if isinstance(x, (int, float)):
+            resultado.append(float(x))
+            continue
 
-            if "valor" in energia[0]:
-                return [float(x["valor"]) for x in energia]
+        if isinstance(x, dict):
 
-    return energia
+            if "valor" in x:
+                resultado.append(float(x["valor"]))
+                continue
+
+            if "energia" in x:
+                resultado.append(float(x["energia"]))
+                continue
+
+        raise ValueError(f"Formato inválido en energía: {x}")
+
+    return resultado
 
 # ==========================================================
 # 🔵 CAPEX
