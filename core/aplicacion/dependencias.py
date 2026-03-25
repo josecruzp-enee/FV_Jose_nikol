@@ -62,40 +62,24 @@ class SizingAdapter:
 
 
 class PanelesAdapter:
-    def ejecutar(self, datos, sizing):
 
-        if sizing is None:
-            raise ValueError("Sizing es None en PanelesAdapter")
+    def ejecutar(self, entrada: EntradaPaneles):
 
-        if not hasattr(datos, "equipos") or not isinstance(datos.equipos, dict):
-            raise ValueError("datos.equipos no definido o inválido")
+        if entrada is None:
+            raise ValueError("EntradaPaneles es None")
 
-        panel_id = datos.equipos.get("panel_id")
-        inversor_id = datos.equipos.get("inversor_id")
+        if entrada.panel is None:
+            raise ValueError("EntradaPaneles sin panel")
 
-        if not panel_id:
-            raise ValueError("panel_id no definido")
+        if entrada.inversor is None:
+            raise ValueError("EntradaPaneles sin inversor")
 
-        if not inversor_id:
-            raise ValueError("inversor_id no definido")
+        if entrada.n_inversores is None:
+            raise ValueError("EntradaPaneles sin n_inversores")
 
-        panel = obtener_panel(panel_id)
-        inversor = obtener_inversor(inversor_id)
-
-        if panel is None:
-            raise ValueError(f"Panel no encontrado: {panel_id}")
-
-        if inversor is None:
-            raise ValueError(f"Inversor no encontrado: {inversor_id}")
-
-        entrada = EntradaPaneles(
-            panel=panel,
-            inversor=inversor,
-            n_paneles_total=getattr(sizing, "n_paneles", None),
-            n_inversores=getattr(sizing, "n_inversores", None),
-            t_min_c=-10.0,
-            t_oper_c=45.0,
-        )
+        print("\n🔌 [ADAPTER PANELES]")
+        print(" - inversor:", entrada.inversor)
+        print(" - n_inversores:", entrada.n_inversores)
 
         resultado = ejecutar_paneles(entrada)
 
@@ -264,7 +248,7 @@ def ejecutar_estudio(
         # ------------------------------------------------------
         print("\n[2] EJECUTANDO PANEL / STRINGS")
 
-        resultado_paneles = deps.paneles.ejecutar(datos, sizing)
+        resultado_paneles = deps.paneles.ejecutar(entrada_paneles)
 
         if resultado_paneles is None:
             raise ValueError("Paneles devolvió None")
