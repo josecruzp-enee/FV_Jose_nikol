@@ -1,3 +1,37 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any, Optional
+
+from core.dominio.contrato import ResultadoProyecto
+
+from core.aplicacion.puertos import (
+    PuertoSizing,
+    PuertoPaneles,
+    PuertoEnergia,
+    PuertoNEC,
+    PuertoFinanzas,
+)
+
+from electrical.paneles.entrada_panel import EntradaPaneles
+from core.aplicacion.multizona import ejecutar_multizona
+
+
+# ==========================================================
+# DEPENDENCIAS
+# ==========================================================
+@dataclass
+class DependenciasEstudio:
+    sizing: PuertoSizing
+    paneles: PuertoPaneles
+    energia: PuertoEnergia
+    nec: Optional[PuertoNEC] = None
+    finanzas: Optional[PuertoFinanzas] = None
+
+
+# ==========================================================
+# ORQUESTADOR
+# ==========================================================
 def ejecutar_estudio(
     datos: Any,
     deps: DependenciasEstudio,
@@ -74,6 +108,7 @@ def ejecutar_estudio(
 
             n_paneles_zona = z.get("n_paneles")
 
+            # 🔥 MODO MANUAL
             if not n_paneles_zona:
                 if i < resto:
                     n_paneles_zona = base + 1
