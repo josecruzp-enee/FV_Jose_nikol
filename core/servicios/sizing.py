@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 """
-Servicio de sizing FV (REFORMADO).
+Servicio de sizing FV (REFORMADO + MULTI-ZONA).
 """
 
 from typing import Any, Dict, Optional, List
@@ -10,10 +10,7 @@ from math import ceil
 from core.dominio.modelo import Datosproyecto
 from core.dominio.contrato import ResultadoSizing, MesEnergia
 
-from core.servicios.consumo import (
-    consumo_anual_kwh,
-    normalizar_cobertura,
-)
+from core.servicios.consumo import consumo_anual_kwh
 
 from electrical.catalogos import get_panel, get_inversor
 from electrical.inversor.orquestador_inversor import ejecutar_inversor_desde_sizing
@@ -96,7 +93,7 @@ def _leer_consumo(p: Datosproyecto):
 
 
 # ==========================================================
-# NUEVO: LECTURA DE SIZING_INPUT
+# SIZING INPUT
 # ==========================================================
 
 def _leer_sizing_input(p: Datosproyecto):
@@ -114,45 +111,31 @@ def _leer_sizing_input(p: Datosproyecto):
 
 
 # ==========================================================
-# GENERADOR FV
+# GENERADOR FV (MODO NORMAL)
 # ==========================================================
 
 def _dimensionar_generador(panel, modo, valor, consumo_anual):
 
-    energia_por_kwp_anual = 1500.0
+    energia_por_kwp_anual = 1500.0  # heurística inicial
 
-    # =============================
-    # CONSUMO
-    # =============================
     if modo == "consumo":
 
         cobertura = _clamp(float(valor) / 100.0, 0.1, 2.0)
         kwp_obj = (consumo_anual * cobertura) / energia_por_kwp_anual
-
         n_paneles_manual = None
 
-    # =============================
-    # ÁREA
-    # =============================
     elif modo == "area":
 
         area = float(valor)
         area_util = area * 0.75
         kwp_obj = area_util / 5.0
-
         n_paneles_manual = None
 
-    # =============================
-    # POTENCIA
-    # =============================
     elif modo == "potencia":
 
         kwp_obj = float(valor)
         n_paneles_manual = None
 
-    # =============================
-    # MANUAL
-    # =============================
     elif modo == "manual":
 
         n_paneles_manual = int(valor)
@@ -165,9 +148,6 @@ def _dimensionar_generador(panel, modo, valor, consumo_anual):
     else:
         raise ValueError(f"Modo inválido: {modo}")
 
-    # =============================
-    # MOTOR DE PANELES
-    # =============================
     from electrical.paneles.entrada_panel import EntradaPaneles
 
     entrada = EntradaPaneles(
@@ -185,6 +165,48 @@ def _dimensionar_generador(panel, modo, valor, consumo_anual):
         raise ValueError(res.errores)
 
     return res.n_paneles, res.pdc_kw
+
+
+# ==========================================================
+# 🔥 MULTI-ZONA
+# ==========================================================
+
+def _dimensionar_por_zonas(panel, zonas, consumo_anual):
+
+    total_paneles = 0
+    total_pdc = 0
+
+    for z in zonas:
+
+        area = float(z.get("area", 0))
+        if area <= 0:
+            continue
+
+        area_util = area * 0.75
+        kwp_obj = area_util / 5.0
+
+        from electrical.paneles.entrada_panel import EntradaPaneles
+
+        entrada = EntradaPaneles(
+            panel=panel,
+            inversor=None,
+            pdc_kw_objetivo=kwp_obj,
+            t_min_c=10,
+            t_oper_c=50,
+        )
+
+        res = dimensionar_paneles(entrada)
+
+        if not res.ok:
+            raise ValueError(f"Zona {z.get('nombre', '')}: {res.errores}")
+
+        total_paneles += res.n_paneles
+        total_pdc += res.pdc_kw
+
+    if total_paneles <= 0:
+        raise ValueError("No se pudo dimensionar ninguna zona")
+
+    return total_paneles, total_pdc
 
 
 # ==========================================================
@@ -230,13 +252,29 @@ def calcular_sizing_unificado(p: Datosproyecto) -> ResultadoSizing:
 
     modo, valor = _leer_sizing_input(p)
 
-    n_paneles, pdc = _dimensionar_generador(
-        panel,
-        modo,
-        valor,
-        consumo_anual
-    )
+    # ======================================================
+    # 🔥 MULTI-ZONA ACTIVADA
+    # ======================================================
+    sf = getattr(p, "sistema_fv", {}) or {}
+    zonas = sf.get("zonas")
 
+    if zonas:
+        n_paneles, pdc = _dimensionar_por_zonas(
+            panel,
+            zonas,
+            consumo_anual
+        )
+    else:
+        n_paneles, pdc = _dimensionar_generador(
+            panel,
+            modo,
+            valor,
+            consumo_anual
+        )
+
+    # ======================================================
+    # INVERSOR
+    # ======================================================
     inv, kw_ac, n_inv, pac_total, sugerencias = _seleccionar_inversor(
         pdc,
         dc_ac_obj,
