@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, Optional
-import copy
 
 from core.dominio.contrato import ResultadoProyecto
 
@@ -13,6 +12,9 @@ from core.aplicacion.puertos import (
     PuertoNEC,
     PuertoFinanzas,
 )
+
+# 🔥 NUEVO
+from electrical.paneles.entrada_panel import EntradaPaneles
 
 
 # ==========================================================
@@ -26,33 +28,6 @@ class DependenciasEstudio:
     energia: PuertoEnergia
     nec: Optional[PuertoNEC] = None
     finanzas: Optional[PuertoFinanzas] = None
-
-
-# ==========================================================
-# 🔥 HELPER: INYECTAR INVERSOR REAL EN DATOS
-# ==========================================================
-
-def _inyectar_inversor_en_datos(datos, sizing):
-    """
-    Inyecta inversor y n_inversores en datos SIN romper estructura existente.
-    """
-    try:
-        datos_fix = copy.deepcopy(datos)
-
-        # 🔥 inyección estándar
-        setattr(datos_fix, "inversor", sizing.inversor)
-        setattr(datos_fix, "n_inversores", sizing.n_inversores)
-
-        # opcional: algunos adapters usan esto
-        if hasattr(datos_fix, "sistema"):
-            setattr(datos_fix.sistema, "inversor", sizing.inversor)
-            setattr(datos_fix.sistema, "n_inversores", sizing.n_inversores)
-
-        return datos_fix
-
-    except Exception as e:
-        print("⚠ No se pudo inyectar inversor en datos:", str(e))
-        return datos  # fallback seguro
 
 
 # ==========================================================
@@ -88,22 +63,29 @@ def ejecutar_estudio(
         )
 
     # ======================================================
-    # 🔥 2. PREPARAR DATOS CORRECTOS PARA PANELES
+    # 2. CONSTRUIR ENTRADA PANEL (🔥 CAMBIO CLAVE)
     # ======================================================
-    print("\n[2] PREPARANDO DATOS PARA PANELES")
+    print("\n[2] CONSTRUYENDO ENTRADA PANELES")
 
-    datos_paneles = _inyectar_inversor_en_datos(datos, sizing)
+    entrada_paneles = EntradaPaneles(
+        panel=datos.panel,  # ajusta si tu modelo usa otra ruta
+        inversor=sizing.inversor,                 # 🔥 CLAVE
+        n_inversores=sizing.n_inversores,         # 🔥 CLAVE
+        n_paneles_total=getattr(sizing, "n_paneles", None),
+        t_min_c=datos.clima.t_min,
+        t_oper_c=getattr(datos.clima, "t_oper", 55),
+    )
 
-    print("DEBUG INYECCIÓN:")
-    print(" - inversor:", getattr(datos_paneles, "inversor", None))
-    print(" - n_inversores:", getattr(datos_paneles, "n_inversores", None))
+    print("DEBUG ENTRADA PANELES:")
+    print(" - inversor:", entrada_paneles.inversor)
+    print(" - n_inversores:", entrada_paneles.n_inversores)
 
     # ======================================================
     # 3. PANELES / STRINGS
     # ======================================================
     print("\n[3] EJECUTANDO PANEL / STRINGS")
 
-    resultado_paneles = deps.paneles.ejecutar(datos_paneles, sizing)
+    resultado_paneles = deps.paneles.ejecutar(entrada_paneles)
 
     if resultado_paneles is None:
         raise ValueError("Paneles devolvió None")
@@ -136,7 +118,7 @@ def ejecutar_estudio(
 
         except Exception as e:
             print("🔥 ERROR ELECTRICAL:", str(e))
-            resultado_electrico = None
+            resultado_electrico = None  # no romper flujo
 
         if resultado_electrico is None:
             print("⚠ Electrical devolvió None")
