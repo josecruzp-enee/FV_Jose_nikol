@@ -9,7 +9,7 @@ from core.aplicacion.puertos import (
     PuertoSizing,
     PuertoPaneles,
     PuertoEnergia,
-    PuertoNEC,
+    PuertoElectrical,   # 🔥 CAMBIO
     PuertoFinanzas,
 )
 
@@ -25,7 +25,6 @@ from core.servicios.finanzas import ejecutar_finanzas
 
 from electrical.paneles.entrada_panel import EntradaPaneles
 from electrical.catalogos.catalogos import get_panel as obtener_panel
-from electrical.catalogos.catalogos import get_inversor as obtener_inversor
 
 from energy.contrato import EnergiaInput
 
@@ -43,8 +42,8 @@ class DependenciasEstudio:
     sizing: PuertoSizing
     paneles: PuertoPaneles
     energia: PuertoEnergia
-    electrical: ElectricalAdapter   
-    finanzas: PuertoFinanzas
+    electrical: Optional[PuertoElectrical]   # 🔥 FIX
+    finanzas: Optional[PuertoFinanzas]
 
 
 # ==========================================================
@@ -54,10 +53,8 @@ class DependenciasEstudio:
 class SizingAdapter:
     def ejecutar(self, datos):
         resultado = calcular_sizing_unificado(datos)
-
         if resultado is None:
-            raise ValueError("Sizing devolvió None desde servicio")
-
+            raise ValueError("Sizing devolvió None")
         return resultado
 
 
@@ -67,19 +64,6 @@ class PanelesAdapter:
 
         if entrada is None:
             raise ValueError("EntradaPaneles es None")
-
-        if entrada.panel is None:
-            raise ValueError("EntradaPaneles sin panel")
-
-        if entrada.inversor is None:
-            raise ValueError("EntradaPaneles sin inversor")
-
-        if entrada.n_inversores is None:
-            raise ValueError("EntradaPaneles sin n_inversores")
-
-        print("\n🔌 [ADAPTER PANELES]")
-        print(" - inversor:", entrada.inversor)
-        print(" - n_inversores:", entrada.n_inversores)
 
         resultado = ejecutar_paneles(entrada)
 
@@ -103,79 +87,37 @@ class ElectricalAdapter:
 
         return resultado
 
+
 class EnergiaAdapter:
 
     def ejecutar(self, datos, sizing, paneles):
 
-        # ==================================================
-        # VALIDACIONES
-        # ==================================================
-        if paneles is None or not getattr(paneles, "ok", False):
-            raise ValueError("Paneles inválido para energía")
+        lat = datos.lat
+        lon = datos.lon
 
-        kw_ac = getattr(sizing, "kw_ac", None)
-        if not kw_ac or kw_ac <= 0:
-            raise ValueError("kw_ac inválido para energía")
-
-        lat = getattr(datos, "lat", None)
-        lon = getattr(datos, "lon", None)
-
-        if lat is None or lon is None:
-            raise ValueError("Faltan lat/lon")
-
-        # ==================================================
-        # CLIMA
-        # ==================================================
         clima = descargar_clima_pvgis(
             EntradaClimaPVGIS(lat=lat, lon=lon)
         )
 
-        if clima is None:
-            raise ValueError("Clima no disponible")
-
-        # ==================================================
-        # 🔥 TRADUCCIÓN SISTEMA (SIN ACOPLAR DEMÁS DOMINIOS)
-        # ==================================================
         n_series = paneles.recomendacion.n_series
         n_strings = paneles.array.n_strings_total
         pdc_kw = paneles.array.potencia_dc_w / 1000
 
-        # ==================================================
-        # 🔥 FIX CRÍTICO: PANEL SPEC CORRECTO
-        # ==================================================
-        panel_id = datos.equipos.get("panel_id")
-        panel_spec = obtener_panel(panel_id)
+        panel_spec = obtener_panel(datos.equipos.get("panel_id"))
 
-        if panel_spec is None:
-            raise ValueError(f"Panel no encontrado para energía: {panel_id}")
-
-        # ==================================================
-        # INPUT ENERGÍA (ALINEADO)
-        # ==================================================
         entrada = EnergiaInput(
             n_series=n_series,
             n_strings=n_strings,
             pdc_kw=pdc_kw,
-
             panel=panel_spec,
-            pac_nominal_kw=kw_ac,
-
+            pac_nominal_kw=sizing.kw_ac,
             clima=clima,
-
-            # 👉 flexibles pero backward-compatible
-            tilt_deg=getattr(datos, "tilt", 15),
-            azimut_deg=getattr(datos, "azimut", 180),
-
-            perdidas_dc_frac=getattr(datos, "perdidas_dc_pct", 5) / 100,
-            sombras_frac=getattr(datos, "sombras_pct", 2) / 100,
-            eficiencia_inversor=getattr(datos, "eficiencia_inversor", 0.98),
-            perdidas_ac_frac=getattr(datos, "perdidas_ac_pct", 5) / 100,
         )
 
         resultado = ejecutar_energia(entrada)
 
-        if not resultado or not resultado.ok:
-            raise ValueError(f"Energía inválida: {resultado.errores}")
+        if not resultado.ok:
+            raise ValueError("Energía inválida")
 
         return resultado
 
@@ -204,12 +146,13 @@ def construir_dependencias() -> DependenciasEstudio:
         sizing=SizingAdapter(),
         paneles=PanelesAdapter(),
         energia=EnergiaAdapter(),
-        electrical=ElectricalAdapter(),
+        electrical=ElectricalAdapter(),   # 🔥
         finanzas=FinanzasAdapter(),
     )
 
+
 # ==========================================================
-# ORQUESTADOR (ORDEN CORRECTO)
+# ORQUESTADOR
 # ==========================================================
 
 def ejecutar_estudio(
@@ -217,94 +160,32 @@ def ejecutar_estudio(
     deps: DependenciasEstudio,
 ):
 
-    print("\n==============================")
-    print("FV ENGINE — INICIO ESTUDIO")
-    print("==============================")
-
     try:
 
-        # ------------------------------------------------------
         # 1. SIZING
-        # ------------------------------------------------------
-        print("\n[1] EJECUTANDO SIZING")
-
         sizing = deps.sizing.ejecutar(datos)
 
-        if sizing is None:
-            raise ValueError("Sizing devolvió None")
-
-        if getattr(sizing, "ok", True) is False:
-            return ResultadoProyecto(
-                sizing=sizing,
-                strings=None,
-                energia=None,
-                nec=None,
-                financiero=None,
-            )
-
-        # ------------------------------------------------------
-        # 2. PANEL / STRINGS
-        # ------------------------------------------------------
-        print("\n[2] EJECUTANDO PANEL / STRINGS")
-
+        # 2. PANELES
         resultado_paneles = deps.paneles.ejecutar(entrada_paneles)
 
-        if resultado_paneles is None:
-            raise ValueError("Paneles devolvió None")
-
-        if not resultado_paneles.ok:
-            return ResultadoProyecto(
-                sizing=sizing,
-                strings=resultado_paneles,
-                energia=None,
-                nec=None,
-                financiero=None,
-            )
-
-        # ------------------------------------------------------
-        # 3. ENERGÍA (🔥 PRIMERO)
-        # ------------------------------------------------------
-        print("\n[3] EJECUTANDO ENERGIA")
-
+        # 3. ENERGÍA
         energia = deps.energia.ejecutar(
             datos,
             sizing,
             resultado_paneles,
         )
 
-        if energia is None:
-            raise ValueError("Energía devolvió None")
-
-        if getattr(energia, "ok", True) is False:
-            return ResultadoProyecto(
-                sizing=sizing,
-                strings=resultado_paneles,
-                energia=energia,
-                nec=None,
-                financiero=None,
-            )
-
-        # ------------------------------------------------------
-        # 4. ELECTRICAL / NEC
-        # ------------------------------------------------------
-        print("\n[4] CALCULOS ELECTRICOS")
-
+        # 4. ELECTRICAL
         resultado_electrico = None
 
-        if deps.nec:
-            resultado_electrico = deps.nec.ejecutar(
+        if deps.electrical:
+            resultado_electrico = deps.electrical.ejecutar(
                 datos=datos,
                 paneles=resultado_paneles,
+                sizing=sizing,
             )
 
-            if resultado_electrico is None:
-                raise ValueError("Electrical devolvió None")
-
-        # ------------------------------------------------------
         # 5. FINANZAS
-        # ------------------------------------------------------
-        print("\n[5] EJECUTANDO FINANZAS")
-
         financiero = None
 
         if deps.finanzas:
@@ -314,34 +195,15 @@ def ejecutar_estudio(
                 energia,
             )
 
-        # ------------------------------------------------------
-        # VALIDACIÓN FINAL
-        # ------------------------------------------------------
-        if energia is None:
-            raise ValueError("ENERGÍA NO GENERADA")
-
-        # ------------------------------------------------------
-        # RESULTADO FINAL
-        # ------------------------------------------------------
-        resultado = ResultadoProyecto(
+        return ResultadoProyecto(
             sizing=sizing,
             strings=resultado_paneles,
             energia=energia,
-            nec=resultado_electrico,
+            electrical=resultado_electrico,  # 🔥 CAMBIO CLAVE
             financiero=financiero,
         )
 
-        print("\n==============================")
-        print("FV ENGINE — FIN ESTUDIO")
-        print("==============================")
-
-        return resultado
-
     except Exception:
-
         import traceback
-
-        print("\n🔥 ERROR REAL EN ORQUESTADOR 🔥")
         print(traceback.format_exc())
-
         raise
