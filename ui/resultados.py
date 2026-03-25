@@ -2,11 +2,11 @@ from __future__ import annotations
 
 """
 PASO 6 — RESULTADOS Y PROPUESTA
-FV Engine
+FV Engine (UI limpia profesional)
 """
 
 import copy
-from typing import Any, Dict, List, Tuple
+from typing import List, Tuple
 
 import streamlit as st
 
@@ -20,274 +20,157 @@ from reportes.imagenes import generar_artefactos
 # ==========================================================
 # VALIDACIÓN CONTEXTO
 # ==========================================================
-
 def _validar_ctx(ctx) -> bool:
 
     if getattr(ctx, "resultado_proyecto", None) is None:
-
-        st.error(
-            "No hay resultados del estudio. "
-            "Genere primero la ingeniería eléctrica (Paso 5)."
-        )
-
+        st.error("Genere primero la ingeniería eléctrica (Paso 5).")
         return False
 
-    if not hasattr(ctx, "datos_proyecto") or ctx.datos_proyecto is None:
-
-        st.error(
-            "Falta ctx.datos_proyecto. "
-            "En Paso 5 debes guardar Datosproyecto."
-        )
-
+    if getattr(ctx, "datos_proyecto", None) is None:
+        st.error("Faltan datos del proyecto.")
         return False
 
     return True
 
 
 # ==========================================================
-# OBTENER RESULTADO
+# RESULTADO
 # ==========================================================
-
 def _get_resultado_proyecto(ctx):
-
     rp = getattr(ctx, "resultado_proyecto", None)
-
     if rp is None:
         raise ValueError("resultado_proyecto inexistente")
+    return rp
 
-    return rp  # 🔥 devolver el objeto completo
 
 # ==========================================================
-# KPIs PRINCIPALES
+# BLOQUE 1 — DATOS DEL PROYECTO
 # ==========================================================
+def _render_datos_proyecto(ctx) -> None:
 
-def _render_kpis(resultado_proyecto) -> None:
+    st.subheader("Datos del proyecto")
 
-    sizing = getattr(resultado_proyecto, "sizing", None)
-    financiero = getattr(resultado_proyecto, "financiero", None) or {}
+    datos = getattr(ctx, "datos_proyecto", None)
 
-    if not sizing or not financiero:
+    col1, col2, col3 = st.columns(3)
 
-        st.error("Estructura de resultado_proyecto incompleta")
-        st.write(resultado_proyecto)
+    col1.metric("Ubicación", getattr(datos, "ubicacion", "—"))
+    col2.metric(
+        "Consumo anual",
+        f"{getattr(datos, 'consumo_anual_kwh', 0):,.0f} kWh"
+    )
+    col3.metric(
+        "Tarifa",
+        f"L {getattr(datos, 'tarifa', 0):.2f}/kWh"
+    )
+
+
+# ==========================================================
+# BLOQUE 2 — DIMENSIONAMIENTO
+# ==========================================================
+def _render_dimensionamiento(rp) -> None:
+
+    st.subheader("Dimensionamiento del sistema")
+
+    sizing = getattr(rp, "sizing", None)
+
+    c1, c2, c3, c4 = st.columns(4)
+
+    c1.metric("Paneles", getattr(sizing, "n_paneles", 0))
+    c2.metric("Potencia DC", f"{getattr(sizing, 'pdc_kw', 0):.2f} kW")
+    c3.metric("Potencia AC", f"{getattr(sizing, 'kw_ac', 0):.2f} kW")
+    c4.metric("DC/AC", f"{getattr(sizing, 'dc_ac_ratio', 0):.2f}")
+
+
+# ==========================================================
+# BLOQUE 3 — EQUIPOS
+# ==========================================================
+def _render_equipos(rp) -> None:
+
+    st.subheader("Equipos del sistema")
+
+    sizing = getattr(rp, "sizing", None)
+    inv = getattr(sizing, "inversor", None)
+
+    col1, col2 = st.columns(2)
+
+    col1.write("**Inversor**")
+    col1.write(f"Potencia: {getattr(inv, 'kw_ac', 0)} kW")
+    col1.write(f"MPPT: {getattr(inv, 'n_mppt', 0)}")
+
+    col2.write("**Parámetros eléctricos**")
+    col2.write(f"Vdc máx: {getattr(inv, 'vdc_max_v', 0)} V")
+    col2.write(
+        f"Rango MPPT: {getattr(inv, 'mppt_min_v', 0)} - "
+        f"{getattr(inv, 'mppt_max_v', 0)} V"
+    )
+
+
+# ==========================================================
+# BLOQUE 4 — CORRIENTES
+# ==========================================================
+def _render_corrientes(rp) -> None:
+
+    st.subheader("Corrientes del sistema")
+
+    electrical = getattr(rp, "nec", None)
+
+    if not electrical or not getattr(electrical, "ok", False):
+        st.warning("Sin resultados eléctricos")
         return
 
-    pdc_kw = float(getattr(sizing, "pdc_kw", 0.0))
-    cuota = float(financiero.get("cuota_mensual") or 0.0)
-
-    evaluacion = financiero.get("evaluacion") or {}
-
-    estado = str(
-        evaluacion.get("estado")
-        or evaluacion.get("dictamen")
-        or "N/D"
-    )
+    corr = getattr(electrical, "corrientes", {}) or {}
 
     c1, c2, c3 = st.columns(3)
 
-    c1.metric("Sistema (kWp DC)", num(pdc_kw, 2))
-    c2.metric("Cuota mensual", money_L(cuota))
-    c3.metric("Estado", estado)
+    c1.metric("I string", f"{corr.get('string', 0):.2f} A")
+    c2.metric("I DC total", f"{corr.get('idc_total', 0):.2f} A")
+    c3.metric("I AC", f"{corr.get('iac', 0):.2f} A")
 
-    if pdc_kw <= 0:
-        st.warning("Sizing inválido")
+
 # ==========================================================
-# RESUMEN NEC
+# BLOQUE 5 — CONDUCTORES
 # ==========================================================
-# ==========================================================
-# RESUMEN ELÉCTRICO (ANTES NEC)
-# ==========================================================
-def _render_resumen_electrico(resultado_proyecto) -> None:
+def _render_conductores(rp) -> None:
 
-    st.subheader("Resumen de ingeniería eléctrica")
+    st.subheader("Conductores")
 
-    # 🔥 acceso correcto
-    electrical = getattr(resultado_proyecto, "nec", None)  # ⚠ luego puedes renombrar a "electrical"
-    strings = getattr(resultado_proyecto, "strings", None)
-
-    # =========================
-    # VALIDACIÓN
-    # =========================
-    if not electrical:
-        st.warning("No existe resultado eléctrico")
-        return
-
-    if not getattr(electrical, "ok", False):
-        errores = getattr(electrical, "errores", [])
-        st.error("No se pudo generar la ingeniería eléctrica")
-        if errores:
-            for e in errores:
-                st.write(f"- {e}")
-        return
-
-    # =========================
-    # LAYOUT PRINCIPAL
-    # =========================
-    c1, c2, c3, c4 = st.columns(4)
-
-    # =========================
-    # STRINGS
-    # =========================
-    lista_strings = getattr(strings, "strings", []) if strings else []
-
-    c1.metric("Strings", len(lista_strings))
-
-    # =========================
-    # CORRIENTES
-    # =========================
-    corr = getattr(electrical, "corrientes", {}) or {}
-
-    idc = corr.get("idc_total")
-    iac = corr.get("iac")
-
-    c2.metric(
-        "I DC",
-        f"{idc:.2f} A" if isinstance(idc, (int, float)) else "—"
-    )
-
-    c3.metric(
-        "I AC",
-        f"{iac:.2f} A" if isinstance(iac, (int, float)) else "—"
-    )
-
-    # =========================
-    # PROTECCIONES
-    # =========================
-    prot = getattr(electrical, "protecciones", {}) or {}
-
-    breaker = prot.get("breaker_ac")
-
-    c4.metric(
-        "Breaker AC",
-        f"{int(breaker)} A" if isinstance(breaker, (int, float)) else "—"
-    )
-
-    # =========================
-    # DETALLE CONDUCTORES
-    # =========================
-    st.markdown("#### 🧵 Conductores")
+    electrical = getattr(rp, "nec", None)
 
     cond = getattr(electrical, "conductores", {}) or {}
-
-    col_dc, col_ac = st.columns(2)
 
     dc = cond.get("dc", {})
     ac = cond.get("ac", {})
 
-    col_dc.write("**DC**")
-    col_dc.write(f"Calibre: {dc.get('calibre', '—')}")
-    col_dc.write(f"Ampacidad: {dc.get('ampacidad', '—')} A")
+    c1, c2 = st.columns(2)
 
-    col_ac.write("**AC**")
-    col_ac.write(f"Calibre: {ac.get('calibre', '—')}")
-    col_ac.write(f"Ampacidad: {ac.get('ampacidad', '—')} A")
+    c1.metric("Conductor DC", dc.get("calibre", "—"))
+    c1.write(f"Ampacidad: {dc.get('ampacidad', '—')} A")
 
-    # =========================
-    # DETALLE PROTECCIONES
-    # =========================
-    st.markdown("#### ⚠ Protecciones")
+    c2.metric("Conductor AC", ac.get("calibre", "—"))
+    c2.write(f"Ampacidad: {ac.get('ampacidad', '—')} A")
 
-    col_p1, col_p2 = st.columns(2)
 
-    col_p1.write(f"Fusible string: {prot.get('fusible_string', '—')} A")
-    col_p2.write(f"Breaker AC: {prot.get('breaker_ac', '—')} A")
-
-    # =========================
-    # DEBUG (CLAVE PARA TI)
-    # =========================
-    with st.expander("🔎 Ver resultado eléctrico completo"):
-        st.write(electrical)
 # ==========================================================
-# DEBUG MOTOR ENERGÍA
+# BLOQUE 6 — PROTECCIONES
 # ==========================================================
+def _render_protecciones(rp) -> None:
 
-def _render_debug_energia(resultado_proyecto: dict) -> None:
-    
+    st.subheader("Protecciones")
 
-    energia = getattr(resultado_proyecto, "energia", None)
+    electrical = getattr(rp, "nec", None)
 
-    if energia is None:
-        st.info("El motor energético no retornó datos.")
-        return
+    prot = getattr(electrical, "protecciones", {}) or {}
 
-    # si es dataclass convertir a dict
-    if hasattr(energia, "__dict__"):
-        energia = energia.__dict__
+    c1, c2 = st.columns(2)
 
-    meta = energia.get("meta", {})
+    c1.metric("Fusible string", f"{prot.get('fusible_string', '—')} A")
+    c2.metric("Breaker AC", f"{prot.get('breaker_ac', '—')} A")
 
-    if not meta:
-        st.warning("No hay metadatos del motor energético.")
-        return
 
-    motor = meta.get("motor")
-
-    # ======================================================
-    # MOTOR HSP MENSUAL
-    # ======================================================
-
-    if motor == "mensual":
-
-        st.success("Motor energético activo: HSP mensual")
-
-        meses = meta.get("meses")
-
-        if meses:
-            st.write("Meses simulados:", meses)
-
-        energia_anual = energia.get("energia_util_anual")
-
-        if energia_anual:
-            st.metric(
-                "Energía anual FV",
-                f"{energia_anual:,.0f} kWh"
-            )
-
-        energia_12m = energia.get("energia_util_12m")
-
-        if energia_12m:
-            with st.expander("Producción mensual"):
-                for i, v in enumerate(energia_12m, 1):
-                    st.write(f"Mes {i}: {v:,.0f} kWh")
-
-    # ======================================================
-    # MOTOR 8760
-    # ======================================================
-
-    elif motor == "8760":
-
-        st.success("Motor energético activo: Simulación 8760")
-
-        energia_anual = energia.get("energia_util_anual")
-
-        if energia_anual:
-            st.metric(
-                "Energía anual FV",
-                f"{energia_anual:,.0f} kWh"
-            )
-
-        horas = meta.get("horas")
-
-        if horas:
-            st.write("Horas simuladas:", horas)
-
-        with st.expander("Metadatos del motor"):
-            st.json(meta)
-
-    # ======================================================
-    # MOTOR DESCONOCIDO
-    # ======================================================
-
-    else:
-
-        st.warning("Motor energético no identificado")
-
-        st.write("Metadatos recibidos:")
-        st.json(meta)
 # ==========================================================
-# UI BOTÓN PDF
+# BOTÓN PDF
 # ==========================================================
-
 def _ui_boton_pdf(disabled: bool = False) -> bool:
 
     st.markdown("#### Generar propuesta (PDF)")
@@ -295,19 +178,10 @@ def _ui_boton_pdf(disabled: bool = False) -> bool:
     col_a, col_b = st.columns([1, 2])
 
     with col_a:
-
-        run = st.button(
-            "Generar PDF",
-            type="primary",
-            disabled=disabled,
-        )
+        run = st.button("Generar PDF", type="primary", disabled=disabled)
 
     with col_b:
-
-        st.caption(
-            "Genera charts, layout y PDF profesional "
-            "usando los datos ya calculados."
-        )
+        st.caption("Genera PDF profesional del proyecto")
 
     return bool(run)
 
@@ -315,45 +189,23 @@ def _ui_boton_pdf(disabled: bool = False) -> bool:
 # ==========================================================
 # PIPELINE PDF
 # ==========================================================
-
-def _ejecutar_pipeline_pdf(ctx, resultado_proyecto: dict) -> None:
+def _ejecutar_pipeline_pdf(ctx, resultado_proyecto) -> None:
 
     paths = preparar_salida("salidas")
 
-    out_dir = (
-        paths.get("out_dir")
-        or paths.get("base_dir")
-        or "salidas"
-    )
-
     try:
-
-        st.write("DEBUG RESULTADO_PROYECTO")
-        st.write(resultado_proyecto)
-
         arte = generar_artefactos(
             res=resultado_proyecto,
-            out_dir=out_dir,
+            out_dir=paths.get("out_dir", "salidas"),
             vista_resultados={},
             dos_aguas=True,
         )
-
         paths.update(arte)
-
-    except Exception as e:
-
-        st.exception(e)
-
-        st.warning(
-            "No se pudieron generar artefactos "
-            "(charts/layout)."
-        )
+    except Exception:
+        st.warning("No se pudieron generar gráficos")
 
     try:
-
-        datos_pdf = dict(
-            getattr(ctx.datos_proyecto, "__dict__", {})
-        )
+        datos_pdf = dict(getattr(ctx.datos_proyecto, "__dict__", {}))
 
         pdf_path = generar_pdf_profesional(
             resultado_proyecto,
@@ -362,7 +214,6 @@ def _ejecutar_pipeline_pdf(ctx, resultado_proyecto: dict) -> None:
         )
 
         with open(pdf_path, "rb") as f:
-
             st.download_button(
                 "Descargar PDF",
                 data=f,
@@ -373,75 +224,62 @@ def _ejecutar_pipeline_pdf(ctx, resultado_proyecto: dict) -> None:
         st.success("PDF generado")
 
     except Exception as e:
-
         st.exception(e)
-
-        st.warning("No se pudo generar PDF")
+        st.error("Error generando PDF")
 
 
 # ==========================================================
 # RENDER PRINCIPAL
 # ==========================================================
-
 def render(ctx) -> None:
 
-    st.markdown("### Resultados y propuesta")
+    st.markdown("### Resultados del sistema FV")
 
     if not _validar_ctx(ctx):
         return
 
-    resultado_proyecto = _get_resultado_proyecto(ctx)
+    rp = _get_resultado_proyecto(ctx)
 
-    _render_kpis(resultado_proyecto)
-
+    _render_datos_proyecto(ctx)
     st.divider()
 
-    _render_resumen_electrico(resultado_proyecto)
-
+    _render_dimensionamiento(rp)
     st.divider()
 
-    _render_debug_energia(resultado_proyecto)
-
+    _render_equipos(rp)
     st.divider()
 
-    stale_inputs = is_result_stale(ctx)
+    _render_corrientes(rp)
+    st.divider()
 
-    if stale_inputs:
+    _render_conductores(rp)
+    st.divider()
 
-        st.warning(
-            "Los datos cambiaron después del cálculo. "
-            "Regenera la ingeniería antes del PDF."
-        )
+    _render_protecciones(rp)
+    st.divider()
 
-    if not _ui_boton_pdf(disabled=stale_inputs):
+    stale = is_result_stale(ctx)
+
+    if stale:
+        st.warning("Resultados desactualizados. Recalcular.")
+
+    if not _ui_boton_pdf(disabled=stale):
         return
 
-    _ejecutar_pipeline_pdf(
-        ctx,
-        copy.deepcopy(resultado_proyecto),
-    )
+    _ejecutar_pipeline_pdf(ctx, copy.deepcopy(rp))
 
 
 # ==========================================================
-# VALIDACIÓN DEL PASO
+# VALIDACIÓN
 # ==========================================================
-
 def validar(ctx) -> Tuple[bool, List[str]]:
 
     errores: List[str] = []
 
     if getattr(ctx, "resultado_proyecto", None) is None:
-
-        errores.append(
-            "No hay resultados del estudio "
-            "(genere en Paso 5)."
-        )
+        errores.append("Debe ejecutar el cálculo primero.")
 
     if is_result_stale(ctx):
-
-        errores.append(
-            "Resultados desactualizados. "
-            "Regenera la ingeniería."
-        )
+        errores.append("Resultados desactualizados.")
 
     return (len(errores) == 0), errores
