@@ -1,5 +1,5 @@
 # ==========================================================
-# UI — SISTEMA FV (LIMPIO + MULTI-MODO)
+# UI — SISTEMA FV (LIMPIO + UX PRO)
 # ==========================================================
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ def _defaults_sistema_fv() -> Dict[str, Any]:
         "latitud": 15.8,
         "longitud": -87.2,
 
-        "modo_diseno": "manual",  # 🔥 NUEVO
+        "modo_diseno": "manual",
 
         "sizing_input": {
             "modo": "consumo",
@@ -29,9 +29,6 @@ def _defaults_sistema_fv() -> Dict[str, Any]:
         },
 
         "zonas": [],
-
-        #"sombras_pct": 0.0,
-        #"perdidas_sistema_pct": 15.0,
     }
 
 
@@ -101,14 +98,14 @@ def _render_selector_modo(sf):
 
 
 # ==========================================================
-# SIZING CLÁSICO
+# DIMENSIONAMIENTO PRO (SIN SLIDER)
 # ==========================================================
 
 def _render_modo_dimensionado(sf):
 
     st.markdown("### Dimensionamiento")
 
-    modo = st.radio(
+    metodo = st.radio(
         "Método",
         [
             "Cobertura energética",
@@ -116,27 +113,43 @@ def _render_modo_dimensionado(sf):
             "Potencia objetivo",
             "Manual (paneles)"
         ],
+        key="metodo_dimensionado"
     )
 
-    if "Cobertura" in modo:
+    # ----------------------------------
+    # BOTÓN INTELIGENTE
+    # ----------------------------------
+    if st.button("⚡ Aplicar valores recomendados"):
 
-        valor = st.slider("Cobertura (%)", 10, 150, 80)
-        sf["sizing_input"] = {"modo": "consumo", "valor": float(valor)}
+        if metodo == "Cobertura energética":
+            sf["sizing_input"] = {"modo": "consumo", "valor": 80.0}
 
-    elif "Espacio" in modo:
+        elif metodo == "Espacio físico disponible":
+            sf["sizing_input"] = {"modo": "area", "valor": 100.0}
 
-        valor = st.number_input("Área (m²)", 1.0, 10000.0, 20.0)
-        sf["sizing_input"] = {"modo": "area", "valor": float(valor)}
+        elif metodo == "Potencia objetivo":
+            sf["sizing_input"] = {"modo": "potencia", "valor": 10.0}
 
-    elif "Potencia" in modo:
+        elif metodo == "Manual (paneles)":
+            sf["sizing_input"] = {"modo": "manual", "valor": 30}
 
-        valor = st.number_input("Potencia (kW)", 0.1, 1000.0, 5.0)
-        sf["sizing_input"] = {"modo": "potencia", "valor": float(valor)}
+    # ----------------------------------
+    # MOSTRAR RESULTADO
+    # ----------------------------------
+    modo_actual = sf["sizing_input"]["modo"]
+    valor = sf["sizing_input"]["valor"]
 
-    else:
+    if modo_actual == "consumo":
+        st.success(f"Cobertura configurada: {valor} %")
 
-        valor = st.number_input("Número de paneles", 1, 10000, 10)
-        sf["sizing_input"] = {"modo": "manual", "valor": int(valor)}
+    elif modo_actual == "area":
+        st.success(f"Área configurada: {valor} m²")
+
+    elif modo_actual == "potencia":
+        st.success(f"Potencia configurada: {valor} kW")
+
+    elif modo_actual == "manual":
+        st.success(f"Paneles configurados: {valor}")
 
 
 # ==========================================================
@@ -177,18 +190,6 @@ def _render_zonas(sf):
 
 
 # ==========================================================
-# CONDICIONES
-# ==========================================================
-
-def _render_condiciones(sf):
-
-    st.markdown("### Condiciones")
-
-    sf["sombras_pct"] = st.number_input("Sombras (%)", 0.0, 30.0, sf["sombras_pct"])
-    sf["perdidas_sistema_pct"] = st.number_input("Pérdidas (%)", 5.0, 30.0, sf["perdidas_sistema_pct"])
-
-
-# ==========================================================
 # RENDER PRINCIPAL
 # ==========================================================
 
@@ -205,8 +206,6 @@ def render(ctx):
     else:
         _render_zonas(sf)
 
-    _render_condiciones(sf)
-
     ctx.sistema_fv = sf
 
 
@@ -222,8 +221,8 @@ def validar(ctx) -> Tuple[bool, List[str]]:
 
     if sf["modo_diseno"] == "manual":
 
-        if int(sf["sizing_input"].get("valor", 0)) <= 0:
-            errores.append("Cantidad de paneles inválida.")
+        if float(sf["sizing_input"].get("valor", 0)) <= 0:
+            errores.append("Valor de dimensionamiento inválido.")
 
     else:
 
