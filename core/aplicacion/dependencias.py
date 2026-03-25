@@ -182,10 +182,10 @@ class EnergiaAdapter:
             tilt_deg=getattr(datos, "tilt", 15),
             azimut_deg=getattr(datos, "azimut", 180),
 
-            perdidas_dc_pct=getattr(datos, "perdidas_dc_pct", 0.05),
-            sombras_pct=getattr(datos, "sombras_pct", 0.02),
+            perdidas_dc_frac=getattr(datos, "perdidas_dc_pct", 5) / 100,
+            sombras_frac=getattr(datos, "sombras_pct", 2) / 100,
             eficiencia_inversor=getattr(datos, "eficiencia_inversor", 0.98),
-            perdidas_ac_pct=getattr(datos, "perdidas_ac_pct", 0.02),
+            perdidas_ac_frac=getattr(datos, "perdidas_ac_pct", 5) / 100,
         )
 
         resultado = ejecutar_energia(entrada)
