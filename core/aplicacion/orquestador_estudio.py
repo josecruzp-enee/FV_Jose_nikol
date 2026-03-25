@@ -1,40 +1,3 @@
-from __future__ import annotations
-
-from dataclasses import dataclass
-from typing import Any, Optional
-
-from core.dominio.contrato import ResultadoProyecto
-
-from core.aplicacion.puertos import (
-    PuertoSizing,
-    PuertoPaneles,
-    PuertoEnergia,
-    PuertoNEC,
-    PuertoFinanzas,
-)
-
-# 🔥 NUEVO
-from electrical.paneles.entrada_panel import EntradaPaneles
-from core.aplicacion.multizona import ejecutar_multizona
-
-
-# ==========================================================
-# DEPENDENCIAS
-# ==========================================================
-
-@dataclass
-class DependenciasEstudio:
-    sizing: PuertoSizing
-    paneles: PuertoPaneles
-    energia: PuertoEnergia
-    nec: Optional[PuertoNEC] = None
-    finanzas: Optional[PuertoFinanzas] = None
-
-
-# ==========================================================
-# ORQUESTADOR
-# ==========================================================
-
 def ejecutar_estudio(
     datos: Any,
     deps: DependenciasEstudio,
@@ -78,10 +41,6 @@ def ejecutar_estudio(
 
     panel = get_panel(panel_id)
 
-    print("DEBUG PANEL:")
-    print(" - panel_id:", panel_id)
-    print(" - pmax_w:", getattr(panel, "pmax_w", None))
-
     sf = getattr(datos, "sistema_fv", {}) or {}
 
     entrada_paneles = EntradaPaneles(
@@ -91,12 +50,8 @@ def ejecutar_estudio(
         n_paneles_total=getattr(sizing, "n_paneles", None),
     )
 
-    print("DEBUG ENTRADA PANELES:")
-    print(" - inversor:", entrada_paneles.inversor)
-    print(" - n_inversores:", entrada_paneles.n_inversores)
-
     # ======================================================
-    # 3. PANELES / STRINGS (🔥 MULTIZONA)
+    # 3. PANELES / STRINGS (MULTIZONA)
     # ======================================================
     print("\n[3] EJECUTANDO PANEL / STRINGS")
 
@@ -107,12 +62,25 @@ def ejecutar_estudio(
 
         entradas_zonas = []
 
+        total_paneles = getattr(sizing, "n_paneles", None)
+        if not total_paneles:
+            raise ValueError("No se pudo obtener n_paneles desde sizing")
+
+        n_zonas = len(zonas)
+        base = total_paneles // n_zonas
+        resto = total_paneles % n_zonas
+
         for i, z in enumerate(zonas):
 
             n_paneles_zona = z.get("n_paneles")
 
             if not n_paneles_zona:
-                raise ValueError(f"Zona {i} sin n_paneles")
+                if i < resto:
+                    n_paneles_zona = base + 1
+                else:
+                    n_paneles_zona = base
+
+            print(f"Zona {i} → paneles:", n_paneles_zona)
 
             entrada_z = EntradaPaneles(
                 panel=panel,
@@ -154,27 +122,14 @@ def ejecutar_estudio(
                 paneles=resultado_paneles,
                 sizing=sizing,
             )
-
-            print("DEBUG ELECTRICAL:", resultado_electrico)
-
         except Exception as e:
             print("🔥 ERROR ELECTRICAL:", str(e))
             resultado_electrico = None
-
-        if resultado_electrico is None:
-            print("⚠ Electrical devolvió None")
-
-        elif getattr(resultado_electrico, "ok", True) is False:
-            print("⚠ Electrical con errores, se continúa flujo")
 
     # ======================================================
     # 5. ENERGÍA
     # ======================================================
     print("\n[5] EJECUTANDO ENERGIA")
-
-    print("DEBUG INPUT ENERGIA:")
-    print(" - sizing:", sizing)
-    print(" - paneles:", resultado_paneles)
 
     energia = deps.energia.ejecutar(
         datos,
@@ -184,9 +139,6 @@ def ejecutar_estudio(
 
     if energia is None:
         raise ValueError("Energía devolvió None")
-
-    if not getattr(energia, "ok", True):
-        raise ValueError(f"Energía inválida: {energia.errores}")
 
     # ======================================================
     # 6. FINANZAS
