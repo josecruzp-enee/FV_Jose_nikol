@@ -3,18 +3,6 @@ from __future__ import annotations
 """
 PASO 1 — DATOS DEL CLIENTE
 FV Engine
-
-Este módulo representa el primer paso del wizard.
-
-Responsabilidades
------------------
-
-- capturar datos básicos del cliente
-- almacenarlos en ctx.datos_cliente
-- validar los campos requeridos
-
-Este módulo pertenece a la capa UI.
-No contiene lógica de negocio.
 """
 
 from typing import List, Tuple
@@ -29,25 +17,36 @@ def render(ctx) -> None:
 
     st.markdown("### Datos del cliente")
 
+    sf = st.session_state
+
+    # ------------------------------------------------------
+    # VALORES POR DEFECTO (SOLO PRIMERA VEZ)
+    # ------------------------------------------------------
+    sf.setdefault("cliente_nombre", "Cliente Demo")
+    sf.setdefault("cliente_ubicacion", "Ciudad")
+    sf.setdefault("cliente_email", "correo@demo.com")
+
+    # ------------------------------------------------------
+    # INPUTS
+    # ------------------------------------------------------
     cliente = st.text_input(
         "Nombre del cliente",
-        value=str(ctx.datos_cliente.get("cliente", "")),
         key="cliente_nombre",
     )
 
     ubicacion = st.text_input(
         "Ubicación",
-        value=str(ctx.datos_cliente.get("ubicacion", "")),
         key="cliente_ubicacion",
     )
 
     email = st.text_input(
         "Email (opcional)",
-        value=str(ctx.datos_cliente.get("email", "")),
         key="cliente_email",
     )
 
-    # guardar en contexto
+    # ------------------------------------------------------
+    # GUARDAR EN CONTEXTO
+    # ------------------------------------------------------
     ctx.datos_cliente["cliente"] = cliente.strip()
     ctx.datos_cliente["ubicacion"] = ubicacion.strip()
     ctx.datos_cliente["email"] = email.strip()
