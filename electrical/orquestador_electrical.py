@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from electrical.paneles.resultado_paneles import ResultadoPaneles
 
-from electrical.paneles.string_auto import calcular_strings_fv  # 🔥 NUEVO
+from electrical.paneles.string_auto import calcular_strings_fv
 
 from electrical.conductores.corrientes import (
     calcular_corrientes,
@@ -21,6 +21,9 @@ from electrical.protecciones.protecciones import (
 )
 
 from electrical.resultado_electrical import ResultadoElectrico
+
+# 🔥 NUEVO
+from electrical.validacion_fv import validar_sistema_fv
 
 
 # ==========================================================
@@ -107,6 +110,24 @@ def ejecutar_electrical(*args, **kwargs) -> ResultadoElectrico:
         print(" - idc_nom:", array.idc_nom)
         print(" - isc_total:", array.isc_total)
         print(" - vdc_nom:", array.vdc_nom)
+
+        # ==================================================
+        # 🔥 VALIDACIÓN GLOBAL FV (NUEVO)
+        # ==================================================
+        val = validar_sistema_fv(
+            panel=panel,
+            inversor=sizing.inversor,
+            array=array,
+            strings=paneles.strings
+        )
+
+        if not val["ok"]:
+            raise ValueError(val["errores"])
+
+        if val["warnings"]:
+            print("⚠ WARNINGS FV:")
+            for w in val["warnings"]:
+                print(" -", w)
 
         # ==================================================
         # PARAMETROS ELECTRICOS
