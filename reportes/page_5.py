@@ -198,7 +198,10 @@ def _section_energia_mensual(story, paths, styles, content_w):
 # PAGE 5
 # =========================================================
 
-def build_page_5(resultado, datos, paths, pal, styles, content_w, safe_image):
+def build_page_5(resultado, datos, paths, pal, styles, content_w, safe_image=None):
+
+    from pathlib import Path
+    from reportlab.platypus import Paragraph, Spacer, PageBreak, Image
 
     story = []
 
@@ -218,7 +221,7 @@ def build_page_5(resultado, datos, paths, pal, styles, content_w, safe_image):
     _section_energia_horaria(story, paths or {}, styles, content_w)
     _section_energia_mensual(story, paths or {}, styles, content_w)
 
-    # 🔥 IMPORTANTE: pasar safe_image aquí también
+    # 🔥 Layout de paneles (compatible con o sin safe_image)
     insertar_layout_paneles(story, paths or {}, styles, content_w, safe_image)
 
     story.append(PageBreak())
@@ -236,8 +239,13 @@ def build_page_5(resultado, datos, paths, pal, styles, content_w, safe_image):
         story.append(Paragraph("Configuración del String Fotovoltaico", styles["Heading2"]))
         story.append(Spacer(1, 6))
 
-        # 🔥 CAMBIO CLAVE AQUÍ
-        img = safe_image(str(string_fv_path), max_w=content_w, max_h=300)
+        # 🔥 FIX CLAVE: fallback si no hay safe_image
+        if safe_image:
+            img = safe_image(str(string_fv_path), max_w=content_w, max_h=300)
+        else:
+            img = Image(str(string_fv_path))
+            img.drawWidth = content_w
+            img.drawHeight = 300
 
         if img:
             img.hAlign = "CENTER"
