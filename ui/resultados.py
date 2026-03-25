@@ -1,14 +1,10 @@
 from __future__ import annotations
 
-"""
-PASO 6 — RESULTADOS Y PROPUESTA
-FV Engine (UI profesional con tablas)
-"""
-
 import copy
 from typing import List, Tuple
 
 import streamlit as st
+import pandas as pd
 
 from ui.state_helpers import is_result_stale
 from ui.rutas import preparar_salida
@@ -41,45 +37,22 @@ def _get_resultado_proyecto(ctx):
 
 
 # ==========================================================
-# 🎨 TABLA BONITA
+# TABLA STREAMLIT (SIN HTML)
 # ==========================================================
 def _tabla(titulo: str, data: dict):
 
-    filas = ""
+    st.markdown(f"### {titulo}")
 
-    for k, v in data.items():
-        filas += f"""
-        <tr>
-            <td>{k}</td>
-            <td style="text-align:right;"><b>{v}</b></td>
-        </tr>
-        """
+    df = pd.DataFrame({
+        "Parámetro": list(data.keys()),
+        "Valor": list(data.values())
+    })
 
-    html = f"""
-    <div style="
-        border-radius:12px;
-        padding:16px;
-        background:#111827;
-        margin-bottom:16px;
-        border:1px solid #374151;
-        color:white;
-    ">
+    st.dataframe(df, use_container_width=True, hide_index=True)
 
-        <h4 style="margin-bottom:12px;">{titulo}</h4>
-
-        <table style="width:100%; border-collapse: collapse;">
-            <tbody>
-                {filas}
-            </tbody>
-        </table>
-
-    </div>
-    """
-
-    st.markdown(html, unsafe_allow_html=True)
 
 # ==========================================================
-# 📊 DATOS DEL PROYECTO
+# DATOS DEL PROYECTO
 # ==========================================================
 def _render_datos_proyecto(ctx):
 
@@ -93,7 +66,7 @@ def _render_datos_proyecto(ctx):
 
 
 # ==========================================================
-# ⚡ DIMENSIONAMIENTO
+# DIMENSIONAMIENTO
 # ==========================================================
 def _render_dimensionamiento(rp):
 
@@ -108,7 +81,7 @@ def _render_dimensionamiento(rp):
 
 
 # ==========================================================
-# 🔌 EQUIPOS
+# EQUIPOS
 # ==========================================================
 def _render_equipos(rp):
 
@@ -123,7 +96,7 @@ def _render_equipos(rp):
 
 
 # ==========================================================
-# ⚡ CORRIENTES
+# CORRIENTES
 # ==========================================================
 def _render_corrientes(rp):
 
@@ -143,7 +116,7 @@ def _render_corrientes(rp):
 
 
 # ==========================================================
-# 🧵 CONDUCTORES
+# CONDUCTORES
 # ==========================================================
 def _render_conductores(rp):
 
@@ -159,13 +132,7 @@ def _render_conductores(rp):
         st.warning("Conductores no disponibles")
         return
 
-    tramos = cond.tramos
-
-    if not tramos:
-        st.warning("Sin tramos")
-        return
-
-    t = tramos[0]
+    t = cond.tramos[0]
 
     dc = getattr(t, "dc", None)
     ac = getattr(t, "ac", None)
@@ -182,7 +149,7 @@ def _render_conductores(rp):
 
 
 # ==========================================================
-# ⚠ PROTECCIONES
+# PROTECCIONES
 # ==========================================================
 def _render_protecciones(rp):
 
@@ -206,7 +173,6 @@ def _render_protecciones(rp):
 def _ui_boton_pdf(disabled=False):
 
     st.markdown("### 📄 Generar propuesta")
-
     return st.button("Generar PDF", type="primary", disabled=disabled)
 
 
@@ -249,7 +215,7 @@ def _ejecutar_pipeline_pdf(ctx, rp):
 
 
 # ==========================================================
-# RENDER PRINCIPAL
+# RENDER
 # ==========================================================
 def render(ctx):
 
@@ -279,7 +245,7 @@ def render(ctx):
 
 
 # ==========================================================
-# VALIDACIÓN
+# VALIDAR
 # ==========================================================
 def validar(ctx) -> Tuple[bool, List[str]]:
 
