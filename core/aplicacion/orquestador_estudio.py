@@ -63,14 +63,29 @@ def ejecutar_estudio(
         )
 
     # ======================================================
-    # 2. CONSTRUIR ENTRADA PANEL (🔥 CAMBIO CLAVE)
+    # 2. CONSTRUIR ENTRADA PANEL (🔥 CORREGIDO)
     # ======================================================
     print("\n[2] CONSTRUYENDO ENTRADA PANELES")
 
+    from electrical.catalogos.catalogos_yaml import get_panel
+
+    # 🔥 obtener panel desde UI (equipos)
+    equipos = getattr(datos, "equipos", {}) or {}
+    panel_id = equipos.get("panel_id")
+
+    if not panel_id:
+        raise ValueError("No se definió panel_id en datos.equipos")
+
+    panel = get_panel(panel_id)
+
+    print("DEBUG PANEL:")
+    print(" - panel_id:", panel_id)
+    print(" - pmax_w:", getattr(panel, "pmax_w", None))
+
     entrada_paneles = EntradaPaneles(
-        panel=datos.panel,  # ajusta si tu modelo usa otra ruta
-        inversor=sizing.inversor,                 # 🔥 CLAVE
-        n_inversores=sizing.n_inversores,         # 🔥 CLAVE
+        panel=panel,
+        inversor=sizing.inversor,
+        n_inversores=sizing.n_inversores,
         n_paneles_total=getattr(sizing, "n_paneles", None),
         t_min_c=datos.clima.t_min,
         t_oper_c=getattr(datos.clima, "t_oper", 55),
@@ -118,7 +133,7 @@ def ejecutar_estudio(
 
         except Exception as e:
             print("🔥 ERROR ELECTRICAL:", str(e))
-            resultado_electrico = None  # no romper flujo
+            resultado_electrico = None
 
         if resultado_electrico is None:
             print("⚠ Electrical devolvió None")
