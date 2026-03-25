@@ -2,11 +2,13 @@ from pathlib import Path
 from reportlab.platypus import Paragraph, Spacer, Image
 
 
+
+
 # ==========================================================
 # Insertar layout de paneles en el PDF
 # ==========================================================
 
-def insertar_layout_paneles(story, paths, styles, content_w):
+def insertar_layout_paneles(story, paths, styles, content_w, safe_image=None):
 
     if not paths or not isinstance(paths, dict):
         layout = None
@@ -23,11 +25,13 @@ def insertar_layout_paneles(story, paths, styles, content_w):
 
         try:
 
-            img = Image(str(layout))
-
-            # Ajustar tamaño manteniendo proporción
-            img.drawWidth = content_w
-            img.drawHeight = img.imageHeight * (content_w / img.imageWidth)
+            # 🔥 USAR safe_image SI EXISTE
+            if safe_image:
+                img = safe_image(str(layout), max_w=content_w)
+            else:
+                img = Image(str(layout))
+                img.drawWidth = content_w
+                img.drawHeight = img.imageHeight * (content_w / img.imageWidth)
 
             img.hAlign = "CENTER"
 
