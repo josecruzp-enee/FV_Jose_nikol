@@ -143,7 +143,7 @@ def _seleccionar_n_series(
         paneles_usados = strings * n
         sobrantes = n_paneles_total - paneles_usados
 
-        score = error_v + (sobrantes * 50)
+        score = error_v 
 
         if score < best_score:
             best_score = score
