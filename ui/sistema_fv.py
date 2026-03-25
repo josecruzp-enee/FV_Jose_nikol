@@ -18,8 +18,8 @@ from ui.state_helpers import ensure_dict, merge_defaults
 
 def _defaults_sistema_fv() -> Dict[str, Any]:
     return {
-        "latitud": 14.8,
-        "longitud": -86.2,
+        "latitud": 15.8,
+        "longitud": -87.2,
 
         "modo_diseno": "manual",  # 🔥 NUEVO
 
@@ -30,8 +30,8 @@ def _defaults_sistema_fv() -> Dict[str, Any]:
 
         "zonas": [],
 
-        "sombras_pct": 0.0,
-        "perdidas_sistema_pct": 15.0,
+        #"sombras_pct": 0.0,
+        #"perdidas_sistema_pct": 15.0,
     }
 
 
