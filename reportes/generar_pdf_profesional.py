@@ -94,7 +94,7 @@ def generar_pdf_profesional(resultado_proyecto: Any, datos: Any, paths: Dict[str
     story += build_page_2(resultado, datos, paths, pal, styles, content_w, safe_image)
     story += build_page_3(resultado, datos, paths, pal, styles, content_w)
     story += build_page_4(resultado, datos, paths, pal, styles, content_w)
-    story += build_page_5(resultado, datos, paths, pal, styles, content_w, safe_image)
+    story += build_page_5(resultado, datos, paths, pal, styles, content_w)
 
     doc.build(story)
     return str(pdf_path)
