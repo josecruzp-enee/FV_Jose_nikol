@@ -172,61 +172,78 @@ def _render_modo_dimensionado(sf: Dict[str, Any]):
 # ==========================================================
 # UI — GEOMETRÍA
 # ==========================================================
-
 def _render_geometria(sf: Dict[str, Any]):
 
     st.markdown("### Geometría del sistema")
 
-    sf["tipo_superficie"] = st.selectbox(
-        "Tipo de superficie",
-        [
-            "Un plano (suelo/losa/estructura)",
-            "Techo dos aguas",
-        ],
-    )
+    if "zonas" not in sf:
+        sf["zonas"] = []
 
-    if sf["tipo_superficie"] == "Un plano (suelo/losa/estructura)":
+    # ==========================================
+    # BOTÓN AGREGAR ZONA
+    # ==========================================
+    if st.button("➕ Agregar zona"):
+        sf["zonas"].append({
+            "nombre": f"Zona {len(sf['zonas']) + 1}",
+            "area": 20.0,
+            "azimut": 180.0,
+            "inclinacion": 15.0,
+        })
 
-        sf["inclinacion_deg"] = st.number_input(
-            "Inclinación (°)", 0.0, 60.0, float(sf["inclinacion_deg"])
-        )
+    # ==========================================
+    # EDITAR ZONAS
+    # ==========================================
+    zonas_validas = []
 
-        sf["azimut_deg"] = st.number_input(
-            "Azimut (°)", 0.0, 360.0, float(sf["azimut_deg"])
-        )
+    for i, z in enumerate(sf["zonas"]):
 
-        if st.checkbox("Mostrar orientación", value=True):
+        with st.expander(f"Zona {i+1}", expanded=True):
+
+            z["nombre"] = st.text_input(
+                "Nombre",
+                value=z.get("nombre", f"Zona {i+1}"),
+                key=f"nombre_{i}"
+            )
+
+            z["area"] = st.number_input(
+                "Área (m²)",
+                min_value=1.0,
+                max_value=10000.0,
+                value=float(z.get("area", 20.0)),
+                key=f"area_{i}"
+            )
+
+            z["inclinacion"] = st.number_input(
+                "Inclinación (°)",
+                min_value=0.0,
+                max_value=60.0,
+                value=float(z.get("inclinacion", 15.0)),
+                key=f"inc_{i}"
+            )
+
+            z["azimut"] = st.number_input(
+                "Azimut (°)",
+                min_value=0.0,
+                max_value=360.0,
+                value=float(z.get("azimut", 180.0)),
+                key=f"az_{i}"
+            )
 
             col1, col2 = st.columns(2)
 
             with col1:
-                st.pyplot(_compass_plot(sf["azimut_deg"]))
+                st.pyplot(_compass_plot(z["azimut"]))
 
             with col2:
-                st.pyplot(_roof_plot(sf["tipo_superficie"], sf["azimut_deg"]))
+                st.pyplot(_roof_plot("Un plano", z["azimut"]))
 
-    else:
+            # botón eliminar
+            if st.button(f"❌ Eliminar zona {i+1}", key=f"del_{i}"):
+                continue
 
-        sf["azimut_a_deg"] = st.number_input(
-            "Azimut Agua A", 0.0, 360.0, float(sf["azimut_a_deg"])
-        )
+            zonas_validas.append(z)
 
-        sf["azimut_b_deg"] = st.number_input(
-            "Azimut Agua B", 0.0, 360.0, float(sf["azimut_b_deg"])
-        )
-
-        sf["reparto_pct_a"] = st.slider(
-            "Reparto Agua A (%)", 0.0, 100.0, float(sf["reparto_pct_a"])
-        )
-
-        if st.checkbox("Mostrar orientación", value=True):
-
-            st.pyplot(_roof_plot(
-                sf["tipo_superficie"],
-                sf["azimut_a_deg"],
-                sf["azimut_b_deg"]
-            ))
-
+    sf["zonas"] = zonas_validas
 
 # ==========================================================
 # UI — CONDICIONES
