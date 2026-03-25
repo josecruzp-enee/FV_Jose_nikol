@@ -15,6 +15,7 @@ from core.aplicacion.puertos import (
 
 # 🔥 NUEVO
 from electrical.paneles.entrada_panel import EntradaPaneles
+from core.aplicacion.multizona import ejecutar_multizona
 
 
 # ==========================================================
@@ -63,13 +64,12 @@ def ejecutar_estudio(
         )
 
     # ======================================================
-    # 2. CONSTRUIR ENTRADA PANEL (🔥 CORREGIDO)
+    # 2. CONSTRUIR ENTRADA PANELES
     # ======================================================
     print("\n[2] CONSTRUYENDO ENTRADA PANELES")
 
     from electrical.catalogos.catalogos_yaml import get_panel
 
-    # 🔥 obtener panel desde UI (equipos)
     equipos = getattr(datos, "equipos", {}) or {}
     panel_id = equipos.get("panel_id")
 
@@ -81,8 +81,9 @@ def ejecutar_estudio(
     print("DEBUG PANEL:")
     print(" - panel_id:", panel_id)
     print(" - pmax_w:", getattr(panel, "pmax_w", None))
-    
+
     sf = getattr(datos, "sistema_fv", {}) or {}
+
     entrada_paneles = EntradaPaneles(
         panel=panel,
         inversor=sizing.inversor,
@@ -95,11 +96,37 @@ def ejecutar_estudio(
     print(" - n_inversores:", entrada_paneles.n_inversores)
 
     # ======================================================
-    # 3. PANELES / STRINGS
+    # 3. PANELES / STRINGS (🔥 MULTIZONA)
     # ======================================================
     print("\n[3] EJECUTANDO PANEL / STRINGS")
 
-    resultado_paneles = deps.paneles.ejecutar(entrada_paneles)
+    zonas = sf.get("zonas") if isinstance(sf, dict) else None
+
+    if zonas:
+        print("🔥 MODO MULTIZONA ACTIVADO")
+
+        entradas_zonas = []
+
+        for i, z in enumerate(zonas):
+
+            n_paneles_zona = z.get("n_paneles")
+
+            if not n_paneles_zona:
+                raise ValueError(f"Zona {i} sin n_paneles")
+
+            entrada_z = EntradaPaneles(
+                panel=panel,
+                inversor=sizing.inversor,
+                n_inversores=sizing.n_inversores,
+                n_paneles_total=n_paneles_zona,
+            )
+
+            entradas_zonas.append(entrada_z)
+
+        resultado_paneles = ejecutar_multizona(entradas_zonas)
+
+    else:
+        resultado_paneles = deps.paneles.ejecutar(entrada_paneles)
 
     if resultado_paneles is None:
         raise ValueError("Paneles devolvió None")
