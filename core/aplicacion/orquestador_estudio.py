@@ -84,12 +84,21 @@ def _ejecutar_sizing(datos, deps):
 
 def _construir_entrada_paneles(datos, sizing):
 
+    from electrical.catalogos.catalogos import get_panel
+
     equipos = getattr(datos, "equipos", {}) or {}
-    panel = equipos.get("panel")
-    inversor = sizing.inversor
+
+    panel_id = equipos.get("panel_id")
+
+    if not panel_id:
+        raise ValueError("panel_id no definido en datos.equipos")
+
+    panel = get_panel(panel_id)
 
     if panel is None:
-        raise ValueError("Panel no definido")
+        raise ValueError(f"Panel no encontrado en catálogo: {panel_id}")
+
+    inversor = sizing.inversor
 
     return EntradaPaneles(
         panel=panel,
