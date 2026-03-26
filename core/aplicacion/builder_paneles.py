@@ -3,10 +3,10 @@ from __future__ import annotations
 """
 BUILDER DE ENTRADA — PANELES (MULTIZONA READY)
 
-✔ Compatible con EntradaPaneles actual
-✔ No rompe modo legacy
-✔ No calcula nada (solo construye contrato)
-✔ Usa objetos reales PanelSpec / InversorSpec
+✔ Sin dependencia de catalogos externos
+✔ Usa catálogo interno
+✔ Compatible con tu arquitectura actual
+✔ No calcula nada
 """
 
 from typing import Any
@@ -15,31 +15,40 @@ from electrical.paneles.entrada_panel import EntradaPaneles
 from electrical.modelos.paneles import PanelSpec
 from electrical.modelos.inversor import InversorSpec
 
+# 🔥 NUEVO
+from electrical.catalogos.catalogos import get_panel, get_inversor
+
 
 # ==========================================================
-# BUILDER LEGACY (YA EXISTENTE)
+# BUILDER LEGACY
 # ==========================================================
-def construir_entrada_paneles(datos: Any, sizing, catalogos) -> EntradaPaneles:
+def construir_entrada_paneles(datos: Any, sizing) -> EntradaPaneles:
     """
     Construcción clásica (una sola zona).
     """
 
-    panel: PanelSpec = catalogos.obtener_panel(datos.get("panel_id"))
-    inversor: InversorSpec = catalogos.obtener_inversor(sizing.inversor_id)
+    # 🔥 datos es objeto
+    equipos = getattr(datos, "equipos", {}) or {}
+
+    panel_id = equipos.get("panel_id")
+    inversor_id = getattr(sizing, "inversor_id", None)
+
+    panel: PanelSpec = get_panel(panel_id)
+    inversor: InversorSpec = get_inversor(inversor_id)
 
     if panel is None:
-        raise ValueError("Panel no encontrado")
+        raise ValueError(f"Panel no encontrado: {panel_id}")
 
     if inversor is None:
-        raise ValueError("Inversor no definido")
+        raise ValueError(f"Inversor no encontrado: {inversor_id}")
 
-    modo = datos.get("modo_dimensionado", "consumo")
+    modo = getattr(datos, "modo_dimensionado", "consumo")
 
     return EntradaPaneles(
         panel=panel,
         inversor=inversor,
-        modo=modo,
-        n_paneles_total=datos.get("n_paneles"),
+        modo=str(modo).strip().lower(),
+        n_paneles_total=getattr(datos, "n_paneles", None),
         t_min_c=getattr(sizing, "t_min_c", 25.0),
         t_oper_c=getattr(sizing, "t_oper_c", 55.0),
         dos_aguas=getattr(sizing, "dos_aguas", False),
@@ -50,29 +59,25 @@ def construir_entrada_paneles(datos: Any, sizing, catalogos) -> EntradaPaneles:
 
 
 # ==========================================================
-# BUILDER MULTIZONA (🔥 NUEVO)
+# BUILDER MULTIZONA
 # ==========================================================
-def construir_entrada_panel_desde_zona(z, sizing, catalogos) -> EntradaPaneles:
+def construir_entrada_panel_desde_zona(z, sizing) -> EntradaPaneles:
     """
     Construye EntradaPaneles para una zona individual.
-
-    ✔ No calcula nada
-    ✔ Solo define el problema eléctrico
-    ✔ Compatible 100% con tu motor actual
     """
 
-    panel: PanelSpec = catalogos.obtener_panel(z.panel_id)
-    inversor: InversorSpec = catalogos.obtener_inversor(sizing.inversor_id)
+    panel_id = getattr(z, "panel_id", None)
+    inversor_id = getattr(sizing, "inversor_id", None)
+
+    panel: PanelSpec = get_panel(panel_id)
+    inversor: InversorSpec = get_inversor(inversor_id)
 
     if panel is None:
-        raise ValueError(f"Panel no encontrado: {z.panel_id}")
+        raise ValueError(f"Panel no encontrado: {panel_id}")
 
     if inversor is None:
         raise ValueError("Inversor no definido en sizing")
 
-    # -------------------------
-    # BASE COMÚN
-    # -------------------------
     base_kwargs = dict(
         panel=panel,
         inversor=inversor,
@@ -89,9 +94,6 @@ def construir_entrada_panel_desde_zona(z, sizing, catalogos) -> EntradaPaneles:
     # -------------------------
     if z.modo == "area":
 
-        if z.area_m2 is None:
-            raise ValueError(f"Zona {z.nombre} sin área")
-
         return EntradaPaneles(
             modo="area",
             n_paneles_total=None,
@@ -104,7 +106,7 @@ def construir_entrada_panel_desde_zona(z, sizing, catalogos) -> EntradaPaneles:
     elif z.modo == "manual":
 
         if z.paneles_manual is None:
-            raise ValueError(f"Zona {z.nombre} sin paneles definidos")
+            raise ValueError(f"Zona {z.nombre} sin paneles")
 
         return EntradaPaneles(
             modo="manual",
