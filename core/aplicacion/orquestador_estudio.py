@@ -50,10 +50,7 @@ def ejecutar_estudio(datos: Any, deps: DependenciasEstudio):
         # 2. PANELES (🔥 MULTIZONA READY)
         # --------------------------------------------------
         from core.aplicacion.helpers_zonas import extraer_zonas
-        from core.aplicacion.builder_paneles import (
-            construir_entrada_paneles,
-            construir_entrada_panel_desde_zona,
-        )
+        from core.aplicacion.builder_paneles import construir_entrada_paneles
 
         zonas = extraer_zonas(datos)
 
