@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any, Optional, List
 
 from core.dominio.contrato import ResultadoProyecto
 
@@ -14,7 +14,7 @@ from core.aplicacion.puertos import (
 )
 
 # ==========================================================
-# IMPORTS
+# IMPORTS SERVICIOS
 # ==========================================================
 
 from core.servicios.sizing import calcular_sizing_unificado
@@ -23,14 +23,24 @@ from electrical.orquestador_electrical import ejecutar_electrical
 from energy.orquestador_energia import ejecutar_motor_energia as ejecutar_energia
 from core.servicios.finanzas import ejecutar_finanzas
 
-from electrical.paneles.entrada_panel import EntradaPaneles
-from electrical.catalogos.catalogos import get_panel as obtener_panel
+# ==========================================================
+# IMPORTS DOMINIO
+# ==========================================================
 
+from electrical.paneles.entrada_panel import EntradaPaneles
+from electrical.catalogos.catalogos import get_panel
 from energy.contrato import EnergiaInput
 
 from energy.clima.lector_pvgis import (
     descargar_clima_pvgis,
     EntradaClimaPVGIS,
+)
+
+# 🔥 NUEVOS
+from core.aplicacion.helpers_zonas import extraer_zonas
+from core.aplicacion.builder_paneles import (
+    construir_entrada_paneles,
+    construir_entrada_panel_desde_zona,
 )
 
 # ==========================================================
@@ -88,6 +98,10 @@ class ElectricalAdapter:
         return resultado
 
 
+# ==========================================================
+# 🔥 ENERGÍA (CORREGIDO MULTIZONA)
+# ==========================================================
+
 class EnergiaAdapter:
 
     def ejecutar(self, datos, sizing, paneles):
@@ -99,15 +113,20 @@ class EnergiaAdapter:
             EntradaClimaPVGIS(lat=lat, lon=lon)
         )
 
-        n_series = paneles.recomendacion.n_series
-        n_strings = paneles.array.n_strings_total
-        pdc_kw = paneles.array.potencia_dc_w / 1000
-
-        panel_spec = obtener_panel(datos.equipos.get("panel_id"))
-
         # =========================
-        # FIX: INPUT COMPLETO
+        # 🔥 SOPORTE MULTIZONA
         # =========================
+        if isinstance(paneles, list):
+            panel_ref = paneles[0]   # usamos referencia base
+        else:
+            panel_ref = paneles
+
+        n_series = panel_ref.recomendacion.n_series
+        n_strings = panel_ref.array.n_strings_total
+        pdc_kw = panel_ref.array.potencia_dc_w / 1000
+
+        panel_spec = get_panel(datos.equipos.get("panel_id"))
+
         entrada = EnergiaInput(
             n_series=n_series,
             n_strings=n_strings,
@@ -116,7 +135,6 @@ class EnergiaAdapter:
             pac_nominal_kw=sizing.kw_ac,
             clima=clima,
 
-            # 🔥 CAMPOS FALTANTES
             tilt_deg=getattr(datos, "tilt_deg", 15),
             azimut_deg=getattr(datos, "azimut_deg", 180),
             perdidas_dc_frac=getattr(datos, "perdidas_dc_frac", 0.14),
@@ -160,79 +178,3 @@ def construir_dependencias() -> DependenciasEstudio:
         electrical=ElectricalAdapter(),
         finanzas=FinanzasAdapter(),
     )
-
-
-# ==========================================================
-# ORQUESTADOR
-# ==========================================================
-
-def ejecutar_estudio(
-    datos: Any,
-    deps: DependenciasEstudio,
-):
-
-    try:
-
-        # ==================================================
-        # 1. SIZING
-        # ==================================================
-        sizing = deps.sizing.ejecutar(datos)
-
-        # ==================================================
-        # 2. PANELES (FIX: entrada definida)
-        # ==================================================
-        entrada_paneles = EntradaPaneles(
-            datos=datos,
-            sizing=sizing,
-        )
-
-        resultado_paneles = deps.paneles.ejecutar(entrada_paneles)
-
-        # ==================================================
-        # 3. ENERGÍA
-        # ==================================================
-        energia = deps.energia.ejecutar(
-            datos,
-            sizing,
-            resultado_paneles,
-        )
-
-        # ==================================================
-        # 4. ELECTRICAL
-        # ==================================================
-        resultado_electrico = None
-
-        if deps.electrical:
-            resultado_electrico = deps.electrical.ejecutar(
-                datos=datos,
-                paneles=resultado_paneles,
-                sizing=sizing,
-            )
-
-        # ==================================================
-        # 5. FINANZAS
-        # ==================================================
-        financiero = None
-
-        if deps.finanzas:
-            financiero = deps.finanzas.ejecutar(
-                datos,
-                sizing,
-                energia,
-            )
-
-        # ==================================================
-        # RESULTADO FINAL
-        # ==================================================
-        return ResultadoProyecto(
-            sizing=sizing,
-            strings=resultado_paneles,
-            energia=energia,
-            electrical=resultado_electrico,
-            financiero=financiero,
-        )
-
-    except Exception:
-        import traceback
-        print(traceback.format_exc())
-        raise
