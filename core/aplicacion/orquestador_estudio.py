@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any, Optional, List
 
 from core.dominio.contrato import ResultadoProyecto
 
@@ -13,7 +13,6 @@ from core.aplicacion.puertos import (
     PuertoFinanzas,
 )
 
-from electrical.paneles.entrada_panel import EntradaPaneles
 
 # ==========================================================
 # DEPENDENCIAS
@@ -66,7 +65,6 @@ def ejecutar_estudio(datos: Any, deps: DependenciasEstudio):
             entrada_paneles = construir_entrada_paneles(
                 datos,
                 sizing,
-                deps.catalogos,  # 🔥 nuevo
             )
 
             paneles = _ejecutar_paneles(entrada_paneles, deps)
@@ -85,14 +83,13 @@ def ejecutar_estudio(datos: Any, deps: DependenciasEstudio):
         # =========================
         else:
 
-            resultados_zonas = []
+            resultados_zonas: List[Any] = []
 
             for z in zonas:
 
                 entrada = construir_entrada_panel_desde_zona(
                     z,
                     sizing,
-                    deps.catalogos,  # 🔥 desacoplado
                 )
 
                 res = _ejecutar_paneles(entrada, deps)
@@ -108,8 +105,7 @@ def ejecutar_estudio(datos: Any, deps: DependenciasEstudio):
 
                 resultados_zonas.append(res)
 
-            # ⚠️ IMPORTANTE:
-            # aún NO consolidamos (eso viene en el paso 2)
+            # 👉 dejamos lista (no consolidamos aquí)
             paneles = resultados_zonas
 
         # --------------------------------------------------
@@ -152,6 +148,7 @@ def ejecutar_estudio(datos: Any, deps: DependenciasEstudio):
         print(traceback.format_exc())
         raise
 
+
 # ==========================================================
 # FUNCIONES INTERNAS
 # ==========================================================
@@ -164,56 +161,6 @@ def _ejecutar_sizing(datos, deps):
 
     return sizing
 
-
-def _construir_entrada_paneles(datos, sizing):
-
-    from electrical.catalogos.catalogos import get_panel
-    from electrical.paneles.entrada_panel import EntradaPaneles
-
-    equipos = getattr(datos, "equipos", {}) or {}
-
-    panel_id = equipos.get("panel_id")
-
-    if not panel_id:
-        raise ValueError("panel_id no definido en datos.equipos")
-
-    panel = get_panel(panel_id)
-
-    if panel is None:
-        raise ValueError(f"Panel no encontrado en catálogo: {panel_id}")
-
-    inversor = sizing.inversor
-
-    # ------------------------------------------------------
-    # 🔥 OBTENER MODO (CLAVE)
-    # ------------------------------------------------------
-    modo = None
-
-    # caso objeto
-    if hasattr(datos, "modo_dimensionado"):
-        modo = getattr(datos, "modo_dimensionado")
-
-    # caso dict (por si acaso)
-    elif isinstance(datos, dict):
-        modo = datos.get("modo_dimensionado")
-
-    # fallback seguro
-    if not modo:
-        modo = "manual"
-
-    # normalizar
-    modo = str(modo).strip().lower()
-
-    # ------------------------------------------------------
-    # CREAR ENTRADA
-    # ------------------------------------------------------
-    return EntradaPaneles(
-        panel=panel,
-        inversor=inversor,
-        modo=modo,  # 🔥 ESTE ERA EL ERROR
-        n_inversores=getattr(sizing, "n_inversores", 1),
-        n_paneles_total=sizing.n_paneles,
-    )
 
 def _ejecutar_paneles(entrada_paneles, deps):
 
