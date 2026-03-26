@@ -135,20 +135,39 @@ def _render_conductores(rp):
         st.warning("Conductores no disponibles")
         return
 
-    t = cond.tramos[0]
+    t = cond.tramos  # 🔥 FIX
 
     dc = getattr(t, "dc", None)
     ac = getattr(t, "ac", None)
 
-    _tabla("🧵 Conductores DC", {
-        "Calibre": getattr(dc, "calibre", "—") if dc else "—",
-        "Ampacidad": f"{getattr(dc, 'ampacidad', '—')} A" if dc else "—",
-    })
+    # -----------------------------
+    # DC GLOBAL
+    # -----------------------------
+    if dc:
+        _tabla("🧵 DC Global", {
+            "Calibre": dc.calibre,
+            "Ampacidad": f"{dc.ampacidad_ajustada_a} A",
+        })
 
-    _tabla("🧵 Conductores AC", {
-        "Calibre": getattr(ac, "calibre", "—") if ac else "—",
-        "Ampacidad": f"{getattr(ac, 'ampacidad', '—')} A" if ac else "—",
-    })
+    # -----------------------------
+    # MPPT (NUEVO)
+    # -----------------------------
+    if hasattr(t, "mppt") and t.mppt:
+
+        for i, m in enumerate(t.mppt):
+            _tabla(f"🔌 MPPT {i+1}", {
+                "Calibre": m.calibre,
+                "Ampacidad": f"{m.ampacidad_ajustada_a} A",
+            })
+
+    # -----------------------------
+    # AC
+    # -----------------------------
+    if ac:
+        _tabla("⚡ AC", {
+            "Calibre": ac.calibre,
+            "Ampacidad": f"{ac.ampacidad_ajustada_a} A",
+        })
 # ==========================================================
 # PROTECCIONES (🔥 CORREGIDO)
 # ==========================================================
