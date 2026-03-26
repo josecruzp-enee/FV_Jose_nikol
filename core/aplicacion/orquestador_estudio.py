@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Optional, List
+from typing import Any, Optional
 
 from core.dominio.contrato import ResultadoProyecto
 
@@ -47,63 +47,25 @@ def ejecutar_estudio(datos: Any, deps: DependenciasEstudio):
             )
 
         # --------------------------------------------------
-        # 2. PANELES (🔥 MULTIZONA READY)
+        # 2. PANELES (modo estable sin multizona)
         # --------------------------------------------------
-        from core.aplicacion.helpers_zonas import extraer_zonas
         from core.aplicacion.builder_paneles import construir_entrada_paneles
 
-        zonas = extraer_zonas(datos)
+        entrada_paneles = construir_entrada_paneles(
+            datos,
+            sizing,
+        )
 
-        # =========================
-        # CASO LEGACY (1 zona)
-        # =========================
-        if len(zonas) == 1:
+        paneles = _ejecutar_paneles(entrada_paneles, deps)
 
-            entrada_paneles = construir_entrada_paneles(
-                datos,
-                sizing,
+        if not getattr(paneles, "ok", True):
+            return ResultadoProyecto(
+                sizing=sizing,
+                strings=paneles,
+                energia=None,
+                electrical=None,
+                financiero=None
             )
-
-            paneles = _ejecutar_paneles(entrada_paneles, deps)
-
-            if not paneles.ok:
-                return ResultadoProyecto(
-                    sizing=sizing,
-                    strings=paneles,
-                    energia=None,
-                    electrical=None,
-                    financiero=None
-                )
-
-        # =========================
-        # CASO MULTIZONA
-        # =========================
-        else:
-
-            resultados_zonas: List[Any] = []
-
-            for z in zonas:
-
-                entrada = construir_entrada_panel_desde_zona(
-                    z,
-                    sizing,
-                )
-
-                res = _ejecutar_paneles(entrada, deps)
-
-                if not getattr(res, "ok", True):
-                    return ResultadoProyecto(
-                        sizing=sizing,
-                        strings=res,
-                        energia=None,
-                        electrical=None,
-                        financiero=None
-                    )
-
-                resultados_zonas.append(res)
-
-            # 👉 dejamos lista (no consolidamos aquí)
-            paneles = resultados_zonas
 
         # --------------------------------------------------
         # 3. ENERGÍA
