@@ -1,64 +1,39 @@
-def construir_entrada_paneles(datos: Any, sizing, catalogos=None) -> EntradaPaneles:
+def construir_entrada_paneles(datos, sizing) -> EntradaPaneles:
     """
-    Construcción clásica (una sola zona).
-
-    ✔ Fuente única de equipos: datos.equipos
-    ✔ Validación obligatoria
-    ✔ No depende de sizing para equipos
+    ✔ Solo dataclasses
+    ✔ Sin ambigüedad
+    ✔ Sin dict
     """
 
-    # ==========================================================
-    # EXTRAER EQUIPOS
-    # ==========================================================
-    equipos = getattr(datos, "equipos", {}) or {}
+    equipos = datos.equipos
 
-    panel_id = equipos.get("panel_id")
-    inversor_id = equipos.get("inversor_id")
+    panel_id = equipos.panel_id
+    inversor_id = equipos.inversor_id
 
-    # ==========================================================
-    # VALIDACIONES (CRÍTICO)
-    # ==========================================================
     if not panel_id:
-        raise ValueError(
-            "panel_id no definido en datos.equipos "
-            "(UI → seleccion_equipos.py)"
-        )
+        raise ValueError("panel_id no definido")
 
     if not inversor_id:
-        raise ValueError(
-            "inversor_id no definido en datos.equipos "
-            "(UI → seleccion_equipos.py)"
-        )
+        raise ValueError("inversor_id no definido")
 
-    # ==========================================================
-    # OBTENER MODELOS
-    # ==========================================================
-    panel: PanelSpec = get_panel(panel_id)
-    inversor: InversorSpec = get_inversor(inversor_id)
+    panel = get_panel(panel_id)
+    inversor = get_inversor(inversor_id)
 
     if panel is None:
-        raise ValueError(f"Panel no encontrado en catálogo: {panel_id}")
+        raise ValueError(f"Panel no encontrado: {panel_id}")
 
     if inversor is None:
-        raise ValueError(f"Inversor no encontrado en catálogo: {inversor_id}")
+        raise ValueError(f"Inversor no encontrado: {inversor_id}")
 
-    # ==========================================================
-    # MODO
-    # ==========================================================
-    modo = getattr(datos, "modo_dimensionado", "consumo")
-
-    # ==========================================================
-    # CONSTRUIR ENTRADA
-    # ==========================================================
     return EntradaPaneles(
         panel=panel,
         inversor=inversor,
-        modo=str(modo).strip().lower(),
-        n_paneles_total=getattr(datos, "n_paneles", None),
-        t_min_c=getattr(sizing, "t_min_c", 25.0),
-        t_oper_c=getattr(sizing, "t_oper_c", 55.0),
-        dos_aguas=getattr(sizing, "dos_aguas", False),
-        objetivo_dc_ac=getattr(sizing, "dc_ac_ratio", None),
-        pdc_kw_objetivo=getattr(sizing, "pdc_kw", None),
-        n_inversores=getattr(sizing, "n_inversores", 1),
+        modo=datos.modo_dimensionado,
+        n_paneles_total=datos.n_paneles,
+        t_min_c=sizing.t_min_c,
+        t_oper_c=sizing.t_oper_c,
+        dos_aguas=sizing.dos_aguas,
+        objetivo_dc_ac=sizing.dc_ac_ratio,
+        pdc_kw_objetivo=sizing.pdc_kw,
+        n_inversores=sizing.n_inversores,
     )
