@@ -4,46 +4,46 @@ from core.dominio.zona_fv import ZonaFV
 
 def extraer_zonas(datos: Any) -> List[ZonaFV]:
     """
-    Devuelve lista de zonas.
-    
-    ✔ Si no hay zonas → crea una zona única (compatibilidad)
-    ✔ Si hay zonas → las normaliza
+    Devuelve lista de zonas desde objeto DatosProyecto.
+
+    ✔ Multizona
+    ✔ Fallback a zona única
     """
 
-    # -----------------------------
-    # CASO MULTIZONA
-    # -----------------------------
-    if isinstance(datos, dict) and "zonas" in datos:
+    # ------------------------------------------------------
+    # MULTIZONA
+    # ------------------------------------------------------
+    if getattr(datos, "zonas", None):
 
         zonas = []
 
-        for z in datos["zonas"]:
+        for z in datos.zonas:
 
             zonas.append(
                 ZonaFV(
-                    nombre=z.get("nombre", "Zona"),
-                    modo=z.get("modo", "consumo"),
-                    area_m2=z.get("area_m2"),
-                    paneles_manual=z.get("paneles_manual"),
-                    cobertura_pct=z.get("cobertura_pct"),
-                    panel_id=z.get("panel_id", ""),
-                    inclinacion=z.get("inclinacion"),
-                    orientacion=z.get("orientacion"),
+                    nombre=getattr(z, "nombre", "Zona"),
+                    modo=getattr(z, "modo", "consumo"),
+                    area_m2=getattr(z, "area", None),
+                    paneles_manual=getattr(z, "n_paneles", None),
+                    cobertura_pct=getattr(z, "cobertura_pct", None),
+                    panel_id=getattr(z, "panel_id", ""),
+                    inclinacion=getattr(z, "inclinacion", None),
+                    orientacion=getattr(z, "azimut", None),
                 )
             )
 
         return zonas
 
-    # -----------------------------
-    # CASO LEGACY (1 zona)
-    # -----------------------------
+    # ------------------------------------------------------
+    # LEGACY (1 zona)
+    # ------------------------------------------------------
     return [
         ZonaFV(
             nombre="Zona única",
-            modo=datos.get("modo_dimensionado", "consumo"),
-            area_m2=datos.get("area_m2"),
-            paneles_manual=datos.get("n_paneles"),
-            cobertura_pct=datos.get("cobertura_pct"),
-            panel_id=datos.get("panel_id", ""),
+            modo=getattr(datos, "modo_dimensionado", "consumo"),
+            area_m2=getattr(datos, "area_m2", None),
+            paneles_manual=getattr(datos, "n_paneles", None),
+            cobertura_pct=getattr(datos, "cobertura_pct", None),
+            panel_id=getattr(datos, "panel_id", ""),
         )
     ]
