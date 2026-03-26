@@ -14,7 +14,9 @@ from core.aplicacion.puertos import (
 )
 
 from electrical.paneles.entrada_panel import EntradaPaneles
+from electrical.paneles.consolidacion_strings import consolidar_strings
 
+strings_global = consolidar_strings(resultado_paneles)
 
 # ==========================================================
 # DEPENDENCIAS
