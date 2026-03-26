@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from electrical.paneles.resultado_paneles import ResultadoPaneles
 
-from electrical.paneles.string_auto import calcular_strings_fv
-
 from electrical.conductores.corrientes import (
     calcular_corrientes,
     CorrientesInput,
@@ -61,69 +59,35 @@ def ejecutar_electrical(*args, **kwargs) -> ResultadoElectrico:
             raise ValueError("Falta sizing en electrical")
 
         # ==================================================
-        # 🔥 STRINGS AUTOMÁTICO
+        # 🔥 USAR RESULTADO DE PANELES (NO RECALCULAR)
         # ==================================================
         panel_obj = getattr(paneles, "panel", None) or getattr(paneles, "panel_spec", None)
 
         if panel_obj is None:
             raise ValueError("No se pudo obtener panel desde ResultadoPaneles")
 
-        strings = calcular_strings_fv(
-            n_paneles_total=sizing.n_paneles,
-            panel=panel_obj,
-            inversor=sizing.inversor,
-            t_min_c=10
-        )
+        strings = paneles.strings
+        array = paneles.array
 
-        print("DEBUG STRINGS:", strings)
-
-        if not strings["ok"]:
+        if not strings or not array:
             return ResultadoElectrico.build(
                 paneles=paneles,
-                corrientes=_corrientes_error("Error en cálculo de strings"),
-                conductores=_conductores_error("Error en cálculo de strings"),
-                protecciones=_protecciones_error("Error en cálculo de strings"),
+                corrientes=_corrientes_error("Strings no disponibles desde paneles"),
+                conductores=_conductores_error("Strings no disponibles desde paneles"),
+                protecciones=_protecciones_error("Strings no disponibles desde paneles"),
             )
 
-        # ==================================================
-        # 🔥 INYECTAR Y SINCRONIZAR ARRAY
-        # ==================================================
-        paneles.strings = strings["strings"]
-
-        array = paneles.array
-        panel = panel_obj
-
-        n_strings = strings["n_strings"]
-        strings_por_mppt = strings["strings_por_mppt"]
-        paneles_por_string = strings["paneles_por_string"]
-
-        imp = panel.imp_a
-        isc = panel.isc_a
-        vmp = panel.vmp_v
-
-        array.n_strings_total = n_strings
-        array.strings_por_mppt = strings_por_mppt
-
-        array.idc_nom = n_strings * imp
-        array.isc_total = n_strings * isc
-
-        array.vdc_nom = paneles_por_string * vmp
-
-        print("DEBUG ARRAY:")
-        print(" - n_strings:", array.n_strings_total)
-        print(" - strings_por_mppt:", array.strings_por_mppt)
-        print(" - idc_nom:", array.idc_nom)
-        print(" - isc_total:", array.isc_total)
-        print(" - vdc_nom:", array.vdc_nom)
+        print("DEBUG STRINGS (desde paneles):", strings)
+        print("DEBUG ARRAY (desde paneles):", array)
 
         # ==================================================
-        # 🔥 VALIDACIÓN GLOBAL FV (CORREGIDO)
+        # 🔥 VALIDACIÓN GLOBAL FV
         # ==================================================
         val = validar_sistema_fv(
-            panel=panel,
+            panel=panel_obj,
             inversor=sizing.inversor,
             array=array,
-            strings=paneles.strings
+            strings=strings
         )
 
         if not val["ok"]:
@@ -198,7 +162,7 @@ def ejecutar_electrical(*args, **kwargs) -> ResultadoElectrico:
         # ==================================================
         tramos = calcular_conductores(
             corrientes=corrientes,
-            vmp_dc=paneles.array.vdc_nom,
+            vmp_dc=array.vdc_nom,
             vac=vac,
             dist_dc_m=dist_dc_m,
             dist_ac_m=dist_ac_m,
@@ -220,7 +184,7 @@ def ejecutar_electrical(*args, **kwargs) -> ResultadoElectrico:
         # ==================================================
         entrada_prot = EntradaProtecciones(
             corrientes=corrientes,
-            n_strings=paneles.array.n_strings_total,
+            n_strings=array.n_strings_total,
         )
 
         protecciones = calcular_protecciones(entrada_prot)
