@@ -13,7 +13,7 @@ REGLAS:
 """
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, List
 
 
 # =========================================================
@@ -60,12 +60,15 @@ class ResultadoProtecciones:
 
     ok: bool
 
-    errores: list[str]
-    warnings: list[str]
+    errores: List[str]
+    warnings: List[str]
 
     ocpd_ac: OCPDResultado
     ocpd_dc_array: OCPDResultado
     fusible_string: FusibleStringResultado
+
+    # 🔥 NUEVO — PROTECCIONES POR MPPT
+    mppt: List[OCPDResultado]
 
     # =====================================================
     # FACTORY DE ERROR (NECESARIO PARA ORQUESTADOR)
@@ -80,5 +83,6 @@ class ResultadoProtecciones:
             ocpd_dc_array=OCPDResultado(0.0, 0, ""),
             fusible_string=FusibleStringResultado(
                 False, None, None, None, "error"
-            )
+            ),
+            mppt=[]  # 🔥 OBLIGATORIO
         )
