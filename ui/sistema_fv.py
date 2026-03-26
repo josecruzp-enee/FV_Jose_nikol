@@ -104,6 +104,7 @@ def _render_dimensionamiento(sf):
 
         elif manual_op == "Por zonas":
             sf["modo_diseno"] = "zonas"
+            sf["sizing_input"] = {}
 
 # ==========================================================
 # ZONAS
