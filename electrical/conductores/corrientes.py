@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List
 import math
+from collections import defaultdict
 
 from electrical.paneles.resultado_paneles import ResultadoPaneles
 
@@ -25,6 +26,7 @@ class ResultadoCorrientes:
     panel: NivelCorriente
     string: NivelCorriente
     mppt: NivelCorriente
+    mppt_detalle: List[NivelCorriente]  # 🔥 NUEVO (NO rompe nada)
     dc_total: NivelCorriente
     ac: NivelCorriente
 
@@ -38,12 +40,14 @@ class ResultadoCorrientes:
         mppt: NivelCorriente,
         dc_total: NivelCorriente,
         ac: NivelCorriente,
+        mppt_detalle: List[NivelCorriente],  # 🔥 NUEVO
     ) -> "ResultadoCorrientes":
         return ResultadoCorrientes(
             ok=True,
             panel=panel,
             string=string,
             mppt=mppt,
+            mppt_detalle=mppt_detalle,
             dc_total=dc_total,
             ac=ac,
             errores=[],
@@ -59,6 +63,7 @@ class ResultadoCorrientes:
             panel=cero,
             string=cero,
             mppt=cero,
+            mppt_detalle=[],  # 🔥 nuevo
             dc_total=cero,
             ac=cero,
             errores=[msg],
@@ -80,6 +85,21 @@ class CorrientesInput:
 
     factor_dc: float = 1.25
     factor_ac: float = 1.25
+
+
+# ==========================================================
+# HELPERS MPPT
+# ==========================================================
+
+def _agrupar_por_mppt(strings):
+
+    grupos = defaultdict(list)
+
+    for s in strings:
+        mppt_id = getattr(s, "mppt", 0)
+        grupos[mppt_id].append(s)
+
+    return grupos
 
 
 # ==========================================================
@@ -122,18 +142,30 @@ def calcular_corrientes(inp: CorrientesInput) -> ResultadoCorrientes:
 
     string = NivelCorriente(i_string_operacion, i_string_diseno)
 
-    # ------------------------------------------------------
-    # MPPT
-    # ------------------------------------------------------
-    strings_por_mppt = max(1, array.strings_por_mppt)
+    # ======================================================
+    # 🔥 MPPT REAL (POR ZONA)
+    # ======================================================
+    grupos = _agrupar_por_mppt(strings)
 
-    i_mppt_operacion = s0.imp_string_a * strings_por_mppt
-    i_mppt_diseno = (s0.isc_string_a * strings_por_mppt) * FACTOR_DC
+    mppt_detalle = []
+
+    for mppt_id, grupo in grupos.items():
+
+        i_operacion = sum(s.imp_string_a for s in grupo)
+        i_diseno = sum(s.isc_string_a for s in grupo) * FACTOR_DC
+
+        mppt_detalle.append(NivelCorriente(i_operacion, i_diseno))
+
+    # ------------------------------------------------------
+    # MPPT (compatibilidad con sistema actual)
+    # ------------------------------------------------------
+    i_mppt_operacion = sum(m.i_operacion_a for m in mppt_detalle)
+    i_mppt_diseno = sum(m.i_diseno_a for m in mppt_detalle)
 
     mppt = NivelCorriente(i_mppt_operacion, i_mppt_diseno)
 
     # ------------------------------------------------------
-    # DC TOTAL
+    # DC TOTAL (igual que antes)
     # ------------------------------------------------------
     i_dc_operacion = array.idc_nom
     i_dc_diseno = array.isc_total * FACTOR_DC
@@ -164,6 +196,7 @@ def calcular_corrientes(inp: CorrientesInput) -> ResultadoCorrientes:
         panel=panel,
         string=string,
         mppt=mppt,
+        mppt_detalle=mppt_detalle,  # 🔥 nuevo
         dc_total=dc_total,
         ac=ac,
     )
