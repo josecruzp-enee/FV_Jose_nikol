@@ -211,9 +211,27 @@ def _resolver_multizona(entrada: EntradaPaneles) -> ResultadoPaneles:
 
 def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
 
-    # 🔥 MULTIZONA ENTRY POINT
-    if getattr(entrada, "multizona", False):
+    # ======================================================
+    # SELECTOR DE MODO (🔥 CONTROL CENTRAL)
+    # ======================================================
+
+    if entrada.modo == "multizona":
         return _resolver_multizona(entrada)
+
+    # (futuro)
+    # if entrada.modo == "kw_objetivo":
+    #     return _resolver_kw_objetivo(entrada)
+
+    # (futuro)
+    # if entrada.modo == "area":
+    #     return _resolver_area(entrada)
+
+    # ======================================================
+    # FLUJO BASE (manual / consumo)
+    # ======================================================
+
+    errores: List[str] = []
+    warnings: List[str] = []
 
     errores: List[str] = []
     warnings: List[str] = []
