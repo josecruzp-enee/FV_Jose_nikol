@@ -100,7 +100,7 @@ def _render_equipos(rp):
 # ==========================================================
 def _render_corrientes(rp):
 
-    e = rp.nec
+    e = getattr(rp, "electrical", None)
 
     if e is None:
         st.warning("Sin resultados eléctricos")
@@ -108,23 +108,22 @@ def _render_corrientes(rp):
 
     c = getattr(e, "corrientes", None)
 
-    if not c:
+    if not c or not getattr(c, "ok", False):
         st.warning("Corrientes no disponibles")
         return
 
     _tabla("⚡ Corrientes", {
-        "Corriente string": f"{getattr(c, 'imp_string', 0):.2f} A",
-        "Corriente DC total": f"{getattr(c, 'idc_total', 0):.2f} A",
-        "Corriente AC": f"{getattr(c, 'iac', 0):.2f} A",
+        "Corriente string": f"{getattr(c.string, 'i_operacion_a', 0):.2f} A",
+        "Corriente DC total": f"{getattr(c.dc_total, 'i_operacion_a', 0):.2f} A",
+        "Corriente AC": f"{getattr(c.ac, 'i_operacion_a', 0):.2f} A",
     })
-
 
 # ==========================================================
 # CONDUCTORES (🔥 CORREGIDO)
 # ==========================================================
 def _render_conductores(rp):
 
-    e = rp.nec
+    e = getattr(rp, "electrical", None)
 
     if e is None:
         st.warning("Sin conductores")
@@ -132,7 +131,7 @@ def _render_conductores(rp):
 
     cond = getattr(e, "conductores", None)
 
-    if not cond or not getattr(cond, "tramos", None):
+    if not cond or not getattr(cond, "ok", False):
         st.warning("Conductores no disponibles")
         return
 
@@ -150,14 +149,12 @@ def _render_conductores(rp):
         "Calibre": getattr(ac, "calibre", "—") if ac else "—",
         "Ampacidad": f"{getattr(ac, 'ampacidad', '—')} A" if ac else "—",
     })
-
-
 # ==========================================================
 # PROTECCIONES (🔥 CORREGIDO)
 # ==========================================================
 def _render_protecciones(rp):
 
-    e = rp.nec
+    e = getattr(rp, "electrical", None)
 
     if e is None:
         st.warning("Sin protecciones")
@@ -165,16 +162,14 @@ def _render_protecciones(rp):
 
     p = getattr(e, "protecciones", None)
 
-    if not p:
+    if not p or not getattr(p, "ok", False):
         st.warning("Protecciones no disponibles")
         return
 
     _tabla("⚠ Protecciones", {
         "Fusible string": f"{getattr(p, 'fusible_string', '—')} A",
-        "Breaker AC": f"{getattr(p, 'breaker_ac', '—')} A",
+        "Breaker AC": f"{getattr(p, 'ocpd_ac', {}).tamano_a if hasattr(p, 'ocpd_ac') else '—'} A",
     })
-
-
 # ==========================================================
 # PDF
 # ==========================================================
