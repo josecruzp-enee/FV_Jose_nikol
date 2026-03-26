@@ -113,63 +113,57 @@ def _leer_sizing_input(p: Datosproyecto):
 # ==========================================================
 # GENERADOR FV (MODO NORMAL)
 # ==========================================================
-
 def _dimensionar_generador(panel, modo, valor, consumo_anual):
 
     energia_por_kwp_anual = 1500.0  # heurística inicial
 
+    # ------------------------------------------------------
+    # MODO CONSUMO
+    # ------------------------------------------------------
     if modo == "consumo":
 
         cobertura = _clamp(float(valor) / 100.0, 0.1, 2.0)
         kwp_obj = (consumo_anual * cobertura) / energia_por_kwp_anual
-        n_paneles_manual = None
 
+    # ------------------------------------------------------
+    # MODO ÁREA
+    # ------------------------------------------------------
     elif modo == "area":
 
         area = float(valor)
         area_util = area * 0.75
         kwp_obj = area_util / 5.0
-        n_paneles_manual = None
 
+    # ------------------------------------------------------
+    # MODO POTENCIA
+    # ------------------------------------------------------
     elif modo == "potencia":
 
         kwp_obj = float(valor)
-        n_paneles_manual = None
 
+    # ------------------------------------------------------
+    # MODO MANUAL
+    # ------------------------------------------------------
     elif modo == "manual":
 
-        n_paneles_manual = int(valor)
+        n_paneles = int(valor)
 
-        if n_paneles_manual <= 0:
+        if n_paneles <= 0:
             raise ValueError("Número de paneles inválido")
 
-        kwp_obj = None
+        pdc_kw = (n_paneles * panel.pmax_w) / 1000
+        return n_paneles, pdc_kw
 
     else:
         raise ValueError(f"Modo inválido: {modo}")
 
-    from electrical.paneles.entrada_panel import EntradaPaneles
+    # ------------------------------------------------------
+    # CONVERSIÓN A PANELES
+    # ------------------------------------------------------
+    n_paneles = int(ceil((kwp_obj * 1000) / panel.pmax_w))
+    pdc_kw = (n_paneles * panel.pmax_w) / 1000
 
-    modo = (
-        datos.get("modo_dimensionado")
-        if isinstance(datos, dict)
-        else getattr(datos, "modo_dimensionado", "manual")
-    )
-    
-    entrada = EntradaPaneles(
-        panel=panel,
-        inversor=inversor,
-        modo=modo,  
-        n_paneles_total=n_paneles_manual,
-    )
-
-    res = dimensionar_paneles(entrada)
-
-    if not res.ok:
-        raise ValueError(res.errores)
-
-    return res.n_paneles, res.pdc_kw
-
+    return n_paneles, pdc_kw
 
 # ==========================================================
 # MULTI-ZONA
