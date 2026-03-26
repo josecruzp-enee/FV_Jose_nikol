@@ -188,6 +188,7 @@ def _dimensionar_por_zonas(panel, zonas):
         entrada = EntradaPaneles(
             panel=panel,
             inversor=None,
+            modo="area",
             pdc_kw_objetivo=kwp_obj,
             t_min_c=10,
             t_oper_c=50,
