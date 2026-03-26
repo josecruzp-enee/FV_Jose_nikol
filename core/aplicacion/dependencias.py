@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Optional, List
+from typing import Any, Optional
 
 from core.dominio.contrato import ResultadoProyecto
 
@@ -36,9 +36,9 @@ from energy.clima.lector_pvgis import (
     EntradaClimaPVGIS,
 )
 
-# 🔥 NUEVOS
-from core.aplicacion.helpers_zonas import extraer_zonas
+# 🔥 SOLO BUILDER LIMPIO
 from core.aplicacion.builder_paneles import construir_entrada_paneles
+
 
 # ==========================================================
 # DEPENDENCIAS
@@ -66,7 +66,6 @@ class SizingAdapter:
 
 
 class PanelesAdapter:
-
     def ejecutar(self, entrada: EntradaPaneles):
 
         if entrada is None:
@@ -96,13 +95,16 @@ class ElectricalAdapter:
 
 
 # ==========================================================
-# 🔥 ENERGÍA (CORREGIDO MULTIZONA)
+# ENERGÍA (SIN MULTIZONA, CONSISTENTE)
 # ==========================================================
 
 class EnergiaAdapter:
 
     def ejecutar(self, datos, sizing, paneles):
 
+        # -----------------------------
+        # UBICACIÓN
+        # -----------------------------
         lat = datos.lat
         lon = datos.lon
 
@@ -110,20 +112,21 @@ class EnergiaAdapter:
             EntradaClimaPVGIS(lat=lat, lon=lon)
         )
 
-        # =========================
-        # 🔥 SOPORTE MULTIZONA
-        # =========================
-        if isinstance(paneles, list):
-            panel_ref = paneles[0]   # usamos referencia base
-        else:
-            panel_ref = paneles
+        # -----------------------------
+        # PANEL (SIN MULTIZONA)
+        # -----------------------------
+        panel_ref = paneles
 
         n_series = panel_ref.recomendacion.n_series
         n_strings = panel_ref.array.n_strings_total
         pdc_kw = panel_ref.array.potencia_dc_w / 1000
 
-        panel_spec = get_panel(datos.equipos.get("panel_id"))
+        # 🔥 DATACLASS (NO dict)
+        panel_spec = get_panel(datos.equipos.panel_id)
 
+        # -----------------------------
+        # INPUT ENERGÍA
+        # -----------------------------
         entrada = EnergiaInput(
             n_series=n_series,
             n_strings=n_strings,
