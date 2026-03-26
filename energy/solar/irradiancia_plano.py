@@ -155,10 +155,7 @@ def calcular_irradiancia_plano(inp: IrradianciaInput) -> IrradianciaPlano:
         • difusa (cielo)
         • reflejada (suelo)
     """
-    # DEBUG 👇
-    print("zenith:", inp.solar_zenith_deg)
-    print("az solar:", inp.solar_azimuth_deg)
-    print("az panel:", inp.panel_azimuth_deg)
+    
     # ------------------------------------------------------
     # VALIDACIONES
     # ------------------------------------------------------
