@@ -121,6 +121,7 @@ def _ejecutar_sizing(datos, deps):
 def _construir_entrada_paneles(datos, sizing):
 
     from electrical.catalogos.catalogos import get_panel
+    from electrical.paneles.entrada_panel import EntradaPaneles
 
     equipos = getattr(datos, "equipos", {}) or {}
 
@@ -136,13 +137,36 @@ def _construir_entrada_paneles(datos, sizing):
 
     inversor = sizing.inversor
 
+    # ------------------------------------------------------
+    # 🔥 OBTENER MODO (CLAVE)
+    # ------------------------------------------------------
+    modo = None
+
+    # caso objeto
+    if hasattr(datos, "modo_dimensionado"):
+        modo = getattr(datos, "modo_dimensionado")
+
+    # caso dict (por si acaso)
+    elif isinstance(datos, dict):
+        modo = datos.get("modo_dimensionado")
+
+    # fallback seguro
+    if not modo:
+        modo = "manual"
+
+    # normalizar
+    modo = str(modo).strip().lower()
+
+    # ------------------------------------------------------
+    # CREAR ENTRADA
+    # ------------------------------------------------------
     return EntradaPaneles(
         panel=panel,
         inversor=inversor,
-        n_inversores=sizing.n_inversores,
+        modo=modo,  # 🔥 ESTE ERA EL ERROR
+        n_inversores=getattr(sizing, "n_inversores", 1),
         n_paneles_total=sizing.n_paneles,
     )
-
 
 def _ejecutar_paneles(entrada_paneles, deps):
 
