@@ -79,7 +79,6 @@ def tramo_conductor(
     # ------------------------------------------------------
     # 1. Selección por ampacidad
     # ------------------------------------------------------
-
     for t in tabla:
 
         amp_base = t.amp_a
@@ -100,7 +99,6 @@ def tramo_conductor(
     # ------------------------------------------------------
     # 2. Ajuste por VD
     # ------------------------------------------------------
-
     awg = ajustar_calibre_por_vd(
         tabla,
         awg=awg,
@@ -114,7 +112,6 @@ def tramo_conductor(
     # ------------------------------------------------------
     # 3. Resultado final
     # ------------------------------------------------------
-
     fila = next(t for t in tabla if t.awg == awg)
 
     amp_base = fila.amp_a
@@ -169,6 +166,8 @@ class TramosFV:
     dc: ResultadoConductor
     ac: ResultadoConductor
 
+    mppt: List[ResultadoConductor]  # 🔥 NUEVO
+
 
 # ==========================================================
 # ORQUESTADOR FV
@@ -188,6 +187,9 @@ def dimensionar_tramos_fv(
     fases: int = 1,
 ) -> TramosFV:
 
+    # ==================================================
+    # DC GLOBAL (compatibilidad)
+    # ==================================================
     tramo_dc = tramo_conductor(
         nombre="DC_STRING_A_INV",
         i_diseno_a=corrientes.dc_total.i_diseno_a,
@@ -198,6 +200,28 @@ def dimensionar_tramos_fv(
         n_hilos=2,
     )
 
+    # ==================================================
+    # MPPT (NUEVO)
+    # ==================================================
+    tramos_mppt = []
+
+    for i, mppt_corr in enumerate(getattr(corrientes, "mppt_detalle", [])):
+
+        tramo = tramo_conductor(
+            nombre=f"DC_MPPT_{i+1}",
+            i_diseno_a=mppt_corr.i_diseno_a,
+            v_base_v=vmp_dc if vmp_dc > 0 else 1.0,
+            l_m=dist_dc_m,
+            vd_obj_pct=vd_obj_dc_pct,
+            material=material_dc,
+            n_hilos=2,
+        )
+
+        tramos_mppt.append(tramo)
+
+    # ==================================================
+    # AC
+    # ==================================================
     n_hilos_ac = 3 if fases == 3 else 2
 
     tramo_ac = tramo_conductor(
@@ -210,7 +234,11 @@ def dimensionar_tramos_fv(
         n_hilos=n_hilos_ac,
     )
 
+    # ==================================================
+    # RESULTADO FINAL
+    # ==================================================
     return TramosFV(
         dc=tramo_dc,
         ac=tramo_ac,
+        mppt=tramos_mppt,  # 🔥 NUEVO
     )
