@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import List
 from collections import Counter
+from dataclasses import replace
 
 from electrical.paneles.calculo_de_strings import calcular_strings_fv
 from electrical.paneles.dimensionado_paneles import dimensionar_paneles
@@ -24,7 +25,6 @@ from electrical.paneles.validacion_strings import (
 # =========================================================
 
 def _resultado_error(panel, errores, warnings):
-
     return ResultadoPaneles(
         ok=False,
         panel=panel,
@@ -35,6 +35,18 @@ def _resultado_error(panel, errores, warnings):
         warnings=warnings or [],
         errores=errores or [],
         meta=PanelesMeta(0, 0, 0),
+    )
+
+
+# =========================================================
+# CLON SEGURO
+# =========================================================
+
+def _clonar_entrada_para_zona(entrada: EntradaPaneles, *, n_paneles: int) -> EntradaPaneles:
+    return replace(
+        entrada,
+        n_paneles_total=n_paneles,
+        multizona=False,  # evitar recursión
     )
 
 
@@ -101,10 +113,107 @@ def _mapear_strings(strings_res):
 
 
 # =========================================================
+# MULTIZONA (🔥 NUEVO)
+# =========================================================
+
+def _resolver_multizona(entrada: EntradaPaneles) -> ResultadoPaneles:
+
+    if not entrada.zonas:
+        return _resultado_error(entrada.panel, ["Multizona sin zonas"], [])
+
+    strings_global: List[StringFV] = []
+    warnings: List[str] = []
+
+    total_paneles = 0
+    total_potencia = 0.0
+
+    mppt_global = 1
+
+    # ------------------------------------------------------
+    # ITERAR ZONAS
+    # ------------------------------------------------------
+    for i, zona in enumerate(entrada.zonas, start=1):
+
+        if zona.n_paneles <= 0:
+            return _resultado_error(entrada.panel, [f"Zona {i} inválida"], [])
+
+        entrada_zona = _clonar_entrada_para_zona(
+            entrada,
+            n_paneles=zona.n_paneles,
+        )
+
+        resultado = ejecutar_paneles(entrada_zona)
+
+        if not resultado.ok:
+            return resultado
+
+        # --------------------------------------------------
+        # REASIGNAR MPPT GLOBAL
+        # --------------------------------------------------
+        for s in resultado.strings:
+
+            strings_global.append(
+                StringFV(
+                    mppt=mppt_global,
+                    n_series=s.n_series,
+                    vmp_string_v=s.vmp_string_v,
+                    voc_frio_string_v=s.voc_frio_string_v,
+                    imp_string_a=s.imp_string_a,
+                    isc_string_a=s.isc_string_a,
+                )
+            )
+
+            mppt_global += 1
+
+        # --------------------------------------------------
+        # ACUMULAR
+        # --------------------------------------------------
+        total_paneles += resultado.array.n_paneles_total
+        total_potencia += resultado.array.potencia_dc_w
+        warnings.extend(resultado.warnings)
+
+    # ------------------------------------------------------
+    # ARRAY GLOBAL
+    # ------------------------------------------------------
+    array = ArrayFV(
+        potencia_dc_w=total_potencia,
+        vdc_nom=0.0,  # no mezclar zonas
+        idc_nom=0.0,
+        isc_total=sum(s.isc_string_a for s in strings_global),
+        voc_frio_array_v=max(s.voc_frio_string_v for s in strings_global),
+        n_strings_total=len(strings_global),
+        n_paneles_total=total_paneles,
+        strings_por_mppt=1,
+        n_mppt=len(strings_global),
+        p_panel_w=entrada.panel.pmax_w,
+    )
+
+    return ResultadoPaneles(
+        ok=True,
+        panel=entrada.panel,
+        topologia="multizona",
+        array=array,
+        recomendacion=None,
+        strings=strings_global,
+        warnings=warnings,
+        errores=[],
+        meta=PanelesMeta(
+            n_paneles_total=total_paneles,
+            pdc_kw=total_potencia / 1000,
+            n_inversores=entrada.n_inversores,
+        ),
+    )
+
+
+# =========================================================
 # ORQUESTADOR
 # =========================================================
 
 def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
+
+    # 🔥 MULTIZONA ENTRY POINT
+    if getattr(entrada, "multizona", False):
+        return _resolver_multizona(entrada)
 
     errores: List[str] = []
     warnings: List[str] = []
@@ -215,12 +324,6 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
         pdc_kw=pdc_kw,
         n_inversores=n_inversores,
     )
-
-    print("\nDEBUG PANEL FINAL:")
-    print("n_inversores:", n_inversores)
-    print("n_strings:", array.n_strings_total)
-    print("n_mppt:", array.n_mppt)
-    print("strings/mppt:", array.strings_por_mppt)
 
     topologia = "string" if n_inversores > 1 else "centralizado"
 
