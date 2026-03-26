@@ -65,13 +65,13 @@ def _ocpd(i: float, norma: str) -> OCPDResultado:
 
 def _fusible_string(n_strings: int, i: float) -> FusibleStringResultado:
 
-    if n_strings < 2:
+    if n_strings < 3:
         return FusibleStringResultado(
             requerido=False,
             i_diseno_a=None,
             tamano_a=None,
             norma=None,
-            nota="No requerido (<2 strings)"
+            nota="No requerido (<3 strings)"
         )
 
     size = seleccionar_ocpd(i)
