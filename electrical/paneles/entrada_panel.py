@@ -14,19 +14,32 @@ from electrical.modelos.paneles import PanelSpec
 from electrical.modelos.inversor import InversorSpec
 
 
+from dataclasses import dataclass
+from typing import Optional, Literal
+
 @dataclass(frozen=True)
 class EntradaPaneles:
-    """
-    Problema eléctrico del sistema FV.
-    """
 
     # ESPECIFICACIONES
     panel: PanelSpec
     inversor: InversorSpec
 
-    # CONFIGURACIÓN
+    # CONTROL DE FLUJO (🔥 CLAVE)
+    modo: Literal[
+        "manual",
+        "consumo",
+        "area",
+        "kw_objetivo",
+        "multizona"
+    ]
+
+    # CONFIGURACIÓN BASE
     n_paneles_total: Optional[int] = None
     n_inversores: Optional[int] = None
+
+    # OBJETIVOS
+    objetivo_dc_ac: Optional[float] = None
+    pdc_kw_objetivo: Optional[float] = None
 
     # CONDICIONES
     t_min_c: float = 25.0
@@ -34,7 +47,3 @@ class EntradaPaneles:
 
     # TOPOLOGÍA
     dos_aguas: bool = False
-
-    # OBJETIVO
-    objetivo_dc_ac: Optional[float] = None
-    pdc_kw_objetivo: Optional[float] = None
