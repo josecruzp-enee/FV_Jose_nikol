@@ -2,12 +2,10 @@ from __future__ import annotations
 
 """
 PROTECCIONES FV — DOMINIO
-
-Responsabilidad:
-    - Selección de protecciones
 """
 
 from dataclasses import dataclass
+from typing import List
 
 from electrical.conductores.corrientes import ResultadoCorrientes
 
@@ -53,7 +51,7 @@ def seleccionar_ocpd(i_diseno: float) -> int:
 
 
 # ==========================================================
-# CÁLCULOS
+# HELPERS
 # ==========================================================
 
 def _ocpd(i: float, norma: str) -> OCPDResultado:
@@ -88,7 +86,27 @@ def _fusible_string(n_strings: int, i: float) -> FusibleStringResultado:
 
 
 # ==========================================================
-# MOTOR PRINCIPAL (ESTO ES LO QUE FALTABA)
+# 🔥 NUEVO: MPPT
+# ==========================================================
+
+def _ocpd_mppt(corrientes: ResultadoCorrientes) -> List[OCPDResultado]:
+
+    resultado = []
+
+    for i, mppt in enumerate(getattr(corrientes, "mppt_detalle", [])):
+
+        ocpd = _ocpd(
+            mppt.i_diseno_a,
+            "NEC 690.9 (MPPT)"
+        )
+
+        resultado.append(ocpd)
+
+    return resultado
+
+
+# ==========================================================
+# MOTOR PRINCIPAL
 # ==========================================================
 
 def calcular_protecciones(
@@ -106,20 +124,34 @@ def calcular_protecciones(
             errores=[],
             warnings=warnings,
 
+            # -----------------------------
+            # AC
+            # -----------------------------
             ocpd_ac=_ocpd(
                 corr.ac.i_diseno_a,
                 "NEC 690.8 / 210.20(A)"
             ),
 
+            # -----------------------------
+            # DC GLOBAL
+            # -----------------------------
             ocpd_dc_array=_ocpd(
                 corr.dc_total.i_diseno_a,
                 "NEC 690.9"
             ),
 
+            # -----------------------------
+            # STRING
+            # -----------------------------
             fusible_string=_fusible_string(
                 entrada.n_strings,
                 corr.string.i_diseno_a
-            )
+            ),
+
+            # -----------------------------
+            # 🔥 MPPT (NUEVO)
+            # -----------------------------
+            mppt=_ocpd_mppt(corr)
         )
 
     except Exception as e:
@@ -135,5 +167,7 @@ def calcular_protecciones(
             ocpd_dc_array=OCPDResultado(0.0, 0, ""),
             fusible_string=FusibleStringResultado(
                 False, None, None, None, "error"
-            )
+            ),
+
+            mppt=[]  # 🔥 IMPORTANTE
         )
