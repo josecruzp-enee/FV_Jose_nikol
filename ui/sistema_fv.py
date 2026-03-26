@@ -52,14 +52,21 @@ def _render_dimensionamiento(sf):
 
     st.markdown("### Dimensionamiento")
 
-    col1, col2 = st.columns(2)
+    # ======================================================
+    # 🔥 SELECTOR MAESTRO
+    # ======================================================
+    modo = st.radio(
+        "Modo de dimensionamiento",
+        ["Automático", "Manual"],
+        key="modo_principal"
+    )
 
     # ======================================================
     # AUTOMÁTICO
     # ======================================================
-    with col1:
+    if modo == "Automático":
 
-        st.markdown("#### ⚡ Automático")
+        sf["modo_diseno"] = "auto"
 
         auto_op = st.radio(
             "Método automático",
@@ -70,24 +77,19 @@ def _render_dimensionamiento(sf):
         if auto_op == "Cobertura (%)":
             valor = st.number_input("Cobertura", 0.0, 200.0, 80.0)
             sf["sizing_input"] = {"modo": "consumo", "valor": float(valor)}
-            sf["modo_diseno"] = "auto"
 
         elif auto_op == "Área (m²)":
             valor = st.number_input("Área", 1.0, 10000.0, 100.0)
             sf["sizing_input"] = {"modo": "area", "valor": float(valor)}
-            sf["modo_diseno"] = "auto"
 
         elif auto_op == "Potencia (kW)":
             valor = st.number_input("Potencia", 0.1, 1000.0, 10.0)
             sf["sizing_input"] = {"modo": "potencia", "valor": float(valor)}
-            sf["modo_diseno"] = "auto"
 
     # ======================================================
     # MANUAL
     # ======================================================
-    with col2:
-
-        st.markdown("#### 🔧 Manual")
+    else:
 
         manual_op = st.radio(
             "Modo manual",
@@ -102,7 +104,6 @@ def _render_dimensionamiento(sf):
 
         elif manual_op == "Por zonas":
             sf["modo_diseno"] = "zonas"
-
 
 # ==========================================================
 # ZONAS
