@@ -1,3 +1,4 @@
+from electrical.paneles.entrada_panel import EntradaPaneles
 def construir_entrada_paneles(datos, sizing) -> EntradaPaneles:
     """
     ✔ Solo dataclasses
