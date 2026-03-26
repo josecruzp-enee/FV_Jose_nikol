@@ -38,10 +38,7 @@ from energy.clima.lector_pvgis import (
 
 # 🔥 NUEVOS
 from core.aplicacion.helpers_zonas import extraer_zonas
-from core.aplicacion.builder_paneles import (
-    construir_entrada_paneles,
-    construir_entrada_panel_desde_zona,
-)
+from core.aplicacion.builder_paneles import construir_entrada_paneles
 
 # ==========================================================
 # DEPENDENCIAS
