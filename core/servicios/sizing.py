@@ -150,12 +150,16 @@ def _dimensionar_generador(panel, modo, valor, consumo_anual):
 
     from electrical.paneles.entrada_panel import EntradaPaneles
 
+    modo = (
+        datos.get("modo_dimensionado")
+        if isinstance(datos, dict)
+        else getattr(datos, "modo_dimensionado", "manual")
+    )
+    
     entrada = EntradaPaneles(
         panel=panel,
-        inversor=None,
-        pdc_kw_objetivo=kwp_obj,
-        t_min_c=10,
-        t_oper_c=50,
+        inversor=inversor,
+        modo=modo,  
         n_paneles_total=n_paneles_manual,
     )
 
