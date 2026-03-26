@@ -22,7 +22,7 @@ from electrical.catalogos.catalogos import get_panel, get_inversor
 # ==========================================================
 # BUILDER LEGACY
 # ==========================================================
-def construir_entrada_paneles(datos: Any, sizing) -> EntradaPaneles:
+def construir_entrada_paneles(datos: Any, sizing, catalogos=None) -> EntradaPaneles:
     """
     Construcción clásica (una sola zona).
     """
@@ -61,7 +61,7 @@ def construir_entrada_paneles(datos: Any, sizing) -> EntradaPaneles:
 # ==========================================================
 # BUILDER MULTIZONA
 # ==========================================================
-def construir_entrada_panel_desde_zona(z, sizing) -> EntradaPaneles:
+def construir_entrada_panel_desde_zona(z, sizing, catalogos=None) -> EntradaPaneles:
     """
     Construye EntradaPaneles para una zona individual.
     """
