@@ -49,20 +49,69 @@ def ejecutar_estudio(datos: Any, deps: DependenciasEstudio):
             )
 
         # --------------------------------------------------
-        # 2. PANELES
+        # 2. PANELES (🔥 MULTIZONA READY)
         # --------------------------------------------------
-        entrada_paneles = _construir_entrada_paneles(datos, sizing)
+        from core.aplicacion.helpers_zonas import extraer_zonas
+        from core.aplicacion.builder_paneles import (
+            construir_entrada_paneles,
+            construir_entrada_panel_desde_zona,
+        )
 
-        paneles = _ejecutar_paneles(entrada_paneles, deps)
+        zonas = extraer_zonas(datos)
 
-        if not paneles.ok:
-            return ResultadoProyecto(
-                sizing=sizing,
-                strings=paneles,
-                energia=None,
-                electrical=None,
-                financiero=None
+        # =========================
+        # CASO LEGACY (1 zona)
+        # =========================
+        if len(zonas) == 1:
+
+            entrada_paneles = construir_entrada_paneles(
+                datos,
+                sizing,
+                deps.catalogos,  # 🔥 nuevo
             )
+
+            paneles = _ejecutar_paneles(entrada_paneles, deps)
+
+            if not paneles.ok:
+                return ResultadoProyecto(
+                    sizing=sizing,
+                    strings=paneles,
+                    energia=None,
+                    electrical=None,
+                    financiero=None
+                )
+
+        # =========================
+        # CASO MULTIZONA
+        # =========================
+        else:
+
+            resultados_zonas = []
+
+            for z in zonas:
+
+                entrada = construir_entrada_panel_desde_zona(
+                    z,
+                    sizing,
+                    deps.catalogos,  # 🔥 desacoplado
+                )
+
+                res = _ejecutar_paneles(entrada, deps)
+
+                if not getattr(res, "ok", True):
+                    return ResultadoProyecto(
+                        sizing=sizing,
+                        strings=res,
+                        energia=None,
+                        electrical=None,
+                        financiero=None
+                    )
+
+                resultados_zonas.append(res)
+
+            # ⚠️ IMPORTANTE:
+            # aún NO consolidamos (eso viene en el paso 2)
+            paneles = resultados_zonas
 
         # --------------------------------------------------
         # 3. ENERGÍA
@@ -103,7 +152,6 @@ def ejecutar_estudio(datos: Any, deps: DependenciasEstudio):
         import traceback
         print(traceback.format_exc())
         raise
-
 
 # ==========================================================
 # FUNCIONES INTERNAS
