@@ -166,29 +166,67 @@ def _ejecutar_energia(datos, sizing, paneles, deps):
 
     return energia
 
+from electrical.resultado_electrico import ResultadoElectrico
 
-def _ejecutar_electrical(datos, sizing, paneles, deps):
 
-    if not deps.electrical:
-        print("❌ ERROR: módulo electrical no configurado")
+def ejecutar_electrical(*, datos, paneles, sizing):
+    """
+    Orquestador principal del cálculo eléctrico FV.
+
+    Flujo:
+    paneles → corrientes → conductores → protecciones → resultado final
+    """
+
+    # ==========================================================
+    # VALIDACIÓN BASE
+    # ==========================================================
+    if paneles is None or not getattr(paneles, "ok", False):
         return None
 
     try:
-        resultado = deps.electrical.ejecutar(
-            datos=datos,
+        # ==========================================================
+        # 1. CORRIENTES
+        # ==========================================================
+        from electrical.conductores.calculo_corrientes import calcular_corrientes
+
+        corrientes = calcular_corrientes(
             paneles=paneles,
             sizing=sizing,
         )
 
-        if resultado is None:
-            print("❌ ELECTRICAL devolvió None")
+        if corrientes is None or not getattr(corrientes, "ok", False):
+            return None
 
-        return resultado
+        # ==========================================================
+        # 2. CONDUCTORES
+        # ==========================================================
+        from electrical.conductores.calculo_conductores import calcular_conductores
 
-    except Exception:
-        import traceback
-        print("💥 ERROR EN ELECTRICAL:")
-        print(traceback.format_exc())
+        conductores = calcular_conductores(
+            datos=datos,
+            corrientes=corrientes,
+        )
+
+        if conductores is None or not getattr(conductores, "ok", False):
+            return None
+
+        # ==========================================================
+        # 3. PROTECCIONES
+        # ==========================================================
+        from electrical.protecciones.calculo_protecciones import calcular_protecciones
+
+        protecciones = calcular_protecciones(
+            corrientes=corrientes,
+            conductores=conductores,
+            datos=datos,
+        )
+
+        if protecciones is None or not getattr(protecciones, "ok", False):
+            return None
+
+        # ==========================================================
+        # 4. RESULTADO FINAL
+        # ==========================================================
         return ResultadoElectrico.build(
             paneles=paneles,
             corrientes=corrientes,
@@ -196,6 +234,11 @@ def _ejecutar_electrical(datos, sizing, paneles, deps):
             protecciones=protecciones,
         )
 
+    except Exception:
+        import traceback
+        print("💥 ERROR EN ejecutar_electrical:")
+        print(traceback.format_exc())
+        return None
 
 def _ejecutar_finanzas(datos, sizing, energia, deps):
 
