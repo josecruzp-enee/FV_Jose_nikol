@@ -6,8 +6,8 @@ def construir_entrada_paneles(datos, sizing) -> EntradaPaneles:
     """
     ✔ SOLO dataclasses
     ✔ SIN legacy
-    ✔ SIN fallback silencioso
     ✔ FUENTE ÚNICA DE VERDAD
+    ✔ MODO CORRECTAMENTE MAPEADO (UI → MOTOR)
     """
 
     # ==========================================================
@@ -40,17 +40,44 @@ def construir_entrada_paneles(datos, sizing) -> EntradaPaneles:
         raise ValueError(f"Inversor no encontrado: {inversor_id}")
 
     # ==========================================================
-    # MODO (RÍGIDO)
+    # SISTEMA FV (OBLIGATORIO)
     # ==========================================================
     if not hasattr(datos, "sistema_fv") or not isinstance(datos.sistema_fv, dict):
-        raise ValueError("datos.sistema_fv no definido")
+        raise ValueError("datos.sistema_fv no definido o inválido")
 
-    modo = datos.sistema_fv.get("modo_diseno")
+    sf = datos.sistema_fv
 
-    if not modo:
+    modo_diseno = sf.get("modo_diseno")
+
+    if not modo_diseno:
         raise ValueError("modo_diseno no definido en sistema_fv")
 
-    modo = str(modo).strip().lower()
+    modo_diseno = str(modo_diseno).strip().lower()
+
+    # ==========================================================
+    # MAPEO DE MODO (UI → MOTOR)
+    # ==========================================================
+    if modo_diseno == "zonas":
+        modo = "multizona"
+
+    elif modo_diseno == "manual":
+        modo = "manual"
+
+    elif modo_diseno == "auto":
+        sizing_input = sf.get("sizing_input", {})
+
+        if not isinstance(sizing_input, dict):
+            raise ValueError("sizing_input inválido")
+
+        modo = sizing_input.get("modo")
+
+        if not modo:
+            raise ValueError("modo no definido en sizing_input")
+
+        modo = str(modo).strip().lower()
+
+    else:
+        raise ValueError(f"modo_diseno inválido: {modo_diseno}")
 
     # ==========================================================
     # SALIDA
