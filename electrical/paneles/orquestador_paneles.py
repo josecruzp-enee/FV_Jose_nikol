@@ -42,13 +42,15 @@ def _resultado_error(panel, errores, warnings):
 # CLON SEGURO
 # =========================================================
 
+from dataclasses import replace
+
 def _clonar_entrada_para_zona(entrada: EntradaPaneles, *, n_paneles: int) -> EntradaPaneles:
     return replace(
         entrada,
         n_paneles_total=n_paneles,
-        multizona=False,  # evitar recursión
+        modo="manual",   # 🔥 cada zona es independiente
+        zonas=None,      # 🔥 evita recursión
     )
-
 
 # =========================================================
 # HELPERS
