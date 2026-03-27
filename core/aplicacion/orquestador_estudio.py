@@ -166,7 +166,7 @@ def _ejecutar_energia(datos, sizing, paneles, deps):
 
     return energia
 
-from electrical.resultado_electrico import ResultadoElectrico
+from electrical.resultado_electrical import ResultadoElectrico
 
 
 def ejecutar_electrical(*, datos, paneles, sizing):
