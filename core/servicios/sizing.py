@@ -28,6 +28,7 @@ def _clamp(x: float, lo: float, hi: float) -> float:
 def _leer_equipos(p):
     """
     Soporta dict (legacy) y dataclass Equipos (nuevo)
+    PERO SIEMPRE devuelve objeto con atributos
     """
 
     eq = getattr(p, "equipos", None)
@@ -36,13 +37,13 @@ def _leer_equipos(p):
         raise ValueError("p.equipos no definido")
 
     # -----------------------------
-    # NUEVO: DATACLASS
+    # NUEVO: DATACLASS / OBJETO
     # -----------------------------
     if hasattr(eq, "panel_id") and hasattr(eq, "inversor_id"):
         return eq
 
     # -----------------------------
-    # LEGACY: DICT
+    # LEGACY: DICT → convertir a objeto
     # -----------------------------
     if isinstance(eq, dict):
         panel_id = eq.get("panel_id")
@@ -56,22 +57,24 @@ def _leer_equipos(p):
             "inversor_id": inversor_id,
         })()
 
-    # -----------------------------
-    # ERROR
-    # -----------------------------
     raise ValueError("Formato inválido en p.equipos")
 
-def _panel_id(eq: Dict[str, Any]) -> str:
-    pid = str(eq.get("panel_id") or "").strip()
+
+def _panel_id(eq) -> str:
+    pid = str(getattr(eq, "panel_id", "")).strip()
+
     if not pid:
         raise ValueError("panel_id no definido en equipos")
+
     return pid
 
 
-def _inv_id(eq: Dict[str, Any]) -> Optional[str]:
-    v = eq.get("inversor_id")
+def _inv_id(eq) -> Optional[str]:
+    v = getattr(eq, "inversor_id", None)
+
     if v is None:
         return None
+
     v = str(v).strip()
     return v if v else None
 
@@ -95,7 +98,7 @@ def _leer_panel_y_config(p: Datosproyecto):
         raise ValueError("Potencia de panel inválida")
 
     dc_ac_obj = _clamp(
-        float(eq.get("sobredimension_dc_ac", 1.20)),
+        float(getattr(eq, "sobredimension_dc_ac", 1.20)),
         1.0,
         2.0,
     )
@@ -142,37 +145,23 @@ def _leer_sizing_input(p: Datosproyecto):
 # ==========================================================
 # GENERADOR FV (MODO NORMAL)
 # ==========================================================
+
 def _dimensionar_generador(panel, modo, valor, consumo_anual):
 
-    energia_por_kwp_anual = 1500.0  # heurística inicial
+    energia_por_kwp_anual = 1500.0
 
-    # ------------------------------------------------------
-    # MODO CONSUMO
-    # ------------------------------------------------------
     if modo == "consumo":
-
         cobertura = _clamp(float(valor) / 100.0, 0.1, 2.0)
         kwp_obj = (consumo_anual * cobertura) / energia_por_kwp_anual
 
-    # ------------------------------------------------------
-    # MODO ÁREA
-    # ------------------------------------------------------
     elif modo == "area":
-
         area = float(valor)
         area_util = area * 0.75
         kwp_obj = area_util / 5.0
 
-    # ------------------------------------------------------
-    # MODO POTENCIA
-    # ------------------------------------------------------
     elif modo == "potencia":
-
         kwp_obj = float(valor)
 
-    # ------------------------------------------------------
-    # MODO MANUAL
-    # ------------------------------------------------------
     elif modo == "manual":
 
         n_paneles = int(valor)
@@ -186,13 +175,11 @@ def _dimensionar_generador(panel, modo, valor, consumo_anual):
     else:
         raise ValueError(f"Modo inválido: {modo}")
 
-    # ------------------------------------------------------
-    # CONVERSIÓN A PANELES
-    # ------------------------------------------------------
     n_paneles = int(ceil((kwp_obj * 1000) / panel.pmax_w))
     pdc_kw = (n_paneles * panel.pmax_w) / 1000
 
     return n_paneles, pdc_kw
+
 
 # ==========================================================
 # MULTI-ZONA
@@ -262,7 +249,6 @@ def _seleccionar_inversor(pdc, dc_ac_obj, eq):
 
     dc_ac_ratio = pdc / pac_total
 
-    # 🔥 RELAJADO (no rompe flujo)
     if not (0.9 <= dc_ac_ratio <= 1.6):
         print(f"⚠ DC/AC fuera de rango recomendado: {dc_ac_ratio:.2f}")
 
@@ -282,9 +268,6 @@ def calcular_sizing_unificado(p: Datosproyecto) -> ResultadoSizing:
     sf = getattr(p, "sistema_fv", {}) or {}
     modo_diseno = sf.get("modo_diseno", "manual")
 
-    # ======================================================
-    # 🔥 CONTROL POR MODO (CLAVE)
-    # ======================================================
     if modo_diseno == "zonas":
 
         zonas = sf.get("zonas", [])
@@ -305,16 +288,11 @@ def calcular_sizing_unificado(p: Datosproyecto) -> ResultadoSizing:
             consumo_anual
         )
 
-    # ======================================================
-    # INVERSOR
-    # ======================================================
     inv, kw_ac, n_inv, pac_total, sugerencias = _seleccionar_inversor(
         pdc,
         dc_ac_obj,
         eq
     )
-
-    eq["sugerencias_inversor"] = sugerencias
 
     paneles_por_inversor = ceil(n_paneles / n_inv)
 
@@ -337,4 +315,7 @@ def calcular_sizing_unificado(p: Datosproyecto) -> ResultadoSizing:
         dc_ac_ratio=round(dc_ac_ratio, 3),
 
         energia_12m=energia_12m,
+
+        # 🔥 OPCIONAL (si tu dataclass lo soporta)
+        sugerencias_inversor=sugerencias,
     )
