@@ -17,24 +17,20 @@ def ejecutar_multizona(entradas: List) -> ResultadoPaneles:
         resultados.append(res)
 
     # ==================================================
-    # CONSOLIDACIÓN
+    # CONSOLIDACIÓN BÁSICA
     # ==================================================
     total_paneles = sum(r.array.n_paneles_total for r in resultados)
     total_strings = sum(r.array.n_strings_total for r in resultados)
-    total_idc = sum(r.array.idc_nom for r in resultados)
-    total_isc = sum(r.array.isc_total for r in resultados)
     total_pdc = sum(r.array.potencia_dc_w for r in resultados)
 
-    # referencia base
-    ref = resultados[0].array
     panel = resultados[0].panel
 
     # ==================================================
-    # VALIDACIÓN VOLTAJE (IMPORTANTE)
+    # VALIDACIÓN VOLTAJE
     # ==================================================
     vdc_vals = [r.array.vdc_nom for r in resultados]
 
-    if max(vdc_vals) - min(vdc_vals) > 20:  # tolerancia simple
+    if max(vdc_vals) - min(vdc_vals) > 20:
         return ResultadoPaneles(
             ok=False,
             panel=panel,
@@ -50,29 +46,37 @@ def ejecutar_multizona(entradas: List) -> ResultadoPaneles:
     vdc_nom = sum(vdc_vals) / len(vdc_vals)
 
     # ==================================================
-    # STRINGS TOTALES
+    # STRINGS CONSOLIDADOS (CLAVE)
     # ==================================================
     strings_total = []
     for r in resultados:
         strings_total.extend(r.strings)
 
     # ==================================================
-    # MPPT INTELIGENTE (BÁSICO)
+    # MPPT TOTAL
     # ==================================================
     n_mppt_total = sum(r.array.n_mppt for r in resultados)
+    strings_por_mppt = max(1, total_strings // max(1, n_mppt_total))
 
-    strings_por_mppt = max(1, total_strings // n_mppt_total)
+    # ==================================================
+    # ⚠️ NO SUMAR CORRIENTES AQUÍ
+    # Electrical lo hará correctamente
+    # ==================================================
+    idc_nom = max(r.array.idc_nom for r in resultados)
+    isc_total = max(r.array.isc_total for r in resultados)
 
     # ==================================================
     # ARRAY FINAL
     # ==================================================
     from electrical.paneles.resultado_paneles import ArrayFV, PanelesMeta, RecomendacionStrings
 
+    ref = resultados[0].array
+
     array_total = ArrayFV(
         potencia_dc_w=total_pdc,
         vdc_nom=vdc_nom,
-        idc_nom=total_idc,
-        isc_total=total_isc,
+        idc_nom=idc_nom,
+        isc_total=isc_total,
         voc_frio_array_v=ref.voc_frio_array_v,
         n_strings_total=total_strings,
         n_paneles_total=total_paneles,
@@ -82,10 +86,10 @@ def ejecutar_multizona(entradas: List) -> ResultadoPaneles:
     )
 
     # ==================================================
-    # RECOMENDACIÓN CORRECTA
+    # RECOMENDACIÓN (USAR BASE, NO INVENTAR)
     # ==================================================
     recomendacion = RecomendacionStrings(
-        n_series=int(ref.vdc_nom / ref.p_panel_w * 1000) if ref.p_panel_w else 0,
+        n_series=resultados[0].recomendacion.n_series,
         n_strings_total=total_strings,
         strings_por_mppt=strings_por_mppt,
         vmp_string_v=vdc_nom,
