@@ -170,18 +170,24 @@ def _ejecutar_energia(datos, sizing, paneles, deps):
 def _ejecutar_electrical(datos, sizing, paneles, deps):
 
     if not deps.electrical:
-        print("⚠ No hay módulo electrical")
+        print("❌ ERROR: módulo electrical no configurado")
         return None
 
     try:
-        return deps.electrical.ejecutar(
+        resultado = deps.electrical.ejecutar(
             datos=datos,
             paneles=paneles,
             sizing=sizing,
         )
 
+        if resultado is None:
+            print("❌ ELECTRICAL devolvió None")
+
+        return resultado
+
     except Exception:
         import traceback
+        print("💥 ERROR EN ELECTRICAL:")
         print(traceback.format_exc())
         return None
 
