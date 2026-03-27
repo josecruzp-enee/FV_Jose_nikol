@@ -8,7 +8,7 @@ FV Engine
 from typing import List, Tuple
 import streamlit as st
 
-from core.dominio.modelo import Datosproyecto, InstalacionElectrica
+from core.dominio.modelo import Datosproyecto, InstalacionElectrica, Equipos
 from core.aplicacion.orquestador_estudio import ejecutar_estudio
 from core.aplicacion.dependencias import construir_dependencias
 
@@ -120,7 +120,12 @@ def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
         )
     )
 
-    p.equipos = dict(eq)
+    from core.dominio.modelo import Equipos
+
+    p.equipos = Equipos(
+        panel_id=eq.get("panel_id"),
+        inversor_id=eq.get("inversor_id"),
+    )
     p.sistema_fv = dict(sf)
 
     return p
