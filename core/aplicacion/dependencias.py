@@ -80,7 +80,13 @@ class PanelesAdapter:
 
 
 class ElectricalAdapter:
-    def ejecutar(self, datos, paneles, sizing):
+    def ejecutar(
+        self,
+        *,
+        datos,
+        paneles,
+        sizing,
+    ):
 
         resultado = ejecutar_electrical(
             datos=datos,
@@ -92,7 +98,6 @@ class ElectricalAdapter:
             raise ValueError("Electrical devolvió None")
 
         return resultado
-
 
 # ==========================================================
 # ENERGÍA (SIN MULTIZONA, CONSISTENTE)
