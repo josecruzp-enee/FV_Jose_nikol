@@ -191,42 +191,60 @@ def _mostrar_electrical(electrical):
 
     st.subheader("Ingeniería eléctrica")
 
-    # --------------------------------------------------
-    # NO EJECUTADO
-    # --------------------------------------------------
     if electrical is None:
         st.info("Sin resultados eléctricos (no ejecutado).")
         return
 
-    # --------------------------------------------------
-    # EJECUTADO PERO CON ERRORES
-    # --------------------------------------------------
     if not getattr(electrical, "ok", False):
         st.warning("Ingeniería eléctrica generada con errores")
-
-        # Mostrar errores si existen
-        for err in getattr(electrical, "errores", []):
-            st.write(f"• {err}")
-
     else:
         st.success("Cálculo eléctrico correcto")
 
     # --------------------------------------------------
-    # MOSTRAR RESULTADOS (SIEMPRE)
+    # HELPER PARA SERIALIZAR
     # --------------------------------------------------
+    def _to_dict(obj):
+        try:
+            if hasattr(obj, "__dict__"):
+                return obj.__dict__
+            return str(obj)
+        except:
+            return str(obj)
 
-    if hasattr(electrical, "corrientes"):
+    # --------------------------------------------------
+    # CORRIENTES
+    # --------------------------------------------------
+    if hasattr(electrical, "corrientes") and electrical.corrientes:
         st.write("### Corrientes")
-        _safe_show(electrical.corrientes)
+        _safe_show(_to_dict(electrical.corrientes))
 
-    if hasattr(electrical, "conductores"):
+    # --------------------------------------------------
+    # CONDUCTORES
+    # --------------------------------------------------
+    if hasattr(electrical, "conductores") and electrical.conductores:
         st.write("### Conductores")
-        _safe_show(electrical.conductores)
 
-    if hasattr(electrical, "protecciones"):
+        cond = electrical.conductores
+
+        if hasattr(cond, "tramos"):
+            tramos = cond.tramos
+
+            data = {
+                "DC": _to_dict(tramos.dc),
+                "AC": _to_dict(tramos.ac),
+                "MPPT": [_to_dict(x) for x in getattr(tramos, "mppt", [])],
+            }
+
+            _safe_show(data)
+        else:
+            _safe_show(_to_dict(cond))
+
+    # --------------------------------------------------
+    # PROTECCIONES
+    # --------------------------------------------------
+    if hasattr(electrical, "protecciones") and electrical.protecciones:
         st.write("### Protecciones")
-        _safe_show(electrical.protecciones)
-
+        _safe_show(_to_dict(electrical.protecciones))
 # ==========================================================
 # RENDER PRINCIPAL
 # ==========================================================
