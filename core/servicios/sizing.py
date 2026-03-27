@@ -316,6 +316,4 @@ def calcular_sizing_unificado(p: Datosproyecto) -> ResultadoSizing:
 
         energia_12m=energia_12m,
 
-        # 🔥 OPCIONAL (si tu dataclass lo soporta)
-        sugerencias_inversor=sugerencias,
     )
