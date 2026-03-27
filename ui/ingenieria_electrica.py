@@ -224,27 +224,41 @@ def _mostrar_electrical(electrical, paneles=None):
 # ==========================================================
 # RENDER
 # ==========================================================
-
 def render(ctx):
 
+    # ==========================================================
+    # INPUTS
+    # ==========================================================
     e = _asegurar_dict(ctx, "electrico")
-
     _ui_inputs_electricos(e)
 
     st.markdown("### Ingeniería eléctrica automática")
 
-    faltantes = campos_faltantes_para_paso5(ctx)
+    # ==========================================================
+    # BOTÓN (SIN BLOQUEO)
+    # ==========================================================
+    if st.button("Generar ingeniería"):
 
-    if faltantes:
-        st.warning("Complete los datos requeridos antes de generar ingeniería.")
+        faltantes = campos_faltantes_para_paso5(ctx)
 
-    if st.button("Generar ingeniería", disabled=bool(faltantes)):
+        # 🔴 VALIDACIÓN EN EJECUCIÓN (NO BLOQUEA BOTÓN)
+        if faltantes:
+            st.error(f"Faltan datos obligatorios: {faltantes}")
+            st.stop()
+
         try:
             datos = _datosproyecto_desde_ctx(ctx)
             deps = construir_dependencias()
+
             resultado = ejecutar_estudio(datos, deps)
 
+            if resultado is None:
+                st.error("El motor devolvió None")
+                st.stop()
+
+            # ✅ GUARDAR RESULTADO
             st.session_state["resultado_proyecto"] = resultado
+
             st.success("Ingeniería generada correctamente.")
 
         except Exception:
@@ -253,13 +267,19 @@ def render(ctx):
             st.code(traceback.format_exc())
             st.stop()
 
+    # ==========================================================
+    # MOSTRAR RESULTADOS
+    # ==========================================================
     resultado = st.session_state.get("resultado_proyecto")
 
     if resultado:
+
         _mostrar_sizing(resultado.sizing, ctx.sistema_fv)
+
+        # 🔥 DEBUG OPCIONAL (puedes quitar luego)
+        # st.write("DEBUG ELECTRICAL:", resultado.electrical)
+
         _mostrar_electrical(resultado.electrical, resultado.strings)
-
-
 # ==========================================================
 # VALIDACIÓN
 # ==========================================================
