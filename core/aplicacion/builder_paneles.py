@@ -4,13 +4,14 @@ from electrical.catalogos.catalogos import get_panel, get_inversor
 
 def construir_entrada_paneles(datos, sizing) -> EntradaPaneles:
     """
-    ✔ Solo dataclasses
-    ✔ Sin ambigüedad
-    ✔ Fuente única: datos.equipos
+    ✔ SOLO dataclasses
+    ✔ SIN legacy
+    ✔ SIN fallback silencioso
+    ✔ FUENTE ÚNICA DE VERDAD
     """
 
     # ==========================================================
-    # EQUIPOS
+    # EQUIPOS (OBLIGATORIO)
     # ==========================================================
     if not hasattr(datos, "equipos") or datos.equipos is None:
         raise ValueError("datos.equipos no definido")
@@ -20,9 +21,6 @@ def construir_entrada_paneles(datos, sizing) -> EntradaPaneles:
     panel_id = getattr(equipos, "panel_id", None)
     inversor_id = getattr(equipos, "inversor_id", None)
 
-    # ==========================================================
-    # VALIDACIONES
-    # ==========================================================
     if not panel_id:
         raise ValueError("panel_id no definido en datos.equipos")
 
@@ -42,9 +40,17 @@ def construir_entrada_paneles(datos, sizing) -> EntradaPaneles:
         raise ValueError(f"Inversor no encontrado: {inversor_id}")
 
     # ==========================================================
-    # MODO (normalizado)
+    # MODO (RÍGIDO)
     # ==========================================================
-    modo = str(datos.modo_dimensionado).strip().lower()
+    if not hasattr(datos, "sistema_fv") or not isinstance(datos.sistema_fv, dict):
+        raise ValueError("datos.sistema_fv no definido")
+
+    modo = datos.sistema_fv.get("modo_diseno")
+
+    if not modo:
+        raise ValueError("modo_diseno no definido en sistema_fv")
+
+    modo = str(modo).strip().lower()
 
     # ==========================================================
     # SALIDA
@@ -53,7 +59,7 @@ def construir_entrada_paneles(datos, sizing) -> EntradaPaneles:
         panel=panel,
         inversor=inversor,
         modo=modo,
-        n_paneles_total=getattr(datos, "n_paneles", None),
+        n_paneles_total=getattr(sizing, "n_paneles", None),
         t_min_c=getattr(sizing, "t_min_c", 25.0),
         t_oper_c=getattr(sizing, "t_oper_c", 55.0),
         dos_aguas=getattr(sizing, "dos_aguas", False),
