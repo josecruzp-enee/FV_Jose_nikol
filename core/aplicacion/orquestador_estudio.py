@@ -47,13 +47,22 @@ def ejecutar_estudio(datos: Any, deps: DependenciasEstudio):
             )
 
         # --------------------------------------------------
-        # 2. PANELES (modo estable sin multizona)
+        # 2. PANELES (🔥 USAR BUILDER UI)
         # --------------------------------------------------
-        from core.aplicacion.builder_paneles import construir_entrada_paneles
+        if not hasattr(datos, "sistema_fv"):
+            raise ValueError("Datos sin sistema_fv")
 
-        entrada_paneles = construir_entrada_paneles(
-            datos,
-            sizing,
+        sf = datos.sistema_fv
+
+        from ui.sistema_fv import construir_entrada_paneles as builder_ui
+
+        entrada_paneles = builder_ui(
+            sf=sf,
+            panel=sizing.panel,
+            inversor=sizing.inversor,
+            n_inversores=sizing.n_inversores,
+            t_min=getattr(sizing, "t_min_c", 25.0),
+            t_oper=getattr(sizing, "t_oper_c", 55.0),
         )
 
         paneles = _ejecutar_paneles(entrada_paneles, deps)
@@ -106,8 +115,6 @@ def ejecutar_estudio(datos: Any, deps: DependenciasEstudio):
         import traceback
         print(traceback.format_exc())
         raise
-
-
 # ==========================================================
 # FUNCIONES INTERNAS
 # ==========================================================
