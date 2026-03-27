@@ -110,7 +110,6 @@ def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
 
         om_anual_pct=float(sf.get("om_anual_pct", 0.01)),
 
-        # 🔥 FIX CLAVE (TIPADO FUERTE)
         instalacion_electrica=InstalacionElectrica(
             vac=float(e.get("vac", 240.0)),
             fases=int(e.get("fases", 1)),
@@ -120,12 +119,11 @@ def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
         )
     )
 
-    from core.dominio.modelo import Equipos
-
     p.equipos = Equipos(
         panel_id=eq.get("panel_id"),
         inversor_id=eq.get("inversor_id"),
     )
+
     p.sistema_fv = dict(sf)
 
     return p
@@ -151,17 +149,6 @@ def _mostrar_sizing(sizing, sistema_fv):
     c1.metric("Paneles", sizing.n_paneles)
     c2.metric("Potencia DC", f"{sizing.pdc_kw} kWp")
     c3.metric("Potencia AC", f"{sizing.kw_ac} kW")
-
-    if modo == "zonas":
-        st.markdown("### Zonas consideradas")
-
-        for z in sistema_fv.get("zonas", []):
-            st.write(
-                f"- {z.get('nombre')}: "
-                f"{z.get('area')} m² | "
-                f"{z.get('azimut')}° | "
-                f"{z.get('inclinacion')}°"
-            )
 
 
 # ==========================================================
@@ -192,62 +179,36 @@ def _mostrar_electrical(electrical):
     st.subheader("Ingeniería eléctrica")
 
     if electrical is None:
-        st.info("Sin resultados eléctricos (no ejecutado).")
+        st.info("Sin resultados eléctricos.")
         return
 
     if not getattr(electrical, "ok", False):
-        st.warning("Ingeniería eléctrica generada con errores")
+        st.warning("Ingeniería eléctrica con errores")
     else:
         st.success("Cálculo eléctrico correcto")
 
-    # --------------------------------------------------
-    # HELPER PARA SERIALIZAR
-    # --------------------------------------------------
     def _to_dict(obj):
-        try:
-            if hasattr(obj, "__dict__"):
-                return obj.__dict__
-            return str(obj)
-        except:
-            return str(obj)
+        if hasattr(obj, "__dict__"):
+            return obj.__dict__
+        return str(obj)
 
-    # --------------------------------------------------
-    # CORRIENTES
-    # --------------------------------------------------
-    if hasattr(electrical, "corrientes") and electrical.corrientes:
+    if hasattr(electrical, "corrientes"):
         st.write("### Corrientes")
         _safe_show(_to_dict(electrical.corrientes))
 
-    # --------------------------------------------------
-    # CONDUCTORES
-    # --------------------------------------------------
-    if hasattr(electrical, "conductores") and electrical.conductores:
+    if hasattr(electrical, "conductores"):
         st.write("### Conductores")
+        _safe_show(_to_dict(electrical.conductores))
 
-        cond = electrical.conductores
-
-        if hasattr(cond, "tramos"):
-            tramos = cond.tramos
-
-            data = {
-                "DC": _to_dict(tramos.dc),
-                "AC": _to_dict(tramos.ac),
-                "MPPT": [_to_dict(x) for x in getattr(tramos, "mppt", [])],
-            }
-
-            _safe_show(data)
-        else:
-            _safe_show(_to_dict(cond))
-
-    # --------------------------------------------------
-    # PROTECCIONES
-    # --------------------------------------------------
-    if hasattr(electrical, "protecciones") and electrical.protecciones:
+    if hasattr(electrical, "protecciones"):
         st.write("### Protecciones")
         _safe_show(_to_dict(electrical.protecciones))
+
+
 # ==========================================================
-# RENDER PRINCIPAL
+# RENDER PRINCIPAL (🔥 FIX REAL)
 # ==========================================================
+
 def render(ctx):
 
     e = _asegurar_dict(ctx, "electrico")
@@ -264,17 +225,17 @@ def render(ctx):
     generar = st.button("Generar ingeniería", disabled=bool(faltantes))
 
     # --------------------------------------------------
-    # EJECUTAR SOLO SI PRESIONA
+    # EJECUCIÓN
     # --------------------------------------------------
     if generar:
         try:
             datos = _datosproyecto_desde_ctx(ctx)
-            ctx.datos_proyecto = datos
-
             deps = construir_dependencias()
 
             resultado = ejecutar_estudio(datos, deps)
-            ctx.resultado_proyecto = resultado
+
+            # 🔥 FIX CLAVE
+            st.session_state["resultado_proyecto"] = resultado
 
             st.success("Ingeniería generada correctamente.")
 
@@ -285,17 +246,15 @@ def render(ctx):
             st.stop()
 
     # --------------------------------------------------
-    # 🔥 MOSTRAR SI YA EXISTE RESULTADO
+    # VISUALIZACIÓN (SIEMPRE)
     # --------------------------------------------------
-    resultado = getattr(ctx, "resultado_proyecto", None)
+    resultado = st.session_state.get("resultado_proyecto")
 
     if resultado:
+        _mostrar_sizing(resultado.sizing, ctx.sistema_fv)
+        _mostrar_electrical(getattr(resultado, "electrical", None))
 
-        _mostrar_sizing(resultado.sizing, resultado.sizing.__dict__ if hasattr(resultado.sizing, "__dict__") else {})
 
-        resultado_electrico = getattr(resultado, "electrical", None)
-
-        _mostrar_electrical(resultado_electrico)
 # ==========================================================
 # VALIDACIÓN
 # ==========================================================
@@ -304,7 +263,7 @@ def validar(ctx) -> Tuple[bool, List[str]]:
 
     errores = []
 
-    if not getattr(ctx, "resultado_proyecto", None):
+    if not st.session_state.get("resultado_proyecto"):
         errores.append("Debe generar ingeniería.")
 
     return len(errores) == 0, errores
