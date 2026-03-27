@@ -248,7 +248,6 @@ def _mostrar_electrical(electrical):
 # ==========================================================
 # RENDER PRINCIPAL
 # ==========================================================
-
 def render(ctx):
 
     e = _asegurar_dict(ctx, "electrico")
@@ -262,37 +261,41 @@ def render(ctx):
     if faltantes:
         st.warning("Complete los datos requeridos antes de generar ingeniería.")
 
-    if not st.button("Generar ingeniería", disabled=bool(faltantes)):
-        return
+    generar = st.button("Generar ingeniería", disabled=bool(faltantes))
 
-    try:
+    # --------------------------------------------------
+    # EJECUTAR SOLO SI PRESIONA
+    # --------------------------------------------------
+    if generar:
+        try:
+            datos = _datosproyecto_desde_ctx(ctx)
+            ctx.datos_proyecto = datos
 
-        datos = _datosproyecto_desde_ctx(ctx)
+            deps = construir_dependencias()
 
-        ctx.datos_proyecto = datos
+            resultado = ejecutar_estudio(datos, deps)
+            ctx.resultado_proyecto = resultado
 
-        deps = construir_dependencias()
+            st.success("Ingeniería generada correctamente.")
 
-        resultado = ejecutar_estudio(datos, deps)
+        except Exception as e:
+            import traceback
+            st.error("Error en motor FV")
+            st.code(traceback.format_exc())
+            st.stop()
 
-        ctx.resultado_proyecto = resultado
+    # --------------------------------------------------
+    # 🔥 MOSTRAR SI YA EXISTE RESULTADO
+    # --------------------------------------------------
+    resultado = getattr(ctx, "resultado_proyecto", None)
 
-        st.success("Ingeniería generada correctamente.")
+    if resultado:
 
-        _mostrar_sizing(resultado.sizing, datos.sistema_fv)
+        _mostrar_sizing(resultado.sizing, resultado.sizing.__dict__ if hasattr(resultado.sizing, "__dict__") else {})
 
         resultado_electrico = getattr(resultado, "electrical", None)
 
         _mostrar_electrical(resultado_electrico)
-
-    except Exception as e:
-
-        import traceback
-        st.error("Error en motor FV")
-        st.code(traceback.format_exc())
-        st.stop()
-
-
 # ==========================================================
 # VALIDACIÓN
 # ==========================================================
