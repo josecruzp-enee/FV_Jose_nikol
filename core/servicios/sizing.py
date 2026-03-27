@@ -25,12 +25,41 @@ def _clamp(x: float, lo: float, hi: float) -> float:
     return max(lo, min(hi, float(x)))
 
 
-def _leer_equipos(p: Datosproyecto) -> Dict[str, Any]:
-    eq = getattr(p, "equipos", None) or {}
-    if not isinstance(eq, dict):
-        raise ValueError("Formato inválido en p.equipos")
-    return eq
+def _leer_equipos(p):
+    """
+    Soporta dict (legacy) y dataclass Equipos (nuevo)
+    """
 
+    eq = getattr(p, "equipos", None)
+
+    if eq is None:
+        raise ValueError("p.equipos no definido")
+
+    # -----------------------------
+    # NUEVO: DATACLASS
+    # -----------------------------
+    if hasattr(eq, "panel_id") and hasattr(eq, "inversor_id"):
+        return eq
+
+    # -----------------------------
+    # LEGACY: DICT
+    # -----------------------------
+    if isinstance(eq, dict):
+        panel_id = eq.get("panel_id")
+        inversor_id = eq.get("inversor_id")
+
+        if not panel_id or not inversor_id:
+            raise ValueError("Datos incompletos en p.equipos")
+
+        return type("EquiposTmp", (), {
+            "panel_id": panel_id,
+            "inversor_id": inversor_id,
+        })()
+
+    # -----------------------------
+    # ERROR
+    # -----------------------------
+    raise ValueError("Formato inválido en p.equipos")
 
 def _panel_id(eq: Dict[str, Any]) -> str:
     pid = str(eq.get("panel_id") or "").strip()
