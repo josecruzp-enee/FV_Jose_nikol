@@ -176,35 +176,68 @@ def _safe_show(obj):
 
 def _mostrar_electrical(electrical):
 
+    import streamlit as st
+
     st.subheader("Ingeniería eléctrica")
 
+    # --------------------------------------------------
+    # SIN RESULTADOS
+    # --------------------------------------------------
     if electrical is None:
         st.info("Sin resultados eléctricos.")
-        st.write("DEBUG RESULTADO:", resultado)
-        st.write("DEBUG ELECTRICAL:", getattr(resultado, "electrical", None))
+        st.write("DEBUG ELECTRICAL:", electrical)
         return
 
-    if not getattr(electrical, "ok", False):
+    # --------------------------------------------------
+    # DEBUG GENERAL
+    # --------------------------------------------------
+    st.write("DEBUG ELECTRICAL:", electrical)
+
+    # --------------------------------------------------
+    # NORMALIZACIÓN
+    # --------------------------------------------------
+    def _get(obj, key, default=None):
+        if isinstance(obj, dict):
+            return obj.get(key, default)
+        return getattr(obj, key, default)
+
+    def _safe_show(data):
+        if data is None:
+            st.write("—")
+        elif isinstance(data, (dict, list)):
+            st.json(data)
+        else:
+            st.write(data)
+
+    # --------------------------------------------------
+    # VALIDACIÓN
+    # --------------------------------------------------
+    ok = _get(electrical, "ok", False)
+
+    if not ok:
         st.warning("Ingeniería eléctrica con errores")
     else:
         st.success("Cálculo eléctrico correcto")
 
-    def _to_dict(obj):
-        if hasattr(obj, "__dict__"):
-            return obj.__dict__
-        return str(obj)
+    # --------------------------------------------------
+    # SECCIONES
+    # --------------------------------------------------
 
-    if hasattr(electrical, "corrientes"):
-        st.write("### Corrientes")
-        _safe_show(_to_dict(electrical.corrientes))
+    corrientes = _get(electrical, "corrientes")
+    conductores = _get(electrical, "conductores")
+    protecciones = _get(electrical, "protecciones")
 
-    if hasattr(electrical, "conductores"):
-        st.write("### Conductores")
-        _safe_show(_to_dict(electrical.conductores))
+    if corrientes:
+        st.write("### ⚡ Corrientes")
+        _safe_show(corrientes)
 
-    if hasattr(electrical, "protecciones"):
-        st.write("### Protecciones")
-        _safe_show(_to_dict(electrical.protecciones))
+    if conductores:
+        st.write("### 🧵 Conductores")
+        _safe_show(conductores)
+
+    if protecciones:
+        st.write("### ⚠ Protecciones")
+        _safe_show(protecciones)
 
 
 # ==========================================================
