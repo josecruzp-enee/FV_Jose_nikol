@@ -111,7 +111,11 @@ def ejecutar_estudio(datos: Any, deps: DependenciasEstudio):
         # ==================================================
         # 4. ELECTRICAL  🔥 (CORREGIDO)
         # ==================================================
+        print("🔥 LLAMANDO ELECTRICAL")
+
         electrical = _ejecutar_electrical(datos, sizing, paneles, deps)
+
+        print("🔥 RESULTADO ELECTRICAL:", electrical)
 
         # 👉 IMPORTANTE: no cortamos flujo aunque falle
         # UI debe decidir qué mostrar
