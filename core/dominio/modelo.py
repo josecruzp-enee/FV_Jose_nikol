@@ -19,7 +19,15 @@ NO contiene lógica.
 
 from dataclasses import dataclass
 from typing import List
+from dataclasses import dataclass
 
+# ==========================================================
+# EQUIPOS (FV)
+# ==========================================================
+@dataclass
+class Equipos:
+    panel_id: str
+    inversor_id: str
 
 # =========================================================
 # MODELO ELÉCTRICO (TIPADO FUERTE)
