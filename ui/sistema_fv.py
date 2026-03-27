@@ -11,7 +11,7 @@ from ui.state_helpers import ensure_dict, merge_defaults
 
 # 🔥 IMPORTANTE (ajusta ruta si es necesario)
 from electrical.paneles.entrada_panel import ZonaFV
-
+from electrical.paneles.entrada_panel import EntradaPaneles
 
 # ==========================================================
 # DEFAULTS
@@ -230,33 +230,108 @@ def validar(ctx) -> Tuple[bool, List[str]]:
 # ==========================================================
 
 def construir_entrada_paneles(sf, panel, inversor, n_inversores, t_min, t_oper):
+    """
+    Adaptador UI → Dominio (EntradaPaneles)
+
+    ✔ Soporta automático, manual y multizona
+    ✔ Control total de flujo
+    ✔ Sin accesos inválidos
+    ✔ Compatible con todo el motor
+    """
+
+    # ------------------------------------------------------
+    # VALIDACIÓN BASE
+    # ------------------------------------------------------
+    if not isinstance(sf, dict):
+        raise ValueError("sistema_fv inválido")
+
+    modo_diseno = sf.get("modo_diseno")
+
+    if not modo_diseno:
+        raise ValueError("modo_diseno no definido")
+
+    modo_diseno = str(modo_diseno).strip().lower()
 
     # ------------------------------------------------------
     # MODO
     # ------------------------------------------------------
-    if sf["modo_diseno"] == "zonas":
+    if modo_diseno == "zonas":
         modo = "multizona"
+
+    elif modo_diseno == "manual":
+        modo = "manual"
+
+    elif modo_diseno == "auto":
+
+        sizing_input = sf.get("sizing_input", {})
+
+        if not isinstance(sizing_input, dict):
+            raise ValueError("sizing_input inválido")
+
+        modo = sizing_input.get("modo")
+
+        if not modo:
+            raise ValueError("modo no definido en sizing_input")
+
+        modo = str(modo).strip().lower()
+
     else:
-        modo = sf["sizing_input"]["modo"]
+        raise ValueError(f"modo_diseno inválido: {modo_diseno}")
 
     # ------------------------------------------------------
-    # ZONAS
+    # ZONAS (MULTIZONA)
     # ------------------------------------------------------
     zonas_dom = None
 
     if modo == "multizona":
 
+        zonas = sf.get("zonas")
+
+        if not zonas or not isinstance(zonas, list):
+            raise ValueError("Zonas no definidas")
+
         zonas_dom = []
 
-        for z in sf["zonas"]:
+        for i, z in enumerate(zonas):
 
-            if z["modo"] == "Paneles":
-                n_paneles = z["n_paneles"]
+            if not isinstance(z, dict):
+                raise ValueError(f"Zona {i+1} inválida")
+
+            modo_z = str(z.get("modo", "")).strip().lower()
+            modo_z = modo_z.replace("á", "a")
+
+            # -----------------------------
+            # PANEL DIRECTO
+            # -----------------------------
+            if modo_z == "paneles":
+
+                n_paneles = z.get("n_paneles")
+
+                if n_paneles is None or int(n_paneles) <= 0:
+                    raise ValueError(f"Zona {i+1}: paneles inválidos")
+
+                n_paneles = int(n_paneles)
+
+            # -----------------------------
+            # ÁREA
+            # -----------------------------
+            elif modo_z == "area":
+
+                area = z.get("area")
+
+                if area is None or float(area) <= 0:
+                    raise ValueError(f"Zona {i+1}: área inválida")
+
+                area = float(area)
+
+                # conversión simple (puedes mejorar después)
+                n_paneles = max(1, int(area / 2.0))
+
             else:
-                n_paneles = _area_a_paneles(z["area"])
+                raise ValueError(f"Zona {i+1}: modo inválido ({modo_z})")
 
             zonas_dom.append(
-                ZonaFV(n_paneles=int(n_paneles))
+                ZonaFV(n_paneles=n_paneles)
             )
 
     # ------------------------------------------------------
@@ -265,10 +340,21 @@ def construir_entrada_paneles(sf, panel, inversor, n_inversores, t_min, t_oper):
     n_paneles_total = None
 
     if modo == "manual":
-        n_paneles_total = int(sf["sizing_input"]["valor"])
+
+        sizing_input = sf.get("sizing_input", {})
+
+        if not isinstance(sizing_input, dict):
+            raise ValueError("sizing_input inválido")
+
+        valor = sizing_input.get("valor")
+
+        if valor is None or int(valor) <= 0:
+            raise ValueError("Cantidad de paneles inválida")
+
+        n_paneles_total = int(valor)
 
     # ------------------------------------------------------
-    # CONSTRUIR ENTRADA
+    # CONSTRUIR ENTRADA FINAL
     # ------------------------------------------------------
     return EntradaPaneles(
         panel=panel,
