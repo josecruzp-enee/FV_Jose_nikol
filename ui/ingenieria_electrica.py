@@ -191,19 +191,29 @@ def _mostrar_electrical(electrical):
 
     st.subheader("Ingeniería eléctrica")
 
+    # --------------------------------------------------
+    # NO EJECUTADO
+    # --------------------------------------------------
     if electrical is None:
-        st.info("Sin resultados eléctricos.")
+        st.info("Sin resultados eléctricos (no ejecutado).")
         return
 
+    # --------------------------------------------------
+    # EJECUTADO PERO CON ERRORES
+    # --------------------------------------------------
     if not getattr(electrical, "ok", False):
-        st.error("Error en cálculo eléctrico")
+        st.warning("Ingeniería eléctrica generada con errores")
 
+        # Mostrar errores si existen
         for err in getattr(electrical, "errores", []):
             st.write(f"• {err}")
 
-        return
+    else:
+        st.success("Cálculo eléctrico correcto")
 
-    st.success("Cálculo eléctrico correcto")
+    # --------------------------------------------------
+    # MOSTRAR RESULTADOS (SIEMPRE)
+    # --------------------------------------------------
 
     if hasattr(electrical, "corrientes"):
         st.write("### Corrientes")
@@ -216,7 +226,6 @@ def _mostrar_electrical(electrical):
     if hasattr(electrical, "protecciones"):
         st.write("### Protecciones")
         _safe_show(electrical.protecciones)
-
 
 # ==========================================================
 # RENDER PRINCIPAL
