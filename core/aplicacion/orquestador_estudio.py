@@ -55,7 +55,7 @@ def ejecutar_estudio(datos: Any, deps: DependenciasEstudio):
         from core.aplicacion.builder_paneles import construir_entrada_paneles
 
         entrada_paneles = construir_entrada_paneles(
-            sf=datos.sistema_fv,
+            datos.sistema_fv,
             panel=sizing.panel,
             inversor=sizing.inversor,
             n_inversores=sizing.n_inversores,
