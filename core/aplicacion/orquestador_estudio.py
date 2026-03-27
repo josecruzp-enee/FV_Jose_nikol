@@ -47,20 +47,44 @@ def ejecutar_estudio(datos: Any, deps: DependenciasEstudio):
             )
 
         # --------------------------------------------------
-        # 2. PANELES
+        # 2. PANELES (🔥 MULTIZONA CORRECTO)
         # --------------------------------------------------
         if not hasattr(datos, "sistema_fv"):
             raise ValueError("Datos sin sistema_fv")
 
         from core.aplicacion.builder_paneles import construir_entrada_paneles
+        from core.aplicacion.multizona import ejecutar_multizona
+        from electrical.paneles.entrada_panel import EntradaPaneles
 
-        # ✅ FIX CLAVE
-        entrada_paneles = construir_entrada_paneles(
-            datos,
-            sizing,
-        )
+        sf = getattr(datos, "sistema_fv", {})
+        zonas = sf.get("zonas", [])
 
-        paneles = _ejecutar_paneles(entrada_paneles, deps)
+        if zonas:
+            entradas = []
+
+            for z in zonas:
+                n_paneles = z.get("paneles", 0)
+
+                if n_paneles <= 0:
+                    continue
+
+                entradas.append(
+                    EntradaPaneles(
+                        panel=sizing.panel,
+                        inversor=sizing.inversor,
+                        modo="manual",
+                        n_paneles_total=n_paneles,
+                        n_inversores=sizing.n_inversores,
+                        t_min_c=getattr(sizing, "t_min_c", 25.0),
+                        t_oper_c=getattr(sizing, "t_oper_c", 55.0),
+                    )
+                )
+
+            paneles = ejecutar_multizona(entradas)
+
+        else:
+            entrada_paneles = construir_entrada_paneles(datos, sizing)
+            paneles = _ejecutar_paneles(entrada_paneles, deps)
 
         if not getattr(paneles, "ok", True):
             return ResultadoProyecto(
@@ -126,7 +150,6 @@ def _ejecutar_sizing(datos, deps):
 
 
 def _ejecutar_paneles(entrada_paneles, deps):
-
     resultado = deps.paneles.ejecutar(entrada_paneles)
 
     if resultado is None:
@@ -136,7 +159,6 @@ def _ejecutar_paneles(entrada_paneles, deps):
 
 
 def _ejecutar_energia(datos, sizing, paneles, deps):
-
     energia = deps.energia.ejecutar(datos, sizing, paneles)
 
     if energia is None:
@@ -151,36 +173,15 @@ def _ejecutar_electrical(datos, sizing, paneles, deps):
         print("⚠ No hay módulo electrical")
         return None
 
-    print("\n🔥 ===============================")
-    print("🔥 LLAMANDO ELECTRICAL")
-    print("🔥 datos:", type(datos))
-    print("🔥 sizing kw_ac:", getattr(sizing, "kw_ac", None))
-    print("🔥 paneles ok:", getattr(paneles, "ok", None))
-    print("🔥 paneles strings:", len(getattr(paneles, "strings", [])))
-    print("🔥 paneles array:", getattr(paneles, "array", None))
-
     try:
-        resultado = deps.electrical.ejecutar(
+        return deps.electrical.ejecutar(
             datos=datos,
             paneles=paneles,
             sizing=sizing,
         )
 
-        print("⚡ RESULTADO ELECTRICAL:", resultado)
-        print("⚡ TIPO:", type(resultado))
-
-        if resultado is None:
-            print("❌ ELECTRICAL DEVOLVIÓ NONE")
-        else:
-            print("✅ ELECTRICAL OK:", getattr(resultado, "ok", None))
-
-        print("🔥 ===============================\n")
-
-        return resultado
-
     except Exception:
         import traceback
-        print("💥 ERROR EN ELECTRICAL:")
         print(traceback.format_exc())
         return None
 
