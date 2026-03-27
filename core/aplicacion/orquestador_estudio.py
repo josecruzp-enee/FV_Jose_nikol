@@ -35,60 +35,38 @@ def _ejecutar_electrical(datos, sizing, paneles, deps):
         print("⚠ No hay módulo electrical")
         return None
 
+    print("\n🔥 ===============================")
     print("🔥 LLAMANDO ELECTRICAL")
+    print("🔥 datos:", type(datos))
+    print("🔥 sizing kw_ac:", getattr(sizing, "kw_ac", None))
+    print("🔥 paneles ok:", getattr(paneles, "ok", None))
+    print("🔥 paneles strings:", len(getattr(paneles, "strings", [])))
+    print("🔥 paneles array:", getattr(paneles, "array", None))
 
-    resultado = deps.electrical.ejecutar(
-        datos=datos,
-        paneles=paneles,
-        sizing=sizing,
-    )
-
-    print("⚡ RESULTADO ELECTRICAL:", resultado)
-    print("⚡ TIPO:", type(resultado))
-
-    if resultado is None:
-        print("❌ ELECTRICAL DEVOLVIÓ NONE")
-
-    return resultado
-        # --------------------------------------------------
-        # 3. ENERGÍA
-        # --------------------------------------------------
-        energia = _ejecutar_energia(datos, sizing, paneles, deps)
-
-        if not getattr(energia, "ok", True):
-            return ResultadoProyecto(
-                sizing=sizing,
-                strings=paneles,
-                energia=energia,
-                electrical=None,
-                financiero=None
-            )
-
-        # --------------------------------------------------
-        # 4. ELECTRICAL
-        # --------------------------------------------------
-        electrico = _ejecutar_electrical(datos, sizing, paneles, deps)
-
-        # --------------------------------------------------
-        # 5. FINANZAS
-        # --------------------------------------------------
-        financiero = _ejecutar_finanzas(datos, sizing, energia, deps)
-
-        # --------------------------------------------------
-        # RESULTADO FINAL
-        # --------------------------------------------------
-        return ResultadoProyecto(
+    try:
+        resultado = deps.electrical.ejecutar(
+            datos=datos,
+            paneles=paneles,
             sizing=sizing,
-            strings=paneles,
-            energia=energia,
-            electrical=electrico,
-            financiero=financiero,
         )
 
-    except Exception:
+        print("⚡ RESULTADO ELECTRICAL:", resultado)
+        print("⚡ TIPO:", type(resultado))
+
+        if resultado is None:
+            print("❌ ELECTRICAL DEVOLVIÓ NONE")
+        else:
+            print("✅ ELECTRICAL OK:", getattr(resultado, "ok", None))
+
+        print("🔥 ===============================\n")
+
+        return resultado
+
+    except Exception as e:
         import traceback
+        print("💥 ERROR EN ELECTRICAL:")
         print(traceback.format_exc())
-        raise
+        return None
 # ==========================================================
 # FUNCIONES INTERNAS
 # ==========================================================
