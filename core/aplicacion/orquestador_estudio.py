@@ -13,7 +13,6 @@ from core.aplicacion.puertos import (
     PuertoFinanzas,
 )
 
-
 # ==========================================================
 # DEPENDENCIAS
 # ==========================================================
@@ -32,9 +31,9 @@ class DependenciasEstudio:
 def ejecutar_estudio(datos: Any, deps: DependenciasEstudio):
 
     try:
-        # --------------------------------------------------
+        # ==================================================
         # 1. SIZING
-        # --------------------------------------------------
+        # ==================================================
         sizing = _ejecutar_sizing(datos, deps)
 
         if not getattr(sizing, "ok", True):
@@ -46,9 +45,9 @@ def ejecutar_estudio(datos: Any, deps: DependenciasEstudio):
                 financiero=None
             )
 
-        # --------------------------------------------------
-        # 2. PANELES (🔥 MULTIZONA CORRECTO)
-        # --------------------------------------------------
+        # ==================================================
+        # 2. PANELES (MULTIZONA)
+        # ==================================================
         if not hasattr(datos, "sistema_fv"):
             raise ValueError("Datos sin sistema_fv")
 
@@ -95,9 +94,9 @@ def ejecutar_estudio(datos: Any, deps: DependenciasEstudio):
                 financiero=None
             )
 
-        # --------------------------------------------------
+        # ==================================================
         # 3. ENERGÍA
-        # --------------------------------------------------
+        # ==================================================
         energia = _ejecutar_energia(datos, sizing, paneles, deps)
 
         if not getattr(energia, "ok", True):
@@ -109,19 +108,22 @@ def ejecutar_estudio(datos: Any, deps: DependenciasEstudio):
                 financiero=None
             )
 
-        # --------------------------------------------------
-        # 4. ELECTRICAL
-        # --------------------------------------------------
+        # ==================================================
+        # 4. ELECTRICAL  🔥 (CORREGIDO)
+        # ==================================================
         electrical = _ejecutar_electrical(datos, sizing, paneles, deps)
 
-        # --------------------------------------------------
+        # 👉 IMPORTANTE: no cortamos flujo aunque falle
+        # UI debe decidir qué mostrar
+
+        # ==================================================
         # 5. FINANZAS
-        # --------------------------------------------------
+        # ==================================================
         financiero = _ejecutar_finanzas(datos, sizing, energia, deps)
 
-        # --------------------------------------------------
+        # ==================================================
         # RESULTADO FINAL
-        # --------------------------------------------------
+        # ==================================================
         return ResultadoProyecto(
             sizing=sizing,
             strings=paneles,
@@ -166,8 +168,10 @@ def _ejecutar_energia(datos, sizing, paneles, deps):
 
     return energia
 
-from electrical.resultado_electrical import ResultadoElectrico
 
+# ==========================================================
+# 🔥 ELECTRICAL (CLAVE)
+# ==========================================================
 def _ejecutar_electrical(datos, sizing, paneles, deps):
 
     if not deps.electrical:
@@ -191,6 +195,11 @@ def _ejecutar_electrical(datos, sizing, paneles, deps):
         print("💥 ERROR EN ELECTRICAL:")
         print(traceback.format_exc())
         return None
+
+
+# ==========================================================
+# FINANZAS
+# ==========================================================
 def _ejecutar_finanzas(datos, sizing, energia, deps):
 
     if not deps.finanzas:
