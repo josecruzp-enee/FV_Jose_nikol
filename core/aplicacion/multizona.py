@@ -35,7 +35,24 @@ def ejecutar_multizona(entradas: List) -> ResultadoPaneles:
     panel = resultados[0].panel
 
     # ==================================================
-    # CONSOLIDACIÓN SEGURA (SIN DEPENDER SOLO DE array)
+    # 🔥 DETALLE POR ZONA (CLAVE)
+    # ==================================================
+    zonas_detalle = []
+
+    for i, r in enumerate(resultados, 1):
+
+        zonas_detalle.append({
+            "zona": i,
+            "paneles": r.meta.n_paneles_total if r.meta else None,
+            "pdc_kw": r.meta.pdc_kw if r.meta else None,
+            "strings": len(r.strings) if r.strings else 0,
+            "vdc": r.array.vdc_nom if r.array else None,
+            "idc": r.array.idc_nom if r.array else None,
+            "isc": r.array.isc_total if r.array else None,
+        })
+
+    # ==================================================
+    # CONSOLIDACIÓN SEGURA
     # ==================================================
     total_paneles = sum(
         (r.array.n_paneles_total if r.array else r.meta.n_paneles_total)
@@ -101,7 +118,7 @@ def ejecutar_multizona(entradas: List) -> ResultadoPaneles:
     )
 
     # ==================================================
-    # ⚠️ CORRIENTES (NO SUMAR → paralelo)
+    # ⚠️ CORRIENTES (PARALELO)
     # ==================================================
     idc_nom = max(
         (r.array.idc_nom for r in resultados if r.array),
@@ -151,7 +168,7 @@ def ejecutar_multizona(entradas: List) -> ResultadoPaneles:
     )
 
     # ==================================================
-    # RECOMENDACIÓN (BASE EN PRIMER RESULTADO)
+    # RECOMENDACIÓN
     # ==================================================
     rec_base = resultados[0].recomendacion
 
@@ -182,9 +199,10 @@ def ejecutar_multizona(entradas: List) -> ResultadoPaneles:
         strings=strings_total,
         warnings=warnings,
         errores=[],
-        meta=PanelesMeta(
-            n_paneles_total=total_paneles,
-            pdc_kw=total_pdc / 1000,
-            n_inversores=1,
-        ),
+        meta={
+            "n_paneles_total": total_paneles,
+            "pdc_kw": total_pdc / 1000,
+            "n_inversores": 1,
+            "zonas": zonas_detalle,   # 🔥 AQUÍ ESTÁ LO IMPORTANTE
+        },
     )
