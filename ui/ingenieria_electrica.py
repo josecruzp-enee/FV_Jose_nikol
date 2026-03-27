@@ -180,6 +180,8 @@ def _mostrar_electrical(electrical):
 
     if electrical is None:
         st.info("Sin resultados eléctricos.")
+        st.write("DEBUG RESULTADO:", resultado)
+        st.write("DEBUG ELECTRICAL:", getattr(resultado, "electrical", None))
         return
 
     if not getattr(electrical, "ok", False):
