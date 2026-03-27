@@ -173,73 +173,94 @@ def _safe_show(obj):
     except Exception:
         st.write(str(obj))
 
-
 def _mostrar_electrical(electrical):
 
     import streamlit as st
 
     st.subheader("Ingeniería eléctrica")
 
-    # --------------------------------------------------
-    # SIN RESULTADOS
-    # --------------------------------------------------
     if electrical is None:
         st.info("Sin resultados eléctricos.")
-        st.write("DEBUG ELECTRICAL:", electrical)
         return
 
     # --------------------------------------------------
-    # DEBUG GENERAL
-    # --------------------------------------------------
-    st.write("DEBUG ELECTRICAL:", electrical)
-
-    # --------------------------------------------------
-    # NORMALIZACIÓN
+    # NORMALIZADOR
     # --------------------------------------------------
     def _get(obj, key, default=None):
         if isinstance(obj, dict):
             return obj.get(key, default)
         return getattr(obj, key, default)
 
-    def _safe_show(data):
-        if data is None:
-            st.write("—")
-        elif isinstance(data, (dict, list)):
-            st.json(data)
-        else:
-            st.write(data)
-
-    # --------------------------------------------------
-    # VALIDACIÓN
-    # --------------------------------------------------
     ok = _get(electrical, "ok", False)
 
     if not ok:
-        st.warning("Ingeniería eléctrica con errores")
+        st.error("Ingeniería eléctrica con errores")
     else:
         st.success("Cálculo eléctrico correcto")
 
     # --------------------------------------------------
-    # SECCIONES
+    # WARNINGS
     # --------------------------------------------------
+    warnings = _get(electrical, "warnings", [])
+    if warnings:
+        st.warning("\n".join(warnings))
 
+    # --------------------------------------------------
+    # EXTRAER BLOQUES
+    # --------------------------------------------------
     corrientes = _get(electrical, "corrientes")
     conductores = _get(electrical, "conductores")
     protecciones = _get(electrical, "protecciones")
 
+    # ==================================================
+    # ⚡ CORRIENTES
+    # ==================================================
     if corrientes:
-        st.write("### ⚡ Corrientes")
-        _safe_show(corrientes)
+        st.markdown("### ⚡ Corrientes")
 
+        c1, c2, c3 = st.columns(3)
+
+        c1.metric("String", f"{_get(corrientes.string, 'i_diseno_a', 0):.2f} A")
+        c2.metric("MPPT", f"{_get(corrientes.mppt, 'i_diseno_a', 0):.2f} A")
+        c3.metric("AC", f"{_get(corrientes.ac, 'i_diseno_a', 0):.2f} A")
+
+    # ==================================================
+    # 🧵 CONDUCTORES
+    # ==================================================
     if conductores:
-        st.write("### 🧵 Conductores")
-        _safe_show(conductores)
+        st.markdown("### 🧵 Conductores")
 
+        tramos = _get(conductores, "tramos")
+
+        if tramos and hasattr(tramos, "dc"):
+            dc = tramos.dc
+
+            c1, c2, c3 = st.columns(3)
+
+            c1.metric("Calibre", f"{_get(dc, 'calibre')} AWG")
+            c2.metric("Ampacidad", f"{_get(dc, 'ampacidad_ajustada_a')} A")
+            c3.metric("Caída de tensión", f"{_get(dc, 'vd_pct'):.2f} %")
+
+    # ==================================================
+    # ⚠ PROTECCIONES
+    # ==================================================
     if protecciones:
-        st.write("### ⚠ Protecciones")
-        _safe_show(protecciones)
+        st.markdown("### ⚠ Protecciones")
 
+        ocpd_ac = _get(protecciones, "ocpd_ac")
+        ocpd_dc = _get(protecciones, "ocpd_dc_array")
+        fusible = _get(protecciones, "fusible_string")
 
+        c1, c2, c3 = st.columns(3)
+
+        if ocpd_ac:
+            c1.metric("Breaker AC", f"{_get(ocpd_ac, 'tamano_a')} A")
+
+        if ocpd_dc:
+            c2.metric("Protección DC", f"{_get(ocpd_dc, 'tamano_a')} A")
+
+        if fusible:
+            c3.metric("Fusible string", f"{_get(fusible, 'tamano_a')} A")
 # ==========================================================
 # RENDER PRINCIPAL (🔥 FIX REAL)
 # ==========================================================
