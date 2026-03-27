@@ -54,13 +54,10 @@ def ejecutar_estudio(datos: Any, deps: DependenciasEstudio):
 
         from core.aplicacion.builder_paneles import construir_entrada_paneles
 
+        # ✅ FIX CLAVE
         entrada_paneles = construir_entrada_paneles(
-            datos.sistema_fv,
-            panel=sizing.panel,
-            inversor=sizing.inversor,
-            n_inversores=sizing.n_inversores,
-            t_min=getattr(sizing, "t_min_c", 25.0),
-            t_oper=getattr(sizing, "t_oper_c", 55.0),
+            datos,
+            sizing,
         )
 
         paneles = _ejecutar_paneles(entrada_paneles, deps)
@@ -148,7 +145,6 @@ def _ejecutar_energia(datos, sizing, paneles, deps):
     return energia
 
 
-# 🔥 CON DEBUG (CLAVE PARA DIAGNÓSTICO)
 def _ejecutar_electrical(datos, sizing, paneles, deps):
 
     if not deps.electrical:
@@ -182,7 +178,7 @@ def _ejecutar_electrical(datos, sizing, paneles, deps):
 
         return resultado
 
-    except Exception as e:
+    except Exception:
         import traceback
         print("💥 ERROR EN ELECTRICAL:")
         print(traceback.format_exc())
