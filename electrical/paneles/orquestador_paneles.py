@@ -143,6 +143,9 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
     if err:
         return _resultado_error(panel, err, warnings)
 
+    if n_paneles is None or n_paneles <= 0:
+        return _resultado_error(panel, ["n_paneles inválido"], warnings)
+
     # ------------------------------------------------------
     # INVERSORES
     # ------------------------------------------------------
@@ -157,7 +160,7 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
     n_inversores = int(entrada.n_inversores)
 
     # ------------------------------------------------------
-    # STRINGS (motor)
+    # STRINGS (motor principal)
     # ------------------------------------------------------
 
     strings_res = calcular_strings_fv(
@@ -169,7 +172,6 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
         t_oper_c=entrada.t_oper_c,
     )
 
-    # 🔥 BLINDAJE CRÍTICO
     if not strings_res.ok or strings_res.recomendacion is None:
         return _resultado_error(
             panel,
@@ -188,7 +190,7 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
         warnings.append("strings_por_mppt ajustado a 1")
 
     # ------------------------------------------------------
-    # ENSAMBLE
+    # ENSAMBLE ARRAY
     # ------------------------------------------------------
 
     array = _armar_array(
