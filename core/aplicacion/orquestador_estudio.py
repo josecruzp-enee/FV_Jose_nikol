@@ -29,53 +29,27 @@ class DependenciasEstudio:
 # ==========================================================
 # ORQUESTADOR PRINCIPAL
 # ==========================================================
-def ejecutar_estudio(datos: Any, deps: DependenciasEstudio):
+def _ejecutar_electrical(datos, sizing, paneles, deps):
 
-    try:
-        # --------------------------------------------------
-        # 1. SIZING
-        # --------------------------------------------------
-        sizing = _ejecutar_sizing(datos, deps)
+    if not deps.electrical:
+        print("⚠ No hay módulo electrical")
+        return None
 
-        if not getattr(sizing, "ok", True):
-            return ResultadoProyecto(
-                sizing=sizing,
-                strings=None,
-                energia=None,
-                electrical=None,
-                financiero=None
-            )
+    print("🔥 LLAMANDO ELECTRICAL")
 
-        # --------------------------------------------------
-        # 2. PANELES (🔥 USAR BUILDER UI)
-        # --------------------------------------------------
-        if not hasattr(datos, "sistema_fv"):
-            raise ValueError("Datos sin sistema_fv")
+    resultado = deps.electrical.ejecutar(
+        datos=datos,
+        paneles=paneles,
+        sizing=sizing,
+    )
 
-        sf = datos.sistema_fv
+    print("⚡ RESULTADO ELECTRICAL:", resultado)
+    print("⚡ TIPO:", type(resultado))
 
-        from ui.sistema_fv import construir_entrada_paneles as builder_ui
+    if resultado is None:
+        print("❌ ELECTRICAL DEVOLVIÓ NONE")
 
-        entrada_paneles = builder_ui(
-            sf=sf,
-            panel=sizing.panel,
-            inversor=sizing.inversor,
-            n_inversores=sizing.n_inversores,
-            t_min=getattr(sizing, "t_min_c", 25.0),
-            t_oper=getattr(sizing, "t_oper_c", 55.0),
-        )
-
-        paneles = _ejecutar_paneles(entrada_paneles, deps)
-
-        if not getattr(paneles, "ok", True):
-            return ResultadoProyecto(
-                sizing=sizing,
-                strings=paneles,
-                energia=None,
-                electrical=None,
-                financiero=None
-            )
-
+    return resultado
         # --------------------------------------------------
         # 3. ENERGÍA
         # --------------------------------------------------
