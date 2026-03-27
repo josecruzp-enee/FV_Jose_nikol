@@ -21,14 +21,11 @@ from ui.state_helpers import ensure_dict
 # ==========================================================
 
 def _fmt(v, unit: str = "") -> str:
-
     if v is None:
         return "—"
-
     if isinstance(v, (int, float)):
         s = f"{v:.3f}".rstrip("0").rstrip(".")
         return f"{s} {unit}".rstrip() if unit else s
-
     return str(v)
 
 
@@ -139,10 +136,7 @@ def _mostrar_sizing(sizing, sistema_fv):
 
     modo = sistema_fv.get("modo_diseno", "manual")
 
-    if modo == "zonas":
-        st.info("Modo: Diseño por zonas")
-    else:
-        st.info("Modo: Diseño automático/manual")
+    st.info("Modo: Diseño por zonas" if modo == "zonas" else "Modo: Diseño automático/manual")
 
     c1, c2, c3 = st.columns(3)
 
@@ -152,30 +146,10 @@ def _mostrar_sizing(sizing, sistema_fv):
 
 
 # ==========================================================
-# MOSTRAR ELECTRICAL
+# MOSTRAR ELECTRICAL + MULTIZONA
 # ==========================================================
 
-def _safe_show(obj):
-    import pandas as pd
-
-    try:
-        if isinstance(obj, dict):
-            df = pd.DataFrame([obj])
-        elif isinstance(obj, list):
-            df = pd.DataFrame(obj)
-        else:
-            st.write(str(obj))
-            return
-
-        df = df.astype(str)
-        st.dataframe(df, width="stretch")
-
-    except Exception:
-        st.write(str(obj))
-
-def _mostrar_electrical(electrical):
-
-    import streamlit as st
+def _mostrar_electrical(electrical, paneles=None):
 
     st.subheader("Ingeniería eléctrica")
 
@@ -183,86 +157,72 @@ def _mostrar_electrical(electrical):
         st.info("Sin resultados eléctricos.")
         return
 
-    # --------------------------------------------------
-    # NORMALIZADOR
-    # --------------------------------------------------
     def _get(obj, key, default=None):
-        if isinstance(obj, dict):
-            return obj.get(key, default)
-        return getattr(obj, key, default)
+        return obj.get(key, default) if isinstance(obj, dict) else getattr(obj, key, default)
 
     ok = _get(electrical, "ok", False)
 
-    if not ok:
-        st.error("Ingeniería eléctrica con errores")
-    else:
-        st.success("Cálculo eléctrico correcto")
+    st.success("Cálculo eléctrico correcto") if ok else st.error("Ingeniería eléctrica con errores")
 
-    # --------------------------------------------------
-    # WARNINGS
-    # --------------------------------------------------
     warnings = _get(electrical, "warnings", [])
     if warnings:
         st.warning("\n".join(warnings))
 
-    # --------------------------------------------------
-    # EXTRAER BLOQUES
-    # --------------------------------------------------
     corrientes = _get(electrical, "corrientes")
     conductores = _get(electrical, "conductores")
     protecciones = _get(electrical, "protecciones")
 
-    # ==================================================
     # ⚡ CORRIENTES
-    # ==================================================
     if corrientes:
         st.markdown("### ⚡ Corrientes")
-
         c1, c2, c3 = st.columns(3)
-
         c1.metric("String", f"{_get(corrientes.string, 'i_diseno_a', 0):.2f} A")
         c2.metric("MPPT", f"{_get(corrientes.mppt, 'i_diseno_a', 0):.2f} A")
         c3.metric("AC", f"{_get(corrientes.ac, 'i_diseno_a', 0):.2f} A")
 
-    # ==================================================
     # 🧵 CONDUCTORES
-    # ==================================================
-    if conductores:
+    if conductores and hasattr(conductores, "tramos"):
         st.markdown("### 🧵 Conductores")
+        dc = conductores.tramos.dc
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Calibre", f"{dc.calibre} AWG")
+        c2.metric("Ampacidad", f"{dc.ampacidad_ajustada_a} A")
+        c3.metric("VD", f"{dc.vd_pct:.2f} %")
 
-        tramos = _get(conductores, "tramos")
-
-        if tramos and hasattr(tramos, "dc"):
-            dc = tramos.dc
-
-            c1, c2, c3 = st.columns(3)
-
-            c1.metric("Calibre", f"{_get(dc, 'calibre')} AWG")
-            c2.metric("Ampacidad", f"{_get(dc, 'ampacidad_ajustada_a')} A")
-            c3.metric("Caída de tensión", f"{_get(dc, 'vd_pct'):.2f} %")
-
-    # ==================================================
     # ⚠ PROTECCIONES
-    # ==================================================
     if protecciones:
         st.markdown("### ⚠ Protecciones")
-
-        ocpd_ac = _get(protecciones, "ocpd_ac")
-        ocpd_dc = _get(protecciones, "ocpd_dc_array")
-        fusible = _get(protecciones, "fusible_string")
-
         c1, c2, c3 = st.columns(3)
+        c1.metric("Breaker AC", f"{protecciones.ocpd_ac.tamano_a} A")
+        c2.metric("Protección DC", f"{protecciones.ocpd_dc_array.tamano_a} A")
+        c3.metric("Fusible", f"{protecciones.fusible_string.tamano_a} A")
 
-        if ocpd_ac:
-            c1.metric("Breaker AC", f"{_get(ocpd_ac, 'tamano_a')} A")
+    # 🧭 MULTIZONA
+    try:
+        zonas = getattr(paneles, "meta", {}).get("zonas", [])
+    except:
+        zonas = []
 
-        if ocpd_dc:
-            c2.metric("Protección DC", f"{_get(ocpd_dc, 'tamano_a')} A")
+    if zonas:
+        st.markdown("---")
+        st.markdown("## 🧭 Detalle por zonas")
 
-        if fusible:
-            c3.metric("Fusible string", f"{_get(fusible, 'tamano_a')} A")
+        for z in zonas:
+            with st.expander(f"Zona {z.get('zona')}"):
+                c1, c2, c3 = st.columns(3)
+                c1.metric("Paneles", z.get("paneles"))
+                c2.metric("Potencia", f"{z.get('pdc_kw', 0):.2f} kW")
+                c3.metric("Strings", z.get("strings"))
+
+                c4, c5 = st.columns(2)
+                if z.get("vdc"):
+                    c4.metric("Voltaje", f"{z['vdc']:.1f} V")
+                if z.get("idc"):
+                    c5.metric("Corriente", f"{z['idc']:.2f} A")
+
+
 # ==========================================================
-# RENDER PRINCIPAL (🔥 FIX REAL)
+# RENDER
 # ==========================================================
 
 def render(ctx):
@@ -278,37 +238,26 @@ def render(ctx):
     if faltantes:
         st.warning("Complete los datos requeridos antes de generar ingeniería.")
 
-    generar = st.button("Generar ingeniería", disabled=bool(faltantes))
-
-    # --------------------------------------------------
-    # EJECUCIÓN
-    # --------------------------------------------------
-    if generar:
+    if st.button("Generar ingeniería", disabled=bool(faltantes)):
         try:
             datos = _datosproyecto_desde_ctx(ctx)
             deps = construir_dependencias()
-
             resultado = ejecutar_estudio(datos, deps)
 
-            # 🔥 FIX CLAVE
             st.session_state["resultado_proyecto"] = resultado
-
             st.success("Ingeniería generada correctamente.")
 
-        except Exception as e:
+        except Exception:
             import traceback
             st.error("Error en motor FV")
             st.code(traceback.format_exc())
             st.stop()
 
-    # --------------------------------------------------
-    # VISUALIZACIÓN (SIEMPRE)
-    # --------------------------------------------------
     resultado = st.session_state.get("resultado_proyecto")
 
     if resultado:
         _mostrar_sizing(resultado.sizing, ctx.sistema_fv)
-        _mostrar_electrical(getattr(resultado, "electrical", None))
+        _mostrar_electrical(resultado.electrical, resultado.strings)
 
 
 # ==========================================================
@@ -316,10 +265,7 @@ def render(ctx):
 # ==========================================================
 
 def validar(ctx) -> Tuple[bool, List[str]]:
-
     errores = []
-
     if not st.session_state.get("resultado_proyecto"):
         errores.append("Debe generar ingeniería.")
-
     return len(errores) == 0, errores
