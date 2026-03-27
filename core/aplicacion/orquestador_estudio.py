@@ -189,7 +189,12 @@ def _ejecutar_electrical(datos, sizing, paneles, deps):
         import traceback
         print("💥 ERROR EN ELECTRICAL:")
         print(traceback.format_exc())
-        return None
+        return ResultadoElectrico.build(
+            paneles=paneles,
+            corrientes=corrientes,
+            conductores=conductores,
+            protecciones=protecciones,
+        )
 
 
 def _ejecutar_finanzas(datos, sizing, energia, deps):
