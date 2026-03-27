@@ -190,40 +190,82 @@ def _dimensionar_por_zonas(panel, zonas):
     total_paneles = 0
     total_pdc = 0
 
-    for z in zonas:
+    for i, z in enumerate(zonas):
 
-        area = float(z.get("area", 0))
-        if area <= 0:
-            continue
+        modo = str(z.get("modo", "")).strip().lower()
 
-        area_util = area * 0.75
-        kwp_obj = area_util / 5.0
+        # ==================================================
+        # NORMALIZAR ACENTOS
+        # ==================================================
+        modo = modo.replace("á", "a")
 
-        from electrical.paneles.entrada_panel import EntradaPaneles
+        # ==================================================
+        # MODO ÁREA
+        # ==================================================
+        if modo == "area":
 
-        entrada = EntradaPaneles(
-            panel=panel,
-            inversor=None,
-            modo="area",
-            pdc_kw_objetivo=kwp_obj,
-            t_min_c=10,
-            t_oper_c=50,
-        )
+            area = z.get("area")
 
-        res = dimensionar_paneles(entrada)
+            if area is None:
+                raise ValueError(f"Zona {i+1}: área no definida")
 
-        if not res.ok:
-            raise ValueError(f"Zona {z.get('nombre', '')}: {res.errores}")
+            area = float(area)
 
-        total_paneles += res.n_paneles
-        total_pdc += res.pdc_kw
+            if area <= 0:
+                raise ValueError(f"Zona {i+1}: área inválida")
+
+            area_util = area * 0.75
+            kwp_obj = area_util / 5.0
+
+            from electrical.paneles.entrada_panel import EntradaPaneles
+
+            entrada = EntradaPaneles(
+                panel=panel,
+                inversor=None,
+                modo="area",
+                pdc_kw_objetivo=kwp_obj,
+                t_min_c=10,
+                t_oper_c=50,
+            )
+
+            res = dimensionar_paneles(entrada)
+
+            if not res.ok:
+                raise ValueError(f"Zona {i+1}: {res.errores}")
+
+            total_paneles += res.n_paneles
+            total_pdc += res.pdc_kw
+
+        # ==================================================
+        # MODO PANELES
+        # ==================================================
+        elif modo == "paneles":
+
+            n_paneles = z.get("n_paneles")
+
+            if n_paneles is None:
+                raise ValueError(f"Zona {i+1}: n_paneles no definido")
+
+            n_paneles = int(n_paneles)
+
+            if n_paneles <= 0:
+                raise ValueError(f"Zona {i+1}: número de paneles inválido")
+
+            pdc_kw = (n_paneles * panel.pmax_w) / 1000
+
+            total_paneles += n_paneles
+            total_pdc += pdc_kw
+
+        # ==================================================
+        # ERROR
+        # ==================================================
+        else:
+            raise ValueError(f"Zona {i+1}: modo inválido ({modo})")
 
     if total_paneles <= 0:
         raise ValueError("No se pudo dimensionar ninguna zona")
 
     return total_paneles, total_pdc
-
-
 # ==========================================================
 # INVERSOR
 # ==========================================================
