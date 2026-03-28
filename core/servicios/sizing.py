@@ -117,18 +117,20 @@ def _leer_sizing_input(p: Datosproyecto):
 
     sf = getattr(p, "sistema_fv", {}) or {}
 
+    # 🔥 NUEVO MODELO (YA NO USA sizing_input)
     modo = sf.get("modo")
     valor = sf.get("valor")
 
+    # ======================================================
+    # VALIDACIONES
+    # ======================================================
     if not modo:
-        raise ValueError("sistema_fv sin modo")
+        raise ValueError(f"sistema_fv sin modo: {sf}")
 
     if modo != "multizona" and (valor is None or float(valor) <= 0):
-        raise ValueError("sistema_fv sin valor válido")
+        raise ValueError(f"sistema_fv sin valor válido: {sf}")
 
     return modo, valor
-
-
 # ==========================================================
 # GENERADOR (NO MULTIZONA)
 # ==========================================================
