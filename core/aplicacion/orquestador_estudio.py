@@ -196,6 +196,9 @@ def _consolidar_paneles(resultados):
 
     base = resultados[0]
 
+    # --------------------------------------------------
+    # TOTALES
+    # --------------------------------------------------
     total_paneles = sum(r.meta.n_paneles_total for r in resultados)
     total_pdc = sum(r.meta.pdc_kw for r in resultados)
     total_strings = sum(r.array.n_strings_total for r in resultados)
@@ -203,26 +206,56 @@ def _consolidar_paneles(resultados):
     total_imp = sum(s.imp_string_a for r in resultados for s in r.strings)
     total_isc = sum(s.isc_string_a for r in resultados for s in r.strings)
 
-    # 🔥 ARRAY
-    base.array.n_paneles_total = total_paneles
-    base.array.n_strings_total = total_strings
-    base.array.potencia_dc_w = total_pdc * 1000
-    base.array.idc_nom = total_imp
-    base.array.isc_total = total_isc
+    # --------------------------------------------------
+    # ARRAY NUEVO (NO MUTAR)
+    # --------------------------------------------------
+    array = type(base.array)(
+        potencia_dc_w=total_pdc * 1000,
+        vdc_nom=base.array.vdc_nom,
+        idc_nom=total_imp,
+        isc_total=total_isc,
+        voc_frio_array_v=base.array.voc_frio_array_v,
+        n_strings_total=total_strings,
+        n_paneles_total=total_paneles,
+        strings_por_mppt=base.array.strings_por_mppt,
+        n_mppt=base.array.n_mppt,
+        p_panel_w=base.array.p_panel_w,
+    )
 
-    # 🔥 META
-    base.meta.n_paneles_total = total_paneles
-    base.meta.pdc_kw = total_pdc
+    # --------------------------------------------------
+    # META NUEVO
+    # --------------------------------------------------
+    meta = type(base.meta)(
+        n_paneles_total=total_paneles,
+        pdc_kw=total_pdc,
+        n_inversores=base.meta.n_inversores,
+    )
 
-    # 🔥 STRINGS
-    base.strings = [s for r in resultados for s in r.strings]
+    # --------------------------------------------------
+    # STRINGS + WARNINGS
+    # --------------------------------------------------
+    strings = [s for r in resultados for s in r.strings]
+    warnings = [w for r in resultados for w in r.warnings]
 
-    # 🔥 WARNINGS
-    base.warnings = [w for r in resultados for w in r.warnings]
-    print("TOTAL PANELES:", base.meta.n_paneles_total)
-    print("TOTAL STRINGS:", base.array.n_strings_total)
-    return base
+    # --------------------------------------------------
+    # RESULTADO FINAL (NUEVO)
+    # --------------------------------------------------
+    resultado = type(base)(
+        ok=True,
+        panel=base.panel,
+        topologia=base.topologia,
+        array=array,
+        recomendacion=base.recomendacion,
+        strings=strings,
+        warnings=warnings,
+        errores=[],
+        meta=meta,
+    )
 
+    print("TOTAL PANELES:", total_paneles)
+    print("TOTAL STRINGS:", total_strings)
+
+    return resultado
 
 # ==========================================================
 # ENERGÍA
