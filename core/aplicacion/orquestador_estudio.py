@@ -184,19 +184,29 @@ def _ejecutar_energia(datos, sizing, paneles, deps):
 # ==========================================================
 def _ejecutar_electrical(datos, sizing, paneles, deps):
 
-    if not deps.electrical:
-        print("❌ ERROR: módulo electrical no configurado")
-        return None
-
     try:
+        print("\n⚡ [ELECTRICAL] INICIO")
+
+        # 🔥 LLAMADA CORRECTA
         resultado = deps.electrical.ejecutar(
             datos=datos,
             paneles=paneles,
-            sizing=sizing,
+            sizing=sizing,   # 🔥 ESTE ERA EL PROBLEMA
         )
 
         if resultado is None:
             print("❌ ELECTRICAL devolvió None")
+            return None
+
+        # 🔍 DEBUG CONTROLADO
+        print("\n⚡ [ELECTRICAL RESULTADO]")
+        try:
+            if hasattr(resultado, "corrientes"):
+                print("corrientes:", resultado.corrientes)
+            else:
+                print(resultado)
+        except:
+            print("⚠ No se pudo imprimir corrientes")
 
         return resultado
 
@@ -205,8 +215,6 @@ def _ejecutar_electrical(datos, sizing, paneles, deps):
         print("💥 ERROR EN ELECTRICAL:")
         print(traceback.format_exc())
         return None
-
-
 # ==========================================================
 # FINANZAS
 # ==========================================================
