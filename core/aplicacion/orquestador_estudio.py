@@ -30,124 +30,86 @@ class DependenciasEstudio:
 # ==========================================================
 def ejecutar_estudio(datos: Any, deps: DependenciasEstudio):
 
+    trazas = {}
+
     try:
         # ==================================================
         # 1. SIZING
         # ==================================================
-        sizing = _ejecutar_sizing(datos, deps)
+        try:
+            sizing = _ejecutar_sizing(datos, deps)
+            trazas["sizing"] = "OK"
+        except Exception as e:
+            trazas["sizing"] = f"ERROR: {str(e)}"
+            return ResultadoProyecto(None, None, None, None, None, trazas)
 
         if not getattr(sizing, "ok", True):
-            return ResultadoProyecto(
-                sizing=sizing,
-                strings=None,
-                energia=None,
-                electrical=None,
-                financiero=None
-            )
+            trazas["sizing"] = "FAIL"
+            return ResultadoProyecto(sizing, None, None, None, None, trazas)
 
         # ==================================================
-        # 2. PANELES (MULTIZONA CORREGIDO)
+        # 2. PANELES
         # ==================================================
-        if not hasattr(datos, "sistema_fv"):
-            raise ValueError("Datos sin sistema_fv")
-
-        from core.aplicacion.builder_paneles import construir_entrada_paneles
-        from core.aplicacion.multizona import ejecutar_multizona
-        from electrical.paneles.entrada_panel import EntradaPaneles
-
-        sf = getattr(datos, "sistema_fv", None)
-
-        # 🔥 FIX: soportar objeto o dict
-        if isinstance(sf, dict):
-            zonas = sf.get("zonas", [])
-        else:
-            zonas = getattr(sf, "zonas", [])
-
-        if zonas:
-            entradas = []
-
-            for z in zonas:
-
-                # 🔥 FIX: soportar dict u objeto
-                if isinstance(z, dict):
-                    n_paneles = z.get("paneles", 0)
-                else:
-                    n_paneles = getattr(z, "paneles", 0)
-
-                if n_paneles <= 0:
-                    continue
-
-                entradas.append(
-                    EntradaPaneles(
-                        panel=sizing.panel,
-                        inversor=sizing.inversor,
-                        modo="manual",
-                        n_paneles_total=n_paneles,
-                        n_inversores=sizing.n_inversores,
-                        t_min_c=getattr(sizing, "t_min_c", 25.0),
-                        t_oper_c=getattr(sizing, "t_oper_c", 55.0),
-                    )
-                )
-
-            paneles = ejecutar_multizona(entradas)
-
-        else:
+        try:
+            from core.aplicacion.builder_paneles import construir_entrada_paneles
             entrada_paneles = construir_entrada_paneles(datos, sizing)
             paneles = _ejecutar_paneles(entrada_paneles, deps)
+            trazas["paneles"] = "OK"
+        except Exception as e:
+            trazas["paneles"] = f"ERROR: {str(e)}"
+            return ResultadoProyecto(sizing, None, None, None, None, trazas)
 
         if not getattr(paneles, "ok", True):
-            return ResultadoProyecto(
-                sizing=sizing,
-                strings=paneles,
-                energia=None,
-                electrical=None,
-                financiero=None
-            )
+            trazas["paneles"] = "FAIL"
+            return ResultadoProyecto(sizing, paneles, None, None, None, trazas)
 
         # ==================================================
         # 3. ENERGÍA
         # ==================================================
-        energia = _ejecutar_energia(datos, sizing, paneles, deps)
+        try:
+            energia = _ejecutar_energia(datos, sizing, paneles, deps)
+            trazas["energia"] = "OK"
+        except Exception as e:
+            trazas["energia"] = f"ERROR: {str(e)}"
+            return ResultadoProyecto(sizing, paneles, None, None, None, trazas)
 
         if not getattr(energia, "ok", True):
-            return ResultadoProyecto(
-                sizing=sizing,
-                strings=paneles,
-                energia=energia,
-                electrical=None,
-                financiero=None
-            )
+            trazas["energia"] = "FAIL"
+            return ResultadoProyecto(sizing, paneles, energia, None, None, trazas)
 
         # ==================================================
         # 4. ELECTRICAL
         # ==================================================
-        print("🔥 LLAMANDO ELECTRICAL")
-
-        electrical = _ejecutar_electrical(datos, sizing, paneles, deps)
-
-        print("🔥 RESULTADO ELECTRICAL:", electrical)
+        try:
+            electrical = _ejecutar_electrical(datos, sizing, paneles, deps)
+            trazas["electrical"] = "OK" if electrical else "NONE"
+        except Exception as e:
+            trazas["electrical"] = f"ERROR: {str(e)}"
+            electrical = None
 
         # ==================================================
         # 5. FINANZAS
         # ==================================================
-        financiero = _ejecutar_finanzas(datos, sizing, energia, deps)
+        try:
+            financiero = _ejecutar_finanzas(datos, sizing, energia, deps)
+            trazas["finanzas"] = "OK"
+        except Exception as e:
+            trazas["finanzas"] = f"ERROR: {str(e)}"
+            financiero = None
 
-        # ==================================================
-        # RESULTADO FINAL
-        # ==================================================
         return ResultadoProyecto(
             sizing=sizing,
             strings=paneles,
             energia=energia,
             electrical=electrical,
             financiero=financiero,
+            trazas=trazas,
         )
 
     except Exception:
         import traceback
         print(traceback.format_exc())
         raise
-
 # ==========================================================
 # FUNCIONES INTERNAS
 # ==========================================================
