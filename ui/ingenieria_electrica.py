@@ -298,6 +298,59 @@ def _mostrar_trazas(resultado):
         else:
             st.info(f"{k.upper()} → {v}")
 
+def _mostrar_zonas(paneles, corrientes):
+
+    st.markdown("### 🔀 Zonas FV (por MPPT)")
+
+    if not paneles or not corrientes:
+        st.warning("No hay datos de zonas")
+        return
+
+    strings = getattr(paneles, "strings", [])
+    mppt_detalle = getattr(corrientes, "mppt_detalle", [])
+
+    if not strings or not mppt_detalle:
+        st.info("Sistema sin distribución por zonas")
+        return
+
+    # ------------------------------------------------------
+    # AGRUPAR STRINGS POR MPPT
+    # ------------------------------------------------------
+    zonas = {}
+
+    for s in strings:
+        mppt_id = getattr(s, "mppt", 1)
+
+        if mppt_id not in zonas:
+            zonas[mppt_id] = {
+                "n_strings": 0,
+                "n_paneles": 0
+            }
+
+        zonas[mppt_id]["n_strings"] += 1
+        zonas[mppt_id]["n_paneles"] += getattr(s, "n_series", 0)
+
+    # ------------------------------------------------------
+    # MOSTRAR
+    # ------------------------------------------------------
+    for i, (mppt_id, data) in enumerate(zonas.items()):
+
+        corriente = mppt_detalle[i] if i < len(mppt_detalle) else None
+
+        with st.container():
+
+            st.markdown(f"#### Zona {i+1} (MPPT {mppt_id})")
+
+            c1, c2, c3 = st.columns(3)
+
+            c1.metric("Paneles", data["n_paneles"])
+            c2.metric("Strings", data["n_strings"])
+
+            if corriente:
+                c3.metric("Corriente", f"{corriente.i_diseno_a:.2f} A")
+            else:
+                c3.metric("Corriente", "—")
+
 # ==========================================================
 # RENDER
 # ==========================================================
@@ -348,6 +401,12 @@ def render(ctx):
     else:
         st.warning("Sizing no disponible")
 
+    # ======================================================
+    # 🔀 ZONAS FV
+    # ======================================================
+    if resultado and resultado.strings and resultado.electrical:
+        _mostrar_zonas(resultado.strings, resultado.electrical.corrientes)
+        
     # ======================================================
     # ⚡ ELECTRICAL (SIEMPRE MOSTRAR)
     # ======================================================
