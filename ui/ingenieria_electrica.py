@@ -157,23 +157,42 @@ def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
 # MOSTRAR SIZING
 # ==========================================================
 def _mostrar_sizing(sizing, sistema_fv):
+    import streamlit as st
 
-    st.subheader("Sizing del sistema FV")
+    st.markdown("### 📐 Sizing del sistema FV")
 
-    modo = sistema_fv.get("modo", "manual")
+    col1, col2, col3 = st.columns(3)
 
-    if modo == "multizona":
-        st.info("Modo: Diseño por zonas")
-    else:
-        st.info("Modo: Diseño automático/manual")
+    col1.metric("Paneles", getattr(sizing, "n_paneles", 0))
+    col2.metric("Potencia DC (kWp)", round(getattr(sizing, "kw_dc", 0.0), 2))
+    col3.metric("Potencia AC (kW)", round(getattr(sizing, "kw_ac", 0.0), 2))
 
-    c1, c2, c3 = st.columns(3)
+    # ======================================================
+    # NORMALIZACIÓN ROBUSTA (AQUÍ ESTABA EL PROBLEMA)
+    # ======================================================
+    def _safe_get(obj, key, default=None):
+        if obj is None:
+            return default
+        if isinstance(obj, dict):
+            return obj.get(key, default)
+        return getattr(obj, key, default)
 
-    c1.metric("Paneles", sizing.n_paneles)
-    c2.metric("Potencia DC", f"{sizing.pdc_kw} kWp")
-    c3.metric("Potencia AC", f"{sizing.kw_ac} kW")
+    usar_zonas = _safe_get(sistema_fv, "usar_zonas", False)
 
+    if usar_zonas:
+        st.markdown("#### 🔀 Configuración multizona")
 
+        zonas = _safe_get(sistema_fv, "zonas", [])
+
+        for i, z in enumerate(zonas, start=1):
+
+            n_paneles = _safe_get(z, "n_paneles", None)
+            area = _safe_get(z, "area", None)
+
+            if n_paneles is not None:
+                st.write(f"Zona {i}: {n_paneles} paneles")
+            else:
+                st.write(f"Zona {i}: {area} m²")
 # ==========================================================
 # MOSTRAR ELECTRICAL
 # ==========================================================
@@ -219,23 +238,21 @@ def _mostrar_electrical(electrical, paneles=None):
 # ==========================================================
 # RENDER
 # ==========================================================
+# ==========================================================
+# RENDER (CORREGIDO — SOLO USA ctx)
+# REEMPLAZAR COMPLETA ESTA FUNCIÓN
+# ==========================================================
 def render(ctx):
-    """
-    REEMPLAZAR COMPLETA ESTA FUNCIÓN EN:
-    ui/ingenieria_electrica.py
-    """
-
     import streamlit as st
 
-    # 🔥 CORRECCIÓN: leer desde session_state
-    resultado = st.session_state.get("resultado_proyecto")
+    # 🔥 USAR ctx (FUENTE DE VERDAD)
+    resultado = getattr(ctx, "resultado", None)
 
     if resultado is None:
         st.error("No hay resultado disponible")
         return
 
-    # 🔥 sistema_fv también viene de session_state
-    sistema_fv = st.session_state.get("sistema_fv")
+    sistema_fv = getattr(ctx, "sistema_fv", None)
 
     # ================================
     # SIZING
@@ -254,7 +271,6 @@ def render(ctx):
             resultado.electrical,
             getattr(resultado, "strings", None)
         )
-
 # ==========================================================
 # VALIDACIÓN
 # ==========================================================
