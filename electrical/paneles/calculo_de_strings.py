@@ -73,7 +73,7 @@ def _bounds(panel, inv, t_min, t_oper):
 
 
 # =========================================================
-# SELECCIÓN AUTOMÁTICA (TU ORIGINAL)
+# SELECCIÓN AUTOMÁTICA
 # =========================================================
 
 def _seleccionar(n_min, n_max, vmp, inv, n_total):
@@ -93,7 +93,6 @@ def _seleccionar(n_min, n_max, vmp, inv, n_total):
         v_string = n * vmp
 
         error_v = abs(v_string - target)
-
         score = error_v + sobrantes * 100
 
         if score < best_score:
@@ -104,18 +103,21 @@ def _seleccionar(n_min, n_max, vmp, inv, n_total):
 
 
 # =========================================================
-# 🔥 SELECCIÓN MODO FIJO (NUEVO)
+# SELECCIÓN FIJA (ESTRICTA)
 # =========================================================
 
 def _seleccionar_fijo(n_min, n_max, n_total):
 
-    # buscar divisor exacto
-    for n in range(n_max, n_min - 1, -1):
-        if n_total % n == 0:
-            return n
+    candidatos = []
 
-    # si no hay exacto → usar uno válido sin perder paneles
-    return max(n_min, min(n_max, n_total))
+    for n in range(n_min, n_max + 1):
+        if n_total % n == 0:
+            candidatos.append(n)
+
+    if not candidatos:
+        return None  # 🔴 NO INVENTAR
+
+    return max(candidatos)  # preferir strings largos
 
 
 # =========================================================
@@ -148,7 +150,7 @@ def calcular_strings_fv(
     n_inversores: int,
     t_min_c: float,
     t_oper_c: Optional[float] = 55.0,
-    modo_fijo: bool = False,   # 🔥 NUEVO
+    modo: str = "auto",   # 🔥 CAMBIO CLAVE
 ) -> StringsResultado:
 
     warnings: List[str] = []
@@ -163,33 +165,52 @@ def calcular_strings_fv(
         return StringsResultado(False, ["No hay rango válido de serie"], [], [], RecomendacionCalc(0,0,0,0), BoundsCalc(0,0), 0)
 
     # =====================================================
-    # 🔥 SELECCIÓN
+    # SELECCIÓN
     # =====================================================
-    if modo_fijo:
+    if modo in ("manual", "multizona"):
         n_series = _seleccionar_fijo(n_min, n_max, n_paneles_total)
     else:
         n_series = _seleccionar(n_min, n_max, vmp_panel, inversor, n_paneles_total)
 
     if not n_series:
-        return StringsResultado(False, ["No se pudo seleccionar serie"], [], [], RecomendacionCalc(0,0,0,0), BoundsCalc(0,0), 0)
+        return StringsResultado(False, ["No existe combinación válida"], [], [], RecomendacionCalc(0,0,0,0), BoundsCalc(0,0), 0)
 
     # =====================================================
-    # 🔥 STRINGS
+    # STRINGS
     # =====================================================
-    if modo_fijo:
-        n_strings = ceil(n_paneles_total / n_series)
+    if modo in ("manual", "multizona"):
 
-        n_calc = n_series * n_strings
-
-        if n_calc != n_paneles_total:
-            warnings.append(
-                f"No se puede cumplir exactamente {n_paneles_total} paneles (configuración eléctrica)"
+        if n_paneles_total % n_series != 0:
+            return StringsResultado(
+                False,
+                [f"No existe combinación exacta para {n_paneles_total} paneles"],
+                [],
+                [],
+                RecomendacionCalc(0,0,0,0),
+                BoundsCalc(n_min, n_max),
+                n_paneles_total
             )
+
+        n_strings = n_paneles_total // n_series
+
     else:
         n_strings = n_paneles_total // n_series
 
     if n_strings < 1:
         return StringsResultado(False, ["No es posible formar strings"], [], [], RecomendacionCalc(0,0,0,0), BoundsCalc(0,0), 0)
+
+    # VALIDACIÓN FINAL
+    if modo in ("manual", "multizona"):
+        if n_series * n_strings != n_paneles_total:
+            return StringsResultado(
+                False,
+                ["Violación interna: configuración no exacta"],
+                [],
+                [],
+                RecomendacionCalc(0,0,0,0),
+                BoundsCalc(n_min, n_max),
+                n_paneles_total
+            )
 
     # =====================================================
     # DISTRIBUCIÓN
