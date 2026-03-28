@@ -47,7 +47,6 @@ def _get_sf(ctx) -> Dict[str, Any]:
 # ==========================================================
 # DIMENSIONAMIENTO
 # ==========================================================
-
 def _render_dimensionamiento(sf):
 
     st.markdown("### Dimensionamiento")
@@ -64,7 +63,8 @@ def _render_dimensionamiento(sf):
     if modo == "Automático":
 
         sf["modo_diseno"] = "auto"
-        sf["zonas"] = []  # 🔥 automático nunca usa zonas
+        sf["usar_zonas"] = False
+        sf["zonas"] = []
 
         auto_op = st.radio(
             "Método automático",
@@ -82,7 +82,7 @@ def _render_dimensionamiento(sf):
 
         elif auto_op == "Potencia (kW)":
             valor = st.number_input("Potencia", 0.1, 1000.0, 10.0)
-            sf["sizing_input"] = {"modo": "potencia", "valor": float(valor)}  # 🔥 FIX
+            sf["sizing_input"] = {"modo": "potencia", "valor": float(valor)}
 
     # ======================================================
     # MANUAL
@@ -109,6 +109,7 @@ def _render_dimensionamiento(sf):
                 "valor": int(valor)
             }
 
+            sf["usar_zonas"] = False
             sf["zonas"] = []
 
         # --------------------------------------------------
@@ -116,10 +117,12 @@ def _render_dimensionamiento(sf):
         # --------------------------------------------------
         elif manual_op == "Por zonas":
 
-            sf["zonas"] = sf.get("zonas", [])
-            sf["sizing_input"] = {}  # 🔥 se ignora en sizing
+            sf["usar_zonas"] = True
 
+            if "zonas" not in sf:
+                sf["zonas"] = []
 
+            sf["sizing_input"] = {}
 # ==========================================================
 # ZONAS
 # ==========================================================
