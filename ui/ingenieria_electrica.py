@@ -64,7 +64,7 @@ def _ui_inputs_electricos(e: dict):
 
 
 # ==========================================================
-# ctx → DatosProyecto
+# ctx → DatosProyecto (🔥 CORREGIDO)
 # ==========================================================
 
 def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
@@ -75,13 +75,8 @@ def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
     eq = _asegurar_dict(ctx, "equipos")
     e = _asegurar_dict(ctx, "electrico")
 
-    consumo = c.get("kwh_12m", [0] * 12)
-
-    if "panel_id" not in eq:
-        eq["panel_id"] = "JA_550"
-
-    if "inversor_id" not in eq:
-        eq["inversor_id"] = "HUAWEI_50K"
+    # 🔥 FIX 1: consumo correcto
+    consumo = c.get("consumo_12m", [0] * 12)
 
     p = Datosproyecto(
         cliente=str(dc.get("cliente", "")),
@@ -121,7 +116,8 @@ def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
         inversor_id=eq.get("inversor_id"),
     )
 
-    p.sistema_fv = dict(sf)
+    # 🔥 FIX 2: NO convertir a dict
+    p.sistema_fv = sf
 
     return p
 
@@ -146,7 +142,7 @@ def _mostrar_sizing(sizing, sistema_fv):
 
 
 # ==========================================================
-# MOSTRAR ELECTRICAL + MULTIZONA
+# MOSTRAR ELECTRICAL
 # ==========================================================
 
 def _mostrar_electrical(electrical, paneles=None):
@@ -157,30 +153,21 @@ def _mostrar_electrical(electrical, paneles=None):
         st.info("Sin resultados eléctricos.")
         return
 
-    def _get(obj, key, default=None):
-        return obj.get(key, default) if isinstance(obj, dict) else getattr(obj, key, default)
-
-    ok = _get(electrical, "ok", False)
+    ok = getattr(electrical, "ok", False)
 
     st.success("Cálculo eléctrico correcto") if ok else st.error("Ingeniería eléctrica con errores")
 
-    warnings = _get(electrical, "warnings", [])
-    if warnings:
-        st.warning("\n".join(warnings))
+    corrientes = getattr(electrical, "corrientes", None)
+    conductores = getattr(electrical, "conductores", None)
+    protecciones = getattr(electrical, "protecciones", None)
 
-    corrientes = _get(electrical, "corrientes")
-    conductores = _get(electrical, "conductores")
-    protecciones = _get(electrical, "protecciones")
-
-    # ⚡ CORRIENTES
     if corrientes:
         st.markdown("### ⚡ Corrientes")
         c1, c2, c3 = st.columns(3)
-        c1.metric("String", f"{_get(corrientes.string, 'i_diseno_a', 0):.2f} A")
-        c2.metric("MPPT", f"{_get(corrientes.mppt, 'i_diseno_a', 0):.2f} A")
-        c3.metric("AC", f"{_get(corrientes.ac, 'i_diseno_a', 0):.2f} A")
+        c1.metric("String", f"{getattr(corrientes.string, 'i_diseno_a', 0):.2f} A")
+        c2.metric("MPPT", f"{getattr(corrientes.mppt, 'i_diseno_a', 0):.2f} A")
+        c3.metric("AC", f"{getattr(corrientes.ac, 'i_diseno_a', 0):.2f} A")
 
-    # 🧵 CONDUCTORES
     if conductores and hasattr(conductores, "tramos"):
         st.markdown("### 🧵 Conductores")
         dc = conductores.tramos.dc
@@ -189,7 +176,6 @@ def _mostrar_electrical(electrical, paneles=None):
         c2.metric("Ampacidad", f"{dc.ampacidad_ajustada_a} A")
         c3.metric("VD", f"{dc.vd_pct:.2f} %")
 
-    # ⚠ PROTECCIONES
     if protecciones:
         st.markdown("### ⚠ Protecciones")
         c1, c2, c3 = st.columns(3)
@@ -197,66 +183,34 @@ def _mostrar_electrical(electrical, paneles=None):
         c2.metric("Protección DC", f"{protecciones.ocpd_dc_array.tamano_a} A")
         c3.metric("Fusible", f"{protecciones.fusible_string.tamano_a} A")
 
-    # 🧭 MULTIZONA
-    try:
-        zonas = getattr(paneles, "meta", {}).get("zonas", [])
-    except:
-        zonas = []
-
-    if zonas:
-        st.markdown("---")
-        st.markdown("## 🧭 Detalle por zonas")
-
-        for z in zonas:
-            with st.expander(f"Zona {z.get('zona')}"):
-                c1, c2, c3 = st.columns(3)
-                c1.metric("Paneles", z.get("paneles"))
-                c2.metric("Potencia", f"{z.get('pdc_kw', 0):.2f} kW")
-                c3.metric("Strings", z.get("strings"))
-
-                c4, c5 = st.columns(2)
-                if z.get("vdc"):
-                    c4.metric("Voltaje", f"{z['vdc']:.1f} V")
-                if z.get("idc"):
-                    c5.metric("Corriente", f"{z['idc']:.2f} A")
-
 
 # ==========================================================
 # RENDER
 # ==========================================================
+
 def render(ctx):
 
-    # ==========================================================
-    # INPUTS
-    # ==========================================================
     e = _asegurar_dict(ctx, "electrico")
     _ui_inputs_electricos(e)
 
     st.markdown("### Ingeniería eléctrica automática")
 
-    # ==========================================================
-    # BOTÓN (SIN BLOQUEO)
-    # ==========================================================
     if st.button("Generar ingeniería"):
 
         faltantes = campos_faltantes_para_paso5(ctx)
 
-        # 🔴 VALIDACIÓN EN EJECUCIÓN (NO BLOQUEA BOTÓN)
         if faltantes:
             st.error(f"Faltan datos obligatorios: {faltantes}")
             st.stop()
 
         try:
             datos = _datosproyecto_desde_ctx(ctx)
+
+            # 🔥 FIX 3: SIEMPRE usar factory
             deps = construir_dependencias()
 
             resultado = ejecutar_estudio(datos, deps)
 
-            if resultado is None:
-                st.error("El motor devolvió None")
-                st.stop()
-
-            # ✅ GUARDAR RESULTADO
             st.session_state["resultado_proyecto"] = resultado
 
             st.success("Ingeniería generada correctamente.")
@@ -267,19 +221,13 @@ def render(ctx):
             st.code(traceback.format_exc())
             st.stop()
 
-    # ==========================================================
-    # MOSTRAR RESULTADOS
-    # ==========================================================
     resultado = st.session_state.get("resultado_proyecto")
 
     if resultado:
-
         _mostrar_sizing(resultado.sizing, ctx.sistema_fv)
-
-        # 🔥 DEBUG OPCIONAL (puedes quitar luego)
-        # st.write("DEBUG ELECTRICAL:", resultado.electrical)
-
         _mostrar_electrical(resultado.electrical, resultado.strings)
+
+
 # ==========================================================
 # VALIDACIÓN
 # ==========================================================
