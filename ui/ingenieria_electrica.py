@@ -227,25 +227,27 @@ def render(ctx):
 
     import streamlit as st
 
-    resultado = getattr(ctx, "resultado", None)
+    # 🔥 CORRECCIÓN: leer desde session_state
+    resultado = st.session_state.get("resultado_proyecto")
 
     if resultado is None:
         st.error("No hay resultado disponible")
         return
 
-    sistema_fv = getattr(ctx, "sistema_fv", None)
+    # 🔥 sistema_fv también viene de session_state
+    sistema_fv = st.session_state.get("sistema_fv")
 
     # ================================
-    # SIZING 
+    # SIZING
     # ================================
     if getattr(resultado, "sizing", None):
         _mostrar_sizing(
             resultado.sizing,
-            sistema_fv   
+            sistema_fv
         )
 
     # ================================
-    # ELECTRICAL 
+    # ELECTRICAL
     # ================================
     if getattr(resultado, "electrical", None):
         _mostrar_electrical(
