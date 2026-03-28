@@ -122,8 +122,6 @@ def _leer_consumo(p: Datosproyecto):
     consumo_anual = consumo_anual_kwh(consumo_12m)
 
     return consumo_anual
-
-
 # ==========================================================
 # SIZING INPUT
 # ==========================================================
