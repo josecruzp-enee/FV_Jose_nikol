@@ -219,7 +219,8 @@ def _consolidar_paneles(resultados):
 
     # 🔥 WARNINGS
     base.warnings = [w for r in resultados for w in r.warnings]
-
+    print("TOTAL PANELES:", base.meta.n_paneles_total)
+    print("TOTAL STRINGS:", base.array.n_strings_total)
     return base
 
 
