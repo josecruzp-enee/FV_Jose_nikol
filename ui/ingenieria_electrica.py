@@ -10,19 +10,17 @@ import streamlit as st
 # ==========================================================
 def render(ctx: Any):
     """
-    Render de ingeniería eléctrica
-
-    ✔ Usa ctx como fuente de verdad
-    ✔ Evita acceso a atributos inexistentes
+    ✔ Compatible con WizardCtx (NO usa .get)
+    ✔ Evita AttributeError
     """
 
-    resultado = ctx.get("resultado")
+    resultado = getattr(ctx, "resultado", None)
 
     if resultado is None:
         st.error("No hay resultado disponible")
         return
 
-    sistema_fv = ctx.get("sistema_fv")
+    sistema_fv = getattr(ctx, "sistema_fv", None)
 
     if getattr(resultado, "sizing", None):
         _mostrar_sizing(resultado.sizing, sistema_fv)
@@ -41,28 +39,30 @@ def render(ctx: Any):
 
 
 # ==========================================================
-# VALIDAR (REQUERIDO POR WIZARD)
+# VALIDAR
 # ==========================================================
-def validar(ctx: Any) -> bool:
+def validar(ctx: Any):
     """
-    Validación del paso de ingeniería eléctrica
+    ✔ Debe devolver (ok, errores)
+    ✔ Compatible con router (ver línea 291) :contentReference[oaicite:0]{index=0}
+    """
 
-    ✔ Siempre existe (evita AttributeError)
-    ✔ Solo valida existencia de resultado
-    """
+    errores = []
 
     if ctx is None:
-        return False
+        return False, ["ctx no definido"]
 
-    resultado = ctx.get("resultado")
+    resultado = getattr(ctx, "resultado", None)
 
     if resultado is None:
-        return False
+        errores.append("No hay resultado")
 
     if not getattr(resultado, "sizing", None):
-        return False
+        errores.append("Sizing no disponible")
 
-    return True
+    ok = len(errores) == 0
+
+    return ok, errores
 
 
 # ==========================================================
