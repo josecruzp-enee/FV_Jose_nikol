@@ -2,7 +2,7 @@ from __future__ import annotations
 
 """
 PASO 5 — INGENIERÍA ELÉCTRICA
-FV Engine
+FV Engine (CORREGIDO MULTIZONA)
 """
 
 from typing import List, Tuple
@@ -19,7 +19,6 @@ from ui.state_helpers import ensure_dict
 # ==========================================================
 # UTILIDADES
 # ==========================================================
-
 def _fmt(v, unit: str = "") -> str:
     if v is None:
         return "—"
@@ -36,7 +35,6 @@ def _asegurar_dict(ctx, nombre: str) -> dict:
 # ==========================================================
 # INPUTS ELÉCTRICOS
 # ==========================================================
-
 def _ui_inputs_electricos(e: dict):
 
     st.subheader("Parámetros eléctricos de instalación")
@@ -64,43 +62,44 @@ def _ui_inputs_electricos(e: dict):
 
 
 # ==========================================================
-# ctx → DatosProyecto (🔥 CORREGIDO)
+# ctx → DatosProyecto (🔥 CORREGIDO MULTIZONA)
 # ==========================================================
-
 def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
 
     dc = _asegurar_dict(ctx, "datos_cliente")
     c = _asegurar_dict(ctx, "consumo")
-    sf = _asegurar_dict(ctx, "sistema_fv")
+    sf_raw = _asegurar_dict(ctx, "sistema_fv")
     eq = _asegurar_dict(ctx, "equipos")
     e = _asegurar_dict(ctx, "electrico")
 
-    # 🔥 FIX 1: consumo correcto
     consumo = c.get("consumo_12m", [0] * 12)
 
+    # ======================================================
+    # BASE PROYECTO
+    # ======================================================
     p = Datosproyecto(
         cliente=str(dc.get("cliente", "")),
         ubicacion=str(dc.get("ubicacion", "")),
 
-        lat=float(sf.get("latitud", 15.8250)),
-        lon=float(sf.get("longitud", -87.9500)),
+        lat=float(sf_raw.get("latitud", 15.8250)),
+        lon=float(sf_raw.get("longitud", -87.9500)),
 
         consumo_12m=[float(x) for x in consumo],
         tarifa_energia=float(c.get("tarifa_energia_L_kwh", 5.50)),
         cargos_fijos=float(c.get("cargos_fijos_L_mes", 400)),
 
-        prod_base_kwh_kwp_mes=float(sf.get("produccion_base_kwh_kwp_mes", 145)),
-        factores_fv_12m=[float(x) for x in sf.get("factores_fv_12m", [1] * 12)],
-        cobertura_objetivo=float(sf.get("cobertura_objetivo", 0.8)),
+        prod_base_kwh_kwp_mes=float(sf_raw.get("produccion_base_kwh_kwp_mes", 145)),
+        factores_fv_12m=[float(x) for x in sf_raw.get("factores_fv_12m", [1] * 12)],
+        cobertura_objetivo=float(sf_raw.get("cobertura_objetivo", 0.8)),
 
-        costo_usd_kwp=float(sf.get("costo_usd_kwp", 1200)),
-        tcambio=float(sf.get("tcambio", 27)),
+        costo_usd_kwp=float(sf_raw.get("costo_usd_kwp", 1200)),
+        tcambio=float(sf_raw.get("tcambio", 27)),
 
-        tasa_anual=float(sf.get("tasa_anual", 0.08)),
-        plazo_anios=int(sf.get("plazo_anios", 10)),
-        porcentaje_financiado=float(sf.get("porcentaje_financiado", 1)),
+        tasa_anual=float(sf_raw.get("tasa_anual", 0.08)),
+        plazo_anios=int(sf_raw.get("plazo_anios", 10)),
+        porcentaje_financiado=float(sf_raw.get("porcentaje_financiado", 1)),
 
-        om_anual_pct=float(sf.get("om_anual_pct", 0.01)),
+        om_anual_pct=float(sf_raw.get("om_anual_pct", 0.01)),
 
         instalacion_electrica=InstalacionElectrica(
             vac=float(e.get("vac", 240.0)),
@@ -111,12 +110,44 @@ def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
         )
     )
 
+    # ======================================================
+    # EQUIPOS
+    # ======================================================
     p.equipos = Equipos(
         panel_id=eq.get("panel_id"),
         inversor_id=eq.get("inversor_id"),
     )
 
-    # 🔥 FIX 2: NO convertir a dict
+    # ======================================================
+    # 🔥 NORMALIZACIÓN MULTIZONA (CLAVE)
+    # ======================================================
+    sf = {}
+
+    if sf_raw.get("usar_zonas"):
+
+        zonas_norm = []
+
+        for z in sf_raw.get("zonas", []):
+
+            if z.get("modo") == "Paneles":
+                zonas_norm.append({
+                    "n_paneles": int(z.get("n_paneles") or 0)
+                })
+            else:
+                zonas_norm.append({
+                    "area": float(z.get("area") or 0.0)
+                })
+
+        sf["modo"] = "multizona"
+        sf["zonas"] = zonas_norm
+
+    else:
+
+        sizing = sf_raw.get("sizing_input", {})
+
+        sf["modo"] = sizing.get("modo", "manual")
+        sf["valor"] = sizing.get("valor", 0)
+
     p.sistema_fv = sf
 
     return p
@@ -125,14 +156,16 @@ def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
 # ==========================================================
 # MOSTRAR SIZING
 # ==========================================================
-
 def _mostrar_sizing(sizing, sistema_fv):
 
     st.subheader("Sizing del sistema FV")
 
-    modo = sistema_fv.get("modo_diseno", "manual")
+    modo = sistema_fv.get("modo", "manual")
 
-    st.info("Modo: Diseño por zonas" if modo == "zonas" else "Modo: Diseño automático/manual")
+    if modo == "multizona":
+        st.info("Modo: Diseño por zonas")
+    else:
+        st.info("Modo: Diseño automático/manual")
 
     c1, c2, c3 = st.columns(3)
 
@@ -144,7 +177,6 @@ def _mostrar_sizing(sizing, sistema_fv):
 # ==========================================================
 # MOSTRAR ELECTRICAL
 # ==========================================================
-
 def _mostrar_electrical(electrical, paneles=None):
 
     st.subheader("Ingeniería eléctrica")
@@ -187,7 +219,6 @@ def _mostrar_electrical(electrical, paneles=None):
 # ==========================================================
 # RENDER
 # ==========================================================
-
 def render(ctx):
 
     e = _asegurar_dict(ctx, "electrico")
@@ -206,7 +237,6 @@ def render(ctx):
         try:
             datos = _datosproyecto_desde_ctx(ctx)
 
-            # 🔥 FIX 3: SIEMPRE usar factory
             deps = construir_dependencias()
 
             resultado = ejecutar_estudio(datos, deps)
@@ -224,16 +254,18 @@ def render(ctx):
     resultado = st.session_state.get("resultado_proyecto")
 
     if resultado:
-        _mostrar_sizing(resultado.sizing, ctx.sistema_fv)
+        _mostrar_sizing(resultado.sizing, resultado.sistema_fv)
         _mostrar_electrical(resultado.electrical, resultado.strings)
 
 
 # ==========================================================
 # VALIDACIÓN
 # ==========================================================
-
 def validar(ctx) -> Tuple[bool, List[str]]:
+
     errores = []
+
     if not st.session_state.get("resultado_proyecto"):
         errores.append("Debe generar ingeniería.")
+
     return len(errores) == 0, errores
