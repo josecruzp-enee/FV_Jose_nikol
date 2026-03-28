@@ -16,7 +16,7 @@ def _defaults_sistema_fv() -> Dict[str, Any]:
         "modo_diseno": "auto",
         "usar_zonas": False,
         "sizing_input": {
-            "modo": "consumo",
+            "modo": "cobertura",
             "valor": 80.0
         },
         "zonas": [],
@@ -63,7 +63,7 @@ def _render_dimensionamiento(sf):
         if auto_op == "Cobertura (%)":
             valor = st.number_input("Cobertura (%)", 1.0, 200.0, 80.0)
             sf["sizing_input"] = {
-                "modo": "consumo",
+                "modo": "cobertura",
                 "valor": float(valor)
             }
 
@@ -77,7 +77,7 @@ def _render_dimensionamiento(sf):
         elif auto_op == "Potencia (kW)":
             valor = st.number_input("Potencia (kW)", 0.1, 1000.0, 10.0)
             sf["sizing_input"] = {
-                "modo": "kw_objetivo",   # 🔥 CORREGIDO
+                "modo": "kw_objetivo",
                 "valor": float(valor)
             }
 
@@ -95,14 +95,14 @@ def _render_dimensionamiento(sf):
         )
 
         # --------------------------------------------------
-        # MANUAL DIRECTO
+        # MANUAL SIMPLE
         # --------------------------------------------------
         if manual_op == "Cantidad de paneles":
 
             valor = st.number_input("Paneles", 1, 10000, 30)
 
             sf["sizing_input"] = {
-                "modo": "manual",
+                "modo": "paneles",
                 "valor": int(valor)
             }
 
@@ -116,10 +116,8 @@ def _render_dimensionamiento(sf):
 
             sf["usar_zonas"] = True
 
-            # 🔥 NUNCA vacío
             sf["sizing_input"] = {
-                "modo": "multizona",
-                "valor": 1
+                "modo": "multizona"
             }
 
             if not sf.get("zonas"):
