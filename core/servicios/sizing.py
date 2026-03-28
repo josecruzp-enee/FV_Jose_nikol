@@ -326,16 +326,30 @@ def _seleccionar_inversor(pdc, dc_ac_obj, eq):
 
 def calcular_sizing_unificado(p: Datosproyecto) -> ResultadoSizing:
 
+    # ======================================================
+    # 1. PANEL + CONFIG
+    # ======================================================
     panel, dc_ac_obj, eq = _leer_panel_y_config(p)
 
+    # ======================================================
+    # 2. CONSUMO
+    # ======================================================
     consumo_anual = _leer_consumo(p)
 
+    # ======================================================
+    # 3. SISTEMA FV
+    # ======================================================
     sf = getattr(p, "sistema_fv", {}) or {}
-    modo_diseno = sf.get("modo_diseno", "manual")
 
-    if modo_diseno == "zonas":
+    # ======================================================
+    # 4. DECISIÓN DE FLUJO (🔥 CORREGIDO)
+    # ======================================================
+    if sf.get("usar_zonas"):
 
         zonas = sf.get("zonas", [])
+
+        if not zonas:
+            raise ValueError("Multizona activado pero sin zonas")
 
         n_paneles, pdc = _dimensionar_por_zonas(
             panel,
@@ -346,6 +360,10 @@ def calcular_sizing_unificado(p: Datosproyecto) -> ResultadoSizing:
 
         modo, valor = _leer_sizing_input(p)
 
+        # 🔥 Blindaje extra
+        if modo == "multizona":
+            raise ValueError("Error interno: multizona no debe pasar por generador")
+
         n_paneles, pdc = _dimensionar_generador(
             panel,
             modo,
@@ -353,18 +371,27 @@ def calcular_sizing_unificado(p: Datosproyecto) -> ResultadoSizing:
             consumo_anual
         )
 
+    # ======================================================
+    # 5. INVERSOR
+    # ======================================================
     inv, kw_ac, n_inv, pac_total, sugerencias = _seleccionar_inversor(
         pdc,
         dc_ac_obj,
         eq
     )
 
+    # ======================================================
+    # 6. DERIVADOS
+    # ======================================================
     paneles_por_inversor = ceil(n_paneles / n_inv)
 
     dc_ac_ratio = pdc / pac_total
 
     energia_12m: List[MesEnergia] = []
 
+    # ======================================================
+    # 7. RESULTADO
+    # ======================================================
     return ResultadoSizing(
         n_paneles=n_paneles,
         kwp_dc=round(pdc, 3),
@@ -380,5 +407,4 @@ def calcular_sizing_unificado(p: Datosproyecto) -> ResultadoSizing:
         dc_ac_ratio=round(dc_ac_ratio, 3),
 
         energia_12m=energia_12m,
-
     )
