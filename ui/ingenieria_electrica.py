@@ -2,7 +2,7 @@ from __future__ import annotations
 
 """
 PASO 5 — INGENIERÍA ELÉCTRICA
-FV Engine (CORREGIDO MULTIZONA)
+FV Engine (VERSIÓN ESTABLE)
 """
 
 from typing import List, Tuple
@@ -42,27 +42,44 @@ def _ui_inputs_electricos(e: dict):
     c1, c2, c3 = st.columns(3)
 
     with c1:
-        e["vac"] = st.number_input("Voltaje AC (V)", 100.0, 600.0, float(e.get("vac", 240.0)))
+        e["vac"] = st.number_input(
+            "Voltaje AC (V)", 100.0, 600.0,
+            float(e.get("vac", 240.0))
+        )
 
     with c2:
-        e["fases"] = st.selectbox("Fases", [1, 3], index=0 if int(e.get("fases", 1)) == 1 else 1)
+        e["fases"] = st.selectbox(
+            "Fases", [1, 3],
+            index=0 if int(e.get("fases", 1)) == 1 else 1
+        )
 
     with c3:
-        e["fp"] = st.number_input("Factor de potencia", 0.80, 1.00, float(e.get("fp", 1.0)), step=0.01)
+        e["fp"] = st.number_input(
+            "Factor de potencia",
+            0.80, 1.00,
+            float(e.get("fp", 1.0)),
+            step=0.01
+        )
 
     st.markdown("### Distancias")
 
     d1, d2 = st.columns(2)
 
     with d1:
-        e["dist_dc_m"] = st.number_input("Distancia DC (m)", 1.0, value=float(e.get("dist_dc_m", 15.0)))
+        e["dist_dc_m"] = st.number_input(
+            "Distancia DC (m)", 1.0,
+            value=float(e.get("dist_dc_m", 15.0))
+        )
 
     with d2:
-        e["dist_ac_m"] = st.number_input("Distancia AC (m)", 1.0, value=float(e.get("dist_ac_m", 25.0)))
+        e["dist_ac_m"] = st.number_input(
+            "Distancia AC (m)", 1.0,
+            value=float(e.get("dist_ac_m", 25.0))
+        )
 
 
 # ==========================================================
-# ctx → DatosProyecto (🔥 CORREGIDO MULTIZONA)
+# ctx → DatosProyecto
 # ==========================================================
 def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
 
@@ -74,9 +91,6 @@ def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
 
     consumo = c.get("consumo_12m", [0] * 12)
 
-    # ======================================================
-    # BASE PROYECTO
-    # ======================================================
     p = Datosproyecto(
         cliente=str(dc.get("cliente", "")),
         ubicacion=str(dc.get("ubicacion", "")),
@@ -110,16 +124,14 @@ def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
         )
     )
 
-    # ======================================================
     # EQUIPOS
-    # ======================================================
     p.equipos = Equipos(
         panel_id=eq.get("panel_id"),
         inversor_id=eq.get("inversor_id"),
     )
 
     # ======================================================
-    # 🔥 NORMALIZACIÓN MULTIZONA (CLAVE)
+    # NORMALIZACIÓN SIZING
     # ======================================================
     sf = {}
 
@@ -128,7 +140,6 @@ def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
         zonas_norm = []
 
         for z in sf_raw.get("zonas", []):
-
             if z.get("modo") == "Paneles":
                 zonas_norm.append({
                     "n_paneles": int(z.get("n_paneles") or 0)
@@ -157,9 +168,12 @@ def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
 # MOSTRAR SIZING
 # ==========================================================
 def _mostrar_sizing(sizing, sistema_fv):
-    import streamlit as st
 
     st.markdown("### 📐 Sizing del sistema FV")
+
+    if not sistema_fv:
+        st.warning("Sistema FV no definido")
+        return
 
     col1, col2, col3 = st.columns(3)
 
@@ -167,36 +181,20 @@ def _mostrar_sizing(sizing, sistema_fv):
     col2.metric("Potencia DC (kWp)", round(getattr(sizing, "kw_dc", 0.0), 2))
     col3.metric("Potencia AC (kW)", round(getattr(sizing, "kw_ac", 0.0), 2))
 
-    # ======================================================
-    # NORMALIZACIÓN ROBUSTA (AQUÍ ESTABA EL PROBLEMA)
-    # ======================================================
-    def _safe_get(obj, key, default=None):
-        if obj is None:
-            return default
-        if isinstance(obj, dict):
-            return obj.get(key, default)
-        return getattr(obj, key, default)
-
-    usar_zonas = _safe_get(sistema_fv, "usar_zonas", False)
-
-    if usar_zonas:
+    if sistema_fv.get("modo") == "multizona":
         st.markdown("#### 🔀 Configuración multizona")
 
-        zonas = _safe_get(sistema_fv, "zonas", [])
-
-        for i, z in enumerate(zonas, start=1):
-
-            n_paneles = _safe_get(z, "n_paneles", None)
-            area = _safe_get(z, "area", None)
-
-            if n_paneles is not None:
-                st.write(f"Zona {i}: {n_paneles} paneles")
+        for i, z in enumerate(sistema_fv.get("zonas", []), start=1):
+            if "n_paneles" in z:
+                st.write(f"Zona {i}: {z['n_paneles']} paneles")
             else:
-                st.write(f"Zona {i}: {area} m²")
+                st.write(f"Zona {i}: {z.get('area', 0)} m²")
+
+
 # ==========================================================
 # MOSTRAR ELECTRICAL
 # ==========================================================
-def _mostrar_electrical(electrical, paneles=None):
+def _mostrar_electrical(electrical):
 
     st.subheader("Ingeniería eléctrica")
 
@@ -206,7 +204,7 @@ def _mostrar_electrical(electrical, paneles=None):
 
     ok = getattr(electrical, "ok", False)
 
-    st.success("Cálculo eléctrico correcto") if ok else st.error("Ingeniería eléctrica con errores")
+    st.success("Cálculo correcto") if ok else st.error("Errores en ingeniería")
 
     corrientes = getattr(electrical, "corrientes", None)
     conductores = getattr(electrical, "conductores", None)
@@ -215,9 +213,9 @@ def _mostrar_electrical(electrical, paneles=None):
     if corrientes:
         st.markdown("### ⚡ Corrientes")
         c1, c2, c3 = st.columns(3)
-        c1.metric("String", f"{getattr(corrientes.string, 'i_diseno_a', 0):.2f} A")
-        c2.metric("MPPT", f"{getattr(corrientes.mppt, 'i_diseno_a', 0):.2f} A")
-        c3.metric("AC", f"{getattr(corrientes.ac, 'i_diseno_a', 0):.2f} A")
+        c1.metric("String", f"{corrientes.string.i_diseno_a:.2f} A")
+        c2.metric("MPPT", f"{corrientes.mppt.i_diseno_a:.2f} A")
+        c3.metric("AC", f"{corrientes.ac.i_diseno_a:.2f} A")
 
     if conductores and hasattr(conductores, "tramos"):
         st.markdown("### 🧵 Conductores")
@@ -231,54 +229,49 @@ def _mostrar_electrical(electrical, paneles=None):
         st.markdown("### ⚠ Protecciones")
         c1, c2, c3 = st.columns(3)
         c1.metric("Breaker AC", f"{protecciones.ocpd_ac.tamano_a} A")
-        c2.metric("Protección DC", f"{protecciones.ocpd_dc_array.tamano_a} A")
+        c2.metric("DC", f"{protecciones.ocpd_dc_array.tamano_a} A")
         c3.metric("Fusible", f"{protecciones.fusible_string.tamano_a} A")
 
 
 # ==========================================================
 # RENDER
 # ==========================================================
-# ==========================================================
-# RENDER (CORREGIDO — SOLO USA ctx)
-# REEMPLAZAR COMPLETA ESTA FUNCIÓN
-# ==========================================================
 def render(ctx):
-    import streamlit as st
 
-    # 🔥 USAR ctx (FUENTE DE VERDAD)
-    resultado = getattr(ctx, "resultado", None)
+    # INPUTS
+    e = _asegurar_dict(ctx, "electrico")
+    _ui_inputs_electricos(e)
 
-    if resultado is None:
-        st.error("No hay resultado disponible")
+    # EJECUCIÓN
+    try:
+        p = _datosproyecto_desde_ctx(ctx)
+        deps = construir_dependencias()
+
+        resultado = ejecutar_estudio(p, deps)
+        ctx.resultado = resultado
+
+    except Exception:
+        import traceback
+        st.error("Error en motor FV")
+        st.code(traceback.format_exc())
         return
 
-    sistema_fv = getattr(ctx, "sistema_fv", None)
+    sistema_fv = _asegurar_dict(ctx, "sistema_fv")
 
-    # ================================
-    # SIZING
-    # ================================
+    # OUTPUTS
     if getattr(resultado, "sizing", None):
-        _mostrar_sizing(
-            resultado.sizing,
-            sistema_fv
-        )
+        _mostrar_sizing(resultado.sizing, sistema_fv)
 
-    # ================================
-    # ELECTRICAL
-    # ================================
     if getattr(resultado, "electrical", None):
-        _mostrar_electrical(
-            resultado.electrical,
-            getattr(resultado, "strings", None)
-        )
+        _mostrar_electrical(resultado.electrical)
+
+
 # ==========================================================
 # VALIDACIÓN
 # ==========================================================
 def validar(ctx) -> Tuple[bool, List[str]]:
 
-    errores = []
+    if not getattr(ctx, "resultado", None):
+        return False, ["Debe generar ingeniería."]
 
-    if not st.session_state.get("resultado_proyecto"):
-        errores.append("Debe generar ingeniería.")
-
-    return len(errores) == 0, errores
+    return True, []
