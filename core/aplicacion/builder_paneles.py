@@ -138,6 +138,7 @@ def construir_entrada_paneles(datos, sizing) -> EntradaPaneles:
         inversor=inversor,
         modo=modo,
         n_paneles_total=getattr(sizing, "n_paneles", None),
+        zonas=zonas if modo == "multizona" else None,
         t_min_c=getattr(sizing, "t_min_c", 25.0),
         t_oper_c=getattr(sizing, "t_oper_c", 55.0),
         dos_aguas=getattr(sizing, "dos_aguas", False),
