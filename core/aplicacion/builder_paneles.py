@@ -4,10 +4,12 @@ from electrical.catalogos.catalogos import get_panel, get_inversor
 
 def construir_entrada_paneles(datos, sizing) -> EntradaPaneles:
     """
-    ✔ SOLO dataclasses
-    ✔ SIN legacy
-    ✔ FUENTE ÚNICA DE VERDAD
-    ✔ MODO CORRECTAMENTE MAPEADO (UI → MOTOR)
+    BUILDER ROBUSTO
+
+    ✔ Acepta formato UI actual (modo + valor)
+    ✔ Acepta formato nuevo (modo_diseno + sizing_input)
+    ✔ Acepta multizona
+    ✔ Normaliza todo hacia el motor
     """
 
     # ==========================================================
@@ -47,37 +49,86 @@ def construir_entrada_paneles(datos, sizing) -> EntradaPaneles:
 
     sf = datos.sistema_fv
 
-    modo_diseno = sf.get("modo_diseno")
-
-    if not modo_diseno:
-        raise ValueError("modo_diseno no definido en sistema_fv")
-
-    modo_diseno = str(modo_diseno).strip().lower()
-
     # ==========================================================
-    # MAPEO DE MODO (UI → MOTOR)
+    # 🔥 NORMALIZACIÓN CENTRAL
     # ==========================================================
-    if modo_diseno == "zonas":
+    modo = None
+
+    # ----------------------------------------------------------
+    # CASO 1: MULTIZONA (UI)
+    # ----------------------------------------------------------
+    if sf.get("modo") == "multizona" or sf.get("zonas"):
+
         modo = "multizona"
 
-    elif modo_diseno == "manual":
-        modo = "manual"
+        zonas = sf.get("zonas", [])
 
-    elif modo_diseno == "auto":
-        sizing_input = sf.get("sizing_input", {})
+        if not isinstance(zonas, list) or not zonas:
+            raise ValueError("zonas inválidas en sistema_fv")
 
-        if not isinstance(sizing_input, dict):
-            raise ValueError("sizing_input inválido")
+        for i, z in enumerate(zonas):
+            if not isinstance(z, dict):
+                raise ValueError(f"Zona {i+1} inválida")
 
-        modo = sizing_input.get("modo")
+            if "n_paneles" in z:
+                if int(z["n_paneles"]) <= 0:
+                    raise ValueError(f"Zona {i+1}: n_paneles inválido")
+            elif "area" in z:
+                if float(z["area"]) <= 0:
+                    raise ValueError(f"Zona {i+1}: área inválida")
+            else:
+                raise ValueError(f"Zona {i+1}: sin datos válidos")
 
-        if not modo:
-            raise ValueError("modo no definido en sizing_input")
+    # ----------------------------------------------------------
+    # CASO 2: FORMATO NUEVO
+    # ----------------------------------------------------------
+    elif sf.get("modo_diseno"):
 
-        modo = str(modo).strip().lower()
+        modo_diseno = str(sf.get("modo_diseno")).strip().lower()
 
+        if modo_diseno == "zonas":
+            modo = "multizona"
+
+        elif modo_diseno == "manual":
+            modo = "manual"
+
+        elif modo_diseno in ["auto", "automatico", "automático"]:
+
+            sizing_input = sf.get("sizing_input", {})
+
+            if not isinstance(sizing_input, dict):
+                raise ValueError("sizing_input inválido")
+
+            modo = sizing_input.get("modo")
+
+            if not modo:
+                raise ValueError("modo no definido en sizing_input")
+
+            modo = str(modo).strip().lower()
+
+        else:
+            raise ValueError(f"modo_diseno inválido: {modo_diseno}")
+
+    # ----------------------------------------------------------
+    # CASO 3: FORMATO UI ACTUAL
+    # ----------------------------------------------------------
+    elif sf.get("modo"):
+
+        modo = str(sf.get("modo")).strip().lower()
+
+        if modo == "multizona":
+            raise ValueError("multizona sin zonas definidas")
+
+        valor = sf.get("valor")
+
+        if valor is None or float(valor) <= 0:
+            raise ValueError(f"Valor inválido en sistema_fv: {sf}")
+
+    # ----------------------------------------------------------
+    # ERROR TOTAL
+    # ----------------------------------------------------------
     else:
-        raise ValueError(f"modo_diseno inválido: {modo_diseno}")
+        raise ValueError("sistema_fv sin modo válido")
 
     # ==========================================================
     # SALIDA
