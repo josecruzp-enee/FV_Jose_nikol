@@ -11,7 +11,7 @@ from ui.state_helpers import ensure_dict
 
 
 # ==========================================================
-# UTILIDADES
+# UTIL
 # ==========================================================
 def _asegurar_dict(ctx, nombre: str) -> dict:
     return ensure_dict(ctx, nombre, dict)
@@ -60,9 +60,7 @@ def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
     p = Datosproyecto(
         cliente=str(dc.get("cliente", "")),
         ubicacion=str(dc.get("ubicacion", "")),
-
         consumo_12m=[float(x) for x in c.get("consumo_12m", [0]*12)],
-
         instalacion_electrica=InstalacionElectrica(
             vac=float(e.get("vac", 240)),
             fases=int(e.get("fases", 1)),
@@ -79,13 +77,8 @@ def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
 
     # MULTIZONA
     if sf_raw.get("usar_zonas"):
-
-        zonas = []
-        for z in sf_raw.get("zonas", []):
-            zonas.append({"n_paneles": int(z.get("n_paneles") or 0)})
-
+        zonas = [{"n_paneles": int(z.get("n_paneles") or 0)} for z in sf_raw.get("zonas", [])]
         p.sistema_fv = {"modo": "multizona", "zonas": zonas}
-
     else:
         sizing = sf_raw.get("sizing_input", {})
         p.sistema_fv = {
@@ -99,11 +92,11 @@ def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
 # ==========================================================
 # ZONAS
 # ==========================================================
-def _mostrar_zonas(paneles, corrientes):
+def _mostrar_zonas(paneles):
 
-    st.markdown("### 🔀 Zonas FV (reales)")
+    st.markdown("### 🔀 Zonas FV (diseño real)")
 
-    strings = getattr(paneles, "strings", [])
+    strings = paneles.strings
 
     zonas = {}
 
@@ -114,7 +107,7 @@ def _mostrar_zonas(paneles, corrientes):
         zonas[n]["n_paneles"] += n
         zonas[n]["n_strings"] += 1
 
-    for i, (n, d) in enumerate(zonas.items(), start=1):
+    for i, (_, d) in enumerate(zonas.items(), start=1):
         st.markdown(f"#### Zona {i}")
         c1, c2 = st.columns(2)
         c1.metric("Paneles", d["n_paneles"])
@@ -128,33 +121,73 @@ def _mostrar_detalle(paneles, electrical):
 
     st.markdown("## ⚡ Detalle eléctrico completo")
 
-    strings = paneles.strings
     panel = paneles.panel
+    strings = paneles.strings
     corr = electrical.corrientes
+    cond = electrical.conductores
+    prot = electrical.protecciones
 
     # PANEL
     st.markdown("### 🔹 Panel")
-    st.write(f"Imp: {panel.imp_a:.2f} A")
-    st.write(f"Isc: {panel.isc_a:.2f} A")
-    st.write(f"I diseño: {corr.panel.i_diseno_a:.2f} A")
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Imp", f"{panel.imp_a:.2f} A")
+    c2.metric("Isc", f"{panel.isc_a:.2f} A")
+    c3.metric("I diseño", f"{corr.panel.i_diseno_a:.2f} A")
 
     # STRING
     st.markdown("### 🔗 Strings")
+
+    data = []
     for i, s in enumerate(strings, 1):
-        st.write(f"String {i}: {s.n_series} paneles → {s.imp_string_a:.2f} A")
+        data.append({
+            "String": i,
+            "Paneles": s.n_series,
+            "Vmp": f"{s.vmp_string_v:.2f}",
+            "Voc": f"{s.voc_frio_string_v:.2f}",
+            "I": f"{s.imp_string_a:.2f}"
+        })
+    st.table(data)
 
     # MPPT
     st.markdown("### ⚡ MPPT")
+
     for i, m in enumerate(corr.mppt_detalle, 1):
-        st.write(f"MPPT {i}: {m.i_diseno_a:.2f} A")
+        c1, c2 = st.columns(2)
+        c1.metric(f"MPPT {i}", f"{m.i_operacion_a:.2f} A")
+        c2.metric("Diseño", f"{m.i_diseno_a:.2f} A")
 
     # DC
     st.markdown("### 🔌 DC")
-    st.write(f"Total DC: {corr.dc_total.i_diseno_a:.2f} A")
+    c1, c2 = st.columns(2)
+    c1.metric("I DC", f"{corr.dc_total.i_operacion_a:.2f} A")
+    c2.metric("I diseño", f"{corr.dc_total.i_diseno_a:.2f} A")
 
     # AC
     st.markdown("### ⚡ AC")
-    st.write(f"AC: {corr.ac.i_diseno_a:.2f} A")
+    c1, c2 = st.columns(2)
+    c1.metric("I AC", f"{corr.ac.i_operacion_a:.2f} A")
+    c2.metric("I diseño", f"{corr.ac.i_diseno_a:.2f} A")
+
+    # CONDUCTORES
+    st.markdown("### 🧵 Conductores")
+
+    tr = cond.tramos
+
+    data = []
+    if tr.dc:
+        data.append({"Tramo": "DC", "Calibre": tr.dc.calibre, "VD %": f"{tr.dc.vd_pct:.2f}"})
+    if tr.ac:
+        data.append({"Tramo": "AC", "Calibre": tr.ac.calibre, "VD %": f"{tr.ac.vd_pct:.2f}"})
+
+    st.table(data)
+
+    # PROTECCIONES
+    st.markdown("### ⚠ Protecciones")
+
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Breaker AC", f"{prot.ocpd_ac.tamano_a} A")
+    c2.metric("DC", f"{prot.ocpd_dc_array.tamano_a} A")
+    c3.metric("Fusible", f"{prot.fusible_string.tamano_a} A")
 
 
 # ==========================================================
@@ -182,12 +215,8 @@ def render(ctx):
     if not resultado:
         return
 
-    # ZONAS
     if resultado.strings and resultado.electrical:
-        _mostrar_zonas(resultado.strings, resultado.electrical.corrientes)
-
-    # DETALLE COMPLETO
-    if resultado.strings and resultado.electrical:
+        _mostrar_zonas(resultado.strings)
         _mostrar_detalle(resultado.strings, resultado.electrical)
 
 
