@@ -46,7 +46,7 @@ def ejecutar_estudio(datos: Any, deps: DependenciasEstudio):
             )
 
         # ==================================================
-        # 2. PANELES (MULTIZONA)
+        # 2. PANELES (MULTIZONA CORREGIDO)
         # ==================================================
         if not hasattr(datos, "sistema_fv"):
             raise ValueError("Datos sin sistema_fv")
@@ -55,14 +55,24 @@ def ejecutar_estudio(datos: Any, deps: DependenciasEstudio):
         from core.aplicacion.multizona import ejecutar_multizona
         from electrical.paneles.entrada_panel import EntradaPaneles
 
-        sf = getattr(datos, "sistema_fv", {})
-        zonas = sf.get("zonas", [])
+        sf = getattr(datos, "sistema_fv", None)
+
+        # 🔥 FIX: soportar objeto o dict
+        if isinstance(sf, dict):
+            zonas = sf.get("zonas", [])
+        else:
+            zonas = getattr(sf, "zonas", [])
 
         if zonas:
             entradas = []
 
             for z in zonas:
-                n_paneles = z.get("paneles", 0)
+
+                # 🔥 FIX: soportar dict u objeto
+                if isinstance(z, dict):
+                    n_paneles = z.get("paneles", 0)
+                else:
+                    n_paneles = getattr(z, "paneles", 0)
 
                 if n_paneles <= 0:
                     continue
@@ -109,16 +119,13 @@ def ejecutar_estudio(datos: Any, deps: DependenciasEstudio):
             )
 
         # ==================================================
-        # 4. ELECTRICAL  🔥 (CORREGIDO)
+        # 4. ELECTRICAL
         # ==================================================
         print("🔥 LLAMANDO ELECTRICAL")
 
         electrical = _ejecutar_electrical(datos, sizing, paneles, deps)
 
         print("🔥 RESULTADO ELECTRICAL:", electrical)
-
-        # 👉 IMPORTANTE: no cortamos flujo aunque falle
-        # UI debe decidir qué mostrar
 
         # ==================================================
         # 5. FINANZAS
@@ -140,7 +147,6 @@ def ejecutar_estudio(datos: Any, deps: DependenciasEstudio):
         import traceback
         print(traceback.format_exc())
         raise
-
 
 # ==========================================================
 # FUNCIONES INTERNAS
