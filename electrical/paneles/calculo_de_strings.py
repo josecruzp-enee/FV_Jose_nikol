@@ -47,7 +47,7 @@ class StringsResultado:
 
 
 # =========================================================
-# TEMPERATURA (CORRECTO QUE ESTÉ AQUÍ)
+# TEMPERATURA
 # =========================================================
 
 def _voc_frio(voc, coef, t_min):
@@ -59,7 +59,7 @@ def _vmp_temp(vmp, coef, t_oper):
 
 
 # =========================================================
-# LIMITES SOLO VOLTAJE
+# LIMITES
 # =========================================================
 
 def _bounds(panel, inv, t_min, t_oper):
@@ -73,7 +73,7 @@ def _bounds(panel, inv, t_min, t_oper):
 
 
 # =========================================================
-# SELECCIÓN ROBUSTA
+# SELECCIÓN AUTOMÁTICA (TU ORIGINAL)
 # =========================================================
 
 def _seleccionar(n_min, n_max, vmp, inv, n_total):
@@ -94,7 +94,6 @@ def _seleccionar(n_min, n_max, vmp, inv, n_total):
 
         error_v = abs(v_string - target)
 
-        # 🔥 penaliza desperdicio
         score = error_v + sobrantes * 100
 
         if score < best_score:
@@ -105,7 +104,22 @@ def _seleccionar(n_min, n_max, vmp, inv, n_total):
 
 
 # =========================================================
-# DISTRIBUCIÓN SIMPLE
+# 🔥 SELECCIÓN MODO FIJO (NUEVO)
+# =========================================================
+
+def _seleccionar_fijo(n_min, n_max, n_total):
+
+    # buscar divisor exacto
+    for n in range(n_max, n_min - 1, -1):
+        if n_total % n == 0:
+            return n
+
+    # si no hay exacto → usar uno válido sin perder paneles
+    return max(n_min, min(n_max, n_total))
+
+
+# =========================================================
+# DISTRIBUCIÓN
 # =========================================================
 
 def _distribuir(n_strings, n_inv, n_mppt):
@@ -134,7 +148,10 @@ def calcular_strings_fv(
     n_inversores: int,
     t_min_c: float,
     t_oper_c: Optional[float] = 55.0,
+    modo_fijo: bool = False,   # 🔥 NUEVO
 ) -> StringsResultado:
+
+    warnings: List[str] = []
 
     if n_paneles_total <= 0:
         return StringsResultado(False, ["Paneles inválidos"], [], [], RecomendacionCalc(0,0,0,0), BoundsCalc(0,0), 0)
@@ -145,22 +162,41 @@ def calcular_strings_fv(
     if n_max < n_min:
         return StringsResultado(False, ["No hay rango válido de serie"], [], [], RecomendacionCalc(0,0,0,0), BoundsCalc(0,0), 0)
 
-    # selección
-    n_series = _seleccionar(n_min, n_max, vmp_panel, inversor, n_paneles_total)
+    # =====================================================
+    # 🔥 SELECCIÓN
+    # =====================================================
+    if modo_fijo:
+        n_series = _seleccionar_fijo(n_min, n_max, n_paneles_total)
+    else:
+        n_series = _seleccionar(n_min, n_max, vmp_panel, inversor, n_paneles_total)
 
     if not n_series:
         return StringsResultado(False, ["No se pudo seleccionar serie"], [], [], RecomendacionCalc(0,0,0,0), BoundsCalc(0,0), 0)
 
-    # strings
-    n_strings = n_paneles_total // n_series
+    # =====================================================
+    # 🔥 STRINGS
+    # =====================================================
+    if modo_fijo:
+        n_strings = ceil(n_paneles_total / n_series)
+
+        n_calc = n_series * n_strings
+
+        if n_calc != n_paneles_total:
+            warnings.append(
+                f"No se puede cumplir exactamente {n_paneles_total} paneles (configuración eléctrica)"
+            )
+    else:
+        n_strings = n_paneles_total // n_series
 
     if n_strings < 1:
         return StringsResultado(False, ["No es posible formar strings"], [], [], RecomendacionCalc(0,0,0,0), BoundsCalc(0,0), 0)
 
-    # distribución
+    # =====================================================
+    # DISTRIBUCIÓN
+    # =====================================================
     distrib = _distribuir(n_strings, n_inversores, inversor.n_mppt)
 
-    # parámetros eléctricos del string (FÍSICOS, NO NEC)
+    # parámetros eléctricos
     vmp_string = n_series * vmp_panel
     voc_string = n_series * voc_panel
 
@@ -183,7 +219,7 @@ def calcular_strings_fv(
     return StringsResultado(
         ok=True,
         errores=[],
-        warnings=[],
+        warnings=warnings,
         strings=strings,
         recomendacion=RecomendacionCalc(
             n_series=n_series,
