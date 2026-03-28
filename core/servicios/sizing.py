@@ -129,6 +129,32 @@ def _leer_consumo(p: Datosproyecto):
 def _leer_sizing_input(p: Datosproyecto):
 
     sf = getattr(p, "sistema_fv", {}) or {}
+
+    # ======================================================
+    # NUEVO MODELO (PRIORIDAD)
+    # ======================================================
+    if "modo" in sf:
+
+        modo = str(sf.get("modo")).strip().lower()
+
+        if modo == "manual":
+            return "manual", sf.get("n_paneles")
+
+        elif modo == "kw_objetivo":
+            return "potencia", sf.get("kw_objetivo")
+
+        elif modo == "area":
+            return "area", sf.get("area")
+
+        elif modo == "consumo":
+            return "consumo", sf.get("valor", 80)
+
+        elif modo == "multizona":
+            return "multizona", None
+
+    # ======================================================
+    # MODELO LEGACY (FALLBACK)
+    # ======================================================
     si = sf.get("sizing_input", {}) or {}
 
     modo = str(si.get("modo", "consumo")).strip().lower()
@@ -138,7 +164,6 @@ def _leer_sizing_input(p: Datosproyecto):
         raise ValueError("sizing_input sin valor")
 
     return modo, valor
-
 
 # ==========================================================
 # GENERADOR FV (MODO NORMAL)
