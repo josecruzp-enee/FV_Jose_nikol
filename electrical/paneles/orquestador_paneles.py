@@ -146,6 +146,9 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
     if n_paneles is None or n_paneles <= 0:
         return _resultado_error(panel, ["n_paneles inválido"], warnings)
 
+    # 🔥 GUARDAR INPUT ORIGINAL
+    n_paneles_input = n_paneles
+
     # ------------------------------------------------------
     # INVERSORES
     # ------------------------------------------------------
@@ -178,6 +181,27 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
             ["No se pudo generar recomendación de strings"],
             warnings
         )
+
+    # ------------------------------------------------------
+    # 🔥 PROTECCIÓN MODO MANUAL / MULTIZONA
+    # ------------------------------------------------------
+
+    if entrada.modo in ["manual", "multizona"]:
+
+        n_paneles_calc = (
+            strings_res.recomendacion.n_series *
+            strings_res.recomendacion.n_strings_total
+        )
+
+        if n_paneles_calc != n_paneles_input:
+
+            warnings.append(
+                f"Strings ajustados ({n_paneles_calc}) no coinciden con paneles ingresados ({n_paneles_input})"
+            )
+
+            # 🔥 RESPETAR INPUT DEL USUARIO
+            n_paneles = n_paneles_input
+            pdc_kw = (n_paneles * panel.pmax_w) / 1000
 
     # ------------------------------------------------------
     # DISTRIBUCIÓN
