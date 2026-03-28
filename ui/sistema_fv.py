@@ -1,7 +1,3 @@
-# ==========================================================
-# UI — SISTEMA FV (ESTABLE Y CORREGIDO)
-# ==========================================================
-
 from __future__ import annotations
 from typing import Any, Dict
 
@@ -65,16 +61,25 @@ def _render_dimensionamiento(sf):
         )
 
         if auto_op == "Cobertura (%)":
-            valor = st.number_input("Cobertura", 0.0, 200.0, 80.0)
-            sf["sizing_input"] = {"modo": "consumo", "valor": float(valor)}
+            valor = st.number_input("Cobertura (%)", 1.0, 200.0, 80.0)
+            sf["sizing_input"] = {
+                "modo": "consumo",
+                "valor": float(valor)
+            }
 
         elif auto_op == "Área (m²)":
-            valor = st.number_input("Área", 1.0, 10000.0, 100.0)
-            sf["sizing_input"] = {"modo": "area", "valor": float(valor)}
+            valor = st.number_input("Área (m²)", 1.0, 10000.0, 100.0)
+            sf["sizing_input"] = {
+                "modo": "area",
+                "valor": float(valor)
+            }
 
         elif auto_op == "Potencia (kW)":
-            valor = st.number_input("Potencia", 0.1, 1000.0, 10.0)
-            sf["sizing_input"] = {"modo": "potencia", "valor": float(valor)}
+            valor = st.number_input("Potencia (kW)", 0.1, 1000.0, 10.0)
+            sf["sizing_input"] = {
+                "modo": "kw_objetivo",   # 🔥 CORREGIDO
+                "valor": float(valor)
+            }
 
     # ======================================================
     # MANUAL
@@ -110,7 +115,12 @@ def _render_dimensionamiento(sf):
         else:
 
             sf["usar_zonas"] = True
-            sf["sizing_input"] = {}
+
+            # 🔥 NUNCA vacío
+            sf["sizing_input"] = {
+                "modo": "multizona",
+                "valor": 1
+            }
 
             if not sf.get("zonas"):
                 sf["zonas"] = [{
@@ -244,9 +254,10 @@ def validar(ctx):
 
     else:
 
-        valor = float(sf.get("sizing_input", {}).get("valor", 0))
+        sizing = sf.get("sizing_input", {})
+        valor = sizing.get("valor")
 
-        if valor <= 0:
+        if valor is None or float(valor) <= 0:
             errores.append("Valor de dimensionamiento inválido.")
 
     return len(errores) == 0, errores
