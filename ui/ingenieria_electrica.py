@@ -304,14 +304,20 @@ def render(ctx):
 
     sistema_fv = _asegurar_dict(ctx, "sistema_fv")
 
+    # ======================================================
     # OUTPUTS
+    # ======================================================
+
+    # 🔹 SIZING
     if getattr(resultado, "sizing", None):
         _mostrar_sizing(resultado.sizing, sistema_fv)
 
-    if getattr(resultado, "electrical", None):
-        _mostrar_electrical(resultado.electrical)
+    # 🔹 ELECTRICAL (SIEMPRE MOSTRAR)
+    st.markdown("## ⚡ Ingeniería eléctrica")
 
+    electrical = getattr(resultado, "electrical", None)
 
+    _mostrar_electrical(electrical)
 # ==========================================================
 # VALIDACIÓN
 # ==========================================================
