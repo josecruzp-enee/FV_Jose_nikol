@@ -279,16 +279,39 @@ def _mostrar_electrical(electrical):
         c3.metric("Fusible", f"{protecciones.fusible_string.tamano_a} A")
 
 
+def _mostrar_trazas(resultado):
+
+    st.markdown("### 🔍 Estado del motor")
+
+    if not hasattr(resultado, "trazas"):
+        st.warning("Sin trazas disponibles")
+        return
+
+    for k, v in resultado.trazas.items():
+
+        if "OK" in v:
+            st.success(f"{k.upper()} → {v}")
+        elif "ERROR" in v:
+            st.error(f"{k.upper()} → {v}")
+        elif "FAIL" in v:
+            st.warning(f"{k.upper()} → {v}")
+        else:
+            st.info(f"{k.upper()} → {v}")
+
 # ==========================================================
 # RENDER
 # ==========================================================
 def render(ctx):
 
+    # ======================================================
     # INPUTS
+    # ======================================================
     e = _asegurar_dict(ctx, "electrico")
     _ui_inputs_electricos(e)
 
+    # ======================================================
     # EJECUCIÓN
+    # ======================================================
     try:
         p = _datosproyecto_desde_ctx(ctx)
         deps = construir_dependencias()
@@ -308,16 +331,46 @@ def render(ctx):
     # OUTPUTS
     # ======================================================
 
+    if not resultado:
+        st.error("No se generó resultado")
+        return
+
+    # ======================================================
+    # 🔍 TRAZAS (PRIMERO)
+    # ======================================================
+    _mostrar_trazas(resultado)
+
+    # ======================================================
     # 🔹 SIZING
+    # ======================================================
     if getattr(resultado, "sizing", None):
         _mostrar_sizing(resultado.sizing, sistema_fv)
+    else:
+        st.warning("Sizing no disponible")
 
-    # 🔹 ELECTRICAL (SIEMPRE MOSTRAR)
+    # ======================================================
+    # ⚡ ELECTRICAL (SIEMPRE MOSTRAR)
+    # ======================================================
     st.markdown("## ⚡ Ingeniería eléctrica")
 
     electrical = getattr(resultado, "electrical", None)
 
-    _mostrar_electrical(electrical)
+    # 🔥 CLAVE: usar trazas para explicar
+    trazas = getattr(resultado, "trazas", {})
+
+    if electrical is None:
+
+        motivo = trazas.get("electrical", "No ejecutado")
+
+        if "ERROR" in motivo:
+            st.error(f"Electrical falló → {motivo}")
+        elif motivo == "NONE":
+            st.warning("Electrical no devolvió resultados")
+        else:
+            st.info(f"Electrical no disponible → {motivo}")
+
+    else:
+        _mostrar_electrical(electrical)
 # ==========================================================
 # VALIDACIÓN
 # ==========================================================
