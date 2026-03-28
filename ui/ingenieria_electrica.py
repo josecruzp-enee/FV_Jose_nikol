@@ -220,43 +220,38 @@ def _mostrar_electrical(electrical, paneles=None):
 # RENDER
 # ==========================================================
 def render(ctx):
+    """
+    REEMPLAZAR COMPLETA ESTA FUNCIÓN EN:
+    ui/ingenieria_electrica.py
+    """
 
-    e = _asegurar_dict(ctx, "electrico")
-    _ui_inputs_electricos(e)
+    import streamlit as st
 
-    st.markdown("### Ingeniería eléctrica automática")
+    resultado = getattr(ctx, "resultado", None)
 
-    if st.button("Generar ingeniería"):
+    if resultado is None:
+        st.error("No hay resultado disponible")
+        return
 
-        faltantes = campos_faltantes_para_paso5(ctx)
+    sistema_fv = getattr(ctx, "sistema_fv", None)
 
-        if faltantes:
-            st.error(f"Faltan datos obligatorios: {faltantes}")
-            st.stop()
+    # ================================
+    # SIZING 
+    # ================================
+    if getattr(resultado, "sizing", None):
+        _mostrar_sizing(
+            resultado.sizing,
+            sistema_fv   
+        )
 
-        try:
-            datos = _datosproyecto_desde_ctx(ctx)
-
-            deps = construir_dependencias()
-
-            resultado = ejecutar_estudio(datos, deps)
-
-            st.session_state["resultado_proyecto"] = resultado
-
-            st.success("Ingeniería generada correctamente.")
-
-        except Exception:
-            import traceback
-            st.error("Error en motor FV")
-            st.code(traceback.format_exc())
-            st.stop()
-
-    resultado = st.session_state.get("resultado_proyecto")
-
-    if resultado:
-        _mostrar_sizing(resultado.sizing, resultado.sistema_fv)
-        _mostrar_electrical(resultado.electrical, resultado.strings)
-
+    # ================================
+    # ELECTRICAL 
+    # ================================
+    if getattr(resultado, "electrical", None):
+        _mostrar_electrical(
+            resultado.electrical,
+            getattr(resultado, "strings", None)
+        )
 
 # ==========================================================
 # VALIDACIÓN
