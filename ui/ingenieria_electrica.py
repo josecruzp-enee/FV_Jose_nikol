@@ -141,7 +141,12 @@ def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
         sf["modo"] = "multizona"
         sf["zonas"] = zonas_norm
 
-    else:
+        # 🔥 FIX CRÍTICO: sizing necesita valor SIEMPRE
+        total_paneles = sum(z.get("n_paneles", 0) for z in zonas_norm)
+
+        sf["valor"] = total_paneles if total_paneles > 0 else 1
+
+        else:
 
         sizing = sf_raw.get("sizing_input", {})
 
