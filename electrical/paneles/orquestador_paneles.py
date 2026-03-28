@@ -122,100 +122,122 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
         errores += val.errores
         warnings += val.warnings
 
-    if entrada.n_paneles_total is not None:
-        val = validar_parametros_generales(
-            entrada.n_paneles_total,
-            entrada.t_min_c,
-            entrada.t_oper_c,
-        )
-        errores += val.errores
-        warnings += val.warnings
-
     if errores:
         return _resultado_error(panel, errores, warnings)
 
-    # ------------------------------------------------------
-    # DIMENSIONADO
-    # ------------------------------------------------------
+    # ======================================================
+    # 🔥 MULTIZONA (FIX REAL)
+    # ======================================================
+
+    if entrada.modo == "multizona" and entrada.zonas:
+
+        resultados = []
+        total_paneles = 0
+        total_strings = 0
+        total_pdc = 0.0
+
+        for idx, z in enumerate(entrada.zonas, start=1):
+
+            n_paneles = int(z.get("n_paneles") or 0)
+
+            if n_paneles <= 0:
+                return _resultado_error(
+                    panel,
+                    [f"Zona {idx}: paneles inválidos"],
+                    warnings
+                )
+
+            strings_res = calcular_strings_fv(
+                n_paneles_total=n_paneles,
+                panel=panel,
+                inversor=inversor,
+                n_inversores=entrada.n_inversores,
+                t_min_c=entrada.t_min_c,
+                t_oper_c=entrada.t_oper_c,
+                modo="multizona",  # 🔥 CLAVE
+            )
+
+            if not strings_res.ok:
+                return _resultado_error(
+                    panel,
+                    [f"Zona {idx}: {strings_res.errores}"],
+                    warnings
+                )
+
+            total_paneles += n_paneles
+            total_strings += strings_res.recomendacion.n_strings_total
+            total_pdc += (n_paneles * panel.pmax_w) / 1000
+
+            resultados.extend(strings_res.strings)
+
+        # --------------------------------------------------
+        # ARRAY FINAL (sumado)
+        # --------------------------------------------------
+
+        array = ArrayFV(
+            potencia_dc_w=total_pdc * 1000,
+            vdc_nom=strings_res.recomendacion.vmp_string_v,
+            idc_nom=panel.imp_a * total_strings,
+            isc_total=panel.isc_a * total_strings,
+            voc_frio_array_v=strings_res.recomendacion.voc_string_v,
+            n_strings_total=total_strings,
+            n_paneles_total=total_paneles,
+            strings_por_mppt=1,
+            n_mppt=inversor.n_mppt * entrada.n_inversores,
+            p_panel_w=panel.pmax_w,
+        )
+
+        strings = [
+            StringFV(
+                mppt=s.mppt,
+                n_series=s.n_series,
+                vmp_string_v=s.vmp_string_v,
+                voc_frio_string_v=s.voc_frio_string_v,
+                imp_string_a=s.imp_string_a,
+                isc_string_a=s.isc_string_a,
+            )
+            for s in resultados
+        ]
+
+        meta = PanelesMeta(
+            n_paneles_total=total_paneles,
+            pdc_kw=total_pdc,
+            n_inversores=entrada.n_inversores,
+        )
+
+        return ResultadoPaneles(
+            ok=True,
+            panel=panel,
+            topologia="string",
+            array=array,
+            recomendacion=None,
+            strings=strings,
+            warnings=warnings,
+            errores=[],
+            meta=meta,
+        )
+
+    # ======================================================
+    # NORMAL (auto / manual)
+    # ======================================================
 
     n_paneles, pdc_kw, err = _resolver_dimensionado(entrada, panel)
 
     if err:
         return _resultado_error(panel, err, warnings)
 
-    if n_paneles is None or n_paneles <= 0:
-        return _resultado_error(panel, ["n_paneles inválido"], warnings)
-
-    # 🔥 GUARDAR INPUT ORIGINAL
-    n_paneles_input = n_paneles
-
-    # ------------------------------------------------------
-    # INVERSORES
-    # ------------------------------------------------------
-
-    if entrada.n_inversores is None:
-        return _resultado_error(
-            panel,
-            ["n_inversores no definido desde core (sizing)"],
-            warnings
-        )
-
-    n_inversores = int(entrada.n_inversores)
-
-    # ------------------------------------------------------
-    # STRINGS (motor principal)
-    # ------------------------------------------------------
-
     strings_res = calcular_strings_fv(
         n_paneles_total=n_paneles,
         panel=panel,
         inversor=inversor,
-        n_inversores=n_inversores,
+        n_inversores=entrada.n_inversores,
         t_min_c=entrada.t_min_c,
         t_oper_c=entrada.t_oper_c,
+        modo=entrada.modo,
     )
 
-    if not strings_res.ok or strings_res.recomendacion is None:
-        return _resultado_error(
-            panel,
-            ["No se pudo generar recomendación de strings"],
-            warnings
-        )
-
-    # ------------------------------------------------------
-    # 🔥 PROTECCIÓN MODO MANUAL / MULTIZONA
-    # ------------------------------------------------------
-
-    if entrada.modo in ["manual", "multizona"]:
-
-        n_paneles_calc = (
-            strings_res.recomendacion.n_series *
-            strings_res.recomendacion.n_strings_total
-        )
-
-        if n_paneles_calc != n_paneles_input:
-
-            warnings.append(
-                f"Strings ajustados ({n_paneles_calc}) no coinciden con paneles ingresados ({n_paneles_input})"
-            )
-
-            # 🔥 RESPETAR INPUT DEL USUARIO
-            n_paneles = n_paneles_input
-            pdc_kw = (n_paneles * panel.pmax_w) / 1000
-
-    # ------------------------------------------------------
-    # DISTRIBUCIÓN
-    # ------------------------------------------------------
-
-    strings_por_mppt = _strings_por_mppt_real(strings_res)
-
-    if strings_por_mppt <= 0:
-        strings_por_mppt = 1
-        warnings.append("strings_por_mppt ajustado a 1")
-
-    # ------------------------------------------------------
-    # ENSAMBLE ARRAY
-    # ------------------------------------------------------
+    if not strings_res.ok:
+        return _resultado_error(panel, strings_res.errores, warnings)
 
     array = _armar_array(
         panel,
@@ -223,43 +245,24 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
         strings_res,
         n_paneles,
         pdc_kw,
-        strings_por_mppt,
-        n_inversores,
+        _strings_por_mppt_real(strings_res),
+        entrada.n_inversores,
     )
-
-    if array.n_mppt <= 0:
-        return _resultado_error(panel, ["n_mppt inválido"], warnings)
-
-    if array.n_strings_total <= 0:
-        return _resultado_error(panel, ["n_strings_total inválido"], warnings)
-
-    if array.n_strings_total < array.n_mppt:
-        warnings.append(
-            f"Strings insuficientes para MPPT ({array.n_strings_total}/{array.n_mppt})"
-        )
 
     strings = _mapear_strings(strings_res)
 
     meta = PanelesMeta(
         n_paneles_total=n_paneles,
         pdc_kw=pdc_kw,
-        n_inversores=n_inversores,
+        n_inversores=entrada.n_inversores,
     )
-
-    topologia = "string" if n_inversores > 1 else "centralizado"
 
     return ResultadoPaneles(
         ok=True,
         panel=panel,
-        topologia=topologia,
+        topologia="string",
         array=array,
-        recomendacion=RecomendacionStrings(
-            n_series=strings_res.recomendacion.n_series,
-            n_strings_total=strings_res.recomendacion.n_strings_total,
-            strings_por_mppt=strings_por_mppt,
-            vmp_string_v=strings_res.recomendacion.vmp_string_v,
-            voc_frio_string_v=strings_res.recomendacion.voc_string_v,
-        ),
+        recomendacion=strings_res.recomendacion,
         strings=strings,
         warnings=warnings,
         errores=[],
