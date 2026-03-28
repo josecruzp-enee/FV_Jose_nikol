@@ -156,7 +156,7 @@ class ResultadoProyecto:
     energia: EnergiaResultado
 
     electrical: ResultadoElectrico  # 🔥 NUEVO (REEMPLAZA NEC)
-
+    trazas: Dict[str, str] = field(default_factory=dict)
     financiero: ResultadoFinanciero
 
     ok: bool = True
