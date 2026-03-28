@@ -1,17 +1,19 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Dict
 
 import streamlit as st
 
 
+# ==========================================================
+# RENDER
+# ==========================================================
 def render(ctx: Any):
     """
-    Render de ingeniería eléctrica (corregido)
+    Render de ingeniería eléctrica
 
-    ✔ NO usa resultado.sistema_fv (no existe en ResultadoProyecto)
     ✔ Usa ctx como fuente de verdad
-    ✔ Evita AttributeError
+    ✔ Evita acceso a atributos inexistentes
     """
 
     resultado = ctx.get("resultado")
@@ -22,13 +24,13 @@ def render(ctx: Any):
 
     sistema_fv = ctx.get("sistema_fv")
 
-    if resultado.sizing:
+    if getattr(resultado, "sizing", None):
         _mostrar_sizing(resultado.sizing, sistema_fv)
 
-    if resultado.paneles:
+    if getattr(resultado, "paneles", None):
         _mostrar_paneles(resultado.paneles)
 
-    if resultado.energia:
+    if getattr(resultado, "energia", None):
         _mostrar_energia(resultado.energia)
 
     if getattr(resultado, "electrical", None):
@@ -39,15 +41,36 @@ def render(ctx: Any):
 
 
 # ==========================================================
+# VALIDAR (REQUERIDO POR WIZARD)
+# ==========================================================
+def validar(ctx: Any) -> bool:
+    """
+    Validación del paso de ingeniería eléctrica
+
+    ✔ Siempre existe (evita AttributeError)
+    ✔ Solo valida existencia de resultado
+    """
+
+    if ctx is None:
+        return False
+
+    resultado = ctx.get("resultado")
+
+    if resultado is None:
+        return False
+
+    if not getattr(resultado, "sizing", None):
+        return False
+
+    return True
+
+
+# ==========================================================
 # SECCIONES
 # ==========================================================
 def _mostrar_sizing(sizing: Any, sistema_fv: Any):
 
     st.markdown("### 📐 Sizing del sistema FV")
-
-    if sizing is None:
-        st.warning("Sizing no disponible")
-        return
 
     col1, col2, col3 = st.columns(3)
 
@@ -72,48 +95,28 @@ def _mostrar_sizing(sizing: Any, sistema_fv: Any):
 
 def _mostrar_paneles(paneles: Any):
     st.markdown("### 🔋 Paneles")
-
-    if paneles is None:
-        st.warning("Paneles no disponibles")
-        return
-
     st.json(paneles)
 
 
 def _mostrar_energia(energia: Any):
     st.markdown("### ⚡ Energía")
-
-    if energia is None:
-        st.warning("Energía no disponible")
-        return
-
     st.json(energia)
 
 
 def _mostrar_electrical(electrical: Any):
     st.markdown("### ⚠ Ingeniería eléctrica")
-
-    if electrical is None:
-        st.warning("Electrical no disponible")
-        return
-
     st.json(electrical)
 
 
 def _mostrar_finanzas(finanzas: Any):
     st.markdown("### 💰 Finanzas")
-
-    if finanzas is None:
-        st.warning("Finanzas no disponibles")
-        return
-
     st.json(finanzas)
 
 
 # ==========================================================
 # UTILIDAD
 # ==========================================================
-def _to_dict(obj: Any):
+def _to_dict(obj: Any) -> Dict[str, Any]:
 
     if obj is None:
         return {}
