@@ -341,10 +341,13 @@ def calcular_sizing_unificado(p: Datosproyecto) -> ResultadoSizing:
     # ======================================================
     sf = getattr(p, "sistema_fv", {}) or {}
 
+    # 🔥 fuente única de verdad
+    usar_zonas = sf.get("usar_zonas", False)
+
     # ======================================================
-    # 4. DECISIÓN DE FLUJO (🔥 CORREGIDO)
+    # 4. FLUJO DE DIMENSIONAMIENTO
     # ======================================================
-    if sf.get("usar_zonas"):
+    if usar_zonas:
 
         zonas = sf.get("zonas", [])
 
@@ -360,9 +363,9 @@ def calcular_sizing_unificado(p: Datosproyecto) -> ResultadoSizing:
 
         modo, valor = _leer_sizing_input(p)
 
-        # 🔥 Blindaje extra
+        # 🔥 protección
         if modo == "multizona":
-            raise ValueError("Error interno: multizona no debe pasar por generador")
+            raise ValueError("Estado inconsistente: multizona sin usar_zonas")
 
         n_paneles, pdc = _dimensionar_generador(
             panel,
