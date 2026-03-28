@@ -206,13 +206,17 @@ def render(ctx):
 # VALIDACIÓN
 # ==========================================================
 
-def validar(ctx) -> Tuple[bool, List[str]]:
+def validar(ctx):
 
     sf = _get_sf(ctx)
 
     errores = []
 
-    if sf.get("zonas"):
+    # 🔥 SI HAY ZONAS → VALIDAR ZONAS
+    if sf.get("usar_zonas"):
+
+        if not sf.get("zonas"):
+            errores.append("Debe agregar al menos una zona.")
 
         for i, z in enumerate(sf["zonas"]):
 
@@ -224,9 +228,12 @@ def validar(ctx) -> Tuple[bool, List[str]]:
                 if not z.get("area") or z["area"] <= 0:
                     errores.append(f"Zona {i+1}: área inválida")
 
+    # 🔥 SI NO HAY ZONAS → VALIDAR MANUAL NORMAL
     else:
 
-        if float(sf["sizing_input"].get("valor", 0)) <= 0:
+        valor = float(sf.get("sizing_input", {}).get("valor", 0))
+
+        if valor <= 0:
             errores.append("Valor de dimensionamiento inválido.")
 
     return len(errores) == 0, errores
