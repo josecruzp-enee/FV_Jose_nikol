@@ -124,44 +124,90 @@ def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
         )
     )
 
+    # ======================================================
     # EQUIPOS
+    # ======================================================
     p.equipos = Equipos(
         panel_id=eq.get("panel_id"),
         inversor_id=eq.get("inversor_id"),
     )
 
     # ======================================================
-    # NORMALIZACIÓN SIZING
+    # 🔥 NORMALIZACIÓN SIZING (CORRECTA Y ROBUSTA)
     # ======================================================
     sf = {}
 
+    # ------------------------------------------------------
+    # MULTIZONA
+    # ------------------------------------------------------
     if sf_raw.get("usar_zonas"):
 
         zonas_norm = []
 
-        for z in sf_raw.get("zonas", []):
+        for i, z in enumerate(sf_raw.get("zonas", [])):
+
             if z.get("modo") == "Paneles":
+
+                n = int(z.get("n_paneles") or 0)
+
+                if n <= 0:
+                    raise ValueError(f"Zona {i+1}: n_paneles inválido")
+
                 zonas_norm.append({
-                    "n_paneles": int(z.get("n_paneles") or 0)
+                    "n_paneles": n
                 })
+
             else:
+
+                a = float(z.get("area") or 0.0)
+
+                if a <= 0:
+                    raise ValueError(f"Zona {i+1}: área inválida")
+
                 zonas_norm.append({
-                    "area": float(z.get("area") or 0.0)
+                    "area": a
                 })
+
+        if not zonas_norm:
+            raise ValueError("Multizona sin zonas válidas")
 
         sf["modo"] = "multizona"
         sf["zonas"] = zonas_norm
 
+    # ------------------------------------------------------
+    # AUTOMÁTICO / MANUAL SIMPLE
+    # ------------------------------------------------------
     else:
 
         sizing = sf_raw.get("sizing_input", {})
 
-        sf["modo"] = sizing.get("modo", "manual")
-        sf["valor"] = sizing.get("valor", 0)
+        modo = sizing.get("modo")
+        valor = sizing.get("valor")
 
+        # 🔥 VALIDACIONES FUERTES
+        if not modo:
+            raise ValueError("sizing_input sin 'modo'")
+
+        modos_validos = [
+            "cobertura",
+            "area",
+            "kw_objetivo",
+            "paneles"
+        ]
+
+        if modo not in modos_validos:
+            raise ValueError(f"Modo inválido: {modo}")
+
+        if valor is None or float(valor) <= 0:
+            raise ValueError(f"Valor inválido en sizing_input: {sizing}")
+
+        sf["modo"] = modo
+        sf["valor"] = float(valor)
+
+    # 🔥 ASIGNACIÓN FINAL
     p.sistema_fv = sf
 
-    return p
+    return pp
 
 
 # ==========================================================
