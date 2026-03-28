@@ -119,34 +119,42 @@ def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
     )
 
     # ======================================================
-    # 🔥 NORMALIZACIÓN MULTIZONA (CLAVE)
+    # 🔥 NORMALIZACIÓN SISTEMA FV (CLAVE)
     # ======================================================
     sf = {}
 
     if sf_raw.get("usar_zonas"):
 
         zonas_norm = []
+        total_paneles = 0
 
         for z in sf_raw.get("zonas", []):
 
             if z.get("modo") == "Paneles":
+
+                n = int(z.get("n_paneles") or 0)
+
                 zonas_norm.append({
-                    "n_paneles": int(z.get("n_paneles") or 0)
+                    "n_paneles": n
                 })
+
+                total_paneles += n
+
             else:
+
+                a = float(z.get("area") or 0.0)
+
                 zonas_norm.append({
-                    "area": float(z.get("area") or 0.0)
+                    "area": a
                 })
 
         sf["modo"] = "multizona"
         sf["zonas"] = zonas_norm
 
-        # 🔥 FIX CRÍTICO: sizing necesita valor SIEMPRE
-        total_paneles = sum(z.get("n_paneles", 0) for z in zonas_norm)
-
+        # 🔥 CRÍTICO: sizing siempre necesita valor
         sf["valor"] = total_paneles if total_paneles > 0 else 1
 
-        else:
+    else:
 
         sizing = sf_raw.get("sizing_input", {})
 
@@ -156,7 +164,6 @@ def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
     p.sistema_fv = sf
 
     return p
-
 
 # ==========================================================
 # MOSTRAR SIZING
