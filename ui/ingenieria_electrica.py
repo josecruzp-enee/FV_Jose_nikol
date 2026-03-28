@@ -57,10 +57,35 @@ def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
     eq = _asegurar_dict(ctx, "equipos")
     e = _asegurar_dict(ctx, "electrico")
 
+    consumo = c.get("consumo_12m", [0]*12)
+
     p = Datosproyecto(
         cliente=str(dc.get("cliente", "")),
         ubicacion=str(dc.get("ubicacion", "")),
-        consumo_12m=[float(x) for x in c.get("consumo_12m", [0]*12)],
+
+        # 🔥 GEO
+        lat=float(sf_raw.get("latitud", 15.8250)),
+        lon=float(sf_raw.get("longitud", -87.9500)),
+
+        # 🔥 CONSUMO
+        consumo_12m=[float(x) for x in consumo],
+        tarifa_energia=float(c.get("tarifa_energia_L_kwh", 5.50)),
+        cargos_fijos=float(c.get("cargos_fijos_L_mes", 400)),
+
+        # 🔥 FV
+        prod_base_kwh_kwp_mes=float(sf_raw.get("produccion_base_kwh_kwp_mes", 145)),
+        factores_fv_12m=[float(x) for x in sf_raw.get("factores_fv_12m", [1]*12)],
+        cobertura_objetivo=float(sf_raw.get("cobertura_objetivo", 0.8)),
+
+        # 🔥 COSTOS
+        costo_usd_kwp=float(sf_raw.get("costo_usd_kwp", 1200)),
+        tcambio=float(sf_raw.get("tcambio", 27)),
+
+        # 🔥 FINANCIERO
+        tasa_anual=float(sf_raw.get("tasa_anual", 0.08)),
+        plazo_anios=int(sf_raw.get("plazo_anios", 10)),
+        porcentaje_financiado=float(sf_raw.get("porcentaje_financiado", 1)),
+
         instalacion_electrica=InstalacionElectrica(
             vac=float(e.get("vac", 240)),
             fases=int(e.get("fases", 1)),
@@ -70,6 +95,7 @@ def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
         )
     )
 
+    # EQUIPOS
     p.equipos = Equipos(
         panel_id=eq.get("panel_id"),
         inversor_id=eq.get("inversor_id"),
@@ -77,18 +103,25 @@ def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
 
     # MULTIZONA
     if sf_raw.get("usar_zonas"):
-        zonas = [{"n_paneles": int(z.get("n_paneles") or 0)} for z in sf_raw.get("zonas", [])]
-        p.sistema_fv = {"modo": "multizona", "zonas": zonas}
+
+        zonas = []
+        for z in sf_raw.get("zonas", []):
+            zonas.append({"n_paneles": int(z.get("n_paneles") or 0)})
+
+        p.sistema_fv = {
+            "modo": "multizona",
+            "zonas": zonas
+        }
+
     else:
         sizing = sf_raw.get("sizing_input", {})
+
         p.sistema_fv = {
             "modo": sizing.get("modo"),
-            "valor": float(sizing.get("valor"))
+            "valor": float(sizing.get("valor", 0))
         }
 
     return p
-
-
 # ==========================================================
 # ZONAS
 # ==========================================================
