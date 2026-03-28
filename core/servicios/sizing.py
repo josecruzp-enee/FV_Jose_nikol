@@ -130,28 +130,19 @@ def _leer_sizing_input(p: Datosproyecto):
 
     sf = getattr(p, "sistema_fv", {}) or {}
 
-    # ======================================================
-    # NUEVO MODELO (PRIORIDAD)
-    # ======================================================
-    if "modo" in sf:
+    # 🔥 SI ES MULTIZONA → NO USAR sizing_input
+    if sf.get("usar_zonas"):
+        return None, None
 
-        modo = str(sf.get("modo")).strip().lower()
+    si = sf.get("sizing_input", {}) or {}
 
-        if modo == "manual":
-            return "manual", sf.get("n_paneles")
+    modo = str(si.get("modo", "consumo")).strip().lower()
+    valor = si.get("valor", None)
 
-        elif modo == "kw_objetivo":
-            return "potencia", sf.get("kw_objetivo")
+    if valor is None:
+        raise ValueError("sizing_input sin valor")
 
-        elif modo == "area":
-            return "area", sf.get("area")
-
-        elif modo == "consumo":
-            return "consumo", sf.get("valor", 80)
-
-        elif modo == "multizona":
-            return "multizona", None
-
+    return modo, valor
     # ======================================================
     # MODELO LEGACY (FALLBACK)
     # ======================================================
