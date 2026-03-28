@@ -148,16 +148,26 @@ class Datosproyecto:
 # RESULTADO FINAL
 # =========================================================
 
-@dataclass(frozen=True)
+from dataclasses import dataclass, field
+from typing import Dict, List, Any
+
+
+@dataclass
 class ResultadoProyecto:
 
+    # ==================================================
+    # RESULTADOS PRINCIPALES (SIN DEFAULT)
+    # ==================================================
     sizing: ResultadoSizing
     strings: ResultadoStrings
     energia: EnergiaResultado
-
-    electrical: ResultadoElectrico  # 🔥 NUEVO (REEMPLAZA NEC)
-    trazas: Dict[str, str] = field(default_factory=dict)
+    electrical: ResultadoElectrico
     financiero: ResultadoFinanciero
+
+    # ==================================================
+    # ESTADO Y DEBUG
+    # ==================================================
+    trazas: Dict[str, str] = field(default_factory=dict)
 
     ok: bool = True
     errores: List[str] = field(default_factory=list)
