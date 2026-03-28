@@ -300,7 +300,7 @@ def _mostrar_trazas(resultado):
 
 def _mostrar_zonas(paneles, corrientes):
 
-    st.markdown("### 🔀 Zonas FV (por MPPT)")
+    st.markdown("### 🔀 Zonas FV (reales)")
 
     if not paneles or not corrientes:
         st.warning("No hay datos de zonas")
@@ -309,48 +309,48 @@ def _mostrar_zonas(paneles, corrientes):
     strings = getattr(paneles, "strings", [])
     mppt_detalle = getattr(corrientes, "mppt_detalle", [])
 
-    if not strings or not mppt_detalle:
-        st.info("Sistema sin distribución por zonas")
+    if not strings:
+        st.info("Sin strings disponibles")
         return
 
-    # ------------------------------------------------------
-    # AGRUPAR STRINGS POR MPPT
-    # ------------------------------------------------------
+    # ======================================================
+    # 🔥 AGRUPAR POR LONGITUD DE STRING (CLAVE)
+    # ======================================================
     zonas = {}
 
     for s in strings:
-        mppt_id = getattr(s, "mppt", 1)
 
-        if mppt_id not in zonas:
-            zonas[mppt_id] = {
-                "n_strings": 0,
-                "n_paneles": 0
+        n = s.n_series  # 🔥 CLAVE
+
+        if n not in zonas:
+            zonas[n] = {
+                "n_paneles": 0,
+                "n_strings": 0
             }
 
-        zonas[mppt_id]["n_strings"] += 1
-        zonas[mppt_id]["n_paneles"] += getattr(s, "n_series", 0)
+        zonas[n]["n_paneles"] += n
+        zonas[n]["n_strings"] += 1
 
-    # ------------------------------------------------------
+    zonas_list = list(zonas.items())
+
+    # ======================================================
     # MOSTRAR
-    # ------------------------------------------------------
-    for i, (mppt_id, data) in enumerate(zonas.items()):
+    # ======================================================
+    for i, (n_series, data) in enumerate(zonas_list):
 
         corriente = mppt_detalle[i] if i < len(mppt_detalle) else None
 
-        with st.container():
+        st.markdown(f"#### Zona {i+1}")
 
-            st.markdown(f"#### Zona {i+1} (MPPT {mppt_id})")
+        c1, c2, c3 = st.columns(3)
 
-            c1, c2, c3 = st.columns(3)
+        c1.metric("Paneles", data["n_paneles"])
+        c2.metric("Strings", data["n_strings"])
 
-            c1.metric("Paneles", data["n_paneles"])
-            c2.metric("Strings", data["n_strings"])
-
-            if corriente:
-                c3.metric("Corriente", f"{corriente.i_diseno_a:.2f} A")
-            else:
-                c3.metric("Corriente", "—")
-
+        if corriente:
+            c3.metric("Corriente", f"{corriente.i_diseno_a:.2f} A")
+        else:
+            c3.metric("Corriente", "—")
 # ==========================================================
 # RENDER
 # ==========================================================
