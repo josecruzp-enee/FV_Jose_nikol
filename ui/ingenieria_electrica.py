@@ -224,7 +224,7 @@ def _mostrar_sizing(sizing, sistema_fv):
     col1, col2, col3 = st.columns(3)
 
     col1.metric("Paneles", getattr(sizing, "n_paneles", 0))
-    col2.metric("Potencia DC (kWp)", round(getattr(sizing, "kw_dc", 0.0), 2))
+    col2.metric("Potencia DC (kWp)", round(getattr(sizing, "pdc_kw", 0.0), 2))
     col3.metric("Potencia AC (kW)", round(getattr(sizing, "kw_ac", 0.0), 2))
 
     if sistema_fv.get("modo") == "multizona":
