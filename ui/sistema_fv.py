@@ -1,27 +1,24 @@
 # ==========================================================
-# UI — SISTEMA FV (CORREGIDO Y CONSISTENTE)
+# UI — SISTEMA FV (CORREGIDO Y FUNCIONAL)
 # ==========================================================
 
 from __future__ import annotations
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict
 
 import streamlit as st
 
 from ui.state_helpers import ensure_dict, merge_defaults
 
-from electrical.paneles.entrada_panel import ZonaFV
-from electrical.paneles.entrada_panel import EntradaPaneles
-
 
 # ==========================================================
 # DEFAULTS
 # ==========================================================
-
 def _defaults_sistema_fv() -> Dict[str, Any]:
     return {
         "latitud": 15.8,
         "longitud": -87.2,
         "modo_diseno": "auto",
+        "usar_zonas": False,
         "sizing_input": {
             "modo": "consumo",
             "valor": 80.0
@@ -31,15 +28,10 @@ def _defaults_sistema_fv() -> Dict[str, Any]:
 
 
 # ==========================================================
-# HELPERS
+# STATE
 # ==========================================================
-
-def _asegurar_dict(ctx, nombre: str) -> Dict[str, Any]:
-    return ensure_dict(ctx, nombre, dict)
-
-
 def _get_sf(ctx) -> Dict[str, Any]:
-    sf = _asegurar_dict(ctx, "sistema_fv")
+    sf = ensure_dict(ctx, "sistema_fv", dict)
     merge_defaults(sf, _defaults_sistema_fv())
     return sf
 
@@ -113,20 +105,28 @@ def _render_dimensionamiento(sf):
             sf["zonas"] = []
 
         # --------------------------------------------------
-        # MANUAL MULTIZONA
+        # MULTIZONA
         # --------------------------------------------------
-        elif manual_op == "Por zonas":
+        else:
 
             sf["usar_zonas"] = True
-
-            if "zonas" not in sf:
-                sf["zonas"] = []
-
             sf["sizing_input"] = {}
+
+            # 🔥 crear primera zona automáticamente
+            if not sf.get("zonas"):
+                sf["zonas"] = [{
+                    "nombre": "Zona 1",
+                    "modo": "Área",
+                    "area": 20.0,
+                    "n_paneles": None,
+                    "azimut": 180.0,
+                    "inclinacion": 15.0,
+                }]
+
+
 # ==========================================================
 # ZONAS
 # ==========================================================
-
 def _render_zonas(sf):
 
     st.markdown("### Zonas de instalación")
@@ -152,27 +152,27 @@ def _render_zonas(sf):
             z["modo"] = st.radio(
                 "Modo de zona",
                 ["Área", "Paneles"],
+                index=0 if z["modo"] == "Área" else 1,
                 key=f"m{i}"
             )
 
             if z["modo"] == "Área":
                 z["area"] = st.number_input(
-                    "Área (m²)", 1.0, 10000.0, z.get("area", 20.0), key=f"a{i}"
+                    "Área (m²)", 1.0, 10000.0, float(z.get("area", 20.0)), key=f"a{i}"
                 )
                 z["n_paneles"] = None
-
             else:
                 z["n_paneles"] = st.number_input(
-                    "Paneles", 1, 10000, z.get("n_paneles", 10), key=f"p{i}"
+                    "Paneles", 1, 10000, int(z.get("n_paneles", 10)), key=f"p{i}"
                 )
                 z["area"] = None
 
             z["inclinacion"] = st.number_input(
-                "Inclinación", 0.0, 60.0, z["inclinacion"], key=f"i{i}"
+                "Inclinación", 0.0, 60.0, float(z.get("inclinacion", 15.0)), key=f"i{i}"
             )
 
             z["azimut"] = st.number_input(
-                "Azimut", 0.0, 360.0, z["azimut"], key=f"az{i}"
+                "Azimut", 0.0, 360.0, float(z.get("azimut", 180.0)), key=f"az{i}"
             )
 
             if st.button("Eliminar", key=f"d{i}"):
@@ -184,9 +184,8 @@ def _render_zonas(sf):
 
 
 # ==========================================================
-# RENDER PRINCIPAL
+# RENDER
 # ==========================================================
-
 def render(ctx):
 
     st.markdown("## Sistema Fotovoltaico")
@@ -195,8 +194,8 @@ def render(ctx):
 
     _render_dimensionamiento(sf)
 
-    # 🔥 FIX: zonas no depende de modo, sino de existencia
-    if sf.get("zonas"):
+    # 🔥 CORRECTO
+    if sf.get("usar_zonas"):
         _render_zonas(sf)
 
     ctx.sistema_fv = sf
@@ -205,14 +204,12 @@ def render(ctx):
 # ==========================================================
 # VALIDACIÓN
 # ==========================================================
-
 def validar(ctx):
 
     sf = _get_sf(ctx)
 
     errores = []
 
-    # 🔥 SI HAY ZONAS → VALIDAR ZONAS
     if sf.get("usar_zonas"):
 
         if not sf.get("zonas"):
@@ -223,12 +220,10 @@ def validar(ctx):
             if z["modo"] == "Paneles":
                 if not z.get("n_paneles") or z["n_paneles"] <= 0:
                     errores.append(f"Zona {i+1}: paneles inválidos")
-
             else:
                 if not z.get("area") or z["area"] <= 0:
                     errores.append(f"Zona {i+1}: área inválida")
 
-    # 🔥 SI NO HAY ZONAS → VALIDAR MANUAL NORMAL
     else:
 
         valor = float(sf.get("sizing_input", {}).get("valor", 0))
