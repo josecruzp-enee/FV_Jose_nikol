@@ -1,5 +1,5 @@
 # ==========================================================
-# UI — SISTEMA FV (CORREGIDO Y FUNCIONAL)
+# UI — SISTEMA FV (ESTABLE Y CORREGIDO)
 # ==========================================================
 
 from __future__ import annotations
@@ -112,7 +112,6 @@ def _render_dimensionamiento(sf):
             sf["usar_zonas"] = True
             sf["sizing_input"] = {}
 
-            # 🔥 crear primera zona automáticamente
             if not sf.get("zonas"):
                 sf["zonas"] = [{
                     "nombre": "Zona 1",
@@ -152,27 +151,47 @@ def _render_zonas(sf):
             z["modo"] = st.radio(
                 "Modo de zona",
                 ["Área", "Paneles"],
-                index=0 if z["modo"] == "Área" else 1,
+                index=0 if z.get("modo") == "Área" else 1,
                 key=f"m{i}"
             )
 
             if z["modo"] == "Área":
                 z["area"] = st.number_input(
-                    "Área (m²)", 1.0, 10000.0, float(z.get("area", 20.0)), key=f"a{i}"
+                    "Área (m²)",
+                    1.0,
+                    10000.0,
+                    float(z.get("area") or 20.0),
+                    key=f"a{i}"
                 )
                 z["n_paneles"] = None
+
             else:
+                valor = z.get("n_paneles")
+                valor = 10 if valor in [None, 0] else int(valor)
+
                 z["n_paneles"] = st.number_input(
-                    "Paneles", 1, 10000, int(z.get("n_paneles", 10)), key=f"p{i}"
+                    "Paneles",
+                    1,
+                    10000,
+                    valor,
+                    key=f"p{i}"
                 )
                 z["area"] = None
 
             z["inclinacion"] = st.number_input(
-                "Inclinación", 0.0, 60.0, float(z.get("inclinacion", 15.0)), key=f"i{i}"
+                "Inclinación",
+                0.0,
+                60.0,
+                float(z.get("inclinacion") or 15.0),
+                key=f"i{i}"
             )
 
             z["azimut"] = st.number_input(
-                "Azimut", 0.0, 360.0, float(z.get("azimut", 180.0)), key=f"az{i}"
+                "Azimut",
+                0.0,
+                360.0,
+                float(z.get("azimut") or 180.0),
+                key=f"az{i}"
             )
 
             if st.button("Eliminar", key=f"d{i}"):
@@ -194,7 +213,6 @@ def render(ctx):
 
     _render_dimensionamiento(sf)
 
-    # 🔥 CORRECTO
     if sf.get("usar_zonas"):
         _render_zonas(sf)
 
