@@ -146,7 +146,7 @@ def _mostrar_zonas(ctx):
 # ==========================================================
 def _mostrar_detalle(paneles, electrical):
 
-    st.markdown("## ⚡ Detalle eléctrico completo")
+    st.markdown("## ⚡ Ingeniería eléctrica")
 
     panel = paneles.panel
     strings = paneles.strings
@@ -154,70 +154,71 @@ def _mostrar_detalle(paneles, electrical):
     cond = electrical.conductores
     prot = electrical.protecciones
 
-    # PANEL
-    st.markdown("### 🔹 Panel")
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Imp", f"{panel.imp_a:.2f} A")
-    c2.metric("Isc", f"{panel.isc_a:.2f} A")
-    c3.metric("I diseño", f"{corr.panel.i_diseno_a:.2f} A")
-
-    # STRING
-    st.markdown("### 🔗 Strings")
-
+    # ======================================================
+    # TABLA PRINCIPAL (TODO EN UNO)
+    # ======================================================
     data = []
+
     for i, s in enumerate(strings, 1):
+
+        mppt_idx = i % len(corr.mppt_detalle) if hasattr(corr, "mppt_detalle") else 0
+
         data.append({
             "String": f"S{i}",
             "Paneles": s.n_series,
-            "Vmp": f"{s.vmp_string_v:.2f}",
-            "Voc": f"{s.voc_frio_string_v:.2f}",
-            "I": f"{s.imp_string_a:.2f}"
+            "Vmp (V)": round(s.vmp_string_v, 1),
+            "Voc (V)": round(s.voc_frio_string_v, 1),
+            "I (A)": round(s.imp_string_a, 2),
+            "MPPT": mppt_idx + 1
         })
-    st.table(data)
 
-    # MPPT
-    st.markdown("### ⚡ MPPT")
+    st.markdown("### 🔗 Strings / MPPT")
+    st.dataframe(data, use_container_width=True)
 
-    for i, m in enumerate(corr.mppt_detalle, 1):
-        c1, c2 = st.columns(2)
-        c1.metric(f"MPPT {i}", f"{m.i_operacion_a:.2f} A")
-        c2.metric("Diseño", f"{m.i_diseno_a:.2f} A")
+    # ======================================================
+    # RESUMEN ELÉCTRICO
+    # ======================================================
+    st.markdown("### ⚡ Resumen eléctrico")
 
-    # DC
-    st.markdown("### 🔌 DC")
-    c1, c2 = st.columns(2)
-    c1.metric("I DC", f"{corr.dc_total.i_operacion_a:.2f} A")
-    c2.metric("I diseño", f"{corr.dc_total.i_diseno_a:.2f} A")
+    c1, c2, c3, c4 = st.columns(4)
 
-    # AC
-    st.markdown("### ⚡ AC")
-    c1, c2 = st.columns(2)
-    c1.metric("I AC", f"{corr.ac.i_operacion_a:.2f} A")
-    c2.metric("I diseño", f"{corr.ac.i_diseno_a:.2f} A")
+    c1.metric("I string", f"{corr.string.i_diseno_a:.2f} A")
+    c2.metric("I DC", f"{corr.dc_total.i_diseno_a:.2f} A")
+    c3.metric("I AC", f"{corr.ac.i_diseno_a:.2f} A")
+    c4.metric("V string", f"{strings[0].vmp_string_v:.0f} V")
 
-    # CONDUCTORES
-    st.markdown("### 🧵 Conductores")
+    # ======================================================
+    # MPPT DETALLE
+    # ======================================================
+    if hasattr(corr, "mppt_detalle"):
+
+        st.markdown("### 🔌 MPPT")
+
+        for i, m in enumerate(corr.mppt_detalle, 1):
+
+            st.write(
+                f"MPPT {i}: "
+                f"{m.i_operacion_a:.2f} A "
+                f"(diseño {m.i_diseno_a:.2f} A)"
+            )
+
+    # ======================================================
+    # CONDUCTORES + PROTECCIONES (COMPACTO)
+    # ======================================================
+    st.markdown("### 🧵 Protección y conductores")
 
     tr = cond.tramos
 
-    data = []
-    if tr.dc:
-        data.append({"Tramo": "DC", "Calibre": tr.dc.calibre, "VD %": f"{tr.dc.vd_pct:.2f}"})
-    if tr.ac:
-        data.append({"Tramo": "AC", "Calibre": tr.ac.calibre, "VD %": f"{tr.ac.vd_pct:.2f}"})
-
-    st.table(data)
-
-    # PROTECCIONES
-    st.markdown("### ⚠ Protecciones")
-
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Breaker AC", f"{prot.ocpd_ac.tamano_a} A")
-    c2.metric("DC", f"{prot.ocpd_dc_array.tamano_a} A")
-
     fus = prot.fusible_string
-    fus_val = fus.tamano_a if fus and fus.tamano_a else "No requerido"
-    c3.metric("Fusible", fus_val)
+    fus_val = fus.tamano_a if fus and fus.tamano_a else "—"
+
+    st.table([{
+        "DC cable": f"{tr.dc.calibre} AWG" if tr.dc else "-",
+        "AC cable": f"{tr.ac.calibre} AWG" if tr.ac else "-",
+        "Breaker AC": f"{prot.ocpd_ac.tamano_a} A",
+        "Protección DC": f"{prot.ocpd_dc_array.tamano_a} A",
+        "Fusible": fus_val
+    }])
 
 
 # ==========================================================
