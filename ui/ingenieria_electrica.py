@@ -63,25 +63,20 @@ def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
         cliente=str(dc.get("cliente", "")),
         ubicacion=str(dc.get("ubicacion", "")),
 
-        # 🔥 GEO
         lat=float(sf_raw.get("latitud", 15.8250)),
         lon=float(sf_raw.get("longitud", -87.9500)),
 
-        # 🔥 CONSUMO
         consumo_12m=[float(x) for x in consumo],
         tarifa_energia=float(c.get("tarifa_energia_L_kwh", 5.50)),
         cargos_fijos=float(c.get("cargos_fijos_L_mes", 400)),
 
-        # 🔥 FV
         prod_base_kwh_kwp_mes=float(sf_raw.get("produccion_base_kwh_kwp_mes", 145)),
         factores_fv_12m=[float(x) for x in sf_raw.get("factores_fv_12m", [1]*12)],
         cobertura_objetivo=float(sf_raw.get("cobertura_objetivo", 0.8)),
 
-        # 🔥 COSTOS
         costo_usd_kwp=float(sf_raw.get("costo_usd_kwp", 1200)),
         tcambio=float(sf_raw.get("tcambio", 27)),
 
-        # 🔥 FINANCIERO
         tasa_anual=float(sf_raw.get("tasa_anual", 0.08)),
         plazo_anios=int(sf_raw.get("plazo_anios", 10)),
         porcentaje_financiado=float(sf_raw.get("porcentaje_financiado", 1)),
@@ -122,29 +117,28 @@ def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
         }
 
     return p
+
+
 # ==========================================================
-# ZONAS
+# ZONAS (FIX: usar INPUT, no strings)
 # ==========================================================
-def _mostrar_zonas(paneles):
+def _mostrar_zonas(ctx):
 
     st.markdown("### 🔀 Zonas FV (diseño real)")
 
-    strings = paneles.strings
+    sf = getattr(ctx, "sistema_fv", {})
+    zonas = sf.get("zonas", [])
 
-    zonas = {}
+    if not zonas:
+        st.info("Sistema sin zonas definidas")
+        return
 
-    for s in strings:
-        n = s.n_series
-        if n not in zonas:
-            zonas[n] = {"n_paneles": 0, "n_strings": 0}
-        zonas[n]["n_paneles"] += n
-        zonas[n]["n_strings"] += 1
+    for i, z in enumerate(zonas, start=1):
 
-    for i, (_, d) in enumerate(zonas.items(), start=1):
-        st.markdown(f"#### Zona {i}")
         c1, c2 = st.columns(2)
-        c1.metric("Paneles", d["n_paneles"])
-        c2.metric("Strings", d["n_strings"])
+
+        c1.metric(f"Zona {i}", z.get("n_paneles", 0))
+        c2.metric("Strings (resultado)", "—")
 
 
 # ==========================================================
@@ -173,7 +167,7 @@ def _mostrar_detalle(paneles, electrical):
     data = []
     for i, s in enumerate(strings, 1):
         data.append({
-            "String": i,
+            "String": f"S{i}",
             "Paneles": s.n_series,
             "Vmp": f"{s.vmp_string_v:.2f}",
             "Voc": f"{s.voc_frio_string_v:.2f}",
@@ -220,7 +214,10 @@ def _mostrar_detalle(paneles, electrical):
     c1, c2, c3 = st.columns(3)
     c1.metric("Breaker AC", f"{prot.ocpd_ac.tamano_a} A")
     c2.metric("DC", f"{prot.ocpd_dc_array.tamano_a} A")
-    c3.metric("Fusible", f"{prot.fusible_string.tamano_a} A")
+
+    fus = prot.fusible_string
+    fus_val = fus.tamano_a if fus and fus.tamano_a else "No requerido"
+    c3.metric("Fusible", fus_val)
 
 
 # ==========================================================
@@ -249,7 +246,7 @@ def render(ctx):
         return
 
     if resultado.strings and resultado.electrical:
-        _mostrar_zonas(resultado.strings)
+        _mostrar_zonas(ctx)  # ← FIX
         _mostrar_detalle(resultado.strings, resultado.electrical)
 
 
