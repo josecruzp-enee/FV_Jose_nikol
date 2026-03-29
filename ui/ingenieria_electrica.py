@@ -247,9 +247,13 @@ def render(ctx):
             deps = construir_dependencias()
 
             resultado = ejecutar_estudio(p, deps)
-
             ctx.resultado = resultado
+            ctx.resultado_proyecto = resultado
+            ctx.datos_proyecto = p
+
             st.session_state["resultado"] = resultado
+            st.session_state["resultado_proyecto"] = resultado
+            st.session_state["datos_proyecto"] = p
 
         except Exception:
             import traceback
