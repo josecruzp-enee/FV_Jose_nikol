@@ -225,31 +225,56 @@ def _mostrar_detalle(paneles, electrical):
 # ==========================================================
 def render(ctx):
 
+    # ======================================================
+    # INPUTS
+    # ======================================================
     e = _asegurar_dict(ctx, "electrico")
     _ui_inputs_electricos(e)
 
-    try:
-        p = _datosproyecto_desde_ctx(ctx)
-        deps = construir_dependencias()
+    # ======================================================
+    # BOTÓN GENERAR
+    # ======================================================
+    if "resultado" not in st.session_state:
+        st.session_state["resultado"] = None
 
-        resultado = ejecutar_estudio(p, deps)
+    generar = st.button("⚡ Generar ingeniería eléctrica", use_container_width=True)
 
-        ctx.resultado = resultado
-        st.session_state["resultado"] = resultado
+    if generar:
 
-    except Exception:
-        import traceback
-        st.error(traceback.format_exc())
-        return
+        try:
+            p = _datosproyecto_desde_ctx(ctx)
+            deps = construir_dependencias()
+
+            resultado = ejecutar_estudio(p, deps)
+
+            ctx.resultado = resultado
+            st.session_state["resultado"] = resultado
+
+        except Exception:
+            import traceback
+            st.error("Error en motor FV")
+            st.code(traceback.format_exc())
+            return
+
+    # ======================================================
+    # OBTENER RESULTADO (persistente)
+    # ======================================================
+    resultado = getattr(ctx, "resultado", None) or st.session_state.get("resultado")
 
     if not resultado:
+        st.info("Presiona el botón para generar la ingeniería eléctrica")
         return
 
+    # ======================================================
+    # OUTPUTS
+    # ======================================================
     if resultado.strings and resultado.electrical:
-        _mostrar_zonas(ctx)  # ← FIX
+
+        # 🔀 ZONAS (INPUT REAL)
+        _mostrar_zonas(ctx)
+
+        # ⚡ DETALLE COMPLETO
         _mostrar_detalle(resultado.strings, resultado.electrical)
-
-
 # ==========================================================
 # VALIDACIÓN
 # ==========================================================
