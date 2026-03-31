@@ -224,3 +224,18 @@ def render(ctx):
     if resultado.strings and resultado.electrical:
         strings = resultado.strings.strings
         _mostrar_detalle(strings, resultado.electrical, resultado.sizing)
+
+# ==========================================================
+# VALIDACIÓN (REQUIRED POR EL WIZARD)
+# ==========================================================
+def validar(ctx):
+
+    resultado = getattr(ctx, "resultado", None)
+
+    if not resultado:
+        return False, ["Debe generar ingeniería eléctrica"]
+
+    if not getattr(resultado, "ok", False):
+        return False, resultado.errores or ["Error en ingeniería"]
+
+    return True, []
