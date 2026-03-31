@@ -260,10 +260,12 @@ def render(ctx):
 
     if resultado.strings:
 
-        _mostrar_zonas(ctx, resultado.strings)
+        strings = resultado.strings.strings
+
+        _mostrar_zonas(ctx, strings)
 
         if resultado.electrical:
-            _mostrar_detalle(resultado.strings, resultado.electrical)
+            _mostrar_detalle(strings, resultado.electrical)
         else:
             st.error("❌ Electrical NO se generó")
 
