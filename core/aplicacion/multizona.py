@@ -195,11 +195,9 @@ def _consolidar_strings(resultados):
 
     strings = []
 
-    for i, r in enumerate(resultados):
+    for r in resultados:
         if r.strings:
-            for s in r.strings:
-                s.zona = i + 1
-                strings.append(s)
+            strings.extend(r.strings)
 
     return strings
 
