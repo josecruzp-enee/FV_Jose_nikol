@@ -205,15 +205,7 @@ def render(ctx):
 
         deps = construir_dependencias()
 
-        # 🔥 INSTRUMENTAR PIPELINE
-        deps.sizing.ejecutar = trace("sizing")(deps.sizing.ejecutar)
-        deps.paneles.ejecutar = trace("paneles")(deps.paneles.ejecutar)
-        deps.energia.ejecutar = trace("energia")(deps.energia.ejecutar)
-        deps.nec.ejecutar = trace("nec")(deps.nec.ejecutar)
-        deps.finanzas.ejecutar = trace("finanzas")(deps.finanzas.ejecutar)
-
-        clear_trace()
-
+      
         resultado = ejecutar_estudio(p, deps)
 
         ctx.resultado = resultado
