@@ -1,189 +1,208 @@
 from __future__ import annotations
 
-from electrical.paneles.resultado_paneles import ResultadoPaneles
+from typing import Any
 
-from electrical.conductores.corrientes import (
-    calcular_corrientes,
+# ===============================
+# DOMINIO
+# ===============================
+from electrical.resultado_electrico import ResultadoElectrico
+
+# ===============================
+# SUBMÓDULOS
+# ===============================
+from electrical.validaciones.validador_fv import validar_sistema_fv
+from electrical.conductores.calculo_corrientes import (
     CorrientesInput,
+    calcular_corrientes,
 )
-
-from electrical.conductores.calculo_conductores import (
-    dimensionar_tramos_fv as calcular_conductores,
+from electrical.conductores.calculo_conductores import calcular_conductores
+from electrical.protecciones.calculo_protecciones import (
+    EntradaProtecciones,
+    calcular_protecciones,
 )
 
 from electrical.conductores.resultado_conductores import ResultadoConductores
-
-from electrical.protecciones.protecciones import (
-    calcular_protecciones,
-    EntradaProtecciones,
-)
-
-from electrical.resultado_electrical import ResultadoElectrico
-
-# 🔥 VALIDADOR
-from electrical.validacion_fv import validar_sistema_fv
+from electrical.conductores.resultado_corriente import ResultadoCorrientes
+from electrical.protecciones.resultado_protecciones import ResultadoProtecciones
 
 
 # ==========================================================
-# ORQUESTADOR ELECTRICAL
+# HELPERS DE ERROR (NO ROMPEN FLUJO)
 # ==========================================================
-def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
+def _corrientes_error(msg: str):
+    return ResultadoCorrientes.error(msg)
 
-    errores: List[str] = []
-    warnings: List[str] = []
 
-    panel = entrada.panel
-    inversor = entrada.inversor
+def _conductores_error(msg: str):
+    return ResultadoConductores.error(msg)
 
-    # ------------------------------------------------------
-    # VALIDACIÓN
-    # ------------------------------------------------------
-    for val in (
-        validar_panel(panel),
-        validar_inversor(inversor),
-    ):
-        errores += val.errores
-        warnings += val.warnings
 
-    if errores:
-        return _resultado_error(panel, errores, warnings)
+def _protecciones_error(msg: str):
+    return ResultadoProtecciones.error(msg)
 
-    # ======================================================
-    # 🔥 MULTIZONA (ROBUSTO)
-    # ======================================================
-    if entrada.zonas:
 
-        strings: List[StringFV] = []
+# ==========================================================
+# ORQUESTADOR PRINCIPAL
+# ==========================================================
+def ejecutar_electrical(*, datos: Any, paneles: Any, sizing: Any) -> ResultadoElectrico:
 
-        for i, zona in enumerate(entrada.zonas):
+    try:
+        print("\n⚡ [ELECTRICAL] INICIO")
 
-            # 🔍 DEBUG
-            warnings.append(f"DEBUG ZONA {i+1}: {zona}")
-
-            valor = zona.get("n_paneles")
-
-            if valor is None:
-                warnings.append(f"Zona {i+1} sin n_paneles")
-                continue
-
-            try:
-                n = int(valor)
-            except Exception:
-                warnings.append(f"Zona {i+1} inválida")
-                continue
-
-            if n <= 0:
-                warnings.append(f"Zona {i+1} <= 0")
-                continue
-
-            strings.append(
-                StringFV(
-                    mppt=i + 1,
-                    n_series=n,
-                    vmp_string_v=panel.vmp_v * n,
-                    voc_frio_string_v=panel.voc_v * n,
-                    imp_string_a=panel.imp_a,
-                    isc_string_a=panel.isc_a,
-                )
+        # ==================================================
+        # VALIDACIONES BASE
+        # ==================================================
+        if not paneles or not getattr(paneles, "ok", False):
+            return ResultadoElectrico.build(
+                paneles=paneles,
+                corrientes=_corrientes_error("Paneles inválidos"),
+                conductores=_conductores_error("Paneles inválidos"),
+                protecciones=_protecciones_error("Paneles inválidos"),
             )
 
-        # ❌ si todas las zonas fallaron
-        if not strings:
-            return _resultado_error(panel, ["No hay zonas válidas"], warnings)
+        if not sizing:
+            raise ValueError("Falta sizing en electrical")
 
-        # --------------------------------------------------
-        # ARRAY
-        # --------------------------------------------------
-        n_paneles_total = sum(s.n_series for s in strings)
-        pdc_kw = (n_paneles_total * panel.pmax_w) / 1000
+        if not getattr(sizing, "kw_ac", None):
+            raise ValueError("kw_ac inválido o en cero desde sizing")
 
-        array = ArrayFV(
-            potencia_dc_w=pdc_kw * 1000,
-            vdc_nom=max(s.vmp_string_v for s in strings),
-            idc_nom=panel.imp_a * len(strings),
-            isc_total=panel.isc_a * len(strings),
-            voc_frio_array_v=max(s.voc_frio_string_v for s in strings),
-            n_strings_total=len(strings),
-            n_paneles_total=n_paneles_total,
-            strings_por_mppt=1,
-            n_mppt=inversor.n_mppt,
-            p_panel_w=panel.pmax_w,
-        )
+        # ==================================================
+        # DATOS DESDE PANELES
+        # ==================================================
+        panel_obj = getattr(paneles, "panel", None)
 
-        meta = PanelesMeta(
-            n_paneles_total=n_paneles_total,
-            pdc_kw=pdc_kw,
-            n_inversores=entrada.n_inversores,
-        )
+        strings = getattr(paneles, "strings", None)
+        array = getattr(paneles, "array", None)
 
-        return ResultadoPaneles(
-            ok=True,
-            panel=panel,
-            topologia="multizona",
+        if not strings or not array:
+            return ResultadoElectrico.build(
+                paneles=paneles,
+                corrientes=_corrientes_error("Strings no disponibles"),
+                conductores=_conductores_error("Strings no disponibles"),
+                protecciones=_protecciones_error("Strings no disponibles"),
+            )
+
+        print("DEBUG STRINGS:", strings)
+        print("DEBUG ARRAY:", array)
+
+        # ==================================================
+        # INVERSOR
+        # ==================================================
+        inversor = getattr(sizing, "inversor", None)
+        if inversor is None:
+            raise ValueError("Sizing no contiene inversor")
+
+        # ==================================================
+        # VALIDACIÓN FV
+        # ==================================================
+        val = validar_sistema_fv(
+            panel=panel_obj,
+            inversor=inversor,
             array=array,
-            recomendacion=None,
             strings=strings,
-            warnings=warnings,
-            errores=[],
-            meta=meta,
         )
 
-    # ======================================================
-    # NORMAL (auto / manual)
-    # ======================================================
-    n_paneles, pdc_kw, err = _resolver_dimensionado(entrada, panel)
+        if not val["ok"]:
+            return ResultadoElectrico.build(
+                paneles=paneles,
+                corrientes=_corrientes_error("Validación FV fallida"),
+                conductores=_conductores_error("Validación FV fallida"),
+                protecciones=_protecciones_error("Validación FV fallida"),
+            )
 
-    if err:
-        return _resultado_error(panel, err, warnings)
+        # ==================================================
+        # PARÁMETROS ELÉCTRICOS
+        # ==================================================
+        inst = getattr(datos, "instalacion_electrica", None)
 
-    strings_res = calcular_strings_fv(
-        n_paneles_total=n_paneles,
-        panel=panel,
-        inversor=inversor,
-        n_inversores=entrada.n_inversores,
-        t_min_c=entrada.t_min_c,
-        t_oper_c=entrada.t_oper_c,
-        modo=entrada.modo,
-    )
+        if inst is None:
+            raise ValueError("No existe instalacion_electrica")
 
-    if not strings_res.ok:
-        return _resultado_error(panel, strings_res.errores, warnings)
+        vac = getattr(inst, "vac", None)
+        fases = getattr(inst, "fases", 1)
+        fp = getattr(inst, "fp", 1.0)
+        dist_dc_m = getattr(inst, "dist_dc_m", None)
+        dist_ac_m = getattr(inst, "dist_ac_m", None)
 
-    # ------------------------------------------------------
-    # ARRAY
-    # ------------------------------------------------------
-    array = _armar_array(
-        panel,
-        inversor,
-        strings_res,
-        n_paneles,
-        pdc_kw,
-        _strings_por_mppt_real(strings_res),
-        entrada.n_inversores,
-    )
+        if vac is None:
+            raise ValueError("Voltaje AC no definido")
 
-    # ------------------------------------------------------
-    # STRINGS
-    # ------------------------------------------------------
-    strings = _mapear_strings(strings_res)
+        # ==================================================
+        # CORRIENTES
+        # ==================================================
+        corrientes_input = CorrientesInput(
+            paneles=paneles,
+            kw_ac=sizing.kw_ac,
+            vac=vac,
+            fases=fases,
+            fp=fp,
+        )
 
-    # ------------------------------------------------------
-    # META
-    # ------------------------------------------------------
-    meta = PanelesMeta(
-        n_paneles_total=n_paneles,
-        pdc_kw=pdc_kw,
-        n_inversores=entrada.n_inversores,
-    )
+        corrientes = calcular_corrientes(corrientes_input)
 
-    return ResultadoPaneles(
-        ok=True,
-        panel=panel,
-        topologia="string",
-        array=array,
-        recomendacion=strings_res.recomendacion,
-        strings=strings,
-        warnings=warnings,
-        errores=[],
-        meta=meta,
-    )
+        print("DEBUG CORRIENTES:", corrientes)
+
+        if not corrientes.ok:
+            return ResultadoElectrico.build(
+                paneles=paneles,
+                corrientes=corrientes,
+                conductores=_conductores_error("Corrientes inválidas"),
+                protecciones=_protecciones_error("Corrientes inválidas"),
+            )
+
+        # ==================================================
+        # CONDUCTORES
+        # ==================================================
+        tramos = calcular_conductores(
+            corrientes=corrientes,
+            vmp_dc=array.vdc_nom,
+            vac=vac,
+            dist_dc_m=dist_dc_m,
+            dist_ac_m=dist_ac_m,
+            fases=fases,
+        )
+
+        conductores = ResultadoConductores.build(tramos)
+
+        if not conductores.ok:
+            return ResultadoElectrico.build(
+                paneles=paneles,
+                corrientes=corrientes,
+                conductores=conductores,
+                protecciones=_protecciones_error("Conductores inválidos"),
+            )
+
+        # ==================================================
+        # PROTECCIONES
+        # ==================================================
+        entrada_prot = EntradaProtecciones(
+            corrientes=corrientes,
+            n_strings=array.n_strings_total,
+            paneles=paneles,
+        )
+
+        protecciones = calcular_protecciones(entrada_prot)
+
+        print("DEBUG PROTECCIONES:", protecciones)
+
+        # ==================================================
+        # RESULTADO FINAL
+        # ==================================================
+        print("⚡ [ELECTRICAL] OK")
+
+        return ResultadoElectrico.build(
+            paneles=paneles,
+            corrientes=corrientes,
+            conductores=conductores,
+            protecciones=protecciones,
+        )
+
+    except Exception as e:
+        print("🔥 ERROR ELECTRICAL:", str(e))
+
+        return ResultadoElectrico.build(
+            paneles=paneles,
+            corrientes=_corrientes_error(str(e)),
+            conductores=_conductores_error(str(e)),
+            protecciones=_protecciones_error(str(e)),
+        )
