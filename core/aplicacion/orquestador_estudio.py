@@ -209,13 +209,12 @@ def _consolidar_paneles(resultados):
     total_isc = 0.0
 
     # ======================================================
-    # CONSOLIDAR STRINGS (FIX CLAVE AQUÍ)
+    # CONSOLIDAR STRINGS (SIN ROMPER OBJETO)
     # ======================================================
     for i, r in enumerate(resultados, 1):
 
         for s in r.strings:
 
-            # 🔥 FIX: copiar objeto porque es frozen
             s_new = replace(s)
 
             object.__setattr__(s_new, "zona", i)
@@ -225,34 +224,34 @@ def _consolidar_paneles(resultados):
 
         total_strings += len(r.strings)
         total_paneles += getattr(r.array, "n_paneles_total", 0)
-        total_pdc += getattr(r.array, "potencia_dc_w", 0) / 1000.0
+        total_pdc += getattr(r.array, "potencia_dc_w", 0)
         total_imp += getattr(r.array, "idc_nom", 0)
         total_isc += getattr(r.array, "isc_total", 0)
 
     # ======================================================
-    # ARRAY CONSOLIDADO
+    # ARRAY NUEVO
     # ======================================================
-    array = type(base.array)(
-        potencia_dc_w=total_pdc * 1000,
-        vdc_nom=max(s.vmp_string_v for s in strings),  # FIX multizona
+    array_new = replace(
+        base.array,
+        potencia_dc_w=total_pdc,
         idc_nom=total_imp,
         isc_total=total_isc,
-        voc_frio_array_v=base.array.voc_frio_array_v,
         n_strings_total=total_strings,
         n_paneles_total=total_paneles,
-        strings_por_mppt=base.array.strings_por_mppt,
         n_mppt=len(resultados),
-        p_panel_w=base.array.p_panel_w,
+        vdc_nom=max(s.vmp_string_v for s in strings),
     )
 
     # ======================================================
-    # RESULTADO FINAL
+    # RESULTADO FINAL (CLAVE)
     # ======================================================
-    return type(base)(
-        ok=True,
+    resultado = replace(
+        base,
         strings=strings,
-        array=array
+        array=array_new
     )
+
+    return resultado
 # ==========================================================
 # ENERGÍA
 # ==========================================================
