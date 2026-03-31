@@ -122,25 +122,33 @@ def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
 # ==========================================================
 # ZONAS (FIX: usar INPUT, no strings)
 # ==========================================================
-def _mostrar_zonas(ctx):
+def _mostrar_zonas(ctx, paneles):
 
     st.markdown("### 🔀 Zonas FV (diseño real)")
 
     sf = getattr(ctx, "sistema_fv", {})
-    zonas = sf.get("zonas", [])
+    zonas_input = sf.get("zonas", [])
 
-    if not zonas:
+    strings = getattr(paneles, "strings", [])
+
+    # agrupar strings por zona
+    zonas_calc = {}
+    for s in strings:
+        zona = getattr(s, "zona", 1)
+        zonas_calc.setdefault(zona, []).append(s)
+
+    if not zonas_input:
         st.info("Sistema sin zonas definidas")
         return
 
-    for i, z in enumerate(zonas, start=1):
+    for i, z in enumerate(zonas_input, start=1):
 
         c1, c2 = st.columns(2)
 
         c1.metric(f"Zona {i}", z.get("n_paneles", 0))
-        c2.metric("Strings (resultado)", "—")
 
-
+        n_strings = len(zonas_calc.get(i, []))
+        c2.metric("Strings (resultado)", n_strings)
 # ==========================================================
 # DETALLE COMPLETO
 # ==========================================================
@@ -196,8 +204,10 @@ def _mostrar_detalle(paneles, electrical):
 
         # Protección DC por arreglo (simple por ahora)
         try:
-            if prot.ocpd_dc_array:
-                st.info(f"Protección DC sugerida: {prot.ocpd_dc_array.tamano_a} A")
+            # Protección por MPPT
+            if i-1 < len(prot.mppt):
+                p = prot.mppt[i-1]
+                st.info(f"Protección DC (MPPT): {p.tamano_a} A")
         except:
             pass
 
@@ -297,7 +307,7 @@ def render(ctx):
     # ======================================================
     if resultado.strings:
 
-        _mostrar_zonas(ctx)
+        _mostrar_zonas(ctx, resultado.paneles)
 
         if resultado.electrical:
 
