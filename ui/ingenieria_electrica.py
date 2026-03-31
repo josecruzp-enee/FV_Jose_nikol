@@ -164,37 +164,71 @@ def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
 # ==========================================================
 def render(ctx):
 
+    # ===============================
+    # INPUTS
+    # ===============================
     e = _asegurar_dict(ctx, "electrico")
     _ui_inputs_electricos(e)
 
-    if st.button("⚡ Generar ingeniería eléctrica", width="stretch"):
+    # ===============================
+    # BOTÓN
+    # ===============================
+    if st.button("⚡ Generar ingeniería eléctrica"):
 
         try:
             p = _datosproyecto_desde_ctx(ctx)
             deps = construir_dependencias()
+
             resultado = ejecutar_estudio(p, deps)
+
+            # 🔥 SIEMPRE GUARDAR
+            setattr(ctx, "resultado", resultado)
+
+            st.success("✅ Ingeniería generada")
 
         except Exception as err:
             st.error(f"❌ Error generando ingeniería: {err}")
             return
 
-        ctx.resultado = resultado
-        st.success("✅ Ingeniería generada")
-
+    # ===============================
+    # RESULTADO
+    # ===============================
     resultado = getattr(ctx, "resultado", None)
 
-    if not resultado:
+    if resultado is None:
+        st.warning("⚠ No hay resultado aún")
         return
 
-    st.write("Estado:", getattr(resultado, "ok", None))
-    st.write("Errores:", getattr(resultado, "errores", None))
-
-    # 🔥 DEBUG PROTEGIDO
+    # ===============================
+    # ESTADO
+    # ===============================
     try:
-        mostrar_debug_completo(resultado)
+        estado_ok = getattr(resultado, "ok", False)
+        errores = getattr(resultado, "errores", [])
+    except Exception as e:
+        st.error(f"Error leyendo resultado: {e}")
+        return
+
+    st.write("Estado:", estado_ok)
+    st.write("Errores:", errores)
+
+    if not estado_ok:
+        st.error("❌ Resultado no OK")
+        return
+
+    # ===============================
+    # DEBUG SIMPLE (NO ROMPE)
+    # ===============================
+    try:
+        st.markdown("## 🧪 Datos internos")
+
+        st.write("sizing:", getattr(resultado, "sizing", None))
+        st.write("paneles:", getattr(resultado, "strings", None))
+        st.write("energia:", getattr(resultado, "energia", None))
+        st.write("electrical:", getattr(resultado, "electrical", None))
+
     except Exception as e:
         st.error(f"Error debug: {e}")
-
 
 # ==========================================================
 # VALIDACIÓN
