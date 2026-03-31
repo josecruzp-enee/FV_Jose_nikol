@@ -147,6 +147,7 @@ def _mostrar_zonas(ctx, strings):
 # ==========================================================
 # DETALLE
 # ==========================================================
+
 def _mostrar_detalle(strings, electrical):
 
     st.markdown("## ⚡ Ingeniería eléctrica")
@@ -155,7 +156,9 @@ def _mostrar_detalle(strings, electrical):
     cond = electrical.conductores
     prot = electrical.protecciones
 
-    # agrupar por zona
+    # ==================================================
+    # AGRUPAR POR ZONA (UI)
+    # ==================================================
     zonas = {}
     for s in strings:
         zona = getattr(s, "zona", 1)
@@ -182,6 +185,9 @@ def _mostrar_detalle(strings, electrical):
 
         st.dataframe(data, width="stretch")
 
+        # ==================================================
+        # MPPT
+        # ==================================================
         if i-1 < len(mppt_detalle):
             m = mppt_detalle[i-1]
 
@@ -190,22 +196,24 @@ def _mostrar_detalle(strings, electrical):
                 f"(diseño {m.i_diseno_a:.2f} A)"
             )
 
-        # Protección DC por MPPT
+        # ==================================================
+        # PROTECCIÓN DC
+        # ==================================================
         if i-1 < len(prot.mppt):
             p = prot.mppt[i-1]
             st.info(f"Protección DC (MPPT): {p.tamano_a} A")
 
         st.divider()
 
-    # --------------------------------------------------
-    # SISTEMA
-    # --------------------------------------------------
+    # ==================================================
+    # SISTEMA AC
+    # ==================================================
     st.markdown("### ⚡ Sistema")
     st.metric("Corriente AC", f"{corr.ac.i_diseno_a:.2f} A")
 
-    # --------------------------------------------------
-    # CONDUCTORES (🔥 CORREGIDO COMPLETO)
-    # --------------------------------------------------
+    # ==================================================
+    # CONDUCTORES
+    # ==================================================
     st.markdown("### 🧵 Conductores y protecciones (sistema)")
 
     tr = getattr(cond, "tramos", None)
@@ -214,30 +222,66 @@ def _mostrar_detalle(strings, electrical):
         st.warning("No se pudo calcular conductores")
         return
 
-    fus = prot.fusible_string
-    fus_val = fus.tamano_a if fus and fus.tamano_a else "—"
+    # --------------------------------------------------
+    # 🔥 DC POR MPPT (NUEVO)
+    # --------------------------------------------------
+    st.markdown("#### 🔌 Conductores DC por MPPT")
 
-    # DC por MPPT
-    dc_text = "—"
     if getattr(tr, "dc_mppt", None):
-        dc_text = " / ".join(f"{t.calibre} AWG" for t in tr.dc_mppt)
 
+        for i, t in enumerate(tr.dc_mppt, 1):
+
+            st.info(
+                f"MPPT {i} → {t.calibre} AWG | "
+                f"Ampacidad: {t.ampacidad_ajustada_a:.1f} A | "
+                f"VD: {t.vd_pct:.2f}%"
+            )
+
+    else:
+        st.warning("No hay conductores DC calculados")
+
+    # --------------------------------------------------
     # AC
-    ac_text = "-"
-    if getattr(tr, "ac", None):
-        ac_text = f"{tr.ac.calibre} AWG"
+    # --------------------------------------------------
+    st.markdown("#### 🔌 Conductor AC")
 
-    # Breaker
+    ac_text = "-"
+
+    if getattr(tr, "ac", None):
+        t = tr.ac
+        ac_text = (
+            f"{t.calibre} AWG | "
+            f"Ampacidad: {t.ampacidad_ajustada_a:.1f} A | "
+            f"VD: {t.vd_pct:.2f}%"
+        )
+
+    st.info(ac_text)
+
+    # --------------------------------------------------
+    # PROTECCIÓN AC
+    # --------------------------------------------------
+    st.markdown("#### ⚡ Protección AC")
+
     breaker = "-"
+
     if getattr(prot, "ocpd_ac", None):
         breaker = f"{prot.ocpd_ac.tamano_a} A"
 
-    st.table([{
-        "DC cable": dc_text,
-        "AC cable": ac_text,
-        "Breaker AC": breaker,
-        "Fusible (string)": fus_val
-    }])
+    st.info(f"Breaker AC: {breaker}")
+
+    # --------------------------------------------------
+    # FUSIBLE STRING
+    # --------------------------------------------------
+    st.markdown("#### 🔥 Fusible string")
+
+    fus = prot.fusible_string
+
+    if fus and fus.tamano_a:
+        st.info(f"{fus.tamano_a} A")
+    else:
+        st.info("No requerido")
+
+
 # ==========================================================
 # RENDER
 # ==========================================================
