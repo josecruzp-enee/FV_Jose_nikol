@@ -219,7 +219,7 @@ def _consolidar_paneles(resultados):
     # --------------------------------------------------
     array = type(base.array)(
         potencia_dc_w=total_pdc * 1000,
-        vdc_nom=base.array.vdc_nom,
+        vdc_nom=max(s.vmp_string_v for r in resultados for s in r.strings),
         idc_nom=total_imp,
         isc_total=total_isc,
         voc_frio_array_v=base.array.voc_frio_array_v,
