@@ -234,7 +234,11 @@ def _consolidar_paneles(resultados):
     # --------------------------------------------------
     # STRINGS + WARNINGS
     # --------------------------------------------------
-    strings = [s for r in resultados for s in r.strings]
+    strings = []
+    for i, r in enumerate(resultados, 1):
+        for s in r.strings:
+            s.zona = i  # 🔥 CLAVE TOTAL
+            strings.append(s)
     warnings = [w for r in resultados for w in r.warnings]
 
     # --------------------------------------------------
