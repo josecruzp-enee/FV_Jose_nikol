@@ -161,56 +161,50 @@ def _mostrar_detalle(paneles, electrical):
         zona = getattr(s, "zona", 1)
         zonas.setdefault(zona, []).append(s)
 
-    # ======================================================
-    # STRINGS
-    # ======================================================
-    st.markdown("### 🔗 Strings")
+    mppt_detalle = getattr(corr, "mppt_detalle", [])
 
-    data = []
-    string_counter = 1
+    # ======================================================
+    # 🔀 CONFIGURACIÓN POR ARREGLO
+    # ======================================================
+    st.markdown("### 🔀 Configuración por arreglo")
 
-    for zona, strings_zona in zonas.items():
-        for s in strings_zona:
+    for i, (zona, strings_zona) in enumerate(zonas.items(), 1):
+
+        st.markdown(f"#### 🔹 Arreglo {i} (Zona {zona})")
+
+        data = []
+
+        for j, s in enumerate(strings_zona, 1):
             data.append({
-                "Zona": f"Z{zona}",
-                "String": f"S{string_counter}",
+                "String": f"S{j}",
                 "Paneles": s.n_series,
                 "Vmp (V)": round(s.vmp_string_v, 1),
                 "Voc (V)": round(s.voc_frio_string_v, 1),
                 "I (A)": round(s.imp_string_a, 2),
             })
-            string_counter += 1
 
-    st.dataframe(data, use_container_width=True)
+        st.dataframe(data, width="stretch")
 
-    # ======================================================
-    # MPPT (NIVEL REAL)
-    # ======================================================
-    st.markdown("### 🔌 MPPT")
+        # MPPT asociado
+        if i-1 < len(mppt_detalle):
+            m = mppt_detalle[i-1]
 
-    if hasattr(corr, "mppt_detalle") and corr.mppt_detalle:
-
-        for i, m in enumerate(corr.mppt_detalle, 1):
-
-            st.metric(
-                f"MPPT {i}",
-                f"{m.i_operacion_a:.2f} A",
-                f"diseño {m.i_diseno_a:.2f} A"
+            st.success(
+                f"MPPT {i} → {m.i_operacion_a:.2f} A "
+                f"(diseño {m.i_diseno_a:.2f} A)"
             )
 
-    else:
-        # fallback por zona
-        for i, (zona, strings_zona) in enumerate(zonas.items(), 1):
+        # Protección DC por arreglo (simple por ahora)
+        try:
+            if prot.ocpd_dc_array:
+                st.info(f"Protección DC sugerida: {prot.ocpd_dc_array.tamano_a} A")
+        except:
+            pass
 
-            imp = sum(s.imp_string_a for s in strings_zona)
-
-            st.metric(
-                f"MPPT {i} (Zona {zona})",
-                f"{imp:.2f} A"
-            )
+        st.divider()
 
     # ======================================================
-    # SISTEMA (AC)
+    # ⚡ SISTEMA AC
     # ======================================================
     st.markdown("### ⚡ Sistema")
 
@@ -220,9 +214,9 @@ def _mostrar_detalle(paneles, electrical):
         st.metric("Corriente AC", "—")
 
     # ======================================================
-    # CONDUCTORES Y PROTECCIONES
+    # 🧵 CONDUCTORES Y PROTECCIONES
     # ======================================================
-    st.markdown("### 🧵 Protección y conductores")
+    st.markdown("### 🧵 Conductores y protecciones (sistema)")
 
     try:
         tr = cond.tramos
@@ -234,7 +228,6 @@ def _mostrar_detalle(paneles, electrical):
             "DC cable": f"{tr.dc.calibre} AWG" if tr.dc else "-",
             "AC cable": f"{tr.ac.calibre} AWG" if tr.ac else "-",
             "Breaker AC": f"{prot.ocpd_ac.tamano_a} A" if prot.ocpd_ac else "-",
-            "Protección DC": f"{prot.ocpd_dc_array.tamano_a} A" if prot.ocpd_dc_array else "-",
             "Fusible (string)": fus_val
         }])
 
