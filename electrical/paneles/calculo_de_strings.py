@@ -140,7 +140,15 @@ def calcular_strings_fv(
     warnings: List[str] = []
 
     if n_paneles_total <= 0:
-        return StringsResultado(False, ["Paneles inválidos"], [], [], RecomendacionCalc(0,0,0,0), BoundsCalc(0,0), 0)
+        return StringsResultado(
+            False,
+            ["Paneles inválidos"],
+            [],
+            [],
+            RecomendacionCalc(0, 0, 0, 0),
+            BoundsCalc(0, 0),
+            0,
+        )
 
     # --------------------------------------------------
     # LIMITES
@@ -148,26 +156,61 @@ def calcular_strings_fv(
     n_min, n_max, voc_panel, vmp_panel = _bounds(panel, inversor, t_min_c, t_oper_c)
 
     if n_max < n_min:
-        return StringsResultado(False, ["No hay rango válido"], [], [], RecomendacionCalc(0,0,0,0), BoundsCalc(0,0), 0)
+        return StringsResultado(
+            False,
+            ["No hay rango válido"],
+            [],
+            [],
+            RecomendacionCalc(0, 0, 0, 0),
+            BoundsCalc(0, 0),
+            0,
+        )
 
     # --------------------------------------------------
-    # SELECCIÓN
+    # SELECCIÓN (FIX CLAVE AQUÍ)
     # --------------------------------------------------
-    if modo in ("manual", "multizona"):
+    if modo == "multizona":
+
+        # 🔥 RESPETAR ZONA (CLAVE)
+        n_series = n_paneles_total
+
+        # ⚠ VALIDACIÓN ELÉCTRICA (NO BLOQUEA)
+        if n_series < n_min:
+            warnings.append(
+                f"String muy corto ({n_series} paneles) → menor que mínimo MPPT ({n_min})"
+            )
+
+        if n_series > n_max:
+            warnings.append(
+                f"String muy largo ({n_series} paneles) → supera máximo permitido ({n_max})"
+            )
+
+    elif modo == "manual":
         n_series = _seleccionar_fijo(n_min, n_max)
+
     else:
         n_series = _seleccionar(n_min, n_max, vmp_panel, inversor, n_paneles_total)
 
     if not n_series:
-        return StringsResultado(False, ["No se pudo seleccionar n_series"], [], [], RecomendacionCalc(0,0,0,0), BoundsCalc(0,0), 0)
+        return StringsResultado(
+            False,
+            ["No se pudo seleccionar n_series"],
+            [],
+            [],
+            RecomendacionCalc(0, 0, 0, 0),
+            BoundsCalc(0, 0),
+            0,
+        )
 
     # --------------------------------------------------
-    # STRINGS (SIN BLOQUEO)
+    # STRINGS
     # --------------------------------------------------
     n_strings = max(1, n_paneles_total // n_series)
 
     if n_paneles_total % n_series != 0:
-        warnings.append(f"Distribución no exacta ({n_paneles_total} paneles / {n_series} por string)")
+        warnings.append(
+            f"Distribución no exacta ({n_paneles_total} paneles / {n_series} por string)"
+        )
 
     # --------------------------------------------------
     # DISTRIBUCIÓN
@@ -205,8 +248,8 @@ def calcular_strings_fv(
             n_series=n_series,
             n_strings_total=n_strings,
             vmp_string_v=vmp_string,
-            voc_string_v=voc_string
+            voc_string_v=voc_string,
         ),
         bounds=BoundsCalc(n_min, n_max),
-        n_paneles_total=n_paneles_total
+        n_paneles_total=n_paneles_total,
     )
