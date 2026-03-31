@@ -9,8 +9,7 @@ from core.aplicacion.dependencias import construir_dependencias
 
 from ui.state_helpers import ensure_dict
 
-# 🔥 TRACE
-from core.debug.trace_streamlit import trace, get_trace, clear_trace
+
 
 
 # ==========================================================
