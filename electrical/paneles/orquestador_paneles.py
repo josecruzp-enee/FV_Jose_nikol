@@ -126,7 +126,7 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
     # ======================================================
     # 🔥 MULTIZONA (FIX REAL)
     # ======================================================
-    if entrada.modo == "multizona" and entrada.zonas:
+    if entrada.zonas:
 
         strings: List[StringFV] = []
 
