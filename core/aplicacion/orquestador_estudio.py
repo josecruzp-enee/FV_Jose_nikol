@@ -163,7 +163,7 @@ def _ejecutar_paneles(entrada_paneles, deps, datos):
 
             resultados.append(resultado)
 
-        return _consolidar_paneles(resultados, datos)
+        paneles = _ejecutar_paneles(entrada_paneles, deps, datos)
 
     # ------------------------------------------------------
     # 🔹 NORMAL
