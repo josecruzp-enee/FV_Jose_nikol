@@ -263,14 +263,11 @@ def render(ctx):
 
             resultado = ejecutar_estudio(p, deps)
 
-            # Guardar en contexto y sesión
+            # Guardar
             ctx.resultado = resultado
-            ctx.resultado_proyecto = resultado
-            ctx.datos_proyecto = p
-
             st.session_state["resultado"] = resultado
-            st.session_state["resultado_proyecto"] = resultado
-            st.session_state["datos_proyecto"] = p
+
+            st.success("✅ Ingeniería generada")
 
         except Exception:
             import traceback
@@ -279,38 +276,35 @@ def render(ctx):
             return
 
     # ======================================================
-    # OBTENER RESULTADO (persistente)
+    # OBTENER RESULTADO
     # ======================================================
     resultado = getattr(ctx, "resultado", None) or st.session_state.get("resultado")
-
-    # DEBUG (te ayuda a ver si existe)
-    # st.write("DEBUG RESULTADO:", resultado)
-    # st.write("DEBUG ELECTRICAL:", getattr(resultado, "electrical", None) if resultado else None)
 
     if not resultado:
         st.info("Presiona el botón para generar la ingeniería eléctrica")
         return
 
     # ======================================================
-    # OUTPUTS (FIX REAL AQUÍ)
+    # 🔥 DEBUG REAL (CLAVE)
+    # ======================================================
+    st.markdown("### 🧪 Estado del motor")
+    st.write(resultado.trazas)
+
+    st.write("DEBUG ELECTRICAL:", resultado.electrical)
+
+    # ======================================================
+    # OUTPUTS
     # ======================================================
     if resultado.strings:
 
-        # 🔀 ZONAS (INPUT REAL)
         _mostrar_zonas(ctx)
 
-        if resultado.electrical is not None:
-            try:
-                _mostrar_detalle(resultado.strings, resultado.electrical)
-            except Exception as e:
-                st.error("Error mostrando ingeniería eléctrica")
-                st.code(str(e))
-                st.write("Electrical:", resultado.electrical)
+        if resultado.electrical:
+
+            _mostrar_detalle(resultado.strings, resultado.electrical)
+
         else:
-            st.warning("⚠ Electrical no disponible")
-            st.write("Trazas:", getattr(resultado, "trazas", {}))
-
-
+            st.error("❌ Electrical NO se generó")
 # ==========================================================
 # VALIDACIÓN
 # ==========================================================
