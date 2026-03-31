@@ -18,7 +18,7 @@ def _asegurar_dict(ctx, nombre: str) -> dict:
 
 
 # ==========================================================
-# DEBUG COMPLETO (🔥 YA INTEGRADO)
+# DEBUG COMPLETO (ROBUSTO)
 # ==========================================================
 def mostrar_debug_completo(resultado):
 
@@ -26,16 +26,35 @@ def mostrar_debug_completo(resultado):
 
     def safe(obj):
         try:
-            return obj.__dict__
-        except:
+            if obj is None:
+                return "None"
+            if hasattr(obj, "__dict__"):
+                return obj.__dict__
             return str(obj)
+        except Exception as e:
+            return f"ERROR: {e}"
 
-    data = {
-        "sizing": safe(resultado.sizing),
-        "paneles": safe(resultado.strings),
-        "energia": safe(resultado.energia),
-        "electrical": safe(resultado.electrical),
-    }
+    data = {}
+
+    try:
+        data["sizing"] = safe(getattr(resultado, "sizing", None))
+    except:
+        data["sizing"] = "ERROR"
+
+    try:
+        data["paneles"] = safe(getattr(resultado, "strings", None))
+    except:
+        data["paneles"] = "ERROR"
+
+    try:
+        data["energia"] = safe(getattr(resultado, "energia", None))
+    except:
+        data["energia"] = "ERROR"
+
+    try:
+        data["electrical"] = safe(getattr(resultado, "electrical", None))
+    except:
+        data["electrical"] = "ERROR"
 
     st.json(data)
 
@@ -153,7 +172,6 @@ def render(ctx):
         try:
             p = _datosproyecto_desde_ctx(ctx)
             deps = construir_dependencias()
-
             resultado = ejecutar_estudio(p, deps)
 
         except Exception as err:
@@ -168,8 +186,14 @@ def render(ctx):
     if not resultado:
         return
 
-    # 🔥 DEBUG AUTOMÁTICO (YA INTEGRADO)
-    mostrar_debug_completo(resultado)
+    st.write("Estado:", getattr(resultado, "ok", None))
+    st.write("Errores:", getattr(resultado, "errores", None))
+
+    # 🔥 DEBUG PROTEGIDO
+    try:
+        mostrar_debug_completo(resultado)
+    except Exception as e:
+        st.error(f"Error debug: {e}")
 
 
 # ==========================================================
