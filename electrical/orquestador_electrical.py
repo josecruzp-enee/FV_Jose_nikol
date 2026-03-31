@@ -59,7 +59,7 @@ def ejecutar_electrical(*args, **kwargs) -> ResultadoElectrico:
             raise ValueError("Falta sizing en electrical")
 
         # ==================================================
-        # 🔥 USAR RESULTADO DE PANELES (NO RECALCULAR)
+        # 🔥 USAR RESULTADO DE PANELES
         # ==================================================
         panel_obj = getattr(paneles, "panel", None) or getattr(paneles, "panel_spec", None)
 
@@ -81,11 +81,19 @@ def ejecutar_electrical(*args, **kwargs) -> ResultadoElectrico:
         print("DEBUG ARRAY (desde paneles):", array)
 
         # ==================================================
-        # 🔥 VALIDACIÓN GLOBAL FV
+        # 🔥 FIX REAL → INVERSOR DESDE SIZING
+        # ==================================================
+        inversor = getattr(sizing, "inversor", None)
+
+        if inversor is None:
+            raise ValueError("Sizing no contiene inversor")
+
+        # ==================================================
+        # VALIDACIÓN GLOBAL FV
         # ==================================================
         val = validar_sistema_fv(
             panel=panel_obj,
-            inversor=sizing.inversor,
+            inversor=inversor,
             array=array,
             strings=strings
         )
@@ -214,7 +222,6 @@ def ejecutar_electrical(*args, **kwargs) -> ResultadoElectrico:
             conductores=_conductores_error(str(e)),
             protecciones=_protecciones_error(str(e)),
         )
-
 
 # ==================================================
 # HELPERS DE ERROR
