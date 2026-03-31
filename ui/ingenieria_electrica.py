@@ -95,7 +95,6 @@ def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
         inversor_id=eq.get("inversor_id"),
     )
 
-    # MULTIZONA
     if sf_raw.get("usar_zonas"):
 
         zonas = []
@@ -119,39 +118,10 @@ def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
 
 
 # ==========================================================
-# 🔀 ZONAS (CORREGIDO)
-# ==========================================================
-def _mostrar_zonas(ctx, strings):
-
-    st.markdown("### 🔀 Zonas FV (diseño real)")
-
-    sf = getattr(ctx, "sistema_fv", {})
-    zonas_input = sf.get("zonas", [])
-
-    # agrupar strings por zona
-    zonas_calc = {}
-    for s in strings:
-        zona = getattr(s, "zona", 1)
-        zonas_calc.setdefault(zona, []).append(s)
-
-    for i, z in enumerate(zonas_input, start=1):
-
-        c1, c2 = st.columns(2)
-
-        c1.metric(f"Zona {i}", z.get("n_paneles", 0))
-
-        n_strings = len(zonas_calc.get(i, []))
-        c2.metric("Strings (resultado)", n_strings)
-
-
-# ==========================================================
 # DETALLE
 # ==========================================================
+def _mostrar_detalle(strings, electrical, sizing):
 
-def _mostrar_detalle(strings, electrical):
-
-
-    
     st.markdown("## ⚡ Ingeniería eléctrica")
 
     corr = electrical.corrientes
@@ -160,35 +130,30 @@ def _mostrar_detalle(strings, electrical):
 
     tr = getattr(cond, "tramos", None)
     mppt_detalle = getattr(corr, "mppt_detalle", [])
-    inv = electrical.paneles.inversor  # o de donde lo tengas
+
+    # 🔥 INVERSOR CORRECTO
+    inv = getattr(sizing, "inversor", None)
 
     st.markdown("### ⚙ Inversor seleccionado")
 
-    st.markdown(f"""
-    - Modelo: {inv.modelo}  
-    - Potencia AC: {inv.kw_ac} kW  
-    - MPPT: {inv.n_mppt}  
-    - Vdc máx: {inv.vdc_max_v} V  
-    """)
-    # ==================================================
-    # AGRUPAR POR ZONA
-    # ==================================================
-    zonas = {}
-    for s in strings:
-        zona = getattr(s, "zona", 1)
-        zonas.setdefault(zona, []).append(s)
+    if not inv:
+        st.warning("⚠ Inversor no disponible")
+    else:
+        st.markdown(f"""
+- Modelo: {inv.modelo}  
+- Potencia AC: {inv.kw_ac} kW  
+- MPPT: {inv.n_mppt}  
+- Vdc máx: {inv.vdc_max_v} V  
+""")
 
     # ==================================================
-    # 🔷 CONFIGURACIÓN FV
+    # CONFIGURACIÓN FV
     # ==================================================
     st.markdown("### 🔷 Configuración FV")
 
-    for i, (zona, strings_zona) in enumerate(zonas.items(), 1):
-
-        s = strings_zona[0]
-
+    for i, s in enumerate(strings, 1):
         st.markdown(f"""
-**MPPT {i} (Zona {zona})**
+**String {i}**
 
 - Paneles: {s.n_series}  
 - Vmp: {s.vmp_string_v:.1f} V  
@@ -197,23 +162,14 @@ def _mostrar_detalle(strings, electrical):
 """)
 
     # ==================================================
-    # ⚡ RESULTADO ELÉCTRICO POR MPPT (DC)
+    # RESULTADO MPPT
     # ==================================================
     st.markdown("### ⚡ Resultado eléctrico por MPPT")
 
-    for i in range(len(mppt_detalle)):
+    for i, m in enumerate(mppt_detalle):
 
-        m = mppt_detalle[i]
-
-        # protección
         p = prot.mppt[i] if i < len(prot.mppt) else None
-
-        # conductor DC (correcto)
         t = tr.dc_mppt[i] if tr and i < len(tr.dc_mppt) else None
-
-        amp = f"{t.ampacidad_ajustada_a:.1f}" if t else "-"
-        vd = f"{t.vd_pct:.2f}" if t else "-"
-        cal = f"{t.calibre}" if t else "-"
 
         st.markdown(f"""
 **MPPT {i+1}**
@@ -221,55 +177,23 @@ def _mostrar_detalle(strings, electrical):
 - Corriente operación: {m.i_operacion_a:.2f} A  
 - Corriente diseño: {m.i_diseno_a:.2f} A  
 - Protección: {p.tamano_a if p else "-"} A  
-- Conductor: {cal} AWG  
-- Ampacidad: {amp} A  
-- Caída de tensión: {vd}%  
+- Conductor: {t.calibre if t else "-"} AWG  
 """)
 
     # ==================================================
-    # 🔌 SISTEMA AC (SEPARADO CORRECTAMENTE)
+    # AC
     # ==================================================
     st.markdown("### 🔌 Sistema AC")
 
     t_ac = getattr(tr, "ac", None)
 
-    amp_ac = f"{t_ac.ampacidad_ajustada_a:.1f}" if t_ac else "-"
-    vd_ac = f"{t_ac.vd_pct:.2f}" if t_ac else "-"
-    cal_ac = f"{t_ac.calibre}" if t_ac else "-"
-
-    proteccion_ac = prot.ocpd_ac.tamano_a if getattr(prot, "ocpd_ac", None) else "-"
-
     st.markdown(f"""
 - Corriente AC: {corr.ac.i_diseno_a:.2f} A  
-- Protección: {proteccion_ac} A  
-- Conductor: {cal_ac} AWG  
-- Ampacidad: {amp_ac} A  
-- Caída de tensión: {vd_ac}%  
+- Protección: {prot.ocpd_ac.tamano_a if prot.ocpd_ac else "-"} A  
+- Conductor: {t_ac.calibre if t_ac else "-"} AWG  
 """)
 
-    # ==================================================
-    # 🔥 OBSERVACIONES
-    # ==================================================
-    st.markdown("### 🔥 Observaciones")
 
-    fus = prot.fusible_string
-
-    obs = []
-
-    if not fus or not fus.tamano_a:
-        obs.append("✔ Fusible por string no requerido")
-
-    # VD DC
-    if tr and tr.dc_mppt:
-        if all(t.vd_pct <= t.vd_obj_pct for t in tr.dc_mppt):
-            obs.append("✔ Caída de tensión DC dentro de límites")
-
-    # VD AC
-    if t_ac and t_ac.vd_pct <= t_ac.vd_obj_pct:
-        obs.append("✔ Caída de tensión AC dentro de límites")
-
-    for o in obs:
-        st.markdown(f"- {o}")
 # ==========================================================
 # RENDER
 # ==========================================================
@@ -278,59 +202,25 @@ def render(ctx):
     e = _asegurar_dict(ctx, "electrico")
     _ui_inputs_electricos(e)
 
-    if "resultado" not in st.session_state:
-        st.session_state["resultado"] = None
-
     if st.button("⚡ Generar ingeniería eléctrica", width="stretch"):
 
-        try:
-            p = _datosproyecto_desde_ctx(ctx)
-            deps = construir_dependencias()
+        p = _datosproyecto_desde_ctx(ctx)
+        deps = construir_dependencias()
 
-            resultado = ejecutar_estudio(p, deps)
+        resultado = ejecutar_estudio(p, deps)
 
-            ctx.resultado = resultado
-            st.session_state["resultado"] = resultado
+        ctx.resultado = resultado
 
-            st.success("✅ Ingeniería generada")
+        st.success("✅ Ingeniería generada")
 
-        except Exception:
-            import traceback
-            st.error("Error en motor FV")
-            st.code(traceback.format_exc())
-            return
-
-    resultado = getattr(ctx, "resultado", None) or st.session_state.get("resultado")
+    resultado = getattr(ctx, "resultado", None)
 
     if not resultado:
-        st.info("Presiona el botón para generar la ingeniería eléctrica")
         return
 
-    st.markdown("### 🧪 Estado del motor")
-    st.write(resultado.trazas)
+    st.write("Estado:", resultado.ok)
+    st.write("Errores:", resultado.errores)
 
-    st.write("DEBUG ELECTRICAL:", resultado.electrical)
-
-    if resultado.strings:
-
+    if resultado.strings and resultado.electrical:
         strings = resultado.strings.strings
-
-        _mostrar_zonas(ctx, strings)
-
-        if resultado.electrical:
-            _mostrar_detalle(strings, resultado.electrical)
-        else:
-            st.error("❌ Electrical NO se generó")
-
-
-# ==========================================================
-# VALIDACIÓN
-# ==========================================================
-def validar(ctx) -> Tuple[bool, List[str]]:
-
-    resultado = getattr(ctx, "resultado", None) or st.session_state.get("resultado")
-
-    if not resultado:
-        return False, ["Debe generar ingeniería."]
-
-    return True, []
+        _mostrar_detalle(strings, resultado.electrical, resultado.sizing)
