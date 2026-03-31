@@ -48,15 +48,16 @@ def ejecutar_electrical(*args, **kwargs) -> ResultadoElectrico:
         # VALIDACIONES BASE
         # ==================================================
         if not paneles or not paneles.ok:
-            return ResultadoElectrico.build(
-                paneles=paneles,
-                corrientes=_corrientes_error("Paneles inválidos"),
-                conductores=_conductores_error("Paneles inválidos"),
-                protecciones=_protecciones_error("Paneles inválidos"),
-            )
+            raise ValueError("Paneles inválidos")
 
         if not sizing:
             raise ValueError("Falta sizing en electrical")
+
+        # ==================================================
+        # 🔥 VALIDACIÓN CRÍTICA
+        # ==================================================
+        if not getattr(sizing, "kw_ac", None):
+            raise ValueError("kw_ac inválido o en cero desde sizing")
 
         # ==================================================
         # 🔥 USAR RESULTADO DE PANELES
@@ -70,18 +71,13 @@ def ejecutar_electrical(*args, **kwargs) -> ResultadoElectrico:
         array = paneles.array
 
         if not strings or not array:
-            return ResultadoElectrico.build(
-                paneles=paneles,
-                corrientes=_corrientes_error("Strings no disponibles desde paneles"),
-                conductores=_conductores_error("Strings no disponibles desde paneles"),
-                protecciones=_protecciones_error("Strings no disponibles desde paneles"),
-            )
+            raise ValueError("Strings o array no disponibles desde paneles")
 
         print("DEBUG STRINGS (desde paneles):", strings)
         print("DEBUG ARRAY (desde paneles):", array)
 
         # ==================================================
-        # 🔥 FIX REAL → INVERSOR DESDE SIZING
+        # 🔥 INVERSOR DESDE SIZING
         # ==================================================
         inversor = getattr(sizing, "inversor", None)
 
@@ -99,16 +95,7 @@ def ejecutar_electrical(*args, **kwargs) -> ResultadoElectrico:
         )
 
         if not val["ok"]:
-            print("❌ VALIDACIÓN FV FALLIDA:")
-            for err in val["errores"]:
-                print(" -", err)
-
-            return ResultadoElectrico.build(
-                paneles=paneles,
-                corrientes=_corrientes_error("Validación FV fallida"),
-                conductores=_conductores_error("Validación FV fallida"),
-                protecciones=_protecciones_error("Validación FV fallida"),
-            )
+            raise ValueError(f"Validación FV fallida: {val['errores']}")
 
         if val["warnings"]:
             print("⚠ WARNINGS FV:")
@@ -158,12 +145,7 @@ def ejecutar_electrical(*args, **kwargs) -> ResultadoElectrico:
         print("DEBUG CORRIENTES:", corrientes)
 
         if not corrientes.ok:
-            return ResultadoElectrico.build(
-                paneles=paneles,
-                corrientes=corrientes,
-                conductores=_conductores_error("Corrientes inválidas"),
-                protecciones=_protecciones_error("Corrientes inválidas"),
-            )
+            raise ValueError("Corrientes inválidas")
 
         # ==================================================
         # CONDUCTORES
@@ -180,12 +162,7 @@ def ejecutar_electrical(*args, **kwargs) -> ResultadoElectrico:
         conductores = ResultadoConductores.build(tramos)
 
         if not conductores.ok:
-            return ResultadoElectrico.build(
-                paneles=paneles,
-                corrientes=corrientes,
-                conductores=conductores,
-                protecciones=_protecciones_error("Conductores inválidos"),
-            )
+            raise ValueError("Conductores inválidos")
 
         # ==================================================
         # PROTECCIONES
@@ -216,27 +193,5 @@ def ejecutar_electrical(*args, **kwargs) -> ResultadoElectrico:
 
         print("🔥 ERROR ELECTRICAL:", str(e))
 
-        return ResultadoElectrico.build(
-            paneles=paneles,
-            corrientes=_corrientes_error(str(e)),
-            conductores=_conductores_error(str(e)),
-            protecciones=_protecciones_error(str(e)),
-        )
-
-# ==================================================
-# HELPERS DE ERROR
-# ==================================================
-
-def _corrientes_error(msg: str):
-    from electrical.conductores.resultado_corriente import ResultadoCorrientes
-    return ResultadoCorrientes.error(msg)
-
-
-def _conductores_error(msg: str):
-    from electrical.conductores.resultado_conductores import ResultadoConductores
-    return ResultadoConductores.error(msg)
-
-
-def _protecciones_error(msg: str):
-    from electrical.protecciones.resultado_protecciones import ResultadoProtecciones
-    return ResultadoProtecciones.error(msg)
+        # 🔥 AQUÍ YA NO SE OCULTA NADA
+        raise RuntimeError(f"[ELECTRICAL] {str(e)}")
