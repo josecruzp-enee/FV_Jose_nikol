@@ -97,8 +97,8 @@ def _agrupar_por_mppt(strings):
 
     for s in strings:
 
-        # 🔥 usar zona como MPPT
-        zona = getattr(s, "zona", 0)
+        
+        zona = getattr(s, "mppt", 0)
 
         grupos[zona].append(s)
 
