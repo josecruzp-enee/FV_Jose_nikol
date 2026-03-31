@@ -132,7 +132,7 @@ def _ejecutar_sizing(datos, deps):
 # ==========================================================
 # 🔥 PANEL (MULTIZONA AQUÍ)
 # ==========================================================
-def _ejecutar_paneles(entrada_paneles, deps):
+def _ejecutar_paneles(entrada_paneles, deps, datos):
 
     # ------------------------------------------------------
     # 🔥 MULTIZONA
@@ -163,7 +163,7 @@ def _ejecutar_paneles(entrada_paneles, deps):
 
             resultados.append(resultado)
 
-        return _consolidar_paneles(resultados)
+        return _consolidar_paneles(resultados, datos)
 
     # ------------------------------------------------------
     # 🔹 NORMAL
