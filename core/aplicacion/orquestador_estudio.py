@@ -273,7 +273,7 @@ def _consolidar_paneles(resultados):
         warnings=warnings,
         errores=[],
         meta=meta,
-    ) resultado
+    )
 
 # ==========================================================
 # ENERGÍA
