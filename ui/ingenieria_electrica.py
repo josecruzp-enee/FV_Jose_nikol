@@ -154,29 +154,23 @@ def _mostrar_detalle(paneles, electrical):
     prot = electrical.protecciones
 
     # ======================================================
-    # AGRUPAR STRINGS POR ZONA (REAL)
+    # AGRUPAR POR ZONA
     # ======================================================
     zonas = {}
-
     for s in strings:
         zona = getattr(s, "zona", 1)
-
-        if zona not in zonas:
-            zonas[zona] = []
-
-        zonas[zona].append(s)
+        zonas.setdefault(zona, []).append(s)
 
     # ======================================================
-    # TABLA PRINCIPAL (ZONA → STRING → MPPT)
+    # STRINGS
     # ======================================================
+    st.markdown("### 🔗 Strings")
+
     data = []
-    mppt_counter = 1
     string_counter = 1
 
     for zona, strings_zona in zonas.items():
-
         for s in strings_zona:
-
             data.append({
                 "Zona": f"Z{zona}",
                 "String": f"S{string_counter}",
@@ -184,36 +178,13 @@ def _mostrar_detalle(paneles, electrical):
                 "Vmp (V)": round(s.vmp_string_v, 1),
                 "Voc (V)": round(s.voc_frio_string_v, 1),
                 "I (A)": round(s.imp_string_a, 2),
-                "MPPT": mppt_counter
             })
-
             string_counter += 1
 
-        mppt_counter += 1
-
-    st.markdown("### 🔗 Strings / MPPT (configuración real)")
     st.dataframe(data, use_container_width=True)
 
     # ======================================================
-    # RESUMEN ELÉCTRICO GLOBAL
-    # ======================================================
-    st.markdown("### ⚡ Resumen eléctrico")
-
-    c1, c2, c3, c4 = st.columns(4)
-
-    try:
-        c1.metric("I string", f"{corr.string.i_diseno_a:.2f} A")
-        c2.metric("I DC", f"{corr.dc_total.i_diseno_a:.2f} A")
-        c3.metric("I AC", f"{corr.ac.i_diseno_a:.2f} A")
-        c4.metric("V string", f"{strings[0].vmp_string_v:.0f} V")
-    except:
-        c1.metric("I string", "—")
-        c2.metric("I DC", "—")
-        c3.metric("I AC", "—")
-        c4.metric("V string", "—")
-
-    # ======================================================
-    # MPPT DETALLE (REAL SI EXISTE)
+    # MPPT (NIVEL REAL)
     # ======================================================
     st.markdown("### 🔌 MPPT")
 
@@ -221,25 +192,35 @@ def _mostrar_detalle(paneles, electrical):
 
         for i, m in enumerate(corr.mppt_detalle, 1):
 
-            st.write(
-                f"MPPT {i}: "
-                f"{m.i_operacion_a:.2f} A "
-                f"(diseño {m.i_diseno_a:.2f} A)"
+            st.metric(
+                f"MPPT {i}",
+                f"{m.i_operacion_a:.2f} A",
+                f"diseño {m.i_diseno_a:.2f} A"
             )
 
     else:
-        # fallback basado en zonas
+        # fallback por zona
         for i, (zona, strings_zona) in enumerate(zonas.items(), 1):
 
             imp = sum(s.imp_string_a for s in strings_zona)
 
-            st.write(
-                f"MPPT {i} (Zona {zona}): "
+            st.metric(
+                f"MPPT {i} (Zona {zona})",
                 f"{imp:.2f} A"
             )
 
     # ======================================================
-    # CONDUCTORES + PROTECCIONES
+    # SISTEMA (AC)
+    # ======================================================
+    st.markdown("### ⚡ Sistema")
+
+    try:
+        st.metric("Corriente AC", f"{corr.ac.i_diseno_a:.2f} A")
+    except:
+        st.metric("Corriente AC", "—")
+
+    # ======================================================
+    # CONDUCTORES Y PROTECCIONES
     # ======================================================
     st.markdown("### 🧵 Protección y conductores")
 
@@ -254,7 +235,7 @@ def _mostrar_detalle(paneles, electrical):
             "AC cable": f"{tr.ac.calibre} AWG" if tr.ac else "-",
             "Breaker AC": f"{prot.ocpd_ac.tamano_a} A" if prot.ocpd_ac else "-",
             "Protección DC": f"{prot.ocpd_dc_array.tamano_a} A" if prot.ocpd_dc_array else "-",
-            "Fusible": fus_val
+            "Fusible (string)": fus_val
         }])
 
     except:
