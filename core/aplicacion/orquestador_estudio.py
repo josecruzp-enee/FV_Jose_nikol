@@ -193,99 +193,97 @@ def _clonar_entrada_para_zona(entrada, n_paneles):
 # CONSOLIDADOR
 # ==========================================================
 from dataclasses import replace
-def _consolidar_paneles(resultados):
+from electrical.paneles.resultado_paneles import ResultadoPaneles
+from electrical.catalogos.catalogos_yaml import get_inversor
 
+
+def _consolidar_paneles(resultados, datos):
+
+    print("\n🔧 CONSOLIDANDO PANELES")
+
+    # ==================================================
+    # VALIDACIÓN INICIAL
+    # ==================================================
     if not resultados:
-        return None
+        raise ValueError("No hay resultados de paneles")
 
-    print("\n===================================")
-    print("🔥 DEBUG CONSOLIDAR PANELES")
-    print("===================================")
+    if len(resultados) == 1:
+        return resultados[0]
 
-    base = resultados[0]
+    # ==================================================
+    # 🔥 OBTENER INVERSOR REAL
+    # ==================================================
+    inv_id = getattr(datos.equipos, "inversor_id", None)
 
+    if not inv_id:
+        print("⚠ No hay inversor definido → fallback MPPT por zonas")
+        n_mppt_total = len(resultados)
+    else:
+        inv = get_inversor(inv_id)
+
+        if not inv:
+            print("⚠ Inversor no encontrado → fallback")
+            n_mppt_total = len(resultados)
+        else:
+            n_mppt_total = max(1, int(inv.n_mppt))
+            print(f"🔌 Inversor: {inv.modelo} | MPPT: {n_mppt_total}")
+
+    # ==================================================
+    # CONSOLIDAR STRINGS
+    # ==================================================
     strings = []
-    total_strings = 0
-    total_paneles = 0
-    total_pdc = 0.0
-    total_imp = 0.0
-    total_isc = 0.0
 
-    # ======================================================
-    # CONSOLIDAR STRINGS (FIX REAL AQUÍ)
-    # ======================================================
     for i, r in enumerate(resultados, 1):
 
         print(f"\n🔹 ZONA {i}")
-        print("Strings en zona:", len(r.strings))
 
         for j, s in enumerate(r.strings, 1):
 
-            print(f"  String original {j} → MPPT original:", getattr(s, "mppt", "N/A"))
-
             s_new = replace(s)
 
-            # 🔥 UI
+            # zona (para UI)
             object.__setattr__(s_new, "zona", i)
 
-            # 🔥 FIX CRÍTICO (ESTO TE FALTABA)
-            object.__setattr__(s_new, "mppt", i)
+            # 🔥 MPPT REAL (balanceado)
+            mppt = (len(strings) % n_mppt_total) + 1
+            object.__setattr__(s_new, "mppt", mppt)
 
-            # opcional
+            # id string
             object.__setattr__(s_new, "id_string", f"Z{i}_S{j}")
 
-            print(f"  → MPPT NUEVO:", i)
+            print(f"  → String {j} → MPPT {mppt}")
 
             strings.append(s_new)
 
-        total_strings += len(r.strings)
-        total_paneles += getattr(r.array, "n_paneles_total", 0)
-        total_pdc += getattr(r.array, "potencia_dc_w", 0)
-        total_imp += getattr(r.array, "idc_nom", 0)
-        total_isc += getattr(r.array, "isc_total", 0)
+    # ==================================================
+    # CONSOLIDAR ARRAY
+    # ==================================================
+    base = resultados[0]
 
-    # ======================================================
-    # DEBUG GLOBAL
-    # ======================================================
-    print("\n📊 RESUMEN CONSOLIDACIÓN")
+    array_total = replace(base.array)
+
+    total_potencia = sum(r.array.potencia_dc_w for r in resultados)
+    total_strings = sum(r.array.n_strings_total for r in resultados)
+
+    object.__setattr__(array_total, "potencia_dc_w", total_potencia)
+    object.__setattr__(array_total, "n_strings_total", total_strings)
+
+    print("\n📦 ARRAY CONSOLIDADO:")
+    print("Potencia total (W):", total_potencia)
     print("Total strings:", total_strings)
-    print("Total paneles:", total_paneles)
-    print("Total Pdc:", total_pdc)
 
-    mppt_detectados = set(getattr(s, "mppt", None) for s in strings)
-    print("MPPT detectados:", mppt_detectados)
-
-    # ======================================================
-    # ARRAY NUEVO
-    # ======================================================
-    array_new = replace(
-        base.array,
-        potencia_dc_w=total_pdc,
-        idc_nom=total_imp,
-        isc_total=total_isc,
-        n_strings_total=total_strings,
-        n_paneles_total=total_paneles,
-        n_mppt=len(mppt_detectados),  # 🔥 dinámico
-        vdc_nom=max(s.vmp_string_v for s in strings),
-    )
-
-    print("\n🔹 ARRAY FINAL")
-    print("n_strings_total:", array_new.n_strings_total)
-    print("n_paneles_total:", array_new.n_paneles_total)
-    print("n_mppt:", array_new.n_mppt)
-
-    print("===================================\n")
-
-    # ======================================================
+    # ==================================================
     # RESULTADO FINAL
-    # ======================================================
-    resultado = replace(
-        base,
+    # ==================================================
+    return ResultadoPaneles(
+        ok=True,
+        topologia="string",
+        panel=base.panel,
+        array=array_total,
         strings=strings,
-        array=array_new
+        warnings=[],
+        errores=[]
     )
-
-    return resultado
 # ==========================================================
 # ENERGÍA
 # ==========================================================
