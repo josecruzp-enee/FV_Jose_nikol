@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 """
-PROTECCIONES FV — DOMINIO
+PROTECCIONES FV — DOMINIO (DEBUG HARDCORE)
 """
 
 from dataclasses import dataclass
@@ -87,26 +87,48 @@ def _fusible_string(n_strings: int, i: float) -> FusibleStringResultado:
 
 
 # ==========================================================
-# 🔥 MPPT
+# 🔥 MPPT (DEBUG FUERTE)
 # ==========================================================
 
 def _ocpd_mppt(corrientes: ResultadoCorrientes) -> List[OCPDResultado]:
 
     resultado = []
 
-    for mppt in getattr(corrientes, "mppt_detalle", []):
-        resultado.append(
-            _ocpd(
-                mppt.i_diseno_a,
-                "NEC 690.9 (MPPT)"
-            )
+    mppts = getattr(corrientes, "mppt_detalle", [])
+
+    print("\n🔴 DEBUG PROTECCIONES — MPPT")
+    print("Tipo mppt_detalle:", type(mppts))
+    print("Cantidad MPPT:", len(mppts))
+    print("Contenido:", mppts)
+
+    if not mppts:
+        print("⚠ NO HAY MPPT → problema viene de corrientes")
+        return resultado
+
+    for i, mppt in enumerate(mppts):
+
+        print(f"\n➡ MPPT {i+1}")
+        print("i_operacion:", mppt.i_operacion_a)
+        print("i_diseno:", mppt.i_diseno_a)
+
+        if mppt.i_diseno_a <= 0:
+            print("⚠ MPPT con corriente inválida")
+            continue
+
+        ocpd = _ocpd(
+            mppt.i_diseno_a,
+            "NEC 690.9 (MPPT)"
         )
+
+        print("OCPD seleccionado:", ocpd.tamano_a)
+
+        resultado.append(ocpd)
 
     return resultado
 
 
 # ==========================================================
-# 🔥 NUEVO: FUSIBLE POR MPPT
+# 🔥 FUSIBLE POR MPPT (DEBUG)
 # ==========================================================
 
 def _fusible_por_mppt(corrientes: ResultadoCorrientes, paneles) -> List[FusibleStringResultado]:
@@ -115,18 +137,26 @@ def _fusible_por_mppt(corrientes: ResultadoCorrientes, paneles) -> List[FusibleS
 
     strings = getattr(paneles, "strings", [])
 
-    # agrupar por zona
+    print("\n🔴 DEBUG STRINGS")
+    print("Total strings:", len(strings))
+
     grupos = {}
 
     for s in strings:
         zona = getattr(s, "zona", 0)
         grupos.setdefault(zona, []).append(s)
 
+    print("Zonas detectadas:", list(grupos.keys()))
+
     for zona, grupo in grupos.items():
+
+        print(f"\n➡ Zona {zona}")
+        print("Strings en zona:", len(grupo))
 
         n_strings = len(grupo)
 
         if n_strings < 3:
+            print("No requiere fusible")
             resultado.append(
                 FusibleStringResultado(
                     requerido=False,
@@ -139,9 +169,14 @@ def _fusible_por_mppt(corrientes: ResultadoCorrientes, paneles) -> List[FusibleS
             continue
 
         isc = grupo[0].isc_string_a
-        i_diseno = isc * 1.56  # NEC
+        i_diseno = isc * 1.56
+
+        print("ISC:", isc)
+        print("I diseño:", i_diseno)
 
         size = seleccionar_ocpd(i_diseno)
+
+        print("Fusible seleccionado:", size)
 
         resultado.append(
             FusibleStringResultado(
@@ -157,7 +192,7 @@ def _fusible_por_mppt(corrientes: ResultadoCorrientes, paneles) -> List[FusibleS
 
 
 # ==========================================================
-# MOTOR PRINCIPAL
+# MOTOR PRINCIPAL (DEBUG GLOBAL)
 # ==========================================================
 
 def calcular_protecciones(
@@ -170,45 +205,39 @@ def calcular_protecciones(
     try:
         corr = entrada.corrientes
 
+        print("\n==============================")
+        print("🔥 DEBUG PROTECCIONES GLOBAL")
+        print("==============================")
+
+        print("AC diseño:", corr.ac.i_diseno_a)
+        print("String diseño:", corr.string.i_diseno_a)
+
+        print("MPPT DETALLE:", getattr(corr, "mppt_detalle", None))
+        print("LEN MPPT:", len(getattr(corr, "mppt_detalle", [])))
+
         return ResultadoProtecciones(
             ok=True,
             errores=[],
             warnings=warnings,
 
-            # -----------------------------
-            # AC
-            # -----------------------------
             ocpd_ac=_ocpd(
                 corr.ac.i_diseno_a,
                 "NEC 690.8 / 210.20(A)"
             ),
 
-            # -----------------------------
-            # DC GLOBAL (LEGACY)
-            # 👉 NO usar en diseño real
-            # -----------------------------
             ocpd_dc_array=OCPDResultado(
                 i_diseno_a=0.0,
                 tamano_a=0,
                 norma="NO APLICA (MPPT independientes)"
             ),
 
-            # -----------------------------
-            # STRING (LEGACY)
-            # -----------------------------
             fusible_string=_fusible_string(
                 entrada.n_strings,
                 corr.string.i_diseno_a
             ),
 
-            # -----------------------------
-            # MPPT
-            # -----------------------------
             mppt=_ocpd_mppt(corr),
 
-            # -----------------------------
-            # 🔥 NUEVO
-            # -----------------------------
             fusible_mppt=_fusible_por_mppt(
                 corr,
                 entrada.paneles
@@ -218,6 +247,8 @@ def calcular_protecciones(
     except Exception as e:
 
         errores.append(str(e))
+
+        print("💥 ERROR EN PROTECCIONES:", str(e))
 
         return ResultadoProtecciones(
             ok=False,
@@ -234,5 +265,5 @@ def calcular_protecciones(
 
             mppt=[],
 
-            fusible_mppt=[]  # 🔥 clave
+            fusible_mppt=[]
         )
