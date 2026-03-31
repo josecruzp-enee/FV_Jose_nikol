@@ -236,7 +236,8 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
         pdc_kw=pdc_kw,
         n_inversores=entrada.n_inversores,
     )
-
+    print("🔥 DEBUG MODO:", entrada.modo)
+    print("🔥 DEBUG ZONAS:", entrada.zonas)
     return ResultadoPaneles(
         ok=True,
         panel=panel,
