@@ -148,51 +148,76 @@ def _mostrar_detalle(paneles, electrical):
 
     st.markdown("## ⚡ Ingeniería eléctrica")
 
-    panel = paneles.panel
     strings = paneles.strings
     corr = electrical.corrientes
     cond = electrical.conductores
     prot = electrical.protecciones
 
     # ======================================================
-    # TABLA PRINCIPAL (TODO EN UNO)
+    # AGRUPAR STRINGS POR ZONA (REAL)
+    # ======================================================
+    zonas = {}
+
+    for s in strings:
+        zona = getattr(s, "zona", 1)
+
+        if zona not in zonas:
+            zonas[zona] = []
+
+        zonas[zona].append(s)
+
+    # ======================================================
+    # TABLA PRINCIPAL (ZONA → STRING → MPPT)
     # ======================================================
     data = []
+    mppt_counter = 1
+    string_counter = 1
 
-    for i, s in enumerate(strings, 1):
+    for zona, strings_zona in zonas.items():
 
-        mppt_idx = i % len(corr.mppt_detalle) if hasattr(corr, "mppt_detalle") else 0
+        for s in strings_zona:
 
-        data.append({
-            "String": f"S{i}",
-            "Paneles": s.n_series,
-            "Vmp (V)": round(s.vmp_string_v, 1),
-            "Voc (V)": round(s.voc_frio_string_v, 1),
-            "I (A)": round(s.imp_string_a, 2),
-            "MPPT": mppt_idx + 1
-        })
+            data.append({
+                "Zona": f"Z{zona}",
+                "String": f"S{string_counter}",
+                "Paneles": s.n_series,
+                "Vmp (V)": round(s.vmp_string_v, 1),
+                "Voc (V)": round(s.voc_frio_string_v, 1),
+                "I (A)": round(s.imp_string_a, 2),
+                "MPPT": mppt_counter
+            })
 
-    st.markdown("### 🔗 Strings / MPPT")
+            string_counter += 1
+
+        mppt_counter += 1
+
+    st.markdown("### 🔗 Strings / MPPT (configuración real)")
     st.dataframe(data, use_container_width=True)
 
     # ======================================================
-    # RESUMEN ELÉCTRICO
+    # RESUMEN ELÉCTRICO GLOBAL
     # ======================================================
     st.markdown("### ⚡ Resumen eléctrico")
 
     c1, c2, c3, c4 = st.columns(4)
 
-    c1.metric("I string", f"{corr.string.i_diseno_a:.2f} A")
-    c2.metric("I DC", f"{corr.dc_total.i_diseno_a:.2f} A")
-    c3.metric("I AC", f"{corr.ac.i_diseno_a:.2f} A")
-    c4.metric("V string", f"{strings[0].vmp_string_v:.0f} V")
+    try:
+        c1.metric("I string", f"{corr.string.i_diseno_a:.2f} A")
+        c2.metric("I DC", f"{corr.dc_total.i_diseno_a:.2f} A")
+        c3.metric("I AC", f"{corr.ac.i_diseno_a:.2f} A")
+        c4.metric("V string", f"{strings[0].vmp_string_v:.0f} V")
+    except:
+        c1.metric("I string", "—")
+        c2.metric("I DC", "—")
+        c3.metric("I AC", "—")
+        c4.metric("V string", "—")
 
     # ======================================================
-    # MPPT DETALLE
+    # MPPT DETALLE (REAL SI EXISTE)
     # ======================================================
-    if hasattr(corr, "mppt_detalle"):
+    st.markdown("### 🔌 MPPT")
 
-        st.markdown("### 🔌 MPPT")
+    if hasattr(corr, "mppt_detalle") and corr.mppt_detalle:
 
         for i, m in enumerate(corr.mppt_detalle, 1):
 
@@ -202,25 +227,38 @@ def _mostrar_detalle(paneles, electrical):
                 f"(diseño {m.i_diseno_a:.2f} A)"
             )
 
+    else:
+        # fallback basado en zonas
+        for i, (zona, strings_zona) in enumerate(zonas.items(), 1):
+
+            imp = sum(s.imp_string_a for s in strings_zona)
+
+            st.write(
+                f"MPPT {i} (Zona {zona}): "
+                f"{imp:.2f} A"
+            )
+
     # ======================================================
-    # CONDUCTORES + PROTECCIONES (COMPACTO)
+    # CONDUCTORES + PROTECCIONES
     # ======================================================
     st.markdown("### 🧵 Protección y conductores")
 
-    tr = cond.tramos
+    try:
+        tr = cond.tramos
 
-    fus = prot.fusible_string
-    fus_val = fus.tamano_a if fus and fus.tamano_a else "—"
+        fus = prot.fusible_string
+        fus_val = fus.tamano_a if fus and fus.tamano_a else "—"
 
-    st.table([{
-        "DC cable": f"{tr.dc.calibre} AWG" if tr.dc else "-",
-        "AC cable": f"{tr.ac.calibre} AWG" if tr.ac else "-",
-        "Breaker AC": f"{prot.ocpd_ac.tamano_a} A",
-        "Protección DC": f"{prot.ocpd_dc_array.tamano_a} A",
-        "Fusible": fus_val
-    }])
+        st.table([{
+            "DC cable": f"{tr.dc.calibre} AWG" if tr.dc else "-",
+            "AC cable": f"{tr.ac.calibre} AWG" if tr.ac else "-",
+            "Breaker AC": f"{prot.ocpd_ac.tamano_a} A" if prot.ocpd_ac else "-",
+            "Protección DC": f"{prot.ocpd_dc_array.tamano_a} A" if prot.ocpd_dc_array else "-",
+            "Fusible": fus_val
+        }])
 
-
+    except:
+        st.warning("No se pudo calcular conductores/protecciones")
 # ==========================================================
 # RENDER
 # ==========================================================
