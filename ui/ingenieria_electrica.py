@@ -90,13 +90,11 @@ def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
         )
     )
 
-    # EQUIPOS
     p.equipos = Equipos(
         panel_id=eq.get("panel_id"),
         inversor_id=eq.get("inversor_id"),
     )
 
-    # MULTIZONA
     if sf_raw.get("usar_zonas"):
 
         zonas = []
@@ -120,7 +118,7 @@ def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
 
 
 # ==========================================================
-# ZONAS (FIX: usar INPUT, no strings)
+# ZONAS
 # ==========================================================
 def _mostrar_zonas(ctx):
 
@@ -153,19 +151,14 @@ def _mostrar_detalle(paneles, electrical):
     cond = electrical.conductores
     prot = electrical.protecciones
 
-    # ======================================================
-    # AGRUPAR POR ZONA
-    # ======================================================
     zonas = {}
     for s in strings:
         zona = getattr(s, "zona", 1)
         zonas.setdefault(zona, []).append(s)
 
     mppt_detalle = getattr(corr, "mppt_detalle", [])
+    tr = cond.tramos
 
-    # ======================================================
-    # 🔀 CONFIGURACIÓN POR ARREGLO
-    # ======================================================
     st.markdown("### 🔀 Configuración por arreglo")
 
     for i, (zona, strings_zona) in enumerate(zonas.items(), 1):
@@ -185,7 +178,7 @@ def _mostrar_detalle(paneles, electrical):
 
         st.dataframe(data, width="stretch")
 
-        # MPPT asociado
+        # MPPT
         if i-1 < len(mppt_detalle):
             m = mppt_detalle[i-1]
 
@@ -194,17 +187,39 @@ def _mostrar_detalle(paneles, electrical):
                 f"(diseño {m.i_diseno_a:.2f} A)"
             )
 
-        # Protección DC por arreglo (simple por ahora)
+        # 🔥 CONDUCTOR POR MPPT
         try:
-            if prot.ocpd_dc_array:
-                st.info(f"Protección DC sugerida: {prot.ocpd_dc_array.tamano_a} A")
+            if i-1 < len(tr.mppt):
+                tramo = tr.mppt[i-1]
+                st.success(f"Conductor DC: {tramo.calibre} AWG")
+        except:
+            pass
+
+        # 🔥 BREAKER POR MPPT
+        try:
+            if i-1 < len(prot.mppt):
+                ocpd = prot.mppt[i-1]
+                st.info(f"Breaker DC: {ocpd.tamano_a} A")
+        except:
+            pass
+
+        # 🔥 FUSIBLE POR MPPT
+        try:
+            if hasattr(prot, "fusible_mppt") and prot.fusible_mppt:
+                if i-1 < len(prot.fusible_mppt):
+                    fus = prot.fusible_mppt[i-1]
+
+                    if fus.requerido:
+                        st.warning(f"Fusible por string: {fus.tamano_a} A")
+                    else:
+                        st.caption("Fusible: No requerido")
         except:
             pass
 
         st.divider()
 
     # ======================================================
-    # ⚡ SISTEMA AC
+    # AC
     # ======================================================
     st.markdown("### ⚡ Sistema")
 
@@ -214,13 +229,11 @@ def _mostrar_detalle(paneles, electrical):
         st.metric("Corriente AC", "—")
 
     # ======================================================
-    # 🧵 CONDUCTORES Y PROTECCIONES
+    # RESUMEN GLOBAL (SIN TOCAR)
     # ======================================================
     st.markdown("### 🧵 Conductores y protecciones (sistema)")
 
     try:
-        tr = cond.tramos
-
         fus = prot.fusible_string
         fus_val = fus.tamano_a if fus and fus.tamano_a else "—"
 
@@ -233,23 +246,16 @@ def _mostrar_detalle(paneles, electrical):
 
     except:
         st.warning("No se pudo calcular conductores/protecciones")
+
+
 # ==========================================================
 # RENDER
 # ==========================================================
-
 def render(ctx):
 
-    import streamlit as st
-
-    # ======================================================
-    # INPUTS
-    # ======================================================
     e = _asegurar_dict(ctx, "electrico")
     _ui_inputs_electricos(e)
 
-    # ======================================================
-    # BOTÓN GENERAR
-    # ======================================================
     if "resultado" not in st.session_state:
         st.session_state["resultado"] = None
 
@@ -263,7 +269,6 @@ def render(ctx):
 
             resultado = ejecutar_estudio(p, deps)
 
-            # Guardar
             ctx.resultado = resultado
             st.session_state["resultado"] = resultado
 
@@ -275,36 +280,27 @@ def render(ctx):
             st.code(traceback.format_exc())
             return
 
-    # ======================================================
-    # OBTENER RESULTADO
-    # ======================================================
     resultado = getattr(ctx, "resultado", None) or st.session_state.get("resultado")
 
     if not resultado:
         st.info("Presiona el botón para generar la ingeniería eléctrica")
         return
 
-    # ======================================================
-    # 🔥 DEBUG REAL (CLAVE)
-    # ======================================================
     st.markdown("### 🧪 Estado del motor")
     st.write(resultado.trazas)
 
     st.write("DEBUG ELECTRICAL:", resultado.electrical)
 
-    # ======================================================
-    # OUTPUTS
-    # ======================================================
     if resultado.strings:
 
         _mostrar_zonas(ctx)
 
         if resultado.electrical:
-
             _mostrar_detalle(resultado.strings, resultado.electrical)
-
         else:
             st.error("❌ Electrical NO se generó")
+
+
 # ==========================================================
 # VALIDACIÓN
 # ==========================================================
