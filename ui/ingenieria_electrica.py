@@ -194,66 +194,61 @@ def _mostrar_detalle(strings, electrical, sizing):
 # ==========================================================
 def render(ctx):
 
-    debug_mode = st.toggle("🧪 Activar debug pipeline", value=True)
-
     e = _asegurar_dict(ctx, "electrico")
     _ui_inputs_electricos(e)
 
     if st.button("⚡ Generar ingeniería eléctrica", width="stretch"):
 
-        p = _datosproyecto_desde_ctx(ctx)
+        try:
+            p = _datosproyecto_desde_ctx(ctx)
 
-        deps = construir_dependencias()
+            deps = construir_dependencias()
 
-      
-        resultado = ejecutar_estudio(p, deps)
+            resultado = ejecutar_estudio(p, deps)
 
-        ctx.resultado = resultado
+            ctx.resultado = resultado
 
-        st.success("✅ Ingeniería generada")
+            st.success("✅ Ingeniería generada")
+
+        except Exception as e:
+            st.error(f"❌ Error generando ingeniería: {e}")
+            return
 
     resultado = getattr(ctx, "resultado", None)
 
     if not resultado:
         return
 
+    # ===============================
+    # ESTADO GENERAL
+    # ===============================
     st.write("Estado:", resultado.ok)
     st.write("Errores:", resultado.errores)
 
-    if resultado.strings and resultado.electrical:
+    # ===============================
+    # VALIDACIÓN MÍNIMA
+    # ===============================
+    if not resultado.ok:
+        st.error("❌ Resultado no OK")
+        return
+
+    if not resultado.strings:
+        st.error("❌ No hay resultado de strings")
+        return
+
+    if not resultado.electrical:
+        st.error("❌ No hay resultado eléctrico")
+        return
+
+    # ===============================
+    # DETALLE
+    # ===============================
+    try:
         strings = resultado.strings.strings
         _mostrar_detalle(strings, resultado.electrical, resultado.sizing)
 
-    # ==========================================================
-    # DEBUG PIPELINE
-    # ==========================================================
-    if debug_mode:
-
-        trace_data = get_trace()
-
-        if trace_data:
-
-            st.markdown("## 🧪 Debug Pipeline FV")
-
-            for step in trace_data:
-
-                nombre = step.get("funcion", "unknown")
-                entrada = step.get("entrada")
-                salida = step.get("salida")
-                error = step.get("error")
-
-                with st.expander(f"🔹 {nombre.upper()}", expanded=False):
-
-                    st.markdown("**Entrada**")
-                    st.code(str(entrada)[:800], language="python")
-
-                    if error:
-                        st.error(error)
-                    else:
-                        st.markdown("**Salida**")
-                        st.code(str(salida)[:800], language="python")
-
-
+    except Exception as e:
+        st.error(f"❌ Error mostrando detalle: {e}")
 # ==========================================================
 # VALIDACIÓN
 # ==========================================================
