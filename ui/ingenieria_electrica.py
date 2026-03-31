@@ -150,6 +150,8 @@ def _mostrar_zonas(ctx, strings):
 
 def _mostrar_detalle(strings, electrical):
 
+
+    
     st.markdown("## ⚡ Ingeniería eléctrica")
 
     corr = electrical.corrientes
@@ -158,7 +160,16 @@ def _mostrar_detalle(strings, electrical):
 
     tr = getattr(cond, "tramos", None)
     mppt_detalle = getattr(corr, "mppt_detalle", [])
+    inv = electrical.paneles.inversor  # o de donde lo tengas
 
+    st.markdown("### ⚙ Inversor seleccionado")
+
+    st.markdown(f"""
+    - Modelo: {inv.modelo}  
+    - Potencia AC: {inv.kw_ac} kW  
+    - MPPT: {inv.n_mppt}  
+    - Vdc máx: {inv.vdc_max_v} V  
+    """)
     # ==================================================
     # AGRUPAR POR ZONA
     # ==================================================
