@@ -131,8 +131,14 @@ def ejecutar_electrical(*, datos: Any, paneles: Any, sizing: Any) -> ResultadoEl
         # ==================================================
         # CORRIENTES
         # ==================================================
+        # ==================================================
+        # CORRIENTES
+        # ==================================================
         corrientes_input = CorrientesInput(
-            paneles=paneles,
+            strings=strings,      # 🔥 CRÍTICO
+            array=array,          # 🔥 CRÍTICO
+            panel=panel_obj,      # 🔥 CRÍTICO
+
             kw_ac=sizing.kw_ac,
             vac=vac,
             fases=fases,
