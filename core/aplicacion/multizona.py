@@ -35,7 +35,7 @@ def ejecutar_multizona(entradas: List) -> ResultadoPaneles:
     panel = resultados[0].panel
 
     # ==================================================
-    # 🔥 DETALLE POR ZONA (CLAVE)
+    # 🔥 DETALLE POR ZONA (SE MANTIENE)
     # ==================================================
     zonas_detalle = []
 
@@ -52,7 +52,7 @@ def ejecutar_multizona(entradas: List) -> ResultadoPaneles:
         })
 
     # ==================================================
-    # CONSOLIDACIÓN SEGURA
+    # TOTALES (ENERGÉTICOS, NO ELÉCTRICOS)
     # ==================================================
     total_paneles = sum(
         (r.array.n_paneles_total if r.array else r.meta.n_paneles_total)
@@ -70,10 +70,10 @@ def ejecutar_multizona(entradas: List) -> ResultadoPaneles:
     )
 
     # ==================================================
-    # VALIDACIÓN DE VOLTAJE
+    # VALIDACIÓN DE VOLTAJE (SE MANTIENE)
     # ==================================================
     vdc_vals = [
-        (r.array.vdc_nom if r.array else None)
+        r.array.vdc_nom
         for r in resultados
         if (r.array and r.array.vdc_nom is not None)
     ]
@@ -92,20 +92,23 @@ def ejecutar_multizona(entradas: List) -> ResultadoPaneles:
                 meta=None,
             )
 
-        vdc_nom = sum(vdc_vals) / len(vdc_vals)
+        # 🔥 NO PROMEDIAR → usar referencia
+        vdc_nom = vdc_vals[0]
     else:
         vdc_nom = None
 
     # ==================================================
-    # STRINGS CONSOLIDADOS
+    # STRINGS CONSOLIDADOS (MEJORADO)
     # ==================================================
     strings_total = []
-    for r in resultados:
+    for i, r in enumerate(resultados):
         if r.strings:
-            strings_total.extend(r.strings)
+            for s in r.strings:
+                s.zona = i + 1  # 🔥 clave para trazabilidad
+                strings_total.append(s)
 
     # ==================================================
-    # MPPT TOTAL
+    # MPPT TOTAL (SE MANTIENE)
     # ==================================================
     n_mppt_total = sum(
         (r.array.n_mppt if r.array else 0)
@@ -118,24 +121,16 @@ def ejecutar_multizona(entradas: List) -> ResultadoPaneles:
     )
 
     # ==================================================
-    # ⚠️ CORRIENTES (PARALELO)
+    # ⚠️ CORRECCIÓN CLAVE: NO INVENTAR CORRIENTES
     # ==================================================
-    idc_nom = max(
-        (r.array.idc_nom for r in resultados if r.array),
-        default=0
-    )
-
-    isc_total = max(
-        (r.array.isc_total for r in resultados if r.array),
-        default=0
-    )
+    idc_nom = None
+    isc_total = None
 
     # ==================================================
-    # ARRAY FINAL
+    # ARRAY FINAL (REPRESENTATIVO, NO ELÉCTRICO)
     # ==================================================
     from electrical.paneles.resultado_paneles import (
         ArrayFV,
-        PanelesMeta,
         RecomendacionStrings,
     )
 
@@ -157,8 +152,8 @@ def ejecutar_multizona(entradas: List) -> ResultadoPaneles:
     array_total = ArrayFV(
         potencia_dc_w=total_pdc,
         vdc_nom=vdc_nom or ref.vdc_nom,
-        idc_nom=idc_nom,
-        isc_total=isc_total,
+        idc_nom=idc_nom,          # 🔥 ahora correcto
+        isc_total=isc_total,      # 🔥 ahora correcto
         voc_frio_array_v=ref.voc_frio_array_v,
         n_strings_total=total_strings,
         n_paneles_total=total_paneles,
@@ -168,7 +163,7 @@ def ejecutar_multizona(entradas: List) -> ResultadoPaneles:
     )
 
     # ==================================================
-    # RECOMENDACIÓN
+    # RECOMENDACIÓN (SE MANTIENE)
     # ==================================================
     rec_base = resultados[0].recomendacion
 
@@ -181,7 +176,7 @@ def ejecutar_multizona(entradas: List) -> ResultadoPaneles:
     )
 
     # ==================================================
-    # WARNINGS CONSOLIDADOS
+    # WARNINGS
     # ==================================================
     warnings = []
     for r in resultados:
@@ -203,6 +198,6 @@ def ejecutar_multizona(entradas: List) -> ResultadoPaneles:
             "n_paneles_total": total_paneles,
             "pdc_kw": total_pdc / 1000,
             "n_inversores": 1,
-            "zonas": zonas_detalle,   # 🔥 AQUÍ ESTÁ LO IMPORTANTE
+            "zonas": zonas_detalle,
         },
     )
