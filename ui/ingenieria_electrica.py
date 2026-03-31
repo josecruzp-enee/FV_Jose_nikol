@@ -201,18 +201,18 @@ def render(ctx):
 
         try:
             p = _datosproyecto_desde_ctx(ctx)
-
             deps = construir_dependencias()
 
             resultado = ejecutar_estudio(p, deps)
 
-            ctx.resultado = resultado
-
-            st.success("✅ Ingeniería generada")
-
-        except Exception as e:
-            st.error(f"❌ Error generando ingeniería: {e}")
+        except Exception as err:
+            st.error(f"❌ Error generando ingeniería: {err}")
             return
+
+        # 🔥 IMPORTANTE: FUERA DEL TRY
+        ctx.resultado = resultado
+
+        st.success("✅ Ingeniería generada")
 
     resultado = getattr(ctx, "resultado", None)
 
@@ -220,24 +220,21 @@ def render(ctx):
         return
 
     # ===============================
-    # ESTADO GENERAL
+    # ESTADO
     # ===============================
-    st.write("Estado:", resultado.ok)
-    st.write("Errores:", resultado.errores)
+    st.write("Estado:", getattr(resultado, "ok", None))
+    st.write("Errores:", getattr(resultado, "errores", None))
 
-    # ===============================
-    # VALIDACIÓN MÍNIMA
-    # ===============================
-    if not resultado.ok:
+    if not getattr(resultado, "ok", False):
         st.error("❌ Resultado no OK")
         return
 
-    if not resultado.strings:
-        st.error("❌ No hay resultado de strings")
+    if not getattr(resultado, "strings", None):
+        st.error("❌ No hay strings")
         return
 
-    if not resultado.electrical:
-        st.error("❌ No hay resultado eléctrico")
+    if not getattr(resultado, "electrical", None):
+        st.error("❌ No hay electrical")
         return
 
     # ===============================
@@ -247,8 +244,8 @@ def render(ctx):
         strings = resultado.strings.strings
         _mostrar_detalle(strings, resultado.electrical, resultado.sizing)
 
-    except Exception as e:
-        st.error(f"❌ Error mostrando detalle: {e}")
+    except Exception as err:
+        st.error(f"❌ Error mostrando detalle: {err}")
 # ==========================================================
 # VALIDACIÓN
 # ==========================================================
