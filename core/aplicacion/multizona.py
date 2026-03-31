@@ -64,12 +64,58 @@ def ejecutar_multizona(entradas: List) -> ResultadoPaneles:
 # ==========================================================
 # ZONAS
 # ==========================================================
-def _ejecutar_zonas(entradas):
+from electrical.paneles.orquestador_paneles import ejecutar_paneles
+
+
+def _ejecutar_zonas(entrada):
 
     resultados = []
 
-    for e in entradas:
-        res = ejecutar_paneles(e)
+    # ======================================================
+    # 🔥 MULTIZONA REAL
+    # ======================================================
+    if getattr(entrada, "modo", None) == "multizona":
+
+        zonas = getattr(entrada, "zonas", [])
+
+        if not zonas:
+            raise ValueError("Multizona sin zonas")
+
+        for i, z in enumerate(zonas, 1):
+
+            n_paneles = int(z.get("n_paneles") or 0)
+
+            if n_paneles <= 0:
+                raise ValueError(f"Zona {i}: n_paneles inválido")
+
+            # 🔥 crear sub-entrada independiente por zona
+            sub_entrada = entrada.__class__(
+                panel=entrada.panel,
+                inversor=entrada.inversor,
+                modo="manual",
+                n_paneles_total=n_paneles,
+                zonas=None,
+                t_min_c=entrada.t_min_c,
+                t_oper_c=entrada.t_oper_c,
+                dos_aguas=entrada.dos_aguas,
+                objetivo_dc_ac=entrada.objetivo_dc_ac,
+                pdc_kw_objetivo=entrada.pdc_kw_objetivo,
+                n_inversores=entrada.n_inversores,
+            )
+
+            res = ejecutar_paneles(sub_entrada)
+
+            if not res.ok:
+                return res
+
+            resultados.append(res)
+
+    # ======================================================
+    # CASO NORMAL (NO MULTIZONA)
+    # ======================================================
+    else:
+
+        res = ejecutar_paneles(entrada)
 
         if not res.ok:
             return res
@@ -77,7 +123,6 @@ def _ejecutar_zonas(entradas):
         resultados.append(res)
 
     return resultados
-
 
 # ==========================================================
 # DETALLE
