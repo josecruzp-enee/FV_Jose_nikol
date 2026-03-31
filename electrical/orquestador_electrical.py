@@ -5,7 +5,7 @@ from typing import Any
 # DOMINIO
 # ===============================
 from electrical.resultado_electrical import ResultadoElectrico
-
+from electrical.conductores.calculo_conductores import dimensionar_tramos_fv
 # ===============================
 # SUBMÓDULOS
 # ===============================
@@ -16,7 +16,7 @@ from electrical.conductores.corrientes import (
     calcular_corrientes,
 )
 
-from electrical.conductores.calculo_conductores import calcular_conductores
+
 
 from electrical.protecciones.protecciones import (
     EntradaProtecciones,
