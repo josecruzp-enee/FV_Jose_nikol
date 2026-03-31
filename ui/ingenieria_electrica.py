@@ -139,10 +139,14 @@ def _mostrar_detalle(strings, electrical, sizing):
     if not inv:
         st.warning("⚠ Inversor no disponible")
     else:
-        st.markdown(f"""
-- Potencia AC: {getattr(inv, 'kw_ac', '-')} kW  
-- MPPT: {getattr(inv, 'n_mppt', '-')}  
-- Vdc máx: {getattr(inv, 'vdc_max_v', '-')} V  
+        kw = getattr(inv, "kw_ac", None)
+        mppt = getattr(inv, "n_mppt", None)
+        vdc = getattr(inv, "vdc_max_v", None)
+
+    st.markdown(f"""
+- Potencia AC: {kw if kw is not None else "-"} kW  
+- MPPT: {mppt if mppt is not None else "-"}  
+- Vdc máx: {vdc if vdc is not None else "-"} V  
 """)
 
     # ==================================================
