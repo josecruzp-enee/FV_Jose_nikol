@@ -10,13 +10,34 @@ from core.aplicacion.dependencias import construir_dependencias
 from ui.state_helpers import ensure_dict
 
 
-
-
 # ==========================================================
 # UTIL
 # ==========================================================
 def _asegurar_dict(ctx, nombre: str) -> dict:
     return ensure_dict(ctx, nombre, dict)
+
+
+# ==========================================================
+# DEBUG COMPLETO (🔥 YA INTEGRADO)
+# ==========================================================
+def mostrar_debug_completo(resultado):
+
+    st.markdown("## 🧪 INSPECCIÓN COMPLETA DEL SISTEMA")
+
+    def safe(obj):
+        try:
+            return obj.__dict__
+        except:
+            return str(obj)
+
+    data = {
+        "sizing": safe(resultado.sizing),
+        "paneles": safe(resultado.strings),
+        "energia": safe(resultado.energia),
+        "electrical": safe(resultado.electrical),
+    }
+
+    st.json(data)
 
 
 # ==========================================================
@@ -120,76 +141,6 @@ def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
 
 
 # ==========================================================
-# DETALLE
-# ==========================================================
-def _mostrar_detalle(strings, electrical, sizing):
-
-    st.markdown("## ⚡ Ingeniería eléctrica")
-
-    corr = electrical.corrientes
-    cond = electrical.conductores
-    prot = electrical.protecciones
-
-    tr = getattr(cond, "tramos", None)
-    mppt_detalle = getattr(corr, "mppt_detalle", [])
-
-    inv = getattr(sizing, "inversor", None)
-
-    st.markdown("### ⚙ Inversor seleccionado")
-
-    if not inv:
-        st.warning("⚠ Inversor no disponible")
-    else:
-        kw = getattr(inv, "kw_ac", None)
-        mppt = getattr(inv, "n_mppt", None)
-        vdc = getattr(inv, "vdc_max_v", None)
-
-        st.markdown(f"""
-- Potencia AC: {kw if kw is not None else "-"} kW  
-- MPPT: {mppt if mppt is not None else "-"}  
-- Vdc máx: {vdc if vdc is not None else "-"} V  
-""")
-
-    st.markdown("### 🔷 Configuración FV")
-
-    for i, s in enumerate(strings, 1):
-        st.markdown(f"""
-**String {i}**
-
-- Paneles: {s.n_series}  
-- Vmp: {s.vmp_string_v:.1f} V  
-- Voc: {s.voc_frio_string_v:.1f} V  
-- Corriente: {s.imp_string_a:.2f} A  
-""")
-
-    st.markdown("### ⚡ Resultado eléctrico por MPPT")
-
-    for i, m in enumerate(mppt_detalle):
-
-        p = prot.mppt[i] if i < len(prot.mppt) else None
-        t = tr.dc_mppt[i] if tr and i < len(tr.dc_mppt) else None
-
-        st.markdown(f"""
-**MPPT {i+1}**
-
-- Corriente operación: {m.i_operacion_a:.2f} A  
-- Corriente diseño: {m.i_diseno_a:.2f} A  
-- Protección: {p.tamano_a if p else "-"} A  
-- Conductor: {t.calibre if t else "-"} AWG  
-""")
-
-    st.markdown("### 🔌 Sistema AC")
-
-    t_ac = getattr(tr, "ac", None)
-
-    st.markdown(f"""
-- Corriente AC: {corr.ac.i_diseno_a:.2f} A  
-- Protección: {prot.ocpd_ac.tamano_a if prot.ocpd_ac else "-"} A  
-- Conductor: {t_ac.calibre if t_ac else "-"} AWG  
-""")
-
-
-# ==========================================================
 # RENDER
 # ==========================================================
 def render(ctx):
@@ -209,9 +160,7 @@ def render(ctx):
             st.error(f"❌ Error generando ingeniería: {err}")
             return
 
-        # 🔥 IMPORTANTE: FUERA DEL TRY
         ctx.resultado = resultado
-
         st.success("✅ Ingeniería generada")
 
     resultado = getattr(ctx, "resultado", None)
@@ -219,33 +168,10 @@ def render(ctx):
     if not resultado:
         return
 
-    # ===============================
-    # ESTADO
-    # ===============================
-    st.write("Estado:", getattr(resultado, "ok", None))
-    st.write("Errores:", getattr(resultado, "errores", None))
+    # 🔥 DEBUG AUTOMÁTICO (YA INTEGRADO)
+    mostrar_debug_completo(resultado)
 
-    if not getattr(resultado, "ok", False):
-        st.error("❌ Resultado no OK")
-        return
 
-    if not getattr(resultado, "strings", None):
-        st.error("❌ No hay strings")
-        return
-
-    if not getattr(resultado, "electrical", None):
-        st.error("❌ No hay electrical")
-        return
-
-    # ===============================
-    # DETALLE
-    # ===============================
-    try:
-        strings = resultado.strings.strings
-        _mostrar_detalle(strings, resultado.electrical, resultado.sizing)
-
-    except Exception as err:
-        st.error(f"❌ Error mostrando detalle: {err}")
 # ==========================================================
 # VALIDACIÓN
 # ==========================================================
