@@ -1,19 +1,5 @@
 from __future__ import annotations
 
-"""
-TRAMO CONDUCTOR — FV ENGINE
-
-Motor de decisión final del conductor.
-
-Integra:
-
-    ✔ Corrientes
-    ✔ Ampacidad (NEC)
-    ✔ Caída de tensión
-
-NO usa dict
-"""
-
 from dataclasses import dataclass
 from typing import List
 
@@ -57,7 +43,7 @@ class ResultadoConductor:
 
 
 # ==========================================================
-# MOTOR
+# MOTOR BASE
 # ==========================================================
 
 def tramo_conductor(
@@ -76,9 +62,7 @@ def tramo_conductor(
 
     tabla: List[Conductor] = list(tabla_base_conductores(material))
 
-    # ------------------------------------------------------
-    # 1. Selección por ampacidad
-    # ------------------------------------------------------
+    # 1. Ampacidad
     for t in tabla:
 
         amp_base = t.amp_a
@@ -96,9 +80,7 @@ def tramo_conductor(
     else:
         awg = tabla[-1].awg
 
-    # ------------------------------------------------------
-    # 2. Ajuste por VD
-    # ------------------------------------------------------
+    # 2. VD
     awg = ajustar_calibre_por_vd(
         tabla,
         awg=awg,
@@ -109,9 +91,7 @@ def tramo_conductor(
         n_hilos=n_hilos,
     )
 
-    # ------------------------------------------------------
-    # 3. Resultado final
-    # ------------------------------------------------------
+    # 3. Resultado
     fila = next(t for t in tabla if t.awg == awg)
 
     amp_base = fila.amp_a
@@ -157,20 +137,18 @@ def tramo_conductor(
 
 
 # ==========================================================
-# RESULTADO AGRUPADO
+# RESULTADO AGRUPADO (SIN DC GLOBAL)
 # ==========================================================
 
 @dataclass(frozen=True)
 class TramosFV:
 
-    dc: ResultadoConductor
+    dc_mppt: List[ResultadoConductor]  # 🔥 cada MPPT su cable
     ac: ResultadoConductor
-
-    mppt: List[ResultadoConductor]  # 🔥 NUEVO
 
 
 # ==========================================================
-# ORQUESTADOR FV
+# ORQUESTADOR FV (CORRECTO)
 # ==========================================================
 
 def dimensionar_tramos_fv(
@@ -188,20 +166,7 @@ def dimensionar_tramos_fv(
 ) -> TramosFV:
 
     # ==================================================
-    # DC GLOBAL (compatibilidad)
-    # ==================================================
-    tramo_dc = tramo_conductor(
-        nombre="DC_STRING_A_INV",
-        i_diseno_a=corrientes.dc_total.i_diseno_a,
-        v_base_v=vmp_dc if vmp_dc > 0 else 1.0,
-        l_m=dist_dc_m,
-        vd_obj_pct=vd_obj_dc_pct,
-        material=material_dc,
-        n_hilos=2,
-    )
-
-    # ==================================================
-    # MPPT (NUEVO)
+    # DC POR MPPT (🔥 CORRECTO)
     # ==================================================
     tramos_mppt = []
 
@@ -238,7 +203,6 @@ def dimensionar_tramos_fv(
     # RESULTADO FINAL
     # ==================================================
     return TramosFV(
-        dc=tramo_dc,
+        dc_mppt=tramos_mppt,
         ac=tramo_ac,
-        mppt=tramos_mppt,  # 🔥 NUEVO
     )
