@@ -95,7 +95,7 @@ def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
         inversor_id=eq.get("inversor_id"),
     )
 
-    if sf_raw.get("usar_zonas"):
+    if sf_raw.get("zonas"):
 
         zonas = []
         for z in sf_raw.get("zonas", []):
