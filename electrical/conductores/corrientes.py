@@ -170,10 +170,7 @@ def calcular_corrientes(inp: CorrientesInput) -> ResultadoCorrientes:
     # ------------------------------------------------------
     # DC TOTAL (igual que antes)
     # ------------------------------------------------------
-    i_dc_operacion = sum(m.i_operacion_a for m in mppt_detalle)
-    i_dc_diseno = sum(m.i_diseno_a for m in mppt_detalle)
-
-    dc_total = NivelCorriente(i_dc_operacion, i_dc_diseno)
+    mppt = mppt_detalle[0] if mppt_detalle else NivelCorriente(0.0, 0.0)
 
     # ------------------------------------------------------
     # AC
