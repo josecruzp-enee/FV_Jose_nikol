@@ -140,10 +140,9 @@ def _mostrar_detalle(strings, electrical, sizing):
         st.warning("⚠ Inversor no disponible")
     else:
         st.markdown(f"""
-- Modelo: {inv.modelo}  
-- Potencia AC: {inv.kw_ac} kW  
-- MPPT: {inv.n_mppt}  
-- Vdc máx: {inv.vdc_max_v} V  
+- Potencia AC: {getattr(inv, 'kw_ac', '-')} kW  
+- MPPT: {getattr(inv, 'n_mppt', '-')}  
+- Vdc máx: {getattr(inv, 'vdc_max_v', '-')} V  
 """)
 
     # ==================================================
