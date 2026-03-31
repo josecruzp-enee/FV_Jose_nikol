@@ -200,15 +200,16 @@ def _mostrar_detalle(strings, electrical):
         # conductor
         t = tr.dc_mppt[i] if tr and i < len(tr.dc_mppt) else None
 
-        st.markdown(f"""
-        **MPPT {i+1}**
+        amp = f"{t_ac.ampacidad_ajustada_a:.1f}" if t_ac else "-"
+        vd = f"{t_ac.vd_pct:.2f}" if t_ac else "-"
+        cal = f"{t_ac.calibre}" if t_ac else "-"
 
-        - Corriente operación: {m.i_operacion_a:.2f} A  
-        - Corriente diseño: {m.i_diseno_a:.2f} A  
-        - Protección: {p.tamano_a if p else "-"} A  
-        - Conductor: {t.calibre if t else "-"} AWG  
-        - Ampacidad: {t.ampacidad_ajustada_a:.1f} A  
-        - Caída de tensión: {t.vd_pct:.2f}%  
+        st.markdown(f"""
+        - Corriente AC: {corr.ac.i_diseno_a:.2f} A  
+        - Protección: {prot.ocpd_ac.tamano_a if prot.ocpd_ac else "-"} A  
+        - Conductor: {cal} AWG  
+        - Ampacidad: {amp} A  
+        - Caída de tensión: {vd}%  
         """)
 
     # ==================================================
