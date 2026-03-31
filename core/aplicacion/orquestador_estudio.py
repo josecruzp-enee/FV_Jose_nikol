@@ -87,8 +87,8 @@ def ejecutar_estudio(datos: Any, deps: DependenciasEstudio) -> ResultadoProyecto
                     paneles=paneles,
                     sizing=sizing
                 )
-            except Exception:
-                electrical = None
+            except Exception as e:
+                raise RuntimeError(f"[ELECTRICAL ERROR] {str(e)}")
 
         # ==================================================
         # 5. FINANZAS
@@ -100,8 +100,8 @@ def ejecutar_estudio(datos: Any, deps: DependenciasEstudio) -> ResultadoProyecto
                 finanzas = deps.finanzas.ejecutar(
                     datos, sizing, energia
                 )
-            except Exception:
-                finanzas = None
+            except Exception as e:
+                raise RuntimeError(f"[FINANZAS ERROR] {str(e)}")
 
         # ==================================================
         # RESULTADO FINAL
@@ -118,6 +118,7 @@ def ejecutar_estudio(datos: Any, deps: DependenciasEstudio) -> ResultadoProyecto
 
     except Exception as e:
 
+        # 🔥 ESTE YA ES EL ERROR REAL DEL SISTEMA
         return ResultadoProyecto(
             sizing=None,
             strings=None,
