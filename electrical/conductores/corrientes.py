@@ -134,7 +134,6 @@ def calcular_corrientes(inp: CorrientesInput) -> ResultadoCorrientes:
     # ------------------------------------------------------
     i_panel_operacion = s0.isc_string_a
     i_panel_diseno = i_panel_operacion * FACTOR_DC
-
     panel = NivelCorriente(i_panel_operacion, i_panel_diseno)
 
     # ------------------------------------------------------
@@ -142,7 +141,6 @@ def calcular_corrientes(inp: CorrientesInput) -> ResultadoCorrientes:
     # ------------------------------------------------------
     i_string_operacion = s0.imp_string_a
     i_string_diseno = s0.isc_string_a * FACTOR_DC
-
     string = NivelCorriente(i_string_operacion, i_string_diseno)
 
     # ======================================================
@@ -152,7 +150,7 @@ def calcular_corrientes(inp: CorrientesInput) -> ResultadoCorrientes:
 
     mppt_detalle = []
 
-    for mppt_id, grupo in grupos.items():
+    for _, grupo in grupos.items():
 
         i_operacion = sum(s.imp_string_a for s in grupo)
         i_diseno = sum(s.isc_string_a for s in grupo) * FACTOR_DC
@@ -160,17 +158,18 @@ def calcular_corrientes(inp: CorrientesInput) -> ResultadoCorrientes:
         mppt_detalle.append(NivelCorriente(i_operacion, i_diseno))
 
     # ------------------------------------------------------
-    # MPPT (compatibilidad con sistema actual)
-    # ------------------------------------------------------
-    i_mppt_operacion = sum(m.i_operacion_a for m in mppt_detalle)
-    i_mppt_diseno = sum(m.i_diseno_a for m in mppt_detalle)
-
-    mppt = NivelCorriente(i_mppt_operacion, i_mppt_diseno)
-
-    # ------------------------------------------------------
-    # DC TOTAL (igual que antes)
+    # MPPT (compatibilidad)
+    # 👉 NO SUMAR
     # ------------------------------------------------------
     mppt = mppt_detalle[0] if mppt_detalle else NivelCorriente(0.0, 0.0)
+
+    # ------------------------------------------------------
+    # DC TOTAL (esto sí se suma)
+    # ------------------------------------------------------
+    i_dc_operacion = sum(m.i_operacion_a for m in mppt_detalle)
+    i_dc_diseno = sum(m.i_diseno_a for m in mppt_detalle)
+
+    dc_total = NivelCorriente(i_dc_operacion, i_dc_diseno)
 
     # ------------------------------------------------------
     # AC
@@ -186,7 +185,6 @@ def calcular_corrientes(inp: CorrientesInput) -> ResultadoCorrientes:
         i_ac_operacion = p_w / (inp.vac * inp.fp)
 
     i_ac_diseno = i_ac_operacion * FACTOR_AC
-
     ac = NivelCorriente(i_ac_operacion, i_ac_diseno)
 
     # ------------------------------------------------------
@@ -196,7 +194,7 @@ def calcular_corrientes(inp: CorrientesInput) -> ResultadoCorrientes:
         panel=panel,
         string=string,
         mppt=mppt,
-        mppt_detalle=mppt_detalle,  # 🔥 nuevo
+        mppt_detalle=mppt_detalle,
         dc_total=dc_total,
         ac=ac,
     )
