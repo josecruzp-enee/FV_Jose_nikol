@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from typing import Any
-from dataclasses import dataclass
 
 from core.dominio.contrato import ResultadoProyecto
 from core.aplicacion.dependencias import DependenciasEstudio
@@ -12,8 +11,6 @@ from core.aplicacion.dependencias import DependenciasEstudio
 # ==========================================================
 
 def ejecutar_estudio(datos: Any, deps: DependenciasEstudio) -> ResultadoProyecto:
-
-    trazas = {}
 
     try:
 
@@ -26,17 +23,15 @@ def ejecutar_estudio(datos: Any, deps: DependenciasEstudio) -> ResultadoProyecto
             raise ValueError("Sizing devolvió None")
 
         if not getattr(sizing, "ok", True):
-            trazas["sizing"] = "FAIL"
             return ResultadoProyecto(
                 sizing=sizing,
-                paneles=None,
+                strings=None,
                 energia=None,
                 electrical=None,
-                finanzas=None,
-                trazas=trazas
+                financiero=None,
+                ok=False,
+                errores=["Error en sizing"]
             )
-
-        trazas["sizing"] = "OK"
 
         # ==================================================
         # 2. PANELES
@@ -51,17 +46,15 @@ def ejecutar_estudio(datos: Any, deps: DependenciasEstudio) -> ResultadoProyecto
             raise ValueError("Paneles devolvió None")
 
         if not getattr(paneles, "ok", True):
-            trazas["paneles"] = "FAIL"
             return ResultadoProyecto(
                 sizing=sizing,
-                paneles=paneles,
+                strings=paneles,
                 energia=None,
                 electrical=None,
-                finanzas=None,
-                trazas=trazas
+                financiero=None,
+                ok=False,
+                errores=["Error en paneles"]
             )
-
-        trazas["paneles"] = "OK"
 
         # ==================================================
         # 3. ENERGÍA
@@ -72,17 +65,15 @@ def ejecutar_estudio(datos: Any, deps: DependenciasEstudio) -> ResultadoProyecto
             raise ValueError("Energía devolvió None")
 
         if not getattr(energia, "ok", True):
-            trazas["energia"] = "FAIL"
             return ResultadoProyecto(
                 sizing=sizing,
-                paneles=paneles,
+                strings=paneles,
                 energia=energia,
                 electrical=None,
-                finanzas=None,
-                trazas=trazas
+                financiero=None,
+                ok=False,
+                errores=["Error en energía"]
             )
-
-        trazas["energia"] = "OK"
 
         # ==================================================
         # 4. ELECTRICAL
@@ -96,12 +87,8 @@ def ejecutar_estudio(datos: Any, deps: DependenciasEstudio) -> ResultadoProyecto
                     paneles=paneles,
                     sizing=sizing
                 )
-                trazas["electrical"] = "OK" if electrical else "NONE"
-            except Exception as e:
-                trazas["electrical"] = f"ERROR: {str(e)}"
+            except Exception:
                 electrical = None
-        else:
-            trazas["electrical"] = "NONE"
 
         # ==================================================
         # 5. FINANZAS
@@ -113,36 +100,30 @@ def ejecutar_estudio(datos: Any, deps: DependenciasEstudio) -> ResultadoProyecto
                 finanzas = deps.finanzas.ejecutar(
                     datos, sizing, energia
                 )
-                trazas["finanzas"] = "OK"
-            except Exception as e:
-                trazas["finanzas"] = f"ERROR: {str(e)}"
+            except Exception:
                 finanzas = None
-        else:
-            trazas["finanzas"] = "NONE"
 
         # ==================================================
         # RESULTADO FINAL
         # ==================================================
         return ResultadoProyecto(
-            ok=True,
             sizing=sizing,
-            paneles=paneles,
+            strings=paneles,
             energia=energia,
             electrical=electrical,
-            finanzas=finanzas,
-            errores=[],
-            warnings=[],
+            financiero=finanzas,
+            ok=True,
+            errores=[]
         )
 
     except Exception as e:
 
         return ResultadoProyecto(
-            ok=False,
             sizing=None,
-            paneles=None,
+            strings=None,
             energia=None,
             electrical=None,
-            finanzas=None,
-            errores=[str(e)],
-            warnings=[],
+            financiero=None,
+            ok=False,
+            errores=[str(e)]
         )
