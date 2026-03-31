@@ -24,7 +24,7 @@ from electrical.protecciones.resultado_protecciones import (
 class EntradaProtecciones:
     corrientes: ResultadoCorrientes
     n_strings: int
-    paneles=paneles
+    paneles: any 
 
 
 # ==========================================================
