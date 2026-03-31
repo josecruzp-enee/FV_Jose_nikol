@@ -96,8 +96,11 @@ def _agrupar_por_mppt(strings):
     grupos = defaultdict(list)
 
     for s in strings:
-        mppt_id = getattr(s, "mppt", 0)
-        grupos[mppt_id].append(s)
+
+        # 🔥 usar zona como MPPT
+        zona = getattr(s, "zona", 0)
+
+        grupos[zona].append(s)
 
     return grupos
 
@@ -167,8 +170,8 @@ def calcular_corrientes(inp: CorrientesInput) -> ResultadoCorrientes:
     # ------------------------------------------------------
     # DC TOTAL (igual que antes)
     # ------------------------------------------------------
-    i_dc_operacion = array.idc_nom
-    i_dc_diseno = array.isc_total * FACTOR_DC
+    i_dc_operacion = sum(m.i_operacion_a for m in mppt_detalle)
+    i_dc_diseno = sum(m.i_diseno_a for m in mppt_detalle)
 
     dc_total = NivelCorriente(i_dc_operacion, i_dc_diseno)
 
