@@ -160,7 +160,7 @@ def ejecutar_electrical(*, datos: Any, paneles: Any, sizing: Any) -> ResultadoEl
         # ==================================================
         # CONDUCTORES
         # ==================================================
-        tramos = calcular_conductores(
+        tramos = dimensionar_tramos_fv(
             corrientes=corrientes,
             vmp_dc=array.vdc_nom,
             vac=vac,
@@ -171,6 +171,8 @@ def ejecutar_electrical(*, datos: Any, paneles: Any, sizing: Any) -> ResultadoEl
 
         conductores = ResultadoConductores.build(tramos)
 
+
+        
         if not conductores.ok:
             return ResultadoElectrico.build(
                 paneles=paneles,
