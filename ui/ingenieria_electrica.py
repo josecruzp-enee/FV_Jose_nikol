@@ -9,6 +9,9 @@ from core.aplicacion.dependencias import construir_dependencias
 
 from ui.state_helpers import ensure_dict
 
+# 🔥 TRACE
+from core.debug.trace_streamlit import trace, get_trace, clear_trace
+
 
 # ==========================================================
 # UTIL
@@ -131,7 +134,6 @@ def _mostrar_detalle(strings, electrical, sizing):
     tr = getattr(cond, "tramos", None)
     mppt_detalle = getattr(corr, "mppt_detalle", [])
 
-    # 🔥 INVERSOR CORRECTO
     inv = getattr(sizing, "inversor", None)
 
     st.markdown("### ⚙ Inversor seleccionado")
@@ -143,15 +145,12 @@ def _mostrar_detalle(strings, electrical, sizing):
         mppt = getattr(inv, "n_mppt", None)
         vdc = getattr(inv, "vdc_max_v", None)
 
-    st.markdown(f"""
+        st.markdown(f"""
 - Potencia AC: {kw if kw is not None else "-"} kW  
 - MPPT: {mppt if mppt is not None else "-"}  
 - Vdc máx: {vdc if vdc is not None else "-"} V  
 """)
 
-    # ==================================================
-    # CONFIGURACIÓN FV
-    # ==================================================
     st.markdown("### 🔷 Configuración FV")
 
     for i, s in enumerate(strings, 1):
@@ -164,9 +163,6 @@ def _mostrar_detalle(strings, electrical, sizing):
 - Corriente: {s.imp_string_a:.2f} A  
 """)
 
-    # ==================================================
-    # RESULTADO MPPT
-    # ==================================================
     st.markdown("### ⚡ Resultado eléctrico por MPPT")
 
     for i, m in enumerate(mppt_detalle):
@@ -183,9 +179,6 @@ def _mostrar_detalle(strings, electrical, sizing):
 - Conductor: {t.calibre if t else "-"} AWG  
 """)
 
-    # ==================================================
-    # AC
-    # ==================================================
     st.markdown("### 🔌 Sistema AC")
 
     t_ac = getattr(tr, "ac", None)
@@ -202,13 +195,25 @@ def _mostrar_detalle(strings, electrical, sizing):
 # ==========================================================
 def render(ctx):
 
+    debug_mode = st.toggle("🧪 Activar debug pipeline", value=True)
+
     e = _asegurar_dict(ctx, "electrico")
     _ui_inputs_electricos(e)
 
     if st.button("⚡ Generar ingeniería eléctrica", width="stretch"):
 
         p = _datosproyecto_desde_ctx(ctx)
+
         deps = construir_dependencias()
+
+        # 🔥 INSTRUMENTAR PIPELINE
+        deps.sizing.ejecutar = trace("sizing")(deps.sizing.ejecutar)
+        deps.paneles.ejecutar = trace("paneles")(deps.paneles.ejecutar)
+        deps.energia.ejecutar = trace("energia")(deps.energia.ejecutar)
+        deps.nec.ejecutar = trace("nec")(deps.nec.ejecutar)
+        deps.finanzas.ejecutar = trace("finanzas")(deps.finanzas.ejecutar)
+
+        clear_trace()
 
         resultado = ejecutar_estudio(p, deps)
 
@@ -228,8 +233,38 @@ def render(ctx):
         strings = resultado.strings.strings
         _mostrar_detalle(strings, resultado.electrical, resultado.sizing)
 
+    # ==========================================================
+    # DEBUG PIPELINE
+    # ==========================================================
+    if debug_mode:
+
+        trace_data = get_trace()
+
+        if trace_data:
+
+            st.markdown("## 🧪 Debug Pipeline FV")
+
+            for step in trace_data:
+
+                nombre = step.get("funcion", "unknown")
+                entrada = step.get("entrada")
+                salida = step.get("salida")
+                error = step.get("error")
+
+                with st.expander(f"🔹 {nombre.upper()}", expanded=False):
+
+                    st.markdown("**Entrada**")
+                    st.code(str(entrada)[:800], language="python")
+
+                    if error:
+                        st.error(error)
+                    else:
+                        st.markdown("**Salida**")
+                        st.code(str(salida)[:800], language="python")
+
+
 # ==========================================================
-# VALIDACIÓN (REQUIRED POR EL WIZARD)
+# VALIDACIÓN
 # ==========================================================
 def validar(ctx):
 
