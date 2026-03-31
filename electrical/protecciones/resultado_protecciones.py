@@ -67,8 +67,11 @@ class ResultadoProtecciones:
     ocpd_dc_array: OCPDResultado
     fusible_string: FusibleStringResultado
 
-    # 🔥 NUEVO — PROTECCIONES POR MPPT
+    # 🔥 PROTECCIONES POR MPPT
     mppt: List[OCPDResultado]
+
+    # 🔥 NUEVO — FUSIBLES POR MPPT (NO rompe nada)
+    fusible_mppt: Optional[List[FusibleStringResultado]] = None
 
     # =====================================================
     # FACTORY DE ERROR (NECESARIO PARA ORQUESTADOR)
@@ -84,5 +87,6 @@ class ResultadoProtecciones:
             fusible_string=FusibleStringResultado(
                 False, None, None, None, "error"
             ),
-            mppt=[]  # 🔥 OBLIGATORIO
+            mppt=[],
+            fusible_mppt=[]  # 🔥 clave
         )
