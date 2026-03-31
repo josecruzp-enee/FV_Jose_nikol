@@ -190,33 +190,54 @@ def _mostrar_detalle(strings, electrical):
                 f"(diseño {m.i_diseno_a:.2f} A)"
             )
 
-        # 🔥 PROTECCIÓN DC CORRECTA
+        # Protección DC por MPPT
         if i-1 < len(prot.mppt):
             p = prot.mppt[i-1]
             st.info(f"Protección DC (MPPT): {p.tamano_a} A")
 
         st.divider()
 
+    # --------------------------------------------------
     # SISTEMA
+    # --------------------------------------------------
     st.markdown("### ⚡ Sistema")
     st.metric("Corriente AC", f"{corr.ac.i_diseno_a:.2f} A")
 
-    # CONDUCTORES
+    # --------------------------------------------------
+    # CONDUCTORES (🔥 CORREGIDO COMPLETO)
+    # --------------------------------------------------
     st.markdown("### 🧵 Conductores y protecciones (sistema)")
 
-    tr = cond.tramos
+    tr = getattr(cond, "tramos", None)
+
+    if not tr:
+        st.warning("No se pudo calcular conductores")
+        return
 
     fus = prot.fusible_string
     fus_val = fus.tamano_a if fus and fus.tamano_a else "—"
 
+    # DC por MPPT
+    dc_text = "—"
+    if getattr(tr, "dc_mppt", None):
+        dc_text = " / ".join(f"{t.calibre} AWG" for t in tr.dc_mppt)
+
+    # AC
+    ac_text = "-"
+    if getattr(tr, "ac", None):
+        ac_text = f"{tr.ac.calibre} AWG"
+
+    # Breaker
+    breaker = "-"
+    if getattr(prot, "ocpd_ac", None):
+        breaker = f"{prot.ocpd_ac.tamano_a} A"
+
     st.table([{
-        "DC cable": f"{tr.dc.calibre} AWG" if tr.dc else "-",
-        "AC cable": f"{tr.ac.calibre} AWG" if tr.ac else "-",
-        "Breaker AC": f"{prot.ocpd_ac.tamano_a} A",
+        "DC cable": dc_text,
+        "AC cable": ac_text,
+        "Breaker AC": breaker,
         "Fusible (string)": fus_val
     }])
-
-
 # ==========================================================
 # RENDER
 # ==========================================================
