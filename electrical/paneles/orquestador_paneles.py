@@ -102,7 +102,6 @@ def _mapear_strings(strings_res):
 # =========================================================
 # ORQUESTADOR
 # =========================================================
-
 def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
 
     errores: List[str] = []
@@ -114,7 +113,6 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
     # ------------------------------------------------------
     # VALIDACIÓN
     # ------------------------------------------------------
-
     for val in (
         validar_panel(panel),
         validar_inversor(inversor),
@@ -126,101 +124,8 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
         return _resultado_error(panel, errores, warnings)
 
     # ======================================================
-    # 🔥 MULTIZONA (FIX REAL)
-    # ======================================================
-
-    if entrada.modo == "multizona" and entrada.zonas:
-
-        resultados = []
-        total_paneles = 0
-        total_strings = 0
-        total_pdc = 0.0
-
-        for idx, z in enumerate(entrada.zonas, start=1):
-
-            n_paneles = int(z.get("n_paneles") or 0)
-
-            if n_paneles <= 0:
-                return _resultado_error(
-                    panel,
-                    [f"Zona {idx}: paneles inválidos"],
-                    warnings
-                )
-
-            strings_res = calcular_strings_fv(
-                n_paneles_total=n_paneles,
-                panel=panel,
-                inversor=inversor,
-                n_inversores=entrada.n_inversores,
-                t_min_c=entrada.t_min_c,
-                t_oper_c=entrada.t_oper_c,
-                modo="multizona",  # 🔥 CLAVE
-            )
-
-            if not strings_res.ok:
-                return _resultado_error(
-                    panel,
-                    [f"Zona {idx}: {strings_res.errores}"],
-                    warnings
-                )
-
-            total_paneles += n_paneles
-            total_strings += strings_res.recomendacion.n_strings_total
-            total_pdc += (n_paneles * panel.pmax_w) / 1000
-
-            resultados.extend(strings_res.strings)
-
-        # --------------------------------------------------
-        # ARRAY FINAL (sumado)
-        # --------------------------------------------------
-
-        array = ArrayFV(
-            potencia_dc_w=total_pdc * 1000,
-            vdc_nom=strings_res.recomendacion.vmp_string_v,
-            idc_nom=panel.imp_a * total_strings,
-            isc_total=panel.isc_a * total_strings,
-            voc_frio_array_v=strings_res.recomendacion.voc_string_v,
-            n_strings_total=total_strings,
-            n_paneles_total=total_paneles,
-            strings_por_mppt=1,
-            n_mppt=inversor.n_mppt * entrada.n_inversores,
-            p_panel_w=panel.pmax_w,
-        )
-
-        strings = [
-            StringFV(
-                mppt=s.mppt,
-                n_series=s.n_series,
-                vmp_string_v=s.vmp_string_v,
-                voc_frio_string_v=s.voc_frio_string_v,
-                imp_string_a=s.imp_string_a,
-                isc_string_a=s.isc_string_a,
-            )
-            for s in resultados
-        ]
-
-        meta = PanelesMeta(
-            n_paneles_total=total_paneles,
-            pdc_kw=total_pdc,
-            n_inversores=entrada.n_inversores,
-        )
-
-        return ResultadoPaneles(
-            ok=True,
-            panel=panel,
-            topologia="string",
-            array=array,
-            recomendacion=None,
-            strings=strings,
-            warnings=warnings,
-            errores=[],
-            meta=meta,
-        )
-
-    # ======================================================
     # NORMAL (auto / manual)
     # ======================================================
-
     n_paneles, pdc_kw, err = _resolver_dimensionado(entrada, panel)
 
     if err:
@@ -239,6 +144,9 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
     if not strings_res.ok:
         return _resultado_error(panel, strings_res.errores, warnings)
 
+    # ------------------------------------------------------
+    # ARRAY
+    # ------------------------------------------------------
     array = _armar_array(
         panel,
         inversor,
@@ -249,8 +157,14 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
         entrada.n_inversores,
     )
 
+    # ------------------------------------------------------
+    # STRINGS
+    # ------------------------------------------------------
     strings = _mapear_strings(strings_res)
 
+    # ------------------------------------------------------
+    # META
+    # ------------------------------------------------------
     meta = PanelesMeta(
         n_paneles_total=n_paneles,
         pdc_kw=pdc_kw,
