@@ -73,7 +73,7 @@ def _bounds(panel, inv, t_min, t_oper):
 
 
 # =========================================================
-# SELECCIÓN AUTOMÁTICA
+# SELECCIÓN
 # =========================================================
 
 def _seleccionar(n_min, n_max, vmp, inv, n_total):
@@ -85,10 +85,7 @@ def _seleccionar(n_min, n_max, vmp, inv, n_total):
 
     for n in range(n_min, n_max + 1):
 
-        n_strings = n_total // n
-        if n_strings < 1:
-            continue
-
+        n_strings = max(1, n_total // n)
         sobrantes = n_total - (n_strings * n)
         v_string = n * vmp
 
@@ -102,22 +99,9 @@ def _seleccionar(n_min, n_max, vmp, inv, n_total):
     return best
 
 
-# =========================================================
-# SELECCIÓN FIJA (ESTRICTA)
-# =========================================================
-
-def _seleccionar_fijo(n_min, n_max, n_total):
-
-    candidatos = []
-
-    for n in range(n_min, n_max + 1):
-        if n_total % n == 0:
-            candidatos.append(n)
-
-    if not candidatos:
-        return None  # 🔴 NO INVENTAR
-
-    return max(candidatos)  # preferir strings largos
+def _seleccionar_fijo(n_min, n_max):
+    # ya NO depende de divisibilidad
+    return max(range(n_min, n_max + 1), default=None)
 
 
 # =========================================================
@@ -150,7 +134,7 @@ def calcular_strings_fv(
     n_inversores: int,
     t_min_c: float,
     t_oper_c: Optional[float] = 55.0,
-    modo: str = "auto",   # 🔥 CAMBIO CLAVE
+    modo: str = "auto",
 ) -> StringsResultado:
 
     warnings: List[str] = []
@@ -158,66 +142,41 @@ def calcular_strings_fv(
     if n_paneles_total <= 0:
         return StringsResultado(False, ["Paneles inválidos"], [], [], RecomendacionCalc(0,0,0,0), BoundsCalc(0,0), 0)
 
-    # límites eléctricos
+    # --------------------------------------------------
+    # LIMITES
+    # --------------------------------------------------
     n_min, n_max, voc_panel, vmp_panel = _bounds(panel, inversor, t_min_c, t_oper_c)
 
     if n_max < n_min:
-        return StringsResultado(False, ["No hay rango válido de serie"], [], [], RecomendacionCalc(0,0,0,0), BoundsCalc(0,0), 0)
+        return StringsResultado(False, ["No hay rango válido"], [], [], RecomendacionCalc(0,0,0,0), BoundsCalc(0,0), 0)
 
-    # =====================================================
+    # --------------------------------------------------
     # SELECCIÓN
-    # =====================================================
+    # --------------------------------------------------
     if modo in ("manual", "multizona"):
-        n_series = _seleccionar_fijo(n_min, n_max, n_paneles_total)
+        n_series = _seleccionar_fijo(n_min, n_max)
     else:
         n_series = _seleccionar(n_min, n_max, vmp_panel, inversor, n_paneles_total)
 
     if not n_series:
-        return StringsResultado(False, ["No existe combinación válida"], [], [], RecomendacionCalc(0,0,0,0), BoundsCalc(0,0), 0)
+        return StringsResultado(False, ["No se pudo seleccionar n_series"], [], [], RecomendacionCalc(0,0,0,0), BoundsCalc(0,0), 0)
 
-    # =====================================================
-    # STRINGS
-    # =====================================================
-    if modo in ("manual", "multizona"):
+    # --------------------------------------------------
+    # STRINGS (SIN BLOQUEO)
+    # --------------------------------------------------
+    n_strings = max(1, n_paneles_total // n_series)
 
-        if n_paneles_total % n_series != 0:
-            return StringsResultado(
-                False,
-                [f"No existe combinación exacta para {n_paneles_total} paneles"],
-                [],
-                [],
-                RecomendacionCalc(0,0,0,0),
-                BoundsCalc(n_min, n_max),
-                n_paneles_total
-            )
+    if n_paneles_total % n_series != 0:
+        warnings.append(f"Distribución no exacta ({n_paneles_total} paneles / {n_series} por string)")
 
-        n_strings = n_paneles_total // n_series
-
-    else:
-        n_strings = n_paneles_total // n_series
-
-    if n_strings < 1:
-        return StringsResultado(False, ["No es posible formar strings"], [], [], RecomendacionCalc(0,0,0,0), BoundsCalc(0,0), 0)
-
-    # VALIDACIÓN FINAL
-    if modo in ("manual", "multizona"):
-        if n_series * n_strings != n_paneles_total:
-            return StringsResultado(
-                False,
-                ["Violación interna: configuración no exacta"],
-                [],
-                [],
-                RecomendacionCalc(0,0,0,0),
-                BoundsCalc(n_min, n_max),
-                n_paneles_total
-            )
-
-    # =====================================================
+    # --------------------------------------------------
     # DISTRIBUCIÓN
-    # =====================================================
+    # --------------------------------------------------
     distrib = _distribuir(n_strings, n_inversores, inversor.n_mppt)
 
-    # parámetros eléctricos
+    # --------------------------------------------------
+    # PARÁMETROS
+    # --------------------------------------------------
     vmp_string = n_series * vmp_panel
     voc_string = n_series * voc_panel
 
