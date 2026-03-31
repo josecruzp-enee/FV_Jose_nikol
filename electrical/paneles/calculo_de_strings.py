@@ -186,7 +186,7 @@ def calcular_strings_fv(
             )
 
     elif modo == "manual":
-        n_series = _seleccionar_fijo(n_min, n_max)
+        n_series = n_paneles_total
 
     else:
         n_series = _seleccionar(n_min, n_max, vmp_panel, inversor, n_paneles_total)
