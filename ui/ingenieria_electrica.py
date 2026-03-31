@@ -177,16 +177,16 @@ def _mostrar_detalle(strings, electrical):
         s = strings_zona[0]
 
         st.markdown(f"""
-        **MPPT {i} (Zona {zona})**
+**MPPT {i} (Zona {zona})**
 
-        - Paneles: {s.n_series}  
-        - Vmp: {s.vmp_string_v:.1f} V  
-        - Voc: {s.voc_frio_string_v:.1f} V  
-        - Corriente: {s.imp_string_a:.2f} A  
-        """)
+- Paneles: {s.n_series}  
+- Vmp: {s.vmp_string_v:.1f} V  
+- Voc: {s.voc_frio_string_v:.1f} V  
+- Corriente: {s.imp_string_a:.2f} A  
+""")
 
     # ==================================================
-    # ⚡ RESULTADO ELÉCTRICO POR MPPT
+    # ⚡ RESULTADO ELÉCTRICO POR MPPT (DC)
     # ==================================================
     st.markdown("### ⚡ Resultado eléctrico por MPPT")
 
@@ -197,35 +197,44 @@ def _mostrar_detalle(strings, electrical):
         # protección
         p = prot.mppt[i] if i < len(prot.mppt) else None
 
-        # conductor
+        # conductor DC (correcto)
         t = tr.dc_mppt[i] if tr and i < len(tr.dc_mppt) else None
 
-        amp = f"{t_ac.ampacidad_ajustada_a:.1f}" if t_ac else "-"
-        vd = f"{t_ac.vd_pct:.2f}" if t_ac else "-"
-        cal = f"{t_ac.calibre}" if t_ac else "-"
+        amp = f"{t.ampacidad_ajustada_a:.1f}" if t else "-"
+        vd = f"{t.vd_pct:.2f}" if t else "-"
+        cal = f"{t.calibre}" if t else "-"
 
         st.markdown(f"""
-        - Corriente AC: {corr.ac.i_diseno_a:.2f} A  
-        - Protección: {prot.ocpd_ac.tamano_a if prot.ocpd_ac else "-"} A  
-        - Conductor: {cal} AWG  
-        - Ampacidad: {amp} A  
-        - Caída de tensión: {vd}%  
-        """)
+**MPPT {i+1}**
+
+- Corriente operación: {m.i_operacion_a:.2f} A  
+- Corriente diseño: {m.i_diseno_a:.2f} A  
+- Protección: {p.tamano_a if p else "-"} A  
+- Conductor: {cal} AWG  
+- Ampacidad: {amp} A  
+- Caída de tensión: {vd}%  
+""")
 
     # ==================================================
-    # 🔌 SISTEMA AC
+    # 🔌 SISTEMA AC (SEPARADO CORRECTAMENTE)
     # ==================================================
     st.markdown("### 🔌 Sistema AC")
 
     t_ac = getattr(tr, "ac", None)
 
+    amp_ac = f"{t_ac.ampacidad_ajustada_a:.1f}" if t_ac else "-"
+    vd_ac = f"{t_ac.vd_pct:.2f}" if t_ac else "-"
+    cal_ac = f"{t_ac.calibre}" if t_ac else "-"
+
+    proteccion_ac = prot.ocpd_ac.tamano_a if getattr(prot, "ocpd_ac", None) else "-"
+
     st.markdown(f"""
-    - Corriente AC: {corr.ac.i_diseno_a:.2f} A  
-    - Protección: {prot.ocpd_ac.tamano_a if prot.ocpd_ac else "-"} A  
-    - Conductor: {t_ac.calibre if t_ac else "-"} AWG  
-    - Ampacidad: {t_ac.ampacidad_ajustada_a:.1f if t_ac else "-"} A  
-    - Caída de tensión: {t_ac.vd_pct:.2f if t_ac else "-"}%  
-    """)
+- Corriente AC: {corr.ac.i_diseno_a:.2f} A  
+- Protección: {proteccion_ac} A  
+- Conductor: {cal_ac} AWG  
+- Ampacidad: {amp_ac} A  
+- Caída de tensión: {vd_ac}%  
+""")
 
     # ==================================================
     # 🔥 OBSERVACIONES
@@ -239,17 +248,17 @@ def _mostrar_detalle(strings, electrical):
     if not fus or not fus.tamano_a:
         obs.append("✔ Fusible por string no requerido")
 
-    # VD check
+    # VD DC
     if tr and tr.dc_mppt:
         if all(t.vd_pct <= t.vd_obj_pct for t in tr.dc_mppt):
             obs.append("✔ Caída de tensión DC dentro de límites")
 
+    # VD AC
     if t_ac and t_ac.vd_pct <= t_ac.vd_obj_pct:
         obs.append("✔ Caída de tensión AC dentro de límites")
 
     for o in obs:
         st.markdown(f"- {o}")
-
 # ==========================================================
 # RENDER
 # ==========================================================
