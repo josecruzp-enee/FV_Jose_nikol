@@ -93,17 +93,26 @@ class CorrientesInput:
 
 def _agrupar_por_mppt(strings):
 
+    from collections import defaultdict
+
     grupos = defaultdict(list)
 
-    for s in strings:
+    print("\n🔴 DEBUG AGRUPACIÓN MPPT")
 
-        
-        zona = getattr(s, "mppt", 0)
+    for i, s in enumerate(strings):
 
-        grupos[zona].append(s)
+        mppt = getattr(s, "mppt", None)
+
+        print(f"String {i} → MPPT:", mppt)
+
+        if mppt is None:
+            raise ValueError("String sin MPPT")
+
+        grupos[mppt].append(s)
+
+    print("MPPT detectados:", list(grupos.keys()))
 
     return grupos
-
 
 # ==========================================================
 # MOTOR PRINCIPAL
