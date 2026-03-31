@@ -79,27 +79,41 @@ def construir_datos_demo():
 
         consumo_12m=[500]*12,
 
-        # producción base Honduras aprox
         prod_base_kwh_kwp_mes=[
             140,145,150,148,140,135,
             132,134,130,128,135,138
         ],
 
-        # factores mensuales FV
-        factores_fv_12m=[
-            1,1,1,1,1,1,1,1,1,1,1,1
-        ],
+        factores_fv_12m=[1]*12,
 
         cobertura_objetivo=1.0,
 
-        # costos
         costo_usd_kwp=900,
 
-        # financiero
         tcambio=24.5,
         tasa_anual=0.12,
         plazo_anios=10,
-        porcentaje_financiado=0.7
+        porcentaje_financiado=0.7,
+
+        # 🔥 AQUÍ ESTÁ EL FIX
+        sistema_fv={
+            "modo": "multizona",
+            "zonas": [
+                {"n_paneles": 6},
+                {"n_paneles": 8}
+            ]
+        },
+
+        # ⚡ equipo mínimo
+        panel_id="JA_450W",
+        inversor_id="INV_5KW",
+
+        # ⚡ eléctrico mínimo
+        electrico={
+            "vac": 240,
+            "fases": 1,
+            "fp": 1.0
+        }
     )
 def main():
 
