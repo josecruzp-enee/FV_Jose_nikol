@@ -194,6 +194,9 @@ def _clonar_entrada_para_zona(entrada, n_paneles):
 # ==========================================================
 def _consolidar_paneles(resultados):
 
+    if not resultados:
+        raise ValueError("No hay resultados en multizona")
+
     base = resultados[0]
 
     # --------------------------------------------------
@@ -203,8 +206,13 @@ def _consolidar_paneles(resultados):
     total_pdc = sum(r.meta.pdc_kw for r in resultados)
     total_strings = sum(r.array.n_strings_total for r in resultados)
 
-    total_imp = sum(s.imp_string_a for r in resultados for s in r.strings)
-    total_isc = sum(s.isc_string_a for r in resultados for s in r.strings)
+    # 🔥 CLAVE: corriente TOTAL correcta
+    total_imp = sum(
+        s.imp_string_a for r in resultados for s in r.strings
+    )
+    total_isc = sum(
+        s.isc_string_a for r in resultados for s in r.strings
+    )
 
     # --------------------------------------------------
     # ARRAY NUEVO (NO MUTAR)
@@ -218,7 +226,7 @@ def _consolidar_paneles(resultados):
         n_strings_total=total_strings,
         n_paneles_total=total_paneles,
         strings_por_mppt=base.array.strings_por_mppt,
-        n_mppt=base.array.n_mppt,
+        n_mppt=len(resultados),  # 🔥 ahora sí multizona real
         p_panel_w=base.array.p_panel_w,
     )
 
@@ -232,34 +240,40 @@ def _consolidar_paneles(resultados):
     )
 
     # --------------------------------------------------
-    # STRINGS + WARNINGS
+    # 🔥 STRINGS (FIX REAL AQUÍ)
     # --------------------------------------------------
     strings = []
+
     for i, r in enumerate(resultados, 1):
         for s in r.strings:
-            s.zona = i  # 🔥 CLAVE TOTAL
+
+            # 🔥 FORZAR ZONA
+            setattr(s, "zona", i)
+
+            # 🔥 OPCIONAL: renumerar string
+            setattr(s, "id_string", f"S{i}")
+
             strings.append(s)
+
+    # --------------------------------------------------
+    # WARNINGS
+    # --------------------------------------------------
     warnings = [w for r in resultados for w in r.warnings]
 
     # --------------------------------------------------
-    # RESULTADO FINAL (NUEVO)
+    # RESULTADO FINAL
     # --------------------------------------------------
-    resultado = type(base)(
+    return type(base)(
         ok=True,
         panel=base.panel,
-        topologia=base.topologia,
+        topologia="multizona",
         array=array,
         recomendacion=base.recomendacion,
         strings=strings,
         warnings=warnings,
         errores=[],
         meta=meta,
-    )
-
-    print("TOTAL PANELES:", total_paneles)
-    print("TOTAL STRINGS:", total_strings)
-
-    return resultado
+    ) resultado
 
 # ==========================================================
 # ENERGÍA
