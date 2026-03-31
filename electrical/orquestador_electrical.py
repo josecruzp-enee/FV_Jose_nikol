@@ -1,22 +1,24 @@
 from __future__ import annotations
-
 from typing import Any
 
 # ===============================
 # DOMINIO
 # ===============================
-from electrical.resultado_electrico import ResultadoElectrico
+from electrical.resultado_electrical import ResultadoElectrico
 
 # ===============================
 # SUBMÓDULOS
 # ===============================
-from electrical.validaciones.validador_fv import validar_sistema_fv
-from electrical.conductores.calculo_corrientes import (
+from electrical.validacion_fv import validar_sistema_fv
+
+from electrical.conductores.corrientes import (
     CorrientesInput,
     calcular_corrientes,
 )
+
 from electrical.conductores.calculo_conductores import calcular_conductores
-from electrical.protecciones.calculo_protecciones import (
+
+from electrical.protecciones.protecciones import (
     EntradaProtecciones,
     calcular_protecciones,
 )
@@ -24,7 +26,6 @@ from electrical.protecciones.calculo_protecciones import (
 from electrical.conductores.resultado_conductores import ResultadoConductores
 from electrical.conductores.resultado_corriente import ResultadoCorrientes
 from electrical.protecciones.resultado_protecciones import ResultadoProtecciones
-
 
 # ==========================================================
 # HELPERS DE ERROR (NO ROMPEN FLUJO)
