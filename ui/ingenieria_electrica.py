@@ -236,6 +236,7 @@ def _mostrar_detalle(paneles, electrical):
 # ==========================================================
 # RENDER
 # ==========================================================
+
 def render(ctx):
 
     import streamlit as st
@@ -308,6 +309,8 @@ def render(ctx):
         else:
             st.warning("⚠ Electrical no disponible")
             st.write("Trazas:", getattr(resultado, "trazas", {}))
+
+
 # ==========================================================
 # VALIDACIÓN
 # ==========================================================
