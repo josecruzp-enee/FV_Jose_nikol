@@ -156,131 +156,98 @@ def _mostrar_detalle(strings, electrical):
     cond = electrical.conductores
     prot = electrical.protecciones
 
+    tr = getattr(cond, "tramos", None)
+    mppt_detalle = getattr(corr, "mppt_detalle", [])
+
     # ==================================================
-    # AGRUPAR POR ZONA (UI)
+    # AGRUPAR POR ZONA
     # ==================================================
     zonas = {}
     for s in strings:
         zona = getattr(s, "zona", 1)
         zonas.setdefault(zona, []).append(s)
 
-    mppt_detalle = getattr(corr, "mppt_detalle", [])
-
-    st.markdown("### 🔀 Configuración por arreglo")
+    # ==================================================
+    # 🔷 CONFIGURACIÓN FV
+    # ==================================================
+    st.markdown("### 🔷 Configuración FV")
 
     for i, (zona, strings_zona) in enumerate(zonas.items(), 1):
 
-        st.markdown(f"#### 🔹 Arreglo {i} (Zona {zona})")
+        s = strings_zona[0]
 
-        data = []
+        st.markdown(f"""
+        **MPPT {i} (Zona {zona})**
 
-        for j, s in enumerate(strings_zona, 1):
-            data.append({
-                "String": f"S{j}",
-                "Paneles": s.n_series,
-                "Vmp (V)": round(s.vmp_string_v, 1),
-                "Voc (V)": round(s.voc_frio_string_v, 1),
-                "I (A)": round(s.imp_string_a, 2),
-            })
-
-        st.dataframe(data, width="stretch")
-
-        # ==================================================
-        # MPPT
-        # ==================================================
-        if i-1 < len(mppt_detalle):
-            m = mppt_detalle[i-1]
-
-            st.success(
-                f"MPPT {i} → {m.i_operacion_a:.2f} A "
-                f"(diseño {m.i_diseno_a:.2f} A)"
-            )
-
-        # ==================================================
-        # PROTECCIÓN DC
-        # ==================================================
-        if i-1 < len(prot.mppt):
-            p = prot.mppt[i-1]
-            st.info(f"Protección DC (MPPT): {p.tamano_a} A")
-
-        st.divider()
+        - Paneles: {s.n_series}  
+        - Vmp: {s.vmp_string_v:.1f} V  
+        - Voc: {s.voc_frio_string_v:.1f} V  
+        - Corriente: {s.imp_string_a:.2f} A  
+        """)
 
     # ==================================================
-    # SISTEMA AC
+    # ⚡ RESULTADO ELÉCTRICO POR MPPT
     # ==================================================
-    st.markdown("### ⚡ Sistema")
-    st.metric("Corriente AC", f"{corr.ac.i_diseno_a:.2f} A")
+    st.markdown("### ⚡ Resultado eléctrico por MPPT")
+
+    for i in range(len(mppt_detalle)):
+
+        m = mppt_detalle[i]
+
+        # protección
+        p = prot.mppt[i] if i < len(prot.mppt) else None
+
+        # conductor
+        t = tr.dc_mppt[i] if tr and i < len(tr.dc_mppt) else None
+
+        st.markdown(f"""
+        **MPPT {i+1}**
+
+        - Corriente operación: {m.i_operacion_a:.2f} A  
+        - Corriente diseño: {m.i_diseno_a:.2f} A  
+        - Protección: {p.tamano_a if p else "-"} A  
+        - Conductor: {t.calibre if t else "-"} AWG  
+        - Ampacidad: {t.ampacidad_ajustada_a:.1f} A  
+        - Caída de tensión: {t.vd_pct:.2f}%  
+        """)
 
     # ==================================================
-    # CONDUCTORES
+    # 🔌 SISTEMA AC
     # ==================================================
-    st.markdown("### 🧵 Conductores y protecciones (sistema)")
+    st.markdown("### 🔌 Sistema AC")
 
-    tr = getattr(cond, "tramos", None)
+    t_ac = getattr(tr, "ac", None)
 
-    if not tr:
-        st.warning("No se pudo calcular conductores")
-        return
+    st.markdown(f"""
+    - Corriente AC: {corr.ac.i_diseno_a:.2f} A  
+    - Protección: {prot.ocpd_ac.tamano_a if prot.ocpd_ac else "-"} A  
+    - Conductor: {t_ac.calibre if t_ac else "-"} AWG  
+    - Ampacidad: {t_ac.ampacidad_ajustada_a:.1f if t_ac else "-"} A  
+    - Caída de tensión: {t_ac.vd_pct:.2f if t_ac else "-"}%  
+    """)
 
-    # --------------------------------------------------
-    # 🔥 DC POR MPPT (NUEVO)
-    # --------------------------------------------------
-    st.markdown("#### 🔌 Conductores DC por MPPT")
-
-    if getattr(tr, "dc_mppt", None):
-
-        for i, t in enumerate(tr.dc_mppt, 1):
-
-            st.info(
-                f"MPPT {i} → {t.calibre} AWG | "
-                f"Ampacidad: {t.ampacidad_ajustada_a:.1f} A | "
-                f"VD: {t.vd_pct:.2f}%"
-            )
-
-    else:
-        st.warning("No hay conductores DC calculados")
-
-    # --------------------------------------------------
-    # AC
-    # --------------------------------------------------
-    st.markdown("#### 🔌 Conductor AC")
-
-    ac_text = "-"
-
-    if getattr(tr, "ac", None):
-        t = tr.ac
-        ac_text = (
-            f"{t.calibre} AWG | "
-            f"Ampacidad: {t.ampacidad_ajustada_a:.1f} A | "
-            f"VD: {t.vd_pct:.2f}%"
-        )
-
-    st.info(ac_text)
-
-    # --------------------------------------------------
-    # PROTECCIÓN AC
-    # --------------------------------------------------
-    st.markdown("#### ⚡ Protección AC")
-
-    breaker = "-"
-
-    if getattr(prot, "ocpd_ac", None):
-        breaker = f"{prot.ocpd_ac.tamano_a} A"
-
-    st.info(f"Breaker AC: {breaker}")
-
-    # --------------------------------------------------
-    # FUSIBLE STRING
-    # --------------------------------------------------
-    st.markdown("#### 🔥 Fusible string")
+    # ==================================================
+    # 🔥 OBSERVACIONES
+    # ==================================================
+    st.markdown("### 🔥 Observaciones")
 
     fus = prot.fusible_string
 
-    if fus and fus.tamano_a:
-        st.info(f"{fus.tamano_a} A")
-    else:
-        st.info("No requerido")
+    obs = []
 
+    if not fus or not fus.tamano_a:
+        obs.append("✔ Fusible por string no requerido")
+
+    # VD check
+    if tr and tr.dc_mppt:
+        if all(t.vd_pct <= t.vd_obj_pct for t in tr.dc_mppt):
+            obs.append("✔ Caída de tensión DC dentro de límites")
+
+    if t_ac and t_ac.vd_pct <= t_ac.vd_obj_pct:
+        obs.append("✔ Caída de tensión AC dentro de límites")
+
+    for o in obs:
+        st.markdown(f"- {o}")
 
 # ==========================================================
 # RENDER
