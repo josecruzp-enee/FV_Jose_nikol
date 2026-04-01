@@ -188,7 +188,7 @@ def calcular_corrientes(inp: CorrientesInput) -> ResultadoCorrientes:
     string = NivelCorriente(i_string_operacion, i_string_diseno)
 
     # ======================================================
-    # MPPT REAL
+    # 🔥 MPPT REAL
     # ======================================================
     grupos = _agrupar_por_mppt(strings)
 
@@ -197,7 +197,6 @@ def calcular_corrientes(inp: CorrientesInput) -> ResultadoCorrientes:
     print("\n🔹 CÁLCULO MPPT")
 
     for mppt_id, grupo in grupos.items():
-
         i_operacion = sum(s.imp_string_a for s in grupo)
         i_diseno = sum(s.isc_string_a for s in grupo) * FACTOR_DC
 
@@ -262,5 +261,5 @@ def calcular_corrientes(inp: CorrientesInput) -> ResultadoCorrientes:
         dc_total=dc_total,
         ac=ac,
         mppt_detalle=mppt_detalle,
-        strings_detalle=strings,
+        strings_detalle=strings,  # 🔹 ahora pasa la lista completa de strings
     )
