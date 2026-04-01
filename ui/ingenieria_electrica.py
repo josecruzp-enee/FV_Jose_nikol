@@ -220,6 +220,9 @@ def validar(ctx):
     resultado = getattr(ctx, "resultado", None)
 
     if not resultado:
-        return False
+        return False, ["No se ha generado la ingeniería"]
 
-    return True
+    if not getattr(resultado, "ok", True):
+        return False, getattr(resultado, "errores", ["Error desconocido"])
+
+    return True, []
