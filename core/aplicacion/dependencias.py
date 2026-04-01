@@ -68,7 +68,7 @@ class SizingAdapter:
 # ==========================================================
 # ADAPTER: PANELES
 # ==========================================================
-
+'''
 class PanelesAdapter:
     def ejecutar(self, entrada: EntradaPaneles):
 
@@ -81,7 +81,26 @@ class PanelesAdapter:
             raise ValueError("Paneles devolvió None")
 
         return resultado
+'''
 
+from electrical.paneles.multizona import ejecutar_multizona
+
+
+class PanelesAdapter:
+    def ejecutar(self, entrada: EntradaPaneles):
+
+        if entrada is None:
+            raise ValueError("EntradaPaneles es None")
+
+        resultado = ejecutar_multizona(entrada)   # 🔥 FIX
+
+        if resultado is None:
+            raise ValueError("Paneles devolvió None")
+
+        if not getattr(resultado, "ok", True):
+            raise ValueError(f"Error en paneles: {resultado.errores}")
+
+        return resultado
 
 # ==========================================================
 # ADAPTER: ELECTRICAL (RÍGIDO)
