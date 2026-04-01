@@ -35,17 +35,21 @@ class ResultadoSizing:
     n_paneles: int
     kwp_dc: float
     pdc_kw: float
+
     kw_ac: float
     kw_ac_total: float
+
     n_inversores: int
     paneles_por_inversor: int
+
     inversor: Any
     panel: Any
+
     dc_ac_ratio: float
     energia_12m: List[MesEnergia]
 
     # ==================================================
-    # CAMPOS CON DEFAULT (SIEMPRE AL FINAL)
+    # OPCIONALES
     # ==================================================
     ok: bool = True
     errores: List[str] = field(default_factory=list)
