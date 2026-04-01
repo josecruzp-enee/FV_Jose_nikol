@@ -206,8 +206,9 @@ def render(ctx):
         estado_ok = getattr(resultado, "ok", False)
         errores = getattr(resultado, "errores", [])
     except Exception as e:
-        st.error(f"Error leyendo resultado: {e}")
-        return
+        import traceback
+        st.code(traceback.format_exc())
+        raise e
 
     st.write("Estado:", estado_ok)
     st.write("Errores:", errores)
