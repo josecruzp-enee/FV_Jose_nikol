@@ -126,7 +126,7 @@ def _datosproyecto_desde_ctx(ctx):
     }
 
     # ======================================================
-    # EQUIPOS → CONVERSIÓN REAL (CRÍTICO)
+    # EQUIPOS → NORMALIZACIÓN PARA MOTOR (CRÍTICO)
     # ======================================================
     from electrical.catalogos import catalogo_paneles, catalogo_inversores
 
@@ -151,10 +151,25 @@ def _datosproyecto_desde_ctx(ctx):
     if inv_id not in inversores:
         raise ValueError(f"Inversor {inv_id} no encontrado")
 
-    # 🔹 mapear a formato del motor
+    panel_raw = paneles[panel_id]
+    inv_raw = inversores[inv_id]
+
+    # 🔥 NORMALIZACIÓN (LO QUE ARREGLA TU ERROR)
     p.equipos = {
-        "panel": paneles[panel_id],
-        "inversor": inversores[inv_id],
+        "panel": {
+            "pmax_w": float(panel_raw.get("pmax_w", 0)),
+            "vmp_v": float(panel_raw.get("vmp_v", 0)),
+            "voc_v": float(panel_raw.get("voc_v", 0)),
+            "imp_a": float(panel_raw.get("imp_a", 0)),
+            "isc_a": float(panel_raw.get("isc_a", 0)),
+        },
+        "inversor": {
+            "kw_ac": float(inv_raw.get("kw_ac", 0)),
+            "n_mppt": int(inv_raw.get("n_mppt", 1)),
+            "mppt_min_v": float(inv_raw.get("mppt_min_v", 0)),
+            "mppt_max_v": float(inv_raw.get("mppt_max_v", 0)),
+            "vmax_dc_v": float(inv_raw.get("vmax_dc_v", 0)),
+        },
         "config": {
             "sobredimension_dc_ac": equipos_ctx.get("sobredimension_dc_ac"),
             "tension_sistema": equipos_ctx.get("tension_sistema"),
