@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List
+from typing import List, Optional
 import math
 from collections import defaultdict
 
 from electrical.paneles.resultado_paneles import ResultadoPaneles
-
 
 # ==========================================================
 # MODELOS
@@ -26,13 +25,18 @@ class ResultadoCorrientes:
     panel: NivelCorriente
     string: NivelCorriente
     mppt: NivelCorriente
-    mppt_detalle: List[NivelCorriente]
     dc_total: NivelCorriente
     ac: NivelCorriente
+
+    mppt_detalle: List[NivelCorriente]
+    strings_detalle: List[NivelCorriente]
 
     errores: List[str]
     warnings: List[str]
 
+    # =========================
+    # OK
+    # =========================
     @staticmethod
     def build(
         panel: NivelCorriente,
@@ -40,32 +44,37 @@ class ResultadoCorrientes:
         mppt: NivelCorriente,
         dc_total: NivelCorriente,
         ac: NivelCorriente,
-        mppt_detalle: List[NivelCorriente],
-    ) -> "ResultadoCorrientes":
+        mppt_detalle: Optional[List[NivelCorriente]] = None,
+        strings_detalle: Optional[List[NivelCorriente]] = None,
+    ):
         return ResultadoCorrientes(
             ok=True,
             panel=panel,
             string=string,
             mppt=mppt,
-            mppt_detalle=mppt_detalle,
             dc_total=dc_total,
             ac=ac,
+            mppt_detalle=mppt_detalle or [],
+            strings_detalle=strings_detalle or [],
             errores=[],
             warnings=[],
         )
 
+    # =========================
+    # ERROR
+    # =========================
     @staticmethod
-    def error(msg: str) -> "ResultadoCorrientes":
+    def error(msg: str):
         cero = NivelCorriente(0.0, 0.0)
-
         return ResultadoCorrientes(
             ok=False,
             panel=cero,
             string=cero,
             mppt=cero,
-            mppt_detalle=[],
             dc_total=cero,
             ac=cero,
+            mppt_detalle=[],
+            strings_detalle=[],
             errores=[msg],
             warnings=[],
         )
@@ -88,7 +97,7 @@ class CorrientesInput:
 
 
 # ==========================================================
-# 🔥 DEBUG AGRUPACIÓN MPPT (ULTRA)
+# 🔥 DEBUG AGRUPACIÓN MPPT
 # ==========================================================
 
 def _agrupar_por_mppt(strings):
@@ -124,7 +133,7 @@ def _agrupar_por_mppt(strings):
 
 
 # ==========================================================
-# MOTOR PRINCIPAL (DEBUG TOTAL)
+# MOTOR PRINCIPAL
 # ==========================================================
 
 def calcular_corrientes(inp: CorrientesInput) -> ResultadoCorrientes:
@@ -179,7 +188,7 @@ def calcular_corrientes(inp: CorrientesInput) -> ResultadoCorrientes:
     string = NivelCorriente(i_string_operacion, i_string_diseno)
 
     # ======================================================
-    # 🔥 MPPT REAL
+    # MPPT REAL
     # ======================================================
     grupos = _agrupar_por_mppt(strings)
 
@@ -250,7 +259,8 @@ def calcular_corrientes(inp: CorrientesInput) -> ResultadoCorrientes:
         panel=panel,
         string=string,
         mppt=mppt,
-        mppt_detalle=mppt_detalle,
         dc_total=dc_total,
         ac=ac,
+        mppt_detalle=mppt_detalle,
+        strings_detalle=strings,
     )
