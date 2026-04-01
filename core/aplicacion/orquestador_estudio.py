@@ -17,7 +17,7 @@ def ejecutar_estudio(
     try:
 
         # ==================================================
-        # VALIDACIÓN DE ENTRADA (🔥 OBLIGATORIA)
+        # VALIDACIÓN DE ENTRADA
         # ==================================================
         datos.validar_minimo()
 
@@ -32,6 +32,7 @@ def ejecutar_estudio(
         if not sizing.ok:
             return ResultadoProyecto(
                 sizing=sizing,
+                paneles=None,
                 strings=None,
                 energia=None,
                 electrical=None,
@@ -55,7 +56,8 @@ def ejecutar_estudio(
         if not paneles.ok:
             return ResultadoProyecto(
                 sizing=sizing,
-                strings=paneles,
+                paneles=paneles,
+                strings=None,
                 energia=None,
                 electrical=None,
                 financiero=None,
@@ -74,7 +76,8 @@ def ejecutar_estudio(
         if not energia.ok:
             return ResultadoProyecto(
                 sizing=sizing,
-                strings=paneles,
+                paneles=paneles,
+                strings=None,
                 energia=energia,
                 electrical=None,
                 financiero=None,
@@ -101,7 +104,8 @@ def ejecutar_estudio(
             if not electrical.ok:
                 return ResultadoProyecto(
                     sizing=sizing,
-                    strings=paneles,
+                    paneles=paneles,
+                    strings=None,
                     energia=energia,
                     electrical=electrical,
                     financiero=None,
@@ -128,7 +132,8 @@ def ejecutar_estudio(
             if not getattr(finanzas, "ok", True):
                 return ResultadoProyecto(
                     sizing=sizing,
-                    strings=paneles,
+                    paneles=paneles,
+                    strings=None,
                     energia=energia,
                     electrical=electrical,
                     financiero=finanzas,
@@ -141,8 +146,8 @@ def ejecutar_estudio(
         # ==================================================
         return ResultadoProyecto(
             sizing=sizing,
-            strings=None, 
             paneles=paneles,
+            strings=None,
             energia=energia,
             electrical=electrical,
             financiero=finanzas,
@@ -158,6 +163,7 @@ def ejecutar_estudio(
 
         return ResultadoProyecto(
             sizing=None,
+            paneles=None,
             strings=None,
             energia=None,
             electrical=None,
