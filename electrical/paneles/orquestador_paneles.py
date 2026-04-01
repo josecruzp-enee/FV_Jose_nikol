@@ -71,8 +71,8 @@ def _armar_array(
     return ArrayFV(
         potencia_dc_w=pdc_kw * 1000,
         vdc_nom=strings_res.recomendacion.vmp_string_v,
-        idc_nom=None,            # 🔥 CORREGIDO
-        isc_total=None,          # 🔥 CORREGIDO
+        idc_nom=None,
+        isc_total=None,
         voc_frio_array_v=strings_res.recomendacion.voc_string_v,
         n_strings_total=n_strings,
         n_paneles_total=n_paneles,
@@ -97,7 +97,7 @@ def _mapear_strings(strings_res):
 
 
 # =========================================================
-# ORQUESTADOR
+# ORQUESTADOR (SIN MULTIZONA)
 # =========================================================
 def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
 
@@ -121,90 +121,7 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
         return _resultado_error(panel, errores, warnings)
 
     # ======================================================
-    # 🔥 MULTIZONA
-    # ======================================================
-    if entrada.zonas:
-
-        strings: List[StringFV] = []
-
-        n_mppt_disp = inversor.n_mppt * entrada.n_inversores
-
-        if len(entrada.zonas) > n_mppt_disp:
-            return _resultado_error(
-                panel,
-                [f"Hay {len(entrada.zonas)} zonas pero solo {n_mppt_disp} MPPT disponibles"],
-                warnings,
-            )
-
-        for i, zona in enumerate(entrada.zonas):
-
-            n = int(zona.n_paneles)
-
-            if n <= 0:
-                warnings.append(f"Zona {i+1} inválida (n_paneles <= 0)")
-                continue
-
-            strings.append(
-                StringFV(
-                    mppt=i + 1,
-                    n_series=n,
-                    vmp_string_v=panel.vmp_v * n,
-                    voc_frio_string_v=panel.voc_v * n,
-                    imp_string_a=panel.imp_a,
-                    isc_string_a=panel.isc_a,
-                )
-            )
-
-        if not strings:
-            return _resultado_error(panel, ["No hay zonas válidas"], warnings)
-
-        # --------------------------------------------------
-        # ARRAY
-        # --------------------------------------------------
-        n_paneles_total = sum(s.n_series for s in strings)
-        pdc_kw = (n_paneles_total * panel.pmax_w) / 1000
-
-        array = ArrayFV(
-            potencia_dc_w=pdc_kw * 1000,
-            vdc_nom=max(s.vmp_string_v for s in strings),
-            idc_nom=None,            # 🔥 CORREGIDO
-            isc_total=None,          # 🔥 CORREGIDO
-            voc_frio_array_v=max(s.voc_frio_string_v for s in strings),
-            n_strings_total=len(strings),
-            n_paneles_total=n_paneles_total,
-            strings_por_mppt=1,
-            n_mppt=n_mppt_disp,
-            p_panel_w=panel.pmax_w,
-        )
-
-        meta = PanelesMeta(
-            n_paneles_total=n_paneles_total,
-            pdc_kw=pdc_kw,
-            n_inversores=entrada.n_inversores,
-        )
-
-        recomendacion = RecomendacionStrings(
-            n_series=max(s.n_series for s in strings),
-            n_strings_total=len(strings),
-            strings_por_mppt=1,
-            vmp_string_v=max(s.vmp_string_v for s in strings),
-            voc_frio_string_v=max(s.voc_frio_string_v for s in strings),
-        )
-
-        return ResultadoPaneles(
-            ok=True,
-            panel=panel,
-            topologia="multizona",
-            array=array,
-            recomendacion=recomendacion,
-            strings=strings,
-            warnings=warnings,
-            errores=[],
-            meta=meta,
-        )
-
-    # ======================================================
-    # NORMAL
+    # NORMAL (ÚNICA RESPONSABILIDAD)
     # ======================================================
     n_paneles, pdc_kw, err = _resolver_dimensionado(entrada, panel)
 
