@@ -1,4 +1,5 @@
 import streamlit as st
+import pandas as pd
 import pprint
 
 from core.aplicacion.dependencias import construir_dependencias
@@ -16,7 +17,7 @@ def _asegurar_dict(ctx, key):
 
 
 # ==========================================================
-# INPUTS UI
+# INPUTS
 # ==========================================================
 def _ui_inputs_electricos(e):
 
@@ -25,39 +26,23 @@ def _ui_inputs_electricos(e):
     col1, col2, col3 = st.columns(3)
 
     with col1:
-        e["vac"] = st.number_input(
-            "Voltaje AC (V)",
-            value=float(e.get("vac", 240)),
-        )
+        e["vac"] = st.number_input("Voltaje AC (V)", value=float(e.get("vac", 240)))
 
     with col2:
-        e["fases"] = st.selectbox(
-            "Fases",
-            options=[1, 3],
-            index=0 if e.get("fases", 1) == 1 else 1,
-        )
+        e["fases"] = st.selectbox("Fases", [1, 3], index=0)
 
     with col3:
-        e["fp"] = st.number_input(
-            "Factor de potencia",
-            value=float(e.get("fp", 1.0)),
-        )
+        e["fp"] = st.number_input("Factor de potencia", value=float(e.get("fp", 1.0)))
 
     st.markdown("### 📏 Distancias")
 
     col1, col2 = st.columns(2)
 
     with col1:
-        e["dist_dc_m"] = st.number_input(
-            "Distancia DC (m)",
-            value=float(e.get("dist_dc_m", 15)),
-        )
+        e["dist_dc_m"] = st.number_input("Distancia DC (m)", value=float(e.get("15", 15)))
 
     with col2:
-        e["dist_ac_m"] = st.number_input(
-            "Distancia AC (m)",
-            value=float(e.get("dist_ac_m", 25)),
-        )
+        e["dist_ac_m"] = st.number_input("Distancia AC (m)", value=float(e.get("25", 25)))
 
 
 # ==========================================================
@@ -77,117 +62,130 @@ def _render_resultado(resultado):
     st.markdown("### 🧪 Estado del sistema")
 
     estado = {
-        "sizing": "OK" if getattr(resultado, "sizing", None) else "NULL",
-        "paneles": "OK" if getattr(resultado, "paneles", None) else "NULL",
-        "strings": "OK" if getattr(resultado, "strings", None) else "NULL",
-        "energia": "OK" if getattr(resultado, "energia", None) else "NULL",
-        "electrical": "OK" if getattr(resultado, "electrical", None) else "NULL",
-        "finanzas": "OK" if getattr(resultado, "financiero", None) else "NULL",
+        "sizing": "OK" if resultado.sizing else "NULL",
+        "paneles": "OK" if resultado.paneles else "NULL",
+        "strings": "OK" if resultado.strings else "NULL",
+        "energia": "OK" if resultado.energia else "NULL",
+        "electrical": "OK" if resultado.electrical else "NULL",
+        "finanzas": "OK" if resultado.financiero else "NULL",
     }
 
     st.json(estado)
 
-    # ======================================================
-    # ERRORES
-    # ======================================================
-    if not getattr(resultado, "ok", True):
-        st.error("❌ Proyecto con errores")
-        for err in getattr(resultado, "errores", []):
-            st.error(err)
+    paneles = resultado.paneles
+    electrical = resultado.electrical
 
     # ======================================================
-    # DEBUG PANELES
-    # ======================================================
-    st.markdown("### 🔋 DEBUG PANELES")
-
-    paneles = getattr(resultado, "paneles", None)
-
-    if paneles:
-        st.write(paneles)
-        if hasattr(paneles, "array"):
-            st.write("Array interno paneles:", paneles.array)
-    else:
-        st.warning("Paneles = None")
-
-    # ======================================================
-    # DEBUG ELECTRICAL
-    # ======================================================
-    st.markdown("### 🔎 DEBUG ELECTRICAL")
-
-    electrical = getattr(resultado, "electrical", None)
-
-    if electrical is None:
-        st.warning("Electrical = None")
-    else:
-        st.write(electrical)
-
-        if hasattr(electrical, "corrientes"):
-            st.write("Corrientes:", electrical.corrientes)
-
-        if hasattr(electrical, "conductores"):
-            st.write("Conductores:", electrical.conductores)
-
-        if hasattr(electrical, "protecciones"):
-            st.write("Protecciones:", electrical.protecciones)
-
-    # ======================================================
-    # STRINGS FV (CORREGIDO)
+    # STRINGS
     # ======================================================
     st.markdown("### 🔗 Strings FV")
 
-    strings = paneles.strings if paneles and hasattr(paneles, "strings") else []
+    strings = paneles.strings if paneles else []
 
-    if isinstance(strings, list) and len(strings) > 0:
+    if strings:
+        data = []
         for i, s in enumerate(strings, 1):
-            st.write(
-                f"String {i} | MPPT {s.mppt} | Series {s.n_series} | "
-                f"Vmp {s.vmp_string_v:.2f} V | Voc {s.voc_frio_string_v:.2f} V | "
-                f"Ip {s.imp_string_a:.2f} A | Isc {s.isc_string_a:.2f} A"
-            )
+            data.append([
+                i, s.mppt, s.n_series,
+                s.vmp_string_v, s.voc_frio_string_v,
+                s.imp_string_a, s.isc_string_a
+            ])
+
+        df = pd.DataFrame(data, columns=[
+            "#", "MPPT", "Series",
+            "Vmp (V)", "Voc (V)", "Imp (A)", "Isc (A)"
+        ])
+
+        st.dataframe(df, width="stretch")
     else:
-        st.warning("Strings FV no definidos")
+        st.warning("Sin strings")
 
     # ======================================================
-    # ARRAY FV (CORREGIDO)
+    # ARRAY
     # ======================================================
     st.markdown("### ⚡ Array FV")
 
-    array = paneles.array if paneles and hasattr(paneles, "array") else None
+    if paneles and paneles.array:
 
-    if array:
-        st.write(f"Potencia DC total: {array.potencia_dc_w/1000:.2f} kW")
-        st.write(f"VDC nominal: {array.vdc_nom:.2f} V")
-        st.write(f"Corriente DC nominal: {array.idc_nom}")
-        st.write(f"Nº strings por MPPT: {array.strings_por_mppt}")
-        st.write(f"Nº total de strings: {array.n_strings_total}")
-        st.write(f"Nº total de paneles: {array.n_paneles_total}")
-    else:
-        st.info("Array FV no definido")
+        a = paneles.array
+
+        col1, col2, col3 = st.columns(3)
+
+        col1.metric("Potencia DC", f"{a.potencia_dc_w/1000:.2f} kW")
+        col2.metric("Voltaje DC", f"{a.vdc_nom:.2f} V")
+        col3.metric("Corriente DC", f"{a.idc_nom:.2f} A" if a.idc_nom else "—")
+
+        col1.metric("Strings", a.n_strings_total)
+        col2.metric("Paneles", a.n_paneles_total)
+        col3.metric("MPPT", a.n_mppt)
 
     # ======================================================
-    # META
+    # CORRIENTES
     # ======================================================
-    st.markdown("### 📊 Meta")
-    paneles = getattr(resultado, "paneles", None)
-    meta = paneles.meta if paneles and hasattr(paneles, "meta") else None
-    
-    if isinstance(meta, dict):
-        st.write(f"Nº total de paneles: {meta.get('n_paneles_total', 0)}")
-        st.write(f"Potencia DC total: {meta.get('pdc_kw', 0):.2f} kW")
-        st.write(f"Nº de inversores: {meta.get('n_inversores', 0)}")
-    else:
-        st.info("Meta no disponible")
-    # ======================================================
-    # DEBUG COMPLETO
-    # ======================================================
-    st.markdown("### 🧠 INSPECCIÓN COMPLETA")
+    if electrical and hasattr(electrical, "corrientes"):
 
-    with st.expander("Resultado completo", expanded=False):
+        st.markdown("### ⚡ Corrientes")
+
+        c = electrical.corrientes
+
+        df = pd.DataFrame([
+            ["Panel", c.panel.i_operacion_a, c.panel.i_diseno_a],
+            ["String", c.string.i_operacion_a, c.string.i_diseno_a],
+            ["MPPT", c.mppt.i_operacion_a, c.mppt.i_diseno_a],
+            ["DC Total", c.dc_total.i_operacion_a, c.dc_total.i_diseno_a],
+            ["AC", c.ac.i_operacion_a, c.ac.i_diseno_a],
+        ], columns=["Nivel", "I operación (A)", "I diseño (A)"])
+
+        st.dataframe(df, width="stretch")
+
+    # ======================================================
+    # PROTECCIONES
+    # ======================================================
+    if electrical and hasattr(electrical, "protecciones"):
+
+        st.markdown("### 🔌 Protecciones")
+
+        p = electrical.protecciones
+
+        df = pd.DataFrame([
+            ["Breaker AC", p.ocpd_ac.tamano_a, p.ocpd_ac.norma],
+            ["OCPD DC", p.ocpd_dc_array.tamano_a, p.ocpd_dc_array.norma],
+            ["Fusible", "Sí" if p.fusible_string.requerido else "No", p.fusible_string.nota],
+        ], columns=["Elemento", "Valor", "Norma"])
+
+        st.dataframe(df, width="stretch")
+
+    # ======================================================
+    # CONDUCTORES
+    # ======================================================
+    if electrical and hasattr(electrical, "conductores"):
+
+        st.markdown("### 🧵 Conductores")
+
+        data = []
+
+        for t in electrical.conductores.tramos.dc_mppt:
+            data.append([
+                t.nombre,
+                t.calibre,
+                t.material,
+                t.i_diseno_a,
+                t.vd_pct,
+                "✔" if t.cumple else "❌"
+            ])
+
+        df = pd.DataFrame(data, columns=[
+            "Tramo", "Calibre", "Material",
+            "I diseño", "VD (%)", "Cumple"
+        ])
+
+        st.dataframe(df, width="stretch")
+
+    # ======================================================
+    # DEBUG (OPCIONAL)
+    # ======================================================
+    with st.expander("🧠 Debug completo"):
         st.code(pprint.pformat(resultado), language="python")
-
-    if electrical:
-        with st.expander("Electrical completo", expanded=False):
-            st.code(pprint.pformat(electrical), language="python")
 
 
 # ==========================================================
@@ -205,22 +203,6 @@ def render(ctx):
         try:
             p = construir_datos_proyecto(ctx)
 
-            st.markdown("## 🧪 DEBUG INGENIERÍA")
-
-            from dataclasses import asdict
-
-            try:
-                st.markdown("### 📦 Datosproyecto")
-                st.json(asdict(p))
-            except Exception:
-                st.write(p)
-
-            st.markdown("### ⚙️ Equipos")
-            st.json(getattr(p, "equipos", {}))
-
-            st.markdown("### ⚡ Eléctrico")
-            st.json(getattr(p, "electrico", {}))
-
             deps = construir_dependencias()
             resultado = ejecutar_estudio(p, deps)
 
@@ -231,21 +213,13 @@ def render(ctx):
             _render_resultado(resultado)
 
         except Exception as ex:
-            st.error("💥 Error ejecutando ingeniería")
+            st.error("💥 Error")
             st.exception(ex)
-            return
 
-    try:
-        resultado = getattr(ctx, "resultado", None)
+    resultado = getattr(ctx, "resultado", None)
 
-        if resultado:
-            _render_resultado(resultado)
-        else:
-            st.info("Aún no se ha generado resultado")
-
-    except Exception as e:
-        st.error("Error renderizando resultado")
-        st.exception(e)
+    if resultado:
+        _render_resultado(resultado)
 
 
 # ==========================================================
@@ -258,7 +232,7 @@ def validar(ctx):
     if not resultado:
         return False, ["No se ha generado la ingeniería"]
 
-    if not getattr(resultado, "ok", True):
-        return False, getattr(resultado, "errores", ["Error desconocido"])
+    if not resultado.ok:
+        return False, resultado.errores
 
     return True, []
