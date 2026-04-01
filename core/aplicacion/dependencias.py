@@ -68,6 +68,10 @@ class SizingAdapter:
 # ADAPTER: PANELES (MULTIZONA)
 # ==========================================================
 
+from electrical.paneles.orquestador_paneles import ejecutar_paneles
+from core.aplicacion.multizona import ejecutar_multizona
+
+
 class PanelesAdapter:
 
     def ejecutar(self, entrada: EntradaPaneles):
@@ -75,8 +79,22 @@ class PanelesAdapter:
         if entrada is None:
             raise ValueError("EntradaPaneles es None")
 
-        resultado = ejecutar_multizona(entrada)  # 🔥 USO CORRECTO
+        modo = getattr(entrada, "modo", None)
 
+        if not modo:
+            raise ValueError("EntradaPaneles sin modo")
+
+        # ==================================================
+        # ROUTING CORRECTO
+        # ==================================================
+        if modo == "multizona":
+            resultado = ejecutar_multizona(entrada)
+        else:
+            resultado = ejecutar_paneles(entrada)
+
+        # ==================================================
+        # VALIDACIÓN
+        # ==================================================
         if resultado is None:
             raise ValueError("Paneles devolvió None")
 
