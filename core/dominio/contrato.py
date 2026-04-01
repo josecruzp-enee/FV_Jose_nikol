@@ -4,18 +4,17 @@ from __future__ import annotations
 CONTRATO MAESTRO — FV ENGINE
 
 Define:
-- Entrada del sistema (Datosproyecto)
 - Resultados de cada módulo
 - Resultado final del pipeline
 
 Reglas:
-- Entrada fuerte (dataclass)
-- Datos internos flexibles (dict controlado)
-- Sin duplicaciones
+- Entrada NO vive aquí
+- Solo outputs del sistema
 """
 
 from dataclasses import dataclass, field
 from typing import List, Dict, Any
+
 
 # =========================================================
 # ENERGÍA MENSUAL
@@ -60,7 +59,7 @@ class ResultadoSizing:
 
 
 # =========================================================
-# RESULTADO STRINGS (PANELES)
+# RESULTADO STRINGS
 # =========================================================
 
 @dataclass(frozen=True)
@@ -117,88 +116,18 @@ class ResultadoFinanciero:
 
 
 # =========================================================
-# ENTRADA DEL SISTEMA (🔥 CLAVE)
-# =========================================================
-
-@dataclass
-class Datosproyecto:
-
-    # -------------------------------
-    # Información general
-    # -------------------------------
-    cliente: str
-    ubicacion: str
-
-    lat: float
-    lon: float
-
-    # -------------------------------
-    # Consumo
-    # -------------------------------
-    consumo_12m: List[float]
-
-    tarifa_energia: float
-    cargos_fijos: float
-
-    # -------------------------------
-    # Producción FV
-    # -------------------------------
-    prod_base_kwh_kwp_mes: List[float]
-    factores_fv_12m: List[float]
-
-    cobertura_objetivo: float
-
-    # -------------------------------
-    # Costos
-    # -------------------------------
-    costo_usd_kwp: float
-    tcambio: float
-
-    # -------------------------------
-    # Financiamiento
-    # -------------------------------
-    tasa_anual: float
-    plazo_anios: int
-    porcentaje_financiado: float
-
-    # -------------------------------
-    # O&M
-    # -------------------------------
-    om_anual_pct: float = 0.0
-
-    # =====================================================
-    # 🔥 CAMPOS CRÍTICOS DEL PIPELINE
-    # =====================================================
-
-    # FV (modo, valor, zonas, etc.)
-    sistema_fv: Dict[str, Any] = field(default_factory=dict)
-
-    # Equipos (panel_id, inversor_id, etc.)
-    equipos: Dict[str, Any] = field(default_factory=dict)
-
-    # Eléctrico (vac, fases, distancias, etc.)
-    electrico: Dict[str, Any] = field(default_factory=dict)
-
-
-# =========================================================
-# RESULTADO FINAL DEL SISTEMA
+# RESULTADO FINAL
 # =========================================================
 
 @dataclass
 class ResultadoProyecto:
 
-    # ==================================================
-    # RESULTADOS PRINCIPALES
-    # ==================================================
     sizing: ResultadoSizing | None
     strings: Any
     energia: Any
     electrical: Any
     financiero: ResultadoFinanciero | None
 
-    # ==================================================
-    # ESTADO Y DEBUG
-    # ==================================================
     ok: bool = True
     errores: List[str] = field(default_factory=list)
 
