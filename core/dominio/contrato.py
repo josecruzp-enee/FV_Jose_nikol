@@ -123,6 +123,7 @@ class ResultadoFinanciero:
 class ResultadoProyecto:
 
     sizing: ResultadoSizing | None
+    paneles: Any                 # 🔥 NUEVO (CRÍTICO)
     strings: Any
     energia: Any
     electrical: Any
