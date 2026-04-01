@@ -10,27 +10,17 @@ from electrical.paneles.entrada_panel import EntradaPaneles
 from electrical.paneles.resultado_paneles import ResultadoPaneles
 from electrical.paneles.orquestador_paneles import ejecutar_paneles
 
-# ⚠️ Ajusta este import si tu clase está en otra ruta
-try:
-    from core.dominio.zona_fv import ZonaFV
-except Exception:
-    ZonaFV = object  # fallback seguro para no romper import
-
 
 # ==========================================================
 # MAIN
 # ==========================================================
 
 def ejecutar_multizona(entrada: EntradaPaneles) -> ResultadoPaneles:
-    """
-    Orquestador multizona.
-    Entrada SIEMPRE tipada (no dict).
-    """
 
     resultados = _ejecutar_zonas(entrada)
 
     if isinstance(resultados, ResultadoPaneles):
-        return resultados  # error temprano
+        return resultados
 
     if not resultados:
         return _error("No hay resultados válidos en zonas")
@@ -41,8 +31,6 @@ def ejecutar_multizona(entrada: EntradaPaneles) -> ResultadoPaneles:
 
     total_paneles, total_strings, total_pdc = _calcular_totales(resultados)
 
-    vdc_nom = None  # deshabilitado temporalmente
-
     strings_total = _consolidar_strings(resultados)
 
     n_mppt_total, strings_por_mppt = _calcular_mppt(resultados, total_strings)
@@ -52,7 +40,6 @@ def ejecutar_multizona(entrada: EntradaPaneles) -> ResultadoPaneles:
         total_paneles,
         total_strings,
         total_pdc,
-        vdc_nom,
         n_mppt_total,
         strings_por_mppt,
     )
@@ -61,7 +48,6 @@ def ejecutar_multizona(entrada: EntradaPaneles) -> ResultadoPaneles:
         resultados,
         total_strings,
         strings_por_mppt,
-        vdc_nom,
     )
 
     warnings = _collect_warnings(resultados)
@@ -84,16 +70,12 @@ def ejecutar_multizona(entrada: EntradaPaneles) -> ResultadoPaneles:
     )
 
 
-
 # ==========================================================
-# ZONAS
+# ZONAS (🔥 FIX REAL)
 # ==========================================================
 
 def _ejecutar_zonas(entrada: EntradaPaneles) -> List[ResultadoPaneles] | ResultadoPaneles:
 
-    # ======================================================
-    # MULTIZONA → UNA SOLA EJECUCIÓN
-    # ======================================================
     if getattr(entrada, "modo", None) == "multizona":
 
         zonas = getattr(entrada, "zonas", None)
@@ -101,29 +83,58 @@ def _ejecutar_zonas(entrada: EntradaPaneles) -> List[ResultadoPaneles] | Resulta
         if not zonas:
             raise ValueError("Multizona sin zonas")
 
-        # 🔥 VALIDACIÓN
+        resultados = []
+
         for i, z in enumerate(zonas, 1):
 
-            if not hasattr(z, "n_paneles"):
-                raise TypeError(f"Zona {i} no es tipo ZonaFV válido")
+            # ======================================================
+            # VALIDACIÓN
+            # ======================================================
+            n_paneles = getattr(z, "n_paneles", None)
+            area = getattr(z, "area", None)
 
-            n_paneles = int(getattr(z, "n_paneles", 0) or 0)
+            if not n_paneles and not area:
+                raise ValueError(f"Zona {i} sin n_paneles ni area")
 
-            if n_paneles <= 0:
-                raise ValueError(f"Zona {i}: n_paneles inválido")
+            # ======================================================
+            # CONSTRUIR ENTRADA POR ZONA
+            # ======================================================
+            entrada_zona = EntradaPaneles(
+                panel=entrada.panel,
+                inversor=entrada.inversor,
+                modo=entrada.modo,  # 🔥 RESPETA modo
+            )
 
-        # 🔥 CLAVE → UNA sola ejecución
-        res = ejecutar_paneles(entrada)
+            # ======================================================
+            # DATOS DE LA ZONA
+            # ======================================================
+            if n_paneles:
+                entrada_zona.n_paneles_total = int(n_paneles)
 
-        if not res.ok:
-            return res
+            elif area:
+                entrada_zona.area = float(area)
 
-        # 🔥 Devolver como lista para no romper flujo
-        return [res]
+            # ======================================================
+            # GEOMETRÍA (SI EXISTE)
+            # ======================================================
+            if hasattr(z, "inclinacion"):
+                entrada_zona.tilt_deg = getattr(z, "inclinacion", None)
 
-    # ======================================================
-    # NORMAL
-    # ======================================================
+            if hasattr(z, "azimut"):
+                entrada_zona.azimut_deg = getattr(z, "azimut", None)
+
+            # ======================================================
+            # EJECUCIÓN
+            # ======================================================
+            res = ejecutar_paneles(entrada_zona)
+
+            if not res.ok:
+                return res
+
+            resultados.append(res)
+
+        return resultados
+
     else:
 
         res = ejecutar_paneles(entrada)
@@ -133,8 +144,9 @@ def _ejecutar_zonas(entrada: EntradaPaneles) -> List[ResultadoPaneles] | Resulta
 
         return [res]
 
+
 # ==========================================================
-# DETALLE
+# DETALLE ZONAS
 # ==========================================================
 
 def _build_zonas_detalle(resultados: List[ResultadoPaneles]) -> List[dict]:
@@ -144,8 +156,8 @@ def _build_zonas_detalle(resultados: List[ResultadoPaneles]) -> List[dict]:
     for i, r in enumerate(resultados, 1):
         zonas.append({
             "zona": i,
-            "paneles": getattr(r.meta, "n_paneles_total", None) if r.meta else None,
-            "pdc_kw": getattr(r.meta, "pdc_kw", None) if r.meta else None,
+            "paneles": r.array.n_paneles_total if r.array else None,
+            "pdc_kw": (r.array.potencia_dc_w / 1000) if r.array else None,
             "strings": len(r.strings) if r.strings else 0,
             "vdc": r.array.vdc_nom if r.array else None,
             "idc": r.array.idc_nom if r.array else None,
@@ -162,42 +174,21 @@ def _build_zonas_detalle(resultados: List[ResultadoPaneles]) -> List[dict]:
 def _calcular_totales(resultados: List[ResultadoPaneles]):
 
     total_paneles = sum(
-        (r.array.n_paneles_total if r.array else getattr(r.meta, "n_paneles_total", 0))
+        r.array.n_paneles_total if r.array else 0
         for r in resultados
     )
 
     total_strings = sum(
-        (r.array.n_strings_total if r.array else 0)
+        r.array.n_strings_total if r.array else 0
         for r in resultados
     )
 
     total_pdc = sum(
-        (r.array.potencia_dc_w if r.array else getattr(r.meta, "pdc_kw", 0) * 1000)
+        r.array.potencia_dc_w if r.array else 0
         for r in resultados
     )
 
     return total_paneles, total_strings, total_pdc
-
-
-# ==========================================================
-# VOLTAJE
-# ==========================================================
-
-def _validar_voltajes(resultados: List[ResultadoPaneles]):
-
-    vdc_vals = [
-        r.array.vdc_nom
-        for r in resultados
-        if (r.array and r.array.vdc_nom is not None)
-    ]
-
-    if not vdc_vals:
-        return None
-
-    if max(vdc_vals) - min(vdc_vals) > 20:
-        raise ValueError("Voltajes incompatibles entre zonas")
-
-    return vdc_vals[0]
 
 
 # ==========================================================
@@ -222,7 +213,7 @@ def _consolidar_strings(resultados: List[ResultadoPaneles]):
 def _calcular_mppt(resultados: List[ResultadoPaneles], total_strings: int):
 
     n_mppt_total = sum(
-        (r.array.n_mppt if r.array else 0)
+        r.array.n_mppt if r.array else 0
         for r in resultados
     )
 
@@ -235,7 +226,7 @@ def _calcular_mppt(resultados: List[ResultadoPaneles], total_strings: int):
 
 
 # ==========================================================
-# ARRAY
+# ARRAY GLOBAL
 # ==========================================================
 
 def _build_array(
@@ -243,7 +234,6 @@ def _build_array(
     total_paneles: int,
     total_strings: int,
     total_pdc: float,
-    vdc_nom: Optional[float],
     n_mppt_total: int,
     strings_por_mppt: int,
 ):
@@ -257,7 +247,7 @@ def _build_array(
 
     return ArrayFV(
         potencia_dc_w=total_pdc,
-        vdc_nom=vdc_nom or ref.vdc_nom,
+        vdc_nom=ref.vdc_nom,
         idc_nom=None,
         isc_total=None,
         voc_frio_array_v=ref.voc_frio_array_v,
@@ -277,7 +267,6 @@ def _build_recomendacion(
     resultados: List[ResultadoPaneles],
     total_strings: int,
     strings_por_mppt: int,
-    vdc_nom: Optional[float],
 ):
 
     from electrical.paneles.resultado_paneles import RecomendacionStrings
@@ -289,201 +278,7 @@ def _build_recomendacion(
         n_series=rec_base.n_series if rec_base else None,
         n_strings_total=total_strings,
         strings_por_mppt=strings_por_mppt,
-        vmp_string_v=vdc_nom or ref.vdc_nom,
-        voc_frio_string_v=ref.voc_frio_array_v,
-    )
-
-
-# ==========================================================
-# WARNINGS
-# ==========================================================
-
-def _collect_warnings(resultados: List[ResultadoPaneles]):
-
-    warnings = []
-
-    for r in resultados:
-        warnings.extend(r.warnings or [])
-
-    return warnings
-
-
-# ==========================================================
-# ERROR
-# ==========================================================
-
-def _error(msg: str) -> ResultadoPaneles:
-
-    return ResultadoPaneles(
-        ok=False,
-        panel=None,
-        topologia="multizona",
-        array=None,
-        recomendacion=None,
-        strings=[],
-        warnings=[],
-        errores=[msg],
-        meta=None,
-    )
-
-
-# ==========================================================
-# DETALLE
-# ==========================================================
-
-def _build_zonas_detalle(resultados: List[ResultadoPaneles]) -> List[dict]:
-
-    zonas = []
-
-    for i, r in enumerate(resultados, 1):
-        zonas.append({
-            "zona": i,
-            "paneles": getattr(r.meta, "n_paneles_total", None) if r.meta else None,
-            "pdc_kw": getattr(r.meta, "pdc_kw", None) if r.meta else None,
-            "strings": len(r.strings) if r.strings else 0,
-            "vdc": r.array.vdc_nom if r.array else None,
-            "idc": r.array.idc_nom if r.array else None,
-            "isc": r.array.isc_total if r.array else None,
-        })
-
-    return zonas
-
-
-# ==========================================================
-# TOTALES
-# ==========================================================
-
-def _calcular_totales(resultados: List[ResultadoPaneles]):
-
-    total_paneles = sum(
-        (r.array.n_paneles_total if r.array else getattr(r.meta, "n_paneles_total", 0))
-        for r in resultados
-    )
-
-    total_strings = sum(
-        (r.array.n_strings_total if r.array else 0)
-        for r in resultados
-    )
-
-    total_pdc = sum(
-        (r.array.potencia_dc_w if r.array else getattr(r.meta, "pdc_kw", 0) * 1000)
-        for r in resultados
-    )
-
-    return total_paneles, total_strings, total_pdc
-
-
-# ==========================================================
-# VOLTAJE
-# ==========================================================
-
-def _validar_voltajes(resultados: List[ResultadoPaneles]):
-
-    vdc_vals = [
-        r.array.vdc_nom
-        for r in resultados
-        if (r.array and r.array.vdc_nom is not None)
-    ]
-
-    if not vdc_vals:
-        return None
-
-    if max(vdc_vals) - min(vdc_vals) > 20:
-        raise ValueError("Voltajes incompatibles entre zonas")
-
-    return vdc_vals[0]
-
-
-# ==========================================================
-# STRINGS
-# ==========================================================
-
-def _consolidar_strings(resultados: List[ResultadoPaneles]):
-
-    strings = []
-
-    for r in resultados:
-        if r.strings:
-            strings.extend(r.strings)
-
-    return strings
-
-
-# ==========================================================
-# MPPT
-# ==========================================================
-
-def _calcular_mppt(resultados: List[ResultadoPaneles], total_strings: int):
-
-    n_mppt_total = sum(
-        (r.array.n_mppt if r.array else 0)
-        for r in resultados
-    )
-
-    strings_por_mppt = (
-        max(1, total_strings // max(1, n_mppt_total))
-        if n_mppt_total > 0 else 1
-    )
-
-    return n_mppt_total, strings_por_mppt
-
-
-# ==========================================================
-# ARRAY
-# ==========================================================
-
-def _build_array(
-    resultados: List[ResultadoPaneles],
-    total_paneles: int,
-    total_strings: int,
-    total_pdc: float,
-    vdc_nom: Optional[float],
-    n_mppt_total: int,
-    strings_por_mppt: int,
-):
-
-    from electrical.paneles.resultado_paneles import ArrayFV
-
-    ref = next((r.array for r in resultados if r.array), None)
-
-    if ref is None:
-        return None
-
-    return ArrayFV(
-        potencia_dc_w=total_pdc,
-        vdc_nom=vdc_nom or ref.vdc_nom,
-        idc_nom=None,
-        isc_total=None,
-        voc_frio_array_v=ref.voc_frio_array_v,
-        n_strings_total=total_strings,
-        n_paneles_total=total_paneles,
-        strings_por_mppt=strings_por_mppt,
-        n_mppt=n_mppt_total,
-        p_panel_w=ref.p_panel_w,
-    )
-
-
-# ==========================================================
-# RECOMENDACIÓN
-# ==========================================================
-
-def _build_recomendacion(
-    resultados: List[ResultadoPaneles],
-    total_strings: int,
-    strings_por_mppt: int,
-    vdc_nom: Optional[float],
-):
-
-    from electrical.paneles.resultado_paneles import RecomendacionStrings
-
-    rec_base = resultados[0].recomendacion
-    ref = resultados[0].array
-
-    return RecomendacionStrings(
-        n_series=rec_base.n_series if rec_base else None,
-        n_strings_total=total_strings,
-        strings_por_mppt=strings_por_mppt,
-        vmp_string_v=vdc_nom or ref.vdc_nom,
+        vmp_string_v=ref.vdc_nom,
         voc_frio_string_v=ref.voc_frio_array_v,
     )
 
