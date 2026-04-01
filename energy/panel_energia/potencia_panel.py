@@ -99,10 +99,10 @@ def calcular_potencia_panel(inp: PotenciaPanelInput) -> PotenciaPanelResultado:
     Calcula el comportamiento eléctrico del panel FV bajo
     condiciones reales de irradiancia y temperatura.
 
-    Modelo:
-        - Escalamiento por irradiancia
-        - Corrección térmica lineal
-        - Consistencia eléctrica: Pmp = Vmp * Imp
+    Modelo corregido:
+        - Potencia escalada directamente (correcto físicamente)
+        - Voltajes con coeficientes térmicos
+        - Corriente derivada desde potencia (consistencia)
     """
 
     poa = inp.irradiancia_poa_wm2
@@ -134,30 +134,25 @@ def calcular_potencia_panel(inp: PotenciaPanelInput) -> PotenciaPanelResultado:
     delta_t = t_cell - 25.0
 
     # ------------------------------------------------------
-    # VOLTAJE MPP
+    # 🔥 POTENCIA (CORRECTO)
+    # ------------------------------------------------------
+
+    pmp = inp.p_panel_w * g_rel * (1 + inp.coef_potencia * delta_t)
+    pmp = max(0.0, pmp)
+
+    # ------------------------------------------------------
+    # VOLTAJES
     # ------------------------------------------------------
 
     vmp = inp.vmp_panel_v * (1 + inp.coef_vmp * delta_t)
-
-    # ------------------------------------------------------
-    # VOLTAJE VOC
-    # ------------------------------------------------------
-
     voc = inp.voc_panel_v * (1 + inp.coef_voc * delta_t)
 
     # ------------------------------------------------------
-    # CORRIENTES
+    # CORRIENTE CONSISTENTE
     # ------------------------------------------------------
 
-    imp = inp.imp_panel_a * g_rel
+    imp = pmp / vmp if vmp > 0 else 0.0
     isc = inp.isc_panel_a * g_rel
-
-    # ------------------------------------------------------
-    # POTENCIA CONSISTENTE
-    # ------------------------------------------------------
-
-    pmp = vmp * imp
-    pmp = max(0.0, pmp)
 
     # ------------------------------------------------------
     # RESULTADO
