@@ -22,7 +22,7 @@ def render(ctx) -> None:
     sf.setdefault("tarifa_energia_L_kwh", 5.0)
 
     consumo = {
-        "kwh_12m": sf["kwh_12m"],
+        "kwh_12m": list(sf["kwh_12m"]),  # 🔥 copia segura
         "cargos_fijos_L_mes": sf["cargos_fijos_L_mes"],
         "tarifa_energia_L_kwh": sf["tarifa_energia_L_kwh"],
         "fuente": "manual"
@@ -36,13 +36,13 @@ def render(ctx) -> None:
 
     for i, mes in enumerate(_MESES):
         with cols[i % n_cols]:
+
             key = f"kwh_{i}"
 
-            # inicializar cada mes
             if key not in sf:
                 sf[key] = consumo["kwh_12m"][i]
 
-            consumo["kwh_12m"][i] = st.number_input(
+            val = st.number_input(
                 f"{mes} (kWh)",
                 key=key,
                 min_value=0.0,
@@ -50,13 +50,15 @@ def render(ctx) -> None:
                 format="%.2f"
             )
 
+            consumo["kwh_12m"][i] = float(val)
+
     # ------------------------------------------------------
     # TARIFAS Y CARGOS
     # ------------------------------------------------------
     c1, c2 = st.columns(2)
 
     with c1:
-        consumo["cargos_fijos_L_mes"] = st.number_input(
+        cargos = st.number_input(
             "Cargos fijos L/Mes",
             key="cargos_fijos_L_mes",
             min_value=0.0,
@@ -64,27 +66,34 @@ def render(ctx) -> None:
         )
 
     with c2:
-        consumo["tarifa_energia_L_kwh"] = st.number_input(
+        tarifa = st.number_input(
             "Tarifa energía L/kWh",
             key="tarifa_energia_L_kwh",
             min_value=0.0,
             step=0.01
         )
 
+    consumo["cargos_fijos_L_mes"] = float(cargos)
+    consumo["tarifa_energia_L_kwh"] = float(tarifa)
+
     # ------------------------------------------------------
     # TOTALES
     # ------------------------------------------------------
     total_anual = sum(consumo["kwh_12m"])
-    promedio_mensual = total_anual / 12
+    promedio_mensual = total_anual / 12 if total_anual > 0 else 0
 
     st.write(f"**Consumo anual total:** {total_anual:.2f} kWh")
     st.write(f"**Consumo promedio mensual:** {promedio_mensual:.2f} kWh")
 
     # ------------------------------------------------------
-    # GUARDAR EN CONTEXTO
+    # GUARDAR EN CONTEXTO (🔥 CLAVE)
     # ------------------------------------------------------
-    ctx.consumo = consumo
+    ctx.consumo = consumo  # para UI/debug
 
+    # 🔥 VARIABLES PLANAS (LO QUE USA EL SISTEMA)
+    ctx.consumo_12m = consumo["kwh_12m"]
+    ctx.tarifa_energia = consumo["tarifa_energia_L_kwh"]
+    ctx.cargos_fijos = consumo["cargos_fijos_L_mes"]
 
 def validar(ctx) -> Tuple[bool, List[str]]:
     """
