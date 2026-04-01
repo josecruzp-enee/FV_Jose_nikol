@@ -82,31 +82,101 @@ class Datosproyecto:
     # =====================================================
 
     def validar_minimo(self) -> None:
-        """
-        Validación mínima antes de entrar al orquestador.
-        Lanza excepción si algo crítico falta.
-        """
+    """
+    Validación mínima antes de entrar al orquestador.
+    Lanza excepción si algo crítico falta.
+    """
 
-        if not self.equipos:
-            raise ValueError("equipos no definido")
+    errores = []
 
-        if not self.sistema_fv:
-            raise ValueError("sistema_fv no definido")
+    # =====================================================
+    # BASE
+    # =====================================================
+    if not self.equipos:
+        errores.append("equipos no definido")
 
-        if self.lat == 0 and self.lon == 0:
-            raise ValueError("lat/lon inválidos (0,0)")
+    if not self.sistema_fv:
+        errores.append("sistema_fv no definido")
 
-        if "panel_id" not in self.equipos:
-            raise ValueError("panel_id no definido en equipos")
+    if self.lat == 0 and self.lon == 0:
+        errores.append("lat/lon inválidos (0,0)")
 
-        if "inversor_id" not in self.equipos:
-            raise ValueError("inversor_id no definido en equipos")
+    if "panel_id" not in self.equipos:
+        errores.append("panel_id no definido en equipos")
 
-        modo = self.sistema_fv.get("modo")
+    if "inversor_id" not in self.equipos:
+        errores.append("inversor_id no definido en equipos")
 
-        if not modo:
-            raise ValueError("modo no definido en sistema_fv")
+    modo = self.sistema_fv.get("modo")
 
-        if modo in ["cobertura", "offset"]:
-            if self.sistema_fv.get("valor") is None:
-                raise ValueError("valor no definido para modo cobertura/offset")
+    if not modo:
+        errores.append("modo no definido en sistema_fv")
+
+    if modo in ["cobertura", "offset"]:
+        if self.sistema_fv.get("valor") is None:
+            errores.append("valor no definido para modo cobertura/offset")
+
+    # =====================================================
+    # 🔥 CONSUMO (CRÍTICO)
+    # =====================================================
+    if not self.consumo_12m or len(self.consumo_12m) != 12:
+        errores.append("consumo_12m inválido")
+
+    elif sum(self.consumo_12m) <= 0:
+        errores.append("consumo anual inválido (todo en cero)")
+
+    # =====================================================
+    # 🔥 PRODUCCIÓN FV (CRÍTICO)
+    # =====================================================
+    if not self.prod_base_kwh_kwp_mes or len(self.prod_base_kwh_kwp_mes) != 12:
+        errores.append("prod_base_kwh_kwp_mes inválido")
+
+    elif sum(self.prod_base_kwh_kwp_mes) <= 0:
+        errores.append("producción base FV inválida (todo en cero)")
+
+    # =====================================================
+    # 🔥 FACTORES FV
+    # =====================================================
+    if not self.factores_fv_12m or len(self.factores_fv_12m) != 12:
+        errores.append("factores_fv_12m inválido")
+
+    # =====================================================
+    # 🔥 SISTEMA FV (ZONAS)
+    # =====================================================
+    if modo == "multizona":
+
+        zonas = self.sistema_fv.get("zonas", [])
+
+        if not zonas:
+            errores.append("modo multizona sin zonas")
+
+        for i, z in enumerate(zonas):
+
+            n_paneles = z.get("n_paneles")
+            area = z.get("area")
+
+            if (n_paneles is None or n_paneles <= 0) and (area is None or area <= 0):
+                errores.append(f"Zona {i+1}: sin paneles ni área válida")
+
+    # =====================================================
+    # 🔥 ELÉCTRICO
+    # =====================================================
+    if not self.electrico:
+        errores.append("electrico no definido")
+
+    else:
+        vac = self.electrico.get("vac", 0)
+
+        if vac <= 0:
+            errores.append("Voltaje AC inválido")
+
+        fases = self.electrico.get("fases", 0)
+
+        if fases not in [1, 2, 3]:
+            errores.append("Número de fases inválido")
+
+    # =====================================================
+    # FINAL
+    # =====================================================
+    if errores:
+        raise ValueError(" | ".join(errores))
