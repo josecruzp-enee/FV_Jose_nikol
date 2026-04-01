@@ -1,7 +1,6 @@
 from electrical.paneles.entrada_panel import EntradaPaneles
 from electrical.catalogos.catalogos import get_panel, get_inversor
 
-
 # ==========================================================
 # HELPERS
 # ==========================================================
@@ -10,7 +9,6 @@ def _extraer_ids_equipos(equipos):
     """
     Soporta dict y objeto
     """
-
     if isinstance(equipos, dict):
         panel_id = equipos.get("panel_id")
         inversor_id = equipos.get("inversor_id")
@@ -43,16 +41,38 @@ def _resolver_catalogos(panel_id, inversor_id):
 def _validar_sistema_fv(datos):
     if not hasattr(datos, "sistema_fv") or not isinstance(datos.sistema_fv, dict):
         raise ValueError("datos.sistema_fv no definido o inválido")
-
     return datos.sistema_fv
 
 
+# ==========================================================
+# NORMALIZACIÓN DE ZONAS
+# ==========================================================
+def _normalizar_zonas(zonas):
+    """
+    Si n_paneles no está definido, calcularlo desde el área
+    """
+    def estimar_paneles(area):
+        if not area or area <= 0:
+            return 1  # mínimo 1 panel
+        area_por_panel = 2.0  # m² aprox por panel
+        return max(int(area / area_por_panel), 1)
+
+    for z in zonas:
+        if not z.get("n_paneles") or z.get("n_paneles") <= 0:
+            z["n_paneles"] = estimar_paneles(z.get("area"))
+
+    return zonas
+
+
+# ==========================================================
+# BUILD MULTIZONA
+# ==========================================================
 def _build_multizona(sf, panel, inversor, sizing):
-
     zonas = sf.get("zonas", [])
-
     if not isinstance(zonas, list) or not zonas:
         raise ValueError("zonas inválidas en sistema_fv")
+
+    zonas = _normalizar_zonas(zonas)
 
     return EntradaPaneles(
         panel=panel,
@@ -69,19 +89,26 @@ def _build_multizona(sf, panel, inversor, sizing):
     )
 
 
+# ==========================================================
+# BUILD NORMAL
+# ==========================================================
 def _build_normal(sf, panel, inversor, sizing):
-
     modo = str(sf.get("modo")).strip().lower()
     valor = sf.get("valor")
 
     if valor is None or float(valor) <= 0:
         raise ValueError(f"Valor inválido en sistema_fv: {sf}")
 
+    n_paneles_total = getattr(sizing, "n_paneles", None)
+    if n_paneles_total is None and sf.get("zonas"):
+        # en caso que sizing no defina n_paneles, calcular desde zonas
+        n_paneles_total = sum(z.get("n_paneles", 0) for z in _normalizar_zonas(sf.get("zonas", [])))
+
     return EntradaPaneles(
         panel=panel,
         inversor=inversor,
         modo=modo,
-        n_paneles_total=getattr(sizing, "n_paneles", None),
+        n_paneles_total=n_paneles_total,
         zonas=None,
         t_min_c=getattr(sizing, "t_min_c", 25.0),
         t_oper_c=getattr(sizing, "t_oper_c", 55.0),
@@ -93,42 +120,40 @@ def _build_normal(sf, panel, inversor, sizing):
 
 
 # ==========================================================
-# MAIN
+# MAIN BUILDER
 # ==========================================================
-
 def construir_entrada_paneles(datos, sizing) -> EntradaPaneles:
     """
     BUILDER ROBUSTO
 
     ✔ Soporta dict y objeto en equipos
     ✔ Mantiene contrato actual
+    ✔ Normaliza n_paneles automáticamente
     ✔ Refactor limpio
     """
-
-    # ==========================================================
+    # --------------------------
     # EQUIPOS
-    # ==========================================================
+    # --------------------------
     if not hasattr(datos, "equipos") or datos.equipos is None:
         raise ValueError("datos.equipos no definido")
 
     panel_id, inversor_id = _extraer_ids_equipos(datos.equipos)
-
     panel, inversor = _resolver_catalogos(panel_id, inversor_id)
 
-    # ==========================================================
+    # --------------------------
     # SISTEMA FV
-    # ==========================================================
+    # --------------------------
     sf = _validar_sistema_fv(datos)
 
-    # ==========================================================
+    # --------------------------
     # MULTIZONA
-    # ==========================================================
+    # --------------------------
     if sf.get("modo") == "multizona" or sf.get("zonas"):
         return _build_multizona(sf, panel, inversor, sizing)
 
-    # ==========================================================
+    # --------------------------
     # NORMAL
-    # ==========================================================
+    # --------------------------
     if sf.get("modo"):
         return _build_normal(sf, panel, inversor, sizing)
 
