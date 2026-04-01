@@ -112,7 +112,7 @@ def _datosproyecto_desde_ctx(ctx):
     )
 
     # ======================================================
-    # ELÉCTRICO (ATRIBUTO DINÁMICO)
+    # ELÉCTRICO
     # ======================================================
     e = _asegurar_dict(ctx, "electrico")
 
@@ -125,20 +125,30 @@ def _datosproyecto_desde_ctx(ctx):
     }
 
     # ======================================================
-    # EQUIPOS (CLAVE: NO TRANSFORMAR)
+    # EQUIPOS (NO TOCAR ESTRUCTURA)
     # ======================================================
     eq = getattr(ctx, "equipos", None)
 
     if not eq:
         raise ValueError("ctx.equipos no definido (Paso 4 no ejecutado)")
 
-    # 👉 SE PASA TAL CUAL (para que sizing funcione)
-    p.equipos = eq
+    p.equipos = eq  # ✔ correcto
 
     # ======================================================
-    # SISTEMA FV (CRÍTICO PARA SIZING)
+    # SISTEMA FV (🔥 FIX CRÍTICO AQUÍ)
     # ======================================================
-    p.sistema_fv = getattr(ctx, "sistema_fv", {})
+    sf = getattr(ctx, "sistema_fv", {}) or {}
+
+    # 🔥 NORMALIZAR modo
+    modo = sf.get("modo")
+
+    if not modo:
+        modo = (sf.get("sizing_input") or {}).get("modo")
+
+    p.sistema_fv = {
+        **sf,
+        "modo": modo,  # ← CLAVE PARA QUE SIZING NO FALLE
+    }
 
     return p
 
