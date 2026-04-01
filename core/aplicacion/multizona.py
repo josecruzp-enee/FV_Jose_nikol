@@ -41,7 +41,7 @@ def ejecutar_multizona(entrada: EntradaPaneles) -> ResultadoPaneles:
 
     total_paneles, total_strings, total_pdc = _calcular_totales(resultados)
 
-    #vdc_nom = _validar_voltajes(resultados)
+    vdc_nom = None  # deshabilitado temporalmente
 
     strings_total = _consolidar_strings(resultados)
 
