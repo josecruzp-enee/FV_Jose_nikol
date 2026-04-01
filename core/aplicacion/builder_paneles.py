@@ -141,7 +141,7 @@ def _build_multizona(sf, panel, inversor, sizing):
     return EntradaPaneles(
         panel=panel,
         inversor=inversor,
-        modo="multizona",
+        modo="manual",
         zonas=zonas_obj,
 
         n_paneles_total=None,
