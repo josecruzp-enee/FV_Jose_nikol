@@ -28,8 +28,10 @@ class MesEnergia:
 
 @dataclass(frozen=True)
 class ResultadoSizing:
-    ok: bool = True
-    errores: List[str] = field(default_factory=list)
+
+    # ==================================================
+    # CAMPOS OBLIGATORIOS
+    # ==================================================
     n_paneles: int
     kwp_dc: float
     pdc_kw: float
@@ -41,6 +43,12 @@ class ResultadoSizing:
     panel: Any
     dc_ac_ratio: float
     energia_12m: List[MesEnergia]
+
+    # ==================================================
+    # CAMPOS CON DEFAULT (SIEMPRE AL FINAL)
+    # ==================================================
+    ok: bool = True
+    errores: List[str] = field(default_factory=list)
 
 # ==========================================================
 # FINANZAS
