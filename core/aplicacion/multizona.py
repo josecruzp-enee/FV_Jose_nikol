@@ -23,67 +23,58 @@ except Exception:
 
 def ejecutar_multizona(entrada: EntradaPaneles) -> ResultadoPaneles:
     """
-    Orquestador multizona.
-    Entrada SIEMPRE tipada (no dict).
+    Orquestador multizona (CORREGIDO).
     """
 
     resultados = _ejecutar_zonas(entrada)
 
     if isinstance(resultados, ResultadoPaneles):
-        return resultados  # error temprano
+        return resultados
 
     if not resultados:
         return _error("No hay resultados válidos en zonas")
 
-    panel = resultados[0].panel
+    # 🔥 SOLO UN RESULTADO REAL
+    res = resultados[0]
 
-    zonas_detalle = _build_zonas_detalle(resultados)
+    panel = res.panel
 
-    total_paneles, total_strings, total_pdc = _calcular_totales(resultados)
+    # --------------------------------------------------
+    # DETALLE POR ZONA (solo informativo)
+    # --------------------------------------------------
+    zonas_detalle = []
 
-    vdc_nom = None  # deshabilitado temporalmente
+    for i, s in enumerate(res.strings, 1):
+        zonas_detalle.append({
+            "zona": i,
+            "paneles": s.n_series,
+            "strings": 1,
+            "vdc": s.vmp_string_v,
+            "idc": s.imp_string_a,
+            "isc": s.isc_string_a,
+        })
 
-    strings_total = _consolidar_strings(resultados)
-
-    n_mppt_total, strings_por_mppt = _calcular_mppt(resultados, total_strings)
-
-    array_total = _build_array(
-        resultados,
-        total_paneles,
-        total_strings,
-        total_pdc,
-        vdc_nom,
-        n_mppt_total,
-        strings_por_mppt,
-    )
-
-    recomendacion = _build_recomendacion(
-        resultados,
-        total_strings,
-        strings_por_mppt,
-        vdc_nom,
-    )
-
-    warnings = _collect_warnings(resultados)
+    # --------------------------------------------------
+    # META
+    # --------------------------------------------------
+    meta = {
+        "n_paneles_total": res.array.n_paneles_total if res.array else 0,
+        "pdc_kw": res.array.potencia_dc_w / 1000 if res.array else 0,
+        "n_inversores": entrada.n_inversores,
+        "zonas": zonas_detalle,
+    }
 
     return ResultadoPaneles(
-        ok=True,
+        ok=res.ok,
         panel=panel,
         topologia="multizona",
-        array=array_total,
-        recomendacion=recomendacion,
-        strings=strings_total,
-        warnings=warnings,
-        errores=[],
-        meta={
-            "n_paneles_total": total_paneles,
-            "pdc_kw": total_pdc / 1000,
-            "n_inversores": 1,
-            "zonas": zonas_detalle,
-        },
+        array=res.array,               # 🔥 usar directo
+        recomendacion=res.recomendacion,
+        strings=res.strings,           # 🔥 usar directo
+        warnings=res.warnings,
+        errores=res.errores,
+        meta=meta,
     )
-
-
 # ==========================================================
 # ZONAS
 # ==========================================================
