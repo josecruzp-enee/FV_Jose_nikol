@@ -52,22 +52,20 @@ def _validar_sistema_fv(datos):
 # MAPEO UI → MOTOR
 # ==========================================================
 
-def _mapear_modo_ui_a_paneles(modo_ui: str) -> str:
+def _mapear_modo_ui_a_paneles(modo_ui: str):
 
     modo_ui = str(modo_ui).strip().lower()
 
-    if modo_ui in ["cobertura", "potencia"]:
-        return "paneles"
+    if modo_ui == "paneles":
+        return "manual"
+
+    if modo_ui in ["cobertura", "potencia", "consumo", "kw_objetivo"]:
+        return "consumo"   # 🔥 automático
 
     if modo_ui == "area":
         return "area"
 
-    if modo_ui == "paneles":
-        return "paneles"
-
     raise ValueError(f"Modo no soportado: {modo_ui}")
-
-
 # ==========================================================
 # NORMALIZACIÓN ZONAS
 # ==========================================================
