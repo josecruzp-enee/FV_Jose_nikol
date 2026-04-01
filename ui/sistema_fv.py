@@ -62,6 +62,8 @@ def _render_dimensionamiento(sf):
 
         if auto_op == "Cobertura (%)":
             valor = st.number_input("Cobertura (%)", 1.0, 200.0, 80.0)
+
+            sf["modo"] = "cobertura"  # 🔥 FIX
             sf["sizing_input"] = {
                 "modo": "cobertura",
                 "valor": float(valor)
@@ -69,6 +71,8 @@ def _render_dimensionamiento(sf):
 
         elif auto_op == "Área (m²)":
             valor = st.number_input("Área (m²)", 1.0, 10000.0, 100.0)
+
+            sf["modo"] = "area"  # 🔥 FIX
             sf["sizing_input"] = {
                 "modo": "area",
                 "valor": float(valor)
@@ -76,6 +80,8 @@ def _render_dimensionamiento(sf):
 
         elif auto_op == "Potencia (kW)":
             valor = st.number_input("Potencia (kW)", 0.1, 1000.0, 10.0)
+
+            sf["modo"] = "kw_objetivo"  # 🔥 FIX
             sf["sizing_input"] = {
                 "modo": "kw_objetivo",
                 "valor": float(valor)
@@ -101,6 +107,7 @@ def _render_dimensionamiento(sf):
 
             valor = st.number_input("Paneles", 1, 10000, 30)
 
+            sf["modo"] = "paneles"  # 🔥 FIX
             sf["sizing_input"] = {
                 "modo": "paneles",
                 "valor": int(valor)
@@ -110,16 +117,18 @@ def _render_dimensionamiento(sf):
             sf["zonas"] = []
 
         # --------------------------------------------------
-        # MULTIZONA
+        # MULTIZONA (🔥 CLAVE)
         # --------------------------------------------------
         else:
 
             sf["usar_zonas"] = True
 
+            sf["modo"] = "multizona"  # 🔥 FIX CRÍTICO
             sf["sizing_input"] = {
                 "modo": "multizona"
             }
 
+            # inicialización segura
             if not sf.get("zonas"):
                 sf["zonas"] = [{
                     "nombre": "Zona 1",
@@ -129,8 +138,6 @@ def _render_dimensionamiento(sf):
                     "azimut": 180.0,
                     "inclinacion": 15.0,
                 }]
-
-
 # ==========================================================
 # ZONAS
 # ==========================================================
