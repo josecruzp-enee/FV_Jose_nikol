@@ -215,7 +215,7 @@ def _consolidar_strings(resultados: List[ResultadoPaneles]):
 
 def _calcular_mppt(resultados: List[ResultadoPaneles], total_strings: int):
 
-    n_inversores = resultados[0].meta.get("n_inversores", 1)
+    n_inversores = getattr(resultados[0].meta, "n_inversores", 1)
     mppt_por_inversor = resultados[0].array.n_mppt
 
     n_mppt_total = n_inversores * mppt_por_inversor
