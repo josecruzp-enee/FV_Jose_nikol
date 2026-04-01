@@ -252,7 +252,7 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
     # RECOMENDACIÓN (🔥 FIX CRÍTICO)
     # --------------------------------------------------
     recomendacion = RecomendacionStrings(
-        n_series=max(s.n_series for s in strings),
+        n_series = strings[0].n_series,
         n_strings_total=len(strings),
         strings_por_mppt=1,
         vmp_string_v=max(s.vmp_string_v for s in strings),
