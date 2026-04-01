@@ -126,6 +126,9 @@ class EnergiaAdapter:
 
     def ejecutar(self, datos, sizing, paneles):
 
+        # ==================================================
+        # VALIDACIÓN BÁSICA (solo esto debe hacer el adapter)
+        # ==================================================
         if datos is None:
             raise ValueError("datos es None en energía")
 
@@ -135,78 +138,15 @@ class EnergiaAdapter:
         if paneles is None:
             raise ValueError("paneles es None en energía")
 
-        # -----------------------------
-        # VALIDACIÓN UBICACIÓN
-        # -----------------------------
-        lat = datos.lat
-        lon = datos.lon
-
-        if lat == 0 and lon == 0:
-            raise ValueError("Lat/Lon inválidos (0,0) → PVGIS fallará")
-
-        # -----------------------------
-        # CLIMA
-        # -----------------------------
-        clima = descargar_clima_pvgis(
-            EntradaClimaPVGIS(lat=lat, lon=lon)
-        )
-
-        if clima is None:
-            raise ValueError("Clima PVGIS devolvió None")
-
-        # -----------------------------
-        # PANEL (🔥 FIX DICT)
-        # -----------------------------
-        if not datos.equipos:
-            raise ValueError("datos.equipos no definido")
-
-        panel_id = datos.equipos.get("panel_id")
-
-        if not panel_id:
-            raise ValueError("panel_id no definido en equipos")
-
-        panel_spec = get_panel(panel_id)
-
-        if panel_spec is None:
-            raise ValueError(f"Panel no encontrado: {panel_id}")
-
-        # -----------------------------
-        # DATOS ARRAY
-        # -----------------------------
-        n_series = paneles.recomendacion.n_series
-        n_strings = paneles.array.n_strings_total
-        pdc_kw = paneles.array.potencia_dc_w / 1000
-
-        # -----------------------------
-        # INPUT ENERGÍA
-        # -----------------------------
-        entrada = EnergiaInput(
-            n_series=n_series,
-            n_strings=n_strings,
-            pdc_kw=pdc_kw,
-            panel=panel_spec,
-            pac_nominal_kw=sizing.kw_ac,
-            clima=clima,
-
-            tilt_deg=getattr(datos, "tilt_deg", 15),
-            azimut_deg=getattr(datos, "azimut_deg", 180),
-            perdidas_dc_frac=getattr(datos, "perdidas_dc_frac", 0.14),
-            sombras_frac=getattr(datos, "sombras_frac", 0.0),
-            eficiencia_inversor=getattr(datos, "eficiencia_inversor", 0.97),
-            perdidas_ac_frac=getattr(datos, "perdidas_ac_frac", 0.02),
-        )
-
-        resultado = ejecutar_energia(entrada)
+        # ==================================================
+        # DELEGACIÓN AL DOMINIO
+        # ==================================================
+        resultado = ejecutar_energia(datos, sizing, paneles)
 
         if resultado is None:
             raise ValueError("Energía devolvió None")
 
-        if not resultado.ok:
-            raise ValueError("Resultado energía inválido")
-
         return resultado
-
-
 # ==========================================================
 # ADAPTER: FINANZAS
 # ==========================================================
