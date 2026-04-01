@@ -1,6 +1,4 @@
 import streamlit as st
-import inspect
-import pprint
 
 from core.aplicacion.dependencias import construir_dependencias
 from core.aplicacion.orquestador_estudio import ejecutar_estudio
@@ -8,80 +6,7 @@ from core.dominio.modelo import Datosproyecto
 
 
 # ==========================================================
-# TRACE GLOBAL
-# ==========================================================
-def init_trace():
-    if "_trace" not in st.session_state:
-        st.session_state["_trace"] = []
-
-
-def add_trace(nombre, entrada, salida=None, error=None):
-    init_trace()
-    st.session_state["_trace"].append({
-        "funcion": nombre,
-        "entrada": entrada,
-        "salida": salida,
-        "error": error
-    })
-trace = get_trace()
-
-def get_trace():
-    return st.session_state.get("_trace", [])
-
-
-def clear_trace():
-    st.session_state["_trace"] = []
-
-
-# ==========================================================
-# TRACE WRAPPER
-# ==========================================================
-def trace_function(fn, name):
-
-    def wrapper(*args, **kwargs):
-
-        try:
-            result = fn(*args, **kwargs)
-
-            add_trace(
-                name,
-                {"args": str(args), "kwargs": str(kwargs)},
-                str(result),
-                None
-            )
-
-            return result
-
-        except Exception as e:
-
-            add_trace(
-                name,
-                {"args": str(args), "kwargs": str(kwargs)},
-                None,
-                str(e)
-            )
-
-            raise
-
-    return wrapper
-
-
-# ==========================================================
-# INSTRUMENTAR
-# ==========================================================
-def instrument_dependencies(deps):
-
-    deps.sizing.ejecutar = trace_function(deps.sizing.ejecutar, "sizing")
-    deps.paneles.ejecutar = trace_function(deps.paneles.ejecutar, "paneles")
-    deps.energia.ejecutar = trace_function(deps.energia.ejecutar, "energia")
-    deps.nec.ejecutar = trace_function(deps.nec.ejecutar, "nec")
-    deps.finanzas.ejecutar = trace_function(deps.finanzas.ejecutar, "finanzas")
-
-    return deps
-
-
-# ==========================================================
-# DATOS DEMO
+# DATOS DEMO (SIN TRACE)
 # ==========================================================
 def construir_datos_demo():
 
@@ -128,47 +53,22 @@ def construir_datos_demo():
 
 
 # ==========================================================
-# UI
+# UI SIMPLE
 # ==========================================================
-st.title("🧪 Debug Pipeline FV Engine")
+st.title("⚡ Test Pipeline FV (SIN TRACE)")
 
-if st.button("Ejecutar pipeline"):
-
-    clear_trace()
+if st.button("Ejecutar"):
 
     deps = construir_dependencias()
-    deps = instrument_dependencies(deps)
-
     datos = construir_datos_demo()
 
     try:
         resultado = ejecutar_estudio(datos, deps)
-        st.success("Pipeline ejecutado")
 
-        st.write("Resultado final:", resultado)
+        st.success("OK")
+
+        st.write("Resultado:")
+        st.write(resultado)
 
     except Exception as e:
-        st.error(str(e))
-
-
-# ==========================================================
-# MOSTRAR TRACE
-# ==========================================================
-trace = get_trace()
-
-if trace:
-
-    st.markdown("## 🔍 Pipeline FV")
-
-    for step in trace:
-
-        with st.expander(f"🔹 {step['funcion']}", expanded=True):
-
-            st.markdown("**Entrada**")
-            st.json(step["entrada"])
-
-            if step["error"]:
-                st.error(step["error"])
-            else:
-                st.markdown("**Salida**")
-                st.json(step["salida"])
+        st.error(f"Error: {e}")
