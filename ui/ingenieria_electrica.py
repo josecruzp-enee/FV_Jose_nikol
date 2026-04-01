@@ -181,16 +181,26 @@ def render(ctx):
 
             resultado = ejecutar_estudio(p, deps)
 
-            # 🔥 SIEMPRE GUARDAR (aunque esté malo)
             setattr(ctx, "resultado", resultado)
 
             st.success("✅ Ingeniería generada")
 
         except Exception as err:
-            st.error(f"❌ Error generando ingeniería: {err}")
+            import traceback
 
-            # 🔥 fallback para que no se rompa
-            setattr(ctx, "resultado", None)
+            st.error("❌ Error REAL en ingeniería")
+            st.code(traceback.format_exc())
+
+            # 🔥 GUARDAR ERROR COMO RESULTADO CONTROLADO
+            class ResultadoError:
+                ok = False
+                errores = [str(err)]
+                sizing = None
+                strings = None
+                energia = None
+                electrical = None
+
+            setattr(ctx, "resultado", ResultadoError())
             return
 
     # ===============================
@@ -203,17 +213,14 @@ def render(ctx):
         return
 
     # ===============================
-    # ESTADO (MODO SEGURO)
+    # ESTADO (SEGURO)
     # ===============================
     try:
         estado_ok = getattr(resultado, "ok", False)
         errores = getattr(resultado, "errores", [])
     except Exception:
-        st.error("⚠ Error interno en resultado (modo seguro)")
-
-        # 🔥 fallback para evitar crash
         estado_ok = False
-        errores = ["Error interno"]
+        errores = ["Resultado corrupto"]
 
     st.write("Estado:", estado_ok)
     st.write("Errores:", errores)
@@ -222,10 +229,10 @@ def render(ctx):
     # NO BLOQUEAR UI
     # ===============================
     if not estado_ok:
-        st.warning("⚠ Ingeniería generada con errores")
+        st.warning("⚠ Ingeniería con errores (ver detalle abajo)")
 
     # ===============================
-    # DEBUG SEGURO
+    # DEBUG REAL (CLAVE)
     # ===============================
     try:
         st.markdown("## 🧪 Datos internos")
