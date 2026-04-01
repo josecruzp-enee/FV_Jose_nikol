@@ -1,4 +1,6 @@
-from electrical.paneles.entrada_panel import EntradaPaneles
+from __future__ import annotations
+
+from electrical.paneles.entrada_panel import EntradaPaneles, ZonaFV
 from electrical.catalogos.catalogos import get_panel, get_inversor
 
 
@@ -47,7 +49,7 @@ def _validar_sistema_fv(datos):
 
 
 # ==========================================================
-# NORMALIZACIÓN CORRECTA (🔥 FIX REAL)
+# NORMALIZACIÓN (SIN MUTAR + DETERMINÍSTICA)
 # ==========================================================
 
 def _normalizar_zonas(zonas):
@@ -65,15 +67,19 @@ def _normalizar_zonas(zonas):
 
         n = z.get("n_paneles")
 
+        # 🔥 SOLO recalcular si es None
         if n is None:
             n = estimar_paneles(z.get("area"))
 
-        if n <= 0:
+        # 🔥 evitar valores inválidos
+        if n is None or n <= 0:
             n = 1
 
-        out.append({"n_paneles": n})
+        out.append(n)
 
     return out
+
+
 # ==========================================================
 # BUILD MULTIZONA
 # ==========================================================
@@ -85,13 +91,15 @@ def _build_multizona(sf, panel, inversor, sizing):
     if not isinstance(zonas_raw, list) or not zonas_raw:
         raise ValueError("zonas inválidas en sistema_fv")
 
+    # 🔥 NORMALIZAR
     zonas_norm = _normalizar_zonas(zonas_raw)
 
-    # 🔥 CONVERSIÓN A TIPADO FUERTE
-    zonas_obj = [
-        ZonaFV(n_paneles=z["n_paneles"])
-        for z in zonas_norm
-    ]
+    # 🔥 VALIDACIÓN
+    if not zonas_norm:
+        raise ValueError("zonas vacías después de normalización")
+
+    # 🔥 TIPADO FUERTE
+    zonas_obj = [ZonaFV(n_paneles=n) for n in zonas_norm]
 
     return EntradaPaneles(
         panel=panel,
@@ -106,6 +114,8 @@ def _build_multizona(sf, panel, inversor, sizing):
         pdc_kw_objetivo=getattr(sizing, "pdc_kw", None),
         n_inversores=getattr(sizing, "n_inversores", 1),
     )
+
+
 # ==========================================================
 # BUILD NORMAL
 # ==========================================================
@@ -120,9 +130,10 @@ def _build_normal(sf, panel, inversor, sizing):
 
     n_paneles_total = getattr(sizing, "n_paneles", None)
 
+    # fallback desde zonas si sizing no lo trae
     if n_paneles_total is None and sf.get("zonas"):
-        zonas = _normalizar_zonas(sf.get("zonas", []))
-        n_paneles_total = sum(z["n_paneles"] for z in zonas)
+        zonas_norm = _normalizar_zonas(sf.get("zonas", []))
+        n_paneles_total = sum(zonas_norm)
 
     return EntradaPaneles(
         panel=panel,
@@ -153,8 +164,8 @@ def construir_entrada_paneles(datos, sizing) -> EntradaPaneles:
 
     sf = _validar_sistema_fv(datos)
 
-    # 🔥 MULTIZONA PRIORIDAD
-    if sf.get("modo") == "multizona" or sf.get("zonas"):
+    # 🔥 MULTIZONA SOLO SI EL MODO LO INDICA
+    if sf.get("modo") == "multizona":
         return _build_multizona(sf, panel, inversor, sizing)
 
     # 🔹 NORMAL
