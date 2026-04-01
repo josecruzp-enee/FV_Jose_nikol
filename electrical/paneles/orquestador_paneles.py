@@ -132,7 +132,7 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
 
         for i, zona in enumerate(entrada.zonas):
 
-            n = int(zona.get("n_paneles", 0))
+            n = int(zona.n_paneles)  # 
 
             if n <= 0:
                 warnings.append(f"Zona {i+1} inválida (n_paneles <= 0)")
