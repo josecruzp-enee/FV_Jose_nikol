@@ -4,7 +4,6 @@ from collections import Counter
 
 from electrical.paneles.calculo_de_strings import calcular_strings_fv
 from electrical.paneles.dimensionado_paneles import dimensionar_paneles
-from electrical.paneles.entrada_panel import EntradaPaneles
 from electrical.paneles.resultado_paneles import (
     ResultadoPaneles,
     ArrayFV,
