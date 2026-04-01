@@ -1,17 +1,25 @@
 from __future__ import annotations
 
-from typing import Any
-
+from core.dominio.modelo import Datosproyecto
 from core.dominio.contrato import ResultadoProyecto
+
 from core.aplicacion.dependencias import DependenciasEstudio
 
 
 # ==========================================================
 # ORQUESTADOR PRINCIPAL
 # ==========================================================
-def ejecutar_estudio(datos: Any, deps: DependenciasEstudio) -> ResultadoProyecto:
+def ejecutar_estudio(
+    datos: Datosproyecto,
+    deps: DependenciasEstudio
+) -> ResultadoProyecto:
 
     try:
+
+        # ==================================================
+        # VALIDACIÓN DE ENTRADA (🔥 OBLIGATORIA)
+        # ==================================================
+        datos.validar_minimo()
 
         # ==================================================
         # 1. SIZING
@@ -21,7 +29,7 @@ def ejecutar_estudio(datos: Any, deps: DependenciasEstudio) -> ResultadoProyecto
         if sizing is None:
             raise ValueError("Sizing devolvió None")
 
-        if not getattr(sizing, "ok", True):
+        if not sizing.ok:
             return ResultadoProyecto(
                 sizing=sizing,
                 strings=None,
@@ -29,11 +37,11 @@ def ejecutar_estudio(datos: Any, deps: DependenciasEstudio) -> ResultadoProyecto
                 electrical=None,
                 financiero=None,
                 ok=False,
-                errores=["Error en sizing"]
+                errores=sizing.errores or ["Error en sizing"]
             )
 
         # ==================================================
-        # 2. PANELES / STRINGS
+        # 2. PANELES
         # ==================================================
         from core.aplicacion.builder_paneles import construir_entrada_paneles
 
@@ -44,7 +52,7 @@ def ejecutar_estudio(datos: Any, deps: DependenciasEstudio) -> ResultadoProyecto
         if paneles is None:
             raise ValueError("Paneles devolvió None")
 
-        if not getattr(paneles, "ok", True):
+        if not paneles.ok:
             return ResultadoProyecto(
                 sizing=sizing,
                 strings=paneles,
@@ -52,7 +60,7 @@ def ejecutar_estudio(datos: Any, deps: DependenciasEstudio) -> ResultadoProyecto
                 electrical=None,
                 financiero=None,
                 ok=False,
-                errores=["Error en paneles"]
+                errores=paneles.errores or ["Error en paneles"]
             )
 
         # ==================================================
@@ -63,7 +71,7 @@ def ejecutar_estudio(datos: Any, deps: DependenciasEstudio) -> ResultadoProyecto
         if energia is None:
             raise ValueError("Energía devolvió None")
 
-        if not getattr(energia, "ok", True):
+        if not energia.ok:
             return ResultadoProyecto(
                 sizing=sizing,
                 strings=paneles,
@@ -71,15 +79,15 @@ def ejecutar_estudio(datos: Any, deps: DependenciasEstudio) -> ResultadoProyecto
                 electrical=None,
                 financiero=None,
                 ok=False,
-                errores=["Error en energía"]
+                errores=energia.errores or ["Error en energía"]
             )
 
         # ==================================================
-        # 4. ELECTRICAL (CRÍTICO)
+        # 4. ELECTRICAL
         # ==================================================
         electrical = None
 
-        if deps.electrical:
+        if deps.electrical is not None:
 
             electrical = deps.electrical.ejecutar(
                 datos=datos,
@@ -90,7 +98,7 @@ def ejecutar_estudio(datos: Any, deps: DependenciasEstudio) -> ResultadoProyecto
             if electrical is None:
                 raise ValueError("Electrical devolvió None")
 
-            if not getattr(electrical, "ok", True):
+            if not electrical.ok:
                 return ResultadoProyecto(
                     sizing=sizing,
                     strings=paneles,
@@ -98,7 +106,7 @@ def ejecutar_estudio(datos: Any, deps: DependenciasEstudio) -> ResultadoProyecto
                     electrical=electrical,
                     financiero=None,
                     ok=False,
-                    errores=["Error en electrical"]
+                    errores=electrical.errores or ["Error en electrical"]
                 )
 
         # ==================================================
@@ -106,7 +114,7 @@ def ejecutar_estudio(datos: Any, deps: DependenciasEstudio) -> ResultadoProyecto
         # ==================================================
         finanzas = None
 
-        if deps.finanzas:
+        if deps.finanzas is not None:
 
             finanzas = deps.finanzas.ejecutar(
                 datos,
@@ -116,6 +124,17 @@ def ejecutar_estudio(datos: Any, deps: DependenciasEstudio) -> ResultadoProyecto
 
             if finanzas is None:
                 raise ValueError("Finanzas devolvió None")
+
+            if not getattr(finanzas, "ok", True):
+                return ResultadoProyecto(
+                    sizing=sizing,
+                    strings=paneles,
+                    energia=energia,
+                    electrical=electrical,
+                    financiero=finanzas,
+                    ok=False,
+                    errores=getattr(finanzas, "errores", ["Error en finanzas"])
+                )
 
         # ==================================================
         # RESULTADO FINAL
@@ -132,8 +151,8 @@ def ejecutar_estudio(datos: Any, deps: DependenciasEstudio) -> ResultadoProyecto
 
     except Exception as e:
 
-        # 🔥 DEBUG REAL (NO OCULTAR ERROR)
         import traceback
+        print("💥 ERROR EN ORQUESTADOR:")
         print(traceback.format_exc())
 
         return ResultadoProyecto(
