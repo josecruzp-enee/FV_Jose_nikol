@@ -56,7 +56,7 @@ def _resultado_error(inp: EnergiaInput, errores: List[str]) -> EnergiaResultado:
 
 
 # ==========================================================
-# BLOQUES
+# BLOQUES DEL PIPELINE
 # ==========================================================
 
 def _calcular_poa(h, inp):
@@ -178,6 +178,9 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
 
     try:
 
+        if not inp.clima or not inp.clima.horas:
+            raise Exception("Clima vacío o no definido")
+
         horas = inp.clima.horas
 
         dc_bruta_kw: List[float] = []
@@ -186,6 +189,9 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
 
         poa_total_kwh = 0.0
 
+        # ==================================================
+        # LOOP PRINCIPAL
+        # ==================================================
         for h in horas:
 
             poa = _calcular_poa(h, inp)
@@ -200,6 +206,7 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
             dc_bruta_kw.append(dc_bruta)
 
             dc_neta = _aplicar_perdidas_dc(dc_bruta, inp)
+
             inv = _pasar_inversor(dc_neta, inp)
 
             ac_sin, ac_final, _ = _calcular_ac(inv, inp)
@@ -207,6 +214,9 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
             ac_sin_clipping_kw.append(ac_sin)
             ac_final_kw.append(ac_final)
 
+        # ==================================================
+        # VALIDACIÓN
+        # ==================================================
         if len(ac_final_kw) not in (8760, 8784):
             raise ValueError("Serie horaria inválida")
 
@@ -283,3 +293,80 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
 
     except Exception as e:
         return _resultado_error(inp, [str(e)])
+
+
+# ==========================================================
+# ADAPTER
+# ==========================================================
+def ejecutar_energia(datos, sizing, paneles) -> EnergiaResultado:
+
+    if datos is None:
+        return EnergiaResultado.error("datos es None")
+
+    if sizing is None:
+        return EnergiaResultado.error("sizing es None")
+
+    if paneles is None:
+        return EnergiaResultado.error("paneles es None")
+
+    lat = datos.lat
+    lon = datos.lon
+
+    if lat == 0 and lon == 0:
+        return EnergiaResultado.error("Lat/Lon inválidos")
+
+    from energy.clima.lector_pvgis import descargar_clima_pvgis, EntradaClimaPVGIS
+
+    clima_base = descargar_clima_pvgis(
+        EntradaClimaPVGIS(lat=lat, lon=lon)
+    )
+
+    if clima_base is None:
+        return EnergiaResultado.error("Clima PVGIS devolvió None")
+
+    from energy.clima.simulacion_8760 import simular_clima_8760
+
+    tilt = getattr(datos, "tilt_deg", 15)
+    azimuth = getattr(datos, "azimut_deg", 180)
+
+    clima_8760 = simular_clima_8760(
+        clima_base,
+        tilt=tilt,
+        azimuth=azimuth
+    )
+
+    from electrical.catalogos.catalogos import get_panel
+
+    if not isinstance(datos.equipos, dict):
+        return EnergiaResultado.error("datos.equipos inválido")
+
+    panel_id = datos.equipos.get("panel_id")
+
+    if not panel_id:
+        return EnergiaResultado.error("panel_id no definido")
+
+    panel_spec = get_panel(panel_id)
+
+    if panel_spec is None:
+        return EnergiaResultado.error(f"Panel no encontrado: {panel_id}")
+
+    n_series = paneles.recomendacion.n_series
+    n_strings = paneles.array.n_strings_total
+    pdc_kw = paneles.array.potencia_dc_w / 1000
+
+    entrada = EnergiaInput(
+        n_series=n_series,
+        n_strings=n_strings,
+        pdc_kw=pdc_kw,
+        panel=panel_spec,
+        pac_nominal_kw=sizing.kw_ac,
+        clima=clima_8760,
+        tilt_deg=tilt,
+        azimut_deg=azimuth,
+        perdidas_dc_frac=getattr(datos, "perdidas_dc_frac", 0.14),
+        sombras_frac=getattr(datos, "sombras_frac", 0.0),
+        eficiencia_inversor=getattr(datos, "eficiencia_inversor", 0.97),
+        perdidas_ac_frac=getattr(datos, "perdidas_ac_frac", 0.02),
+    )
+
+    return ejecutar_motor_energia(entrada)
