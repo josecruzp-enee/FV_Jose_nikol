@@ -7,7 +7,7 @@ from core.aplicacion.dependencias import DependenciasEstudio
 
 
 # ==========================================================
-# ORQUESTADOR PRINCIPAL (LIMPIO)
+# ORQUESTADOR PRINCIPAL
 # ==========================================================
 def ejecutar_estudio(datos: Any, deps: DependenciasEstudio) -> ResultadoProyecto:
 
@@ -33,7 +33,7 @@ def ejecutar_estudio(datos: Any, deps: DependenciasEstudio) -> ResultadoProyecto
             )
 
         # ==================================================
-        # 2. PANELES
+        # 2. PANELES / STRINGS
         # ==================================================
         from core.aplicacion.builder_paneles import construir_entrada_paneles
 
@@ -75,16 +75,31 @@ def ejecutar_estudio(datos: Any, deps: DependenciasEstudio) -> ResultadoProyecto
             )
 
         # ==================================================
-        # 4. ELECTRICAL
+        # 4. ELECTRICAL (CRÍTICO)
         # ==================================================
         electrical = None
 
         if deps.electrical:
+
             electrical = deps.electrical.ejecutar(
                 datos=datos,
                 paneles=paneles,
                 sizing=sizing
             )
+
+            if electrical is None:
+                raise ValueError("Electrical devolvió None")
+
+            if not getattr(electrical, "ok", True):
+                return ResultadoProyecto(
+                    sizing=sizing,
+                    strings=paneles,
+                    energia=energia,
+                    electrical=electrical,
+                    financiero=None,
+                    ok=False,
+                    errores=["Error en electrical"]
+                )
 
         # ==================================================
         # 5. FINANZAS
@@ -92,9 +107,15 @@ def ejecutar_estudio(datos: Any, deps: DependenciasEstudio) -> ResultadoProyecto
         finanzas = None
 
         if deps.finanzas:
+
             finanzas = deps.finanzas.ejecutar(
-                datos, sizing, energia
+                datos,
+                sizing,
+                energia
             )
+
+            if finanzas is None:
+                raise ValueError("Finanzas devolvió None")
 
         # ==================================================
         # RESULTADO FINAL
@@ -110,6 +131,10 @@ def ejecutar_estudio(datos: Any, deps: DependenciasEstudio) -> ResultadoProyecto
         )
 
     except Exception as e:
+
+        # 🔥 DEBUG REAL (NO OCULTAR ERROR)
+        import traceback
+        print(traceback.format_exc())
 
         return ResultadoProyecto(
             sizing=None,
