@@ -64,63 +64,68 @@ def _ui_inputs_electricos(e):
 # ==========================================================
 # CONVERSIÓN CTX → MODELO
 # ==========================================================
-
 def _datosproyecto_desde_ctx(ctx):
 
-    e = _asegurar_dict(ctx, "electrico")
+    # ======================================================
+    # CREAR OBJETO BASE (SIN ELÉCTRICO)
+    # ======================================================
+    p = Datosproyecto(
 
-    return Datosproyecto(
-
-        # ===============================
+        # -------------------------------
         # DATOS GENERALES
-        # ===============================
+        # -------------------------------
         cliente=getattr(ctx, "cliente", ""),
         ubicacion=getattr(ctx, "ubicacion", ""),
         lat=float(getattr(ctx, "lat", 0)),
         lon=float(getattr(ctx, "lon", 0)),
 
-        # ===============================
+        # -------------------------------
         # CONSUMO
-        # ===============================
+        # -------------------------------
         consumo_12m=getattr(ctx, "consumo_12m", [0]*12),
 
-        # ===============================
+        # -------------------------------
         # TARIFA
-        # ===============================
+        # -------------------------------
         tarifa_energia=float(getattr(ctx, "tarifa_energia", 0)),
         cargos_fijos=float(getattr(ctx, "cargos_fijos", 0)),
 
-        # ===============================
+        # -------------------------------
         # PRODUCCIÓN FV
-        # ===============================
+        # -------------------------------
         prod_base_kwh_kwp_mes=getattr(ctx, "prod_base_kwh_kwp_mes", [0]*12),
         factores_fv_12m=getattr(ctx, "factores_fv_12m", [1]*12),
 
-        # ===============================
+        # -------------------------------
         # OBJETIVO
-        # ===============================
+        # -------------------------------
         cobertura_objetivo=float(getattr(ctx, "cobertura_objetivo", 1.0)),
 
-        # ===============================
+        # -------------------------------
         # COSTOS
-        # ===============================
+        # -------------------------------
         costo_usd_kwp=float(getattr(ctx, "costo_usd_kwp", 1000)),
         tcambio=float(getattr(ctx, "tcambio", 24.5)),
         tasa_anual=float(getattr(ctx, "tasa_anual", 0.1)),
         plazo_anios=int(getattr(ctx, "plazo_anios", 10)),
         porcentaje_financiado=float(getattr(ctx, "porcentaje_financiado", 0)),
-
-        # ===============================
-        # ELÉCTRICO (CLAVE PARA TU ERROR ORIGINAL)
-        # ===============================
-        electrico={
-            "vac": float(e.get("vac", 240)),
-            "fases": int(e.get("fases", 1)),
-            "fp": float(e.get("fp", 1.0)),
-            "dist_dc_m": float(e.get("dist_dc_m", 0)),
-            "dist_ac_m": float(e.get("dist_ac_m", 0)),
-        }
     )
+
+    # ======================================================
+    # ASIGNAR BLOQUE ELÉCTRICO (FUERA DEL CONSTRUCTOR)
+    # ======================================================
+    e = _asegurar_dict(ctx, "electrico")
+
+    p.electrico = {
+        "vac": float(e.get("vac", 240)),
+        "fases": int(e.get("fases", 1)),
+        "fp": float(e.get("fp", 1.0)),
+        "dist_dc_m": float(e.get("dist_dc_m", 0)),
+        "dist_ac_m": float(e.get("dist_ac_m", 0)),
+    }
+
+    return p
+
 
 # ==========================================================
 # RENDER RESULTADO
