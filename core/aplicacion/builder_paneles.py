@@ -57,50 +57,48 @@ def _normalizar_zonas(zonas):
             return 1
         return max(int(area / 2.0), 1)
 
-    zonas_out = []
+    out = []
 
     for z in zonas:
-
         if not isinstance(z, dict):
             continue
 
-        n_paneles = z.get("n_paneles")
+        n = z.get("n_paneles")
 
-        # 🔥 SOLO recalcular si es None (no tocar valores válidos)
-        if n_paneles is None:
-            n_paneles = estimar_paneles(z.get("area"))
+        if n is None:
+            n = estimar_paneles(z.get("area"))
 
-        zonas_out.append({
-            "nombre": z.get("nombre", ""),
-            "modo": z.get("modo", "paneles"),
-            "n_paneles": n_paneles,
-            "area": z.get("area"),
-            "azimut": z.get("azimut"),
-            "inclinacion": z.get("inclinacion"),
-        })
+        if n <= 0:
+            n = 1
 
-    return zonas_out
+        out.append({"n_paneles": n})
 
-
+    return out
 # ==========================================================
 # BUILD MULTIZONA
 # ==========================================================
 
 def _build_multizona(sf, panel, inversor, sizing):
 
-    zonas = sf.get("zonas", [])
+    zonas_raw = sf.get("zonas", [])
 
-    if not isinstance(zonas, list) or not zonas:
+    if not isinstance(zonas_raw, list) or not zonas_raw:
         raise ValueError("zonas inválidas en sistema_fv")
 
-    zonas = _normalizar_zonas(zonas)
+    zonas_norm = _normalizar_zonas(zonas_raw)
+
+    # 🔥 CONVERSIÓN A TIPADO FUERTE
+    zonas_obj = [
+        ZonaFV(n_paneles=z["n_paneles"])
+        for z in zonas_norm
+    ]
 
     return EntradaPaneles(
         panel=panel,
         inversor=inversor,
         modo="multizona",
         n_paneles_total=None,
-        zonas=zonas,
+        zonas=zonas_obj,
         t_min_c=getattr(sizing, "t_min_c", 25.0),
         t_oper_c=getattr(sizing, "t_oper_c", 55.0),
         dos_aguas=getattr(sizing, "dos_aguas", False),
@@ -108,8 +106,6 @@ def _build_multizona(sf, panel, inversor, sizing):
         pdc_kw_objetivo=getattr(sizing, "pdc_kw", None),
         n_inversores=getattr(sizing, "n_inversores", 1),
     )
-
-
 # ==========================================================
 # BUILD NORMAL
 # ==========================================================
