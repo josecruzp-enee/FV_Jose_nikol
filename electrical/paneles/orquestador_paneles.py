@@ -124,15 +124,26 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
         return _resultado_error(panel, errores, warnings)
 
     # ======================================================
-    # 🔥 MULTIZONA (FIX REAL)
+    # 🔥 MULTIZONA (CORREGIDO NIVEL INGENIERÍA)
     # ======================================================
     if entrada.zonas:
 
         strings: List[StringFV] = []
 
+        # 🔥 MPPT disponibles reales
+        n_mppt_disp = inversor.n_mppt * entrada.n_inversores
+
+        # 🔴 VALIDACIÓN CRÍTICA
+        if len(entrada.zonas) > n_mppt_disp:
+            return _resultado_error(
+                panel,
+                [f"Hay {len(entrada.zonas)} zonas pero solo {n_mppt_disp} MPPT disponibles"],
+                warnings,
+            )
+
         for i, zona in enumerate(entrada.zonas):
 
-            n = int(zona.n_paneles)  # 
+            n = int(zona.n_paneles)
 
             if n <= 0:
                 warnings.append(f"Zona {i+1} inválida (n_paneles <= 0)")
@@ -140,7 +151,7 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
 
             strings.append(
                 StringFV(
-                    mppt=i + 1,
+                    mppt=i + 1,   # 🔥 cada zona usa su MPPT
                     n_series=n,
                     vmp_string_v=panel.vmp_v * n,
                     voc_frio_string_v=panel.voc_v * n,
@@ -153,7 +164,7 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
             return _resultado_error(panel, ["No hay zonas válidas"], warnings)
 
         # --------------------------------------------------
-        # ARRAY (simplificado y correcto)
+        # ARRAY FV
         # --------------------------------------------------
         n_paneles_total = sum(s.n_series for s in strings)
         pdc_kw = (n_paneles_total * panel.pmax_w) / 1000
@@ -167,7 +178,7 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
             n_strings_total=len(strings),
             n_paneles_total=n_paneles_total,
             strings_por_mppt=1,
-            n_mppt=inversor.n_mppt,
+            n_mppt=n_mppt_disp,
             p_panel_w=panel.pmax_w,
         )
 
@@ -236,8 +247,7 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
         pdc_kw=pdc_kw,
         n_inversores=entrada.n_inversores,
     )
-    print("🔥 DEBUG MODO:", entrada.modo)
-    print("🔥 DEBUG ZONAS:", entrada.zonas)
+
     return ResultadoPaneles(
         ok=True,
         panel=panel,
