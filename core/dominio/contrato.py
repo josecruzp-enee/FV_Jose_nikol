@@ -30,7 +30,7 @@ class MesEnergia:
 class ResultadoSizing:
     ok: bool
     errores: List[str]
-
+    kwp_dc: float 
     n_paneles: int
     pdc_kw: float
     kw_ac: float
