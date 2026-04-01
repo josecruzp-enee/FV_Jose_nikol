@@ -1,102 +1,180 @@
-from dataclasses import dataclass
-from typing import Optional, Literal, List
+from __future__ import annotations
+from typing import List
+from collections import Counter
 
-from electrical.modelos.paneles import PanelSpec
-from electrical.modelos.inversor import InversorSpec
+from electrical.paneles.calculo_de_strings import calcular_strings_fv
+from electrical.paneles.dimensionado_paneles import dimensionar_paneles
+from electrical.paneles.entrada_panel import EntradaPaneles
+from electrical.paneles.resultado_paneles import (
+    ResultadoPaneles,
+    ArrayFV,
+    StringFV,
+    RecomendacionStrings,
+    PanelesMeta,
+)
+from electrical.paneles.validacion_strings import (
+    validar_panel,
+    validar_inversor,
+)
 
 
-# ==========================================================
-# ZONA FV (FUERTE)
-# ==========================================================
-@dataclass(frozen=True)
-class ZonaFV:
-    n_paneles: int
-    azimut: float = 180.0
-    inclinacion: float = 15.0
+# =========================================================
+# ERROR
+# =========================================================
+def _resultado_error(panel, errores, warnings):
+    return ResultadoPaneles(
+        ok=False,
+        panel=panel,
+        topologia="error",
+        array=None,
+        recomendacion=None,
+        strings=[],
+        warnings=warnings or [],
+        errores=errores or [],
+        meta=PanelesMeta(0, 0, 0),
+    )
 
 
-# ==========================================================
-# ENTRADA PANELES (FUERTE)
-# ==========================================================
-@dataclass(frozen=True)
-class EntradaPaneles:
+# =========================================================
+# HELPERS
+# =========================================================
+def _resolver_dimensionado(entrada, panel):
+    if entrada.n_paneles_total is not None:
+        n_paneles = entrada.n_paneles_total
+        pdc_kw = (n_paneles * panel.pmax_w) / 1000
+        return n_paneles, pdc_kw, None
 
-    # ===============================
-    # ESPECIFICACIONES (OBLIGATORIO)
-    # ===============================
-    panel: PanelSpec
-    inversor: InversorSpec
+    dim = dimensionar_paneles(entrada)
 
-    # ===============================
-    # CONTROL DE FLUJO (OBLIGATORIO)
-    # ===============================
-    modo: Literal[
-        "manual",
-        "consumo",
-        "area",
-        "kw_objetivo",
-        "multizona"
+    if not dim.ok:
+        return None, None, dim.errores
+
+    return dim.n_paneles, dim.pdc_kw, None
+
+
+def _strings_por_mppt_real(strings_res):
+    conteo = Counter((s.inversor, s.mppt) for s in strings_res.strings)
+    return max(conteo.values()) if conteo else 0
+
+
+def _armar_array(
+    panel,
+    inversor,
+    strings_res,
+    n_paneles,
+    pdc_kw,
+    strings_por_mppt,
+    n_inversores,
+):
+    n_strings = strings_res.recomendacion.n_strings_total
+
+    return ArrayFV(
+        potencia_dc_w=pdc_kw * 1000,
+        vdc_nom=strings_res.recomendacion.vmp_string_v,
+        idc_nom=None,
+        isc_total=None,
+        voc_frio_array_v=strings_res.recomendacion.voc_string_v,
+        n_strings_total=n_strings,
+        n_paneles_total=n_paneles,
+        strings_por_mppt=strings_por_mppt,
+        n_mppt=inversor.n_mppt * n_inversores,
+        p_panel_w=panel.pmax_w,
+    )
+
+
+def _mapear_strings(strings_res):
+    return [
+        StringFV(
+            mppt=s.mppt,
+            n_series=s.n_series,
+            vmp_string_v=s.vmp_string_v,
+            voc_frio_string_v=s.voc_frio_string_v,
+            imp_string_a=s.imp_string_a,
+            isc_string_a=s.isc_string_a,
+        )
+        for s in strings_res.strings
     ]
 
-    # ===============================
-    # CONFIGURACIÓN BASE
-    # ===============================
-    n_paneles_total: Optional[int] = None
-    n_inversores: int = 1  # 🔥 default fuerte (no None)
 
-    # ===============================
-    # MULTIZONA
-    # ===============================
-    zonas: Optional[List[ZonaFV]] = None
+# =========================================================
+# ORQUESTADOR (SIN MULTIZONA)
+# =========================================================
+def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
 
-    # ===============================
-    # OBJETIVOS
-    # ===============================
-    objetivo_dc_ac: Optional[float] = None
-    pdc_kw_objetivo: Optional[float] = None
+    errores: List[str] = []
+    warnings: List[str] = []
 
-    # ===============================
-    # CONDICIONES TÉRMICAS
-    # ===============================
-    t_min_c: float = 25.0
-    t_oper_c: float = 55.0
+    panel = entrada.panel
+    inversor = entrada.inversor
 
-    # ===============================
-    # TOPOLOGÍA
-    # ===============================
-    dos_aguas: bool = False
+    # ------------------------------------------------------
+    # VALIDACIÓN
+    # ------------------------------------------------------
+    for val in (
+        validar_panel(panel),
+        validar_inversor(inversor),
+    ):
+        errores += val.errores
+        warnings += val.warnings
+
+    if errores:
+        return _resultado_error(panel, errores, warnings)
 
     # ======================================================
-    # VALIDACIÓN INTERNA (CLAVE 🔥)
+    # NORMAL (ÚNICA RESPONSABILIDAD)
     # ======================================================
-    def __post_init__(self):
+    n_paneles, pdc_kw, err = _resolver_dimensionado(entrada, panel)
 
-    # ======================================================
-    # VALIDACIÓN MULTIZONA
-    # ======================================================
-    if self.modo == "multizona":
+    if err:
+        return _resultado_error(panel, err, warnings)
 
-        if not self.zonas or len(self.zonas) == 0:
-            raise ValueError("Modo multizona requiere zonas válidas")
+    strings_res = calcular_strings_fv(
+        n_paneles_total=n_paneles,
+        panel=panel,
+        inversor=inversor,
+        n_inversores=entrada.n_inversores,
+        t_min_c=entrada.t_min_c,
+        t_oper_c=entrada.t_oper_c,
+        modo=entrada.modo,
+    )
 
-    # ======================================================
-    # VALIDACIÓN MODOS NORMALES
-    # ======================================================
-    else:
+    if not strings_res.ok:
+        return _resultado_error(panel, strings_res.errores, warnings)
 
-        # 🔥 SOLO exigir paneles en modo manual
-        if self.modo == "manual":
+    array = _armar_array(
+        panel,
+        inversor,
+        strings_res,
+        n_paneles,
+        pdc_kw,
+        _strings_por_mppt_real(strings_res),
+        entrada.n_inversores,
+    )
 
-            if self.n_paneles_total is None or self.n_paneles_total <= 0:
-                raise ValueError("n_paneles_total requerido en modo manual")
+    strings = _mapear_strings(strings_res)
 
-        # 🔥 EN OTROS MODOS:
-        # consumo / area / kw_objetivo
-        # → se permite n_paneles_total = None
-        # → paneles se dimensiona automáticamente
+    meta = PanelesMeta(
+        n_paneles_total=n_paneles,
+        pdc_kw=pdc_kw,
+        n_inversores=entrada.n_inversores,
+    )
 
-    # ======================================================
-    # VALIDACIÓN INVERSORES
-    # ======================================================
-    if self.n_inversores <= 0:
-        raise ValueError("n_inversores debe ser >= 1")
+    recomendacion = RecomendacionStrings(
+        n_series=strings[0].n_series,
+        n_strings_total=len(strings),
+        strings_por_mppt=1,
+        vmp_string_v=max(s.vmp_string_v for s in strings),
+        voc_frio_string_v=max(s.voc_frio_string_v for s in strings),
+    )
+
+    return ResultadoPaneles(
+        ok=True,
+        panel=panel,
+        topologia="normal",
+        array=array,
+        recomendacion=recomendacion,
+        strings=strings,
+        warnings=warnings,
+        errores=[],
+        meta=meta,
+    )
