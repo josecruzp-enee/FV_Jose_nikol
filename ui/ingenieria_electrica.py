@@ -64,10 +64,11 @@ def _ui_inputs_electricos(e):
 # ==========================================================
 # CONVERSIÓN CTX → MODELO
 # ==========================================================
+
 def _datosproyecto_desde_ctx(ctx):
 
     # ======================================================
-    # CREAR OBJETO BASE (SIN ELÉCTRICO)
+    # CREAR OBJETO BASE (SIN ELÉCTRICO NI EQUIPOS)
     # ======================================================
     p = Datosproyecto(
 
@@ -112,7 +113,7 @@ def _datosproyecto_desde_ctx(ctx):
     )
 
     # ======================================================
-    # ASIGNAR BLOQUE ELÉCTRICO (FUERA DEL CONSTRUCTOR)
+    # ELÉCTRICO (ATRIBUTO DINÁMICO)
     # ======================================================
     e = _asegurar_dict(ctx, "electrico")
 
@@ -124,8 +125,44 @@ def _datosproyecto_desde_ctx(ctx):
         "dist_ac_m": float(e.get("dist_ac_m", 0)),
     }
 
-    return p
+    # ======================================================
+    # EQUIPOS → CONVERSIÓN REAL (CRÍTICO)
+    # ======================================================
+    from electrical.catalogos import catalogo_paneles, catalogo_inversores
 
+    equipos_ctx = getattr(ctx, "equipos", None)
+
+    if not equipos_ctx:
+        raise ValueError("p.equipos no definido (Paso 4 no conectado)")
+
+    panel_id = equipos_ctx.get("panel_id")
+    inv_id = equipos_ctx.get("inversor_id")
+
+    if not panel_id or not inv_id:
+        raise ValueError("Panel o inversor no seleccionado")
+
+    # 🔹 cargar catálogos
+    paneles = {p["id"]: p for p in catalogo_paneles()}
+    inversores = {i["id"]: i for i in catalogo_inversores()}
+
+    if panel_id not in paneles:
+        raise ValueError(f"Panel {panel_id} no encontrado")
+
+    if inv_id not in inversores:
+        raise ValueError(f"Inversor {inv_id} no encontrado")
+
+    # 🔹 mapear a formato del motor
+    p.equipos = {
+        "panel": paneles[panel_id],
+        "inversor": inversores[inv_id],
+        "config": {
+            "sobredimension_dc_ac": equipos_ctx.get("sobredimension_dc_ac"),
+            "tension_sistema": equipos_ctx.get("tension_sistema"),
+            "strings_config": equipos_ctx.get("strings_config"),
+        }
+    }
+
+    return p
 
 # ==========================================================
 # RENDER RESULTADO
