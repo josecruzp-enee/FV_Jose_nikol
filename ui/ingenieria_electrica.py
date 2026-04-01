@@ -72,7 +72,7 @@ def _render_resultado(resultado):
         return
 
     # ======================================================
-    # ESTADO CORREGIDO
+    # ESTADO
     # ======================================================
     st.markdown("### 🧪 Estado del sistema")
 
@@ -96,7 +96,7 @@ def _render_resultado(resultado):
             st.error(err)
 
     # ======================================================
-    # DEBUG PANELES (NUEVO)
+    # DEBUG PANELES
     # ======================================================
     st.markdown("### 🔋 DEBUG PANELES")
 
@@ -104,7 +104,6 @@ def _render_resultado(resultado):
 
     if paneles:
         st.write(paneles)
-
         if hasattr(paneles, "array"):
             st.write("Array interno paneles:", paneles.array)
     else:
@@ -120,27 +119,23 @@ def _render_resultado(resultado):
     if electrical is None:
         st.warning("Electrical = None")
     else:
-        try:
-            st.write(electrical)
+        st.write(electrical)
 
-            if hasattr(electrical, "corrientes"):
-                st.write("Corrientes:", electrical.corrientes)
+        if hasattr(electrical, "corrientes"):
+            st.write("Corrientes:", electrical.corrientes)
 
-            if hasattr(electrical, "conductores"):
-                st.write("Conductores:", electrical.conductores)
+        if hasattr(electrical, "conductores"):
+            st.write("Conductores:", electrical.conductores)
 
-            if hasattr(electrical, "protecciones"):
-                st.write("Protecciones:", electrical.protecciones)
-
-        except Exception as e:
-            st.error(f"No se pudo mostrar detalle eléctrico: {e}")
+        if hasattr(electrical, "protecciones"):
+            st.write("Protecciones:", electrical.protecciones)
 
     # ======================================================
-    # STRINGS (CORREGIDO)
+    # STRINGS FV (CORREGIDO)
     # ======================================================
     st.markdown("### 🔗 Strings FV")
 
-    strings = getattr(resultado, "strings", None)
+    strings = paneles.strings if paneles and hasattr(paneles, "strings") else []
 
     if isinstance(strings, list) and len(strings) > 0:
         for i, s in enumerate(strings, 1):
@@ -150,14 +145,14 @@ def _render_resultado(resultado):
                 f"Ip {s.imp_string_a:.2f} A | Isc {s.isc_string_a:.2f} A"
             )
     else:
-        st.warning(f"Strings FV no definidos → {type(strings)}")
+        st.warning("Strings FV no definidos")
 
     # ======================================================
-    # ARRAY FV
+    # ARRAY FV (CORREGIDO)
     # ======================================================
     st.markdown("### ⚡ Array FV")
 
-    array = getattr(resultado, "array", None)
+    array = paneles.array if paneles and hasattr(paneles, "array") else None
 
     if array:
         st.write(f"Potencia DC total: {array.potencia_dc_w/1000:.2f} kW")
@@ -174,15 +169,15 @@ def _render_resultado(resultado):
     # ======================================================
     st.markdown("### 📊 Meta")
 
-    meta = getattr(resultado, "meta", None)
+    meta = getattr(resultado, "paneles", None)
 
-    if meta:
-        st.write(f"Nº total de paneles: {meta.n_paneles_total}")
-        st.write(f"Potencia DC total: {meta.pdc_kw:.2f} kW")
-        st.write(f"Nº de inversores: {meta.n_inversores}")
+    if meta and hasattr(meta, "meta"):
+        st.write(f"Nº total de paneles: {meta.meta.n_paneles_total}")
+        st.write(f"Potencia DC total: {meta.meta.pdc_kw:.2f} kW")
+        st.write(f"Nº de inversores: {meta.meta.n_inversores}")
 
     # ======================================================
-    # DUMP COMPLETO (NUEVO 🔥)
+    # DEBUG COMPLETO
     # ======================================================
     st.markdown("### 🧠 INSPECCIÓN COMPLETA")
 
@@ -195,29 +190,20 @@ def _render_resultado(resultado):
 
 
 # ==========================================================
-# MAIN RENDER
+# MAIN
 # ==========================================================
 def render(ctx):
 
     st.markdown("# ⚡ Ingeniería eléctrica")
 
-    # ======================================================
-    # INPUTS
-    # ======================================================
     e = _asegurar_dict(ctx, "electrico")
     _ui_inputs_electricos(e)
 
-    # ======================================================
-    # BOTÓN
-    # ======================================================
     if st.button("⚡ Generar ingeniería eléctrica"):
 
         try:
             p = construir_datos_proyecto(ctx)
 
-            # ======================================================
-            # DEBUG ENTRADA
-            # ======================================================
             st.markdown("## 🧪 DEBUG INGENIERÍA")
 
             from dataclasses import asdict
@@ -234,17 +220,6 @@ def render(ctx):
             st.markdown("### ⚡ Eléctrico")
             st.json(getattr(p, "electrico", {}))
 
-            st.markdown("### 🔗 Strings FV (entrada)")
-            st.write(getattr(p, "strings", "No definido"))
-
-            zonas = getattr(ctx, "zonas", None)
-            if zonas:
-                st.markdown("### 🧪 Multizona")
-                st.json(zonas)
-
-            # ======================================================
-            # EJECUTAR
-            # ======================================================
             deps = construir_dependencias()
             resultado = ejecutar_estudio(p, deps)
 
@@ -259,9 +234,6 @@ def render(ctx):
             st.exception(ex)
             return
 
-    # ======================================================
-    # MOSTRAR RESULTADO PREVIO
-    # ======================================================
     try:
         resultado = getattr(ctx, "resultado", None)
 
