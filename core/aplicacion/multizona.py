@@ -1,15 +1,33 @@
-from typing import List
+from __future__ import annotations
 
-from electrical.paneles.orquestador_paneles import ejecutar_paneles
+from typing import List, Optional
+
+# ==========================================================
+# DOMINIO / CONTRATOS
+# ==========================================================
+
+from electrical.paneles.entrada_panel import EntradaPaneles
 from electrical.paneles.resultado_paneles import ResultadoPaneles
+from electrical.paneles.orquestador_paneles import ejecutar_paneles
+
+# ⚠️ Ajusta este import si tu clase está en otra ruta
+try:
+    from core.dominio.zona_fv import ZonaFV
+except Exception:
+    ZonaFV = object  # fallback seguro para no romper import
 
 
 # ==========================================================
 # MAIN
 # ==========================================================
-def ejecutar_multizona(entradas: List) -> ResultadoPaneles:
 
-    resultados = _ejecutar_zonas(entradas)
+def ejecutar_multizona(entrada: EntradaPaneles) -> ResultadoPaneles:
+    """
+    Orquestador multizona.
+    Entrada SIEMPRE tipada (no dict).
+    """
+
+    resultados = _ejecutar_zonas(entrada)
 
     if isinstance(resultados, ResultadoPaneles):
         return resultados  # error temprano
@@ -23,7 +41,7 @@ def ejecutar_multizona(entradas: List) -> ResultadoPaneles:
 
     total_paneles, total_strings, total_pdc = _calcular_totales(resultados)
 
-    vdc_nom = _validar_voltajes(resultados, panel)
+    vdc_nom = _validar_voltajes(resultados)
 
     strings_total = _consolidar_strings(resultados)
 
@@ -39,7 +57,12 @@ def ejecutar_multizona(entradas: List) -> ResultadoPaneles:
         strings_por_mppt,
     )
 
-    recomendacion = _build_recomendacion(resultados, total_strings, strings_por_mppt, vdc_nom)
+    recomendacion = _build_recomendacion(
+        resultados,
+        total_strings,
+        strings_por_mppt,
+        vdc_nom,
+    )
 
     warnings = _collect_warnings(resultados)
 
@@ -64,32 +87,34 @@ def ejecutar_multizona(entradas: List) -> ResultadoPaneles:
 # ==========================================================
 # ZONAS
 # ==========================================================
-from electrical.paneles.orquestador_paneles import ejecutar_paneles
 
+def _ejecutar_zonas(entrada: EntradaPaneles) -> List[ResultadoPaneles] | ResultadoPaneles:
 
-def _ejecutar_zonas(entrada):
-
-    resultados = []
+    resultados: List[ResultadoPaneles] = []
 
     # ======================================================
-    # 🔥 MULTIZONA REAL
+    # MULTIZONA
     # ======================================================
     if getattr(entrada, "modo", None) == "multizona":
 
-        zonas = getattr(entrada, "zonas", [])
+        zonas: Optional[List[ZonaFV]] = getattr(entrada, "zonas", None)
 
         if not zonas:
             raise ValueError("Multizona sin zonas")
 
         for i, z in enumerate(zonas, 1):
 
-            n_paneles = int(z.get("n_paneles") or 0)
+            # 🔥 VALIDACIÓN DE TIPO (rigurosa)
+            if not hasattr(z, "n_paneles"):
+                raise TypeError(f"Zona {i} no es tipo ZonaFV válido")
+
+            n_paneles = int(getattr(z, "n_paneles", 0) or 0)
 
             if n_paneles <= 0:
                 raise ValueError(f"Zona {i}: n_paneles inválido")
 
-            # 🔥 crear sub-entrada independiente por zona
-            sub_entrada = entrada.__class__(
+            # 🔥 SUB-ENTRADA LIMPIA (SIN zonas)
+            sub_entrada = EntradaPaneles(
                 panel=entrada.panel,
                 inversor=entrada.inversor,
                 modo="manual",
@@ -111,7 +136,7 @@ def _ejecutar_zonas(entrada):
             resultados.append(res)
 
     # ======================================================
-    # CASO NORMAL (NO MULTIZONA)
+    # CASO NORMAL
     # ======================================================
     else:
 
@@ -124,18 +149,20 @@ def _ejecutar_zonas(entrada):
 
     return resultados
 
+
 # ==========================================================
 # DETALLE
 # ==========================================================
-def _build_zonas_detalle(resultados):
+
+def _build_zonas_detalle(resultados: List[ResultadoPaneles]) -> List[dict]:
 
     zonas = []
 
     for i, r in enumerate(resultados, 1):
         zonas.append({
             "zona": i,
-            "paneles": r.meta.n_paneles_total if r.meta else None,
-            "pdc_kw": r.meta.pdc_kw if r.meta else None,
+            "paneles": getattr(r.meta, "n_paneles_total", None) if r.meta else None,
+            "pdc_kw": getattr(r.meta, "pdc_kw", None) if r.meta else None,
             "strings": len(r.strings) if r.strings else 0,
             "vdc": r.array.vdc_nom if r.array else None,
             "idc": r.array.idc_nom if r.array else None,
@@ -148,10 +175,11 @@ def _build_zonas_detalle(resultados):
 # ==========================================================
 # TOTALES
 # ==========================================================
-def _calcular_totales(resultados):
+
+def _calcular_totales(resultados: List[ResultadoPaneles]):
 
     total_paneles = sum(
-        (r.array.n_paneles_total if r.array else r.meta.n_paneles_total)
+        (r.array.n_paneles_total if r.array else getattr(r.meta, "n_paneles_total", 0))
         for r in resultados
     )
 
@@ -161,7 +189,7 @@ def _calcular_totales(resultados):
     )
 
     total_pdc = sum(
-        (r.array.potencia_dc_w if r.array else r.meta.pdc_kw * 1000)
+        (r.array.potencia_dc_w if r.array else getattr(r.meta, "pdc_kw", 0) * 1000)
         for r in resultados
     )
 
@@ -171,7 +199,8 @@ def _calcular_totales(resultados):
 # ==========================================================
 # VOLTAJE
 # ==========================================================
-def _validar_voltajes(resultados, panel):
+
+def _validar_voltajes(resultados: List[ResultadoPaneles]):
 
     vdc_vals = [
         r.array.vdc_nom
@@ -191,7 +220,8 @@ def _validar_voltajes(resultados, panel):
 # ==========================================================
 # STRINGS
 # ==========================================================
-def _consolidar_strings(resultados):
+
+def _consolidar_strings(resultados: List[ResultadoPaneles]):
 
     strings = []
 
@@ -205,7 +235,8 @@ def _consolidar_strings(resultados):
 # ==========================================================
 # MPPT
 # ==========================================================
-def _calcular_mppt(resultados, total_strings):
+
+def _calcular_mppt(resultados: List[ResultadoPaneles], total_strings: int):
 
     n_mppt_total = sum(
         (r.array.n_mppt if r.array else 0)
@@ -223,14 +254,15 @@ def _calcular_mppt(resultados, total_strings):
 # ==========================================================
 # ARRAY
 # ==========================================================
+
 def _build_array(
-    resultados,
-    total_paneles,
-    total_strings,
-    total_pdc,
-    vdc_nom,
-    n_mppt_total,
-    strings_por_mppt,
+    resultados: List[ResultadoPaneles],
+    total_paneles: int,
+    total_strings: int,
+    total_pdc: float,
+    vdc_nom: Optional[float],
+    n_mppt_total: int,
+    strings_por_mppt: int,
 ):
 
     from electrical.paneles.resultado_paneles import ArrayFV
@@ -257,7 +289,13 @@ def _build_array(
 # ==========================================================
 # RECOMENDACIÓN
 # ==========================================================
-def _build_recomendacion(resultados, total_strings, strings_por_mppt, vdc_nom):
+
+def _build_recomendacion(
+    resultados: List[ResultadoPaneles],
+    total_strings: int,
+    strings_por_mppt: int,
+    vdc_nom: Optional[float],
+):
 
     from electrical.paneles.resultado_paneles import RecomendacionStrings
 
@@ -276,7 +314,8 @@ def _build_recomendacion(resultados, total_strings, strings_por_mppt, vdc_nom):
 # ==========================================================
 # WARNINGS
 # ==========================================================
-def _collect_warnings(resultados):
+
+def _collect_warnings(resultados: List[ResultadoPaneles]):
 
     warnings = []
 
@@ -289,7 +328,8 @@ def _collect_warnings(resultados):
 # ==========================================================
 # ERROR
 # ==========================================================
-def _error(msg):
+
+def _error(msg: str) -> ResultadoPaneles:
 
     return ResultadoPaneles(
         ok=False,
