@@ -75,9 +75,12 @@ def ejecutar_multizona(entrada: EntradaPaneles) -> ResultadoPaneles:
 # ==========================================================
 def _ejecutar_zonas(entrada: EntradaPaneles) -> list | ResultadoPaneles:
 
-    if getattr(entrada, "modo", None) == "multizona":
+    # ======================================================
+    # MULTIZONA
+    # ======================================================
+    if getattr(entrada, "zonas", None):
 
-        zonas = getattr(entrada, "zonas", None)
+        zonas = entrada.zonas
 
         if not zonas:
             raise ValueError("Multizona sin zonas")
@@ -90,47 +93,37 @@ def _ejecutar_zonas(entrada: EntradaPaneles) -> list | ResultadoPaneles:
             # VALIDACIÓN
             # ======================================================
             n_paneles = getattr(z, "n_paneles", None)
-            area = getattr(z, "area", None)
 
-            if (n_paneles is None or n_paneles <= 0) and (area is None or area <= 0):
-                raise ValueError(f"Zona {i} sin n_paneles ni area")
-
-            # ======================================================
-            # DEFINIR MODO CORRECTO POR ZONA (🔥 FIX CRÍTICO)
-            # ======================================================
-            if n_paneles is not None and n_paneles > 0:
-                modo_zona = "paneles"
-            elif area is not None and area > 0:
-                modo_zona = "area"
-            else:
-                raise ValueError(f"Zona {i} inválida")
+            if n_paneles is None or n_paneles <= 0:
+                raise ValueError(f"Zona {i} con n_paneles inválido")
 
             # ======================================================
-            # CONSTRUIR ENTRADA POR ZONA
+            # CONSTRUCCIÓN CORRECTA (SIN MUTACIÓN)
             # ======================================================
             entrada_zona = EntradaPaneles(
                 panel=entrada.panel,
                 inversor=entrada.inversor,
-                modo=modo_zona,  # 🔥 CORRECTO
+
+                # 🔥 Cada zona es problema simple
+                modo="manual",
+
+                n_paneles_total=int(n_paneles),
+
+                # ===============================
+                # HEREDAR CONTEXTO
+                # ===============================
+                t_min_c=entrada.t_min_c,
+                t_oper_c=entrada.t_oper_c,
+                dos_aguas=entrada.dos_aguas,
+
+                objetivo_dc_ac=entrada.objetivo_dc_ac,
+                pdc_kw_objetivo=entrada.pdc_kw_objetivo,
+                n_inversores=entrada.n_inversores,
+
+                vac=entrada.vac,
+                fases=entrada.fases,
+                fp=entrada.fp,
             )
-
-            # ======================================================
-            # DATOS DE LA ZONA
-            # ======================================================
-            if modo_zona == "paneles":
-                entrada_zona.n_paneles_total = int(n_paneles)
-
-            elif modo_zona == "area":
-                entrada_zona.area = float(area)
-
-            # ======================================================
-            # GEOMETRÍA (SI EXISTE)
-            # ======================================================
-            if hasattr(z, "inclinacion"):
-                entrada_zona.tilt_deg = getattr(z, "inclinacion", None)
-
-            if hasattr(z, "azimut"):
-                entrada_zona.azimut_deg = getattr(z, "azimut", None)
 
             # ======================================================
             # EJECUCIÓN
@@ -144,6 +137,9 @@ def _ejecutar_zonas(entrada: EntradaPaneles) -> list | ResultadoPaneles:
 
         return resultados
 
+    # ======================================================
+    # MODO NORMAL
+    # ======================================================
     else:
 
         res = ejecutar_paneles(entrada)
@@ -152,7 +148,6 @@ def _ejecutar_zonas(entrada: EntradaPaneles) -> list | ResultadoPaneles:
             return res
 
         return [res]
-
 # ==========================================================
 # DETALLE ZONAS
 # ==========================================================
