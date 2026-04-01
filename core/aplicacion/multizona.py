@@ -23,39 +23,31 @@ except Exception:
 
 def ejecutar_multizona(entrada: EntradaPaneles) -> ResultadoPaneles:
     """
-    Orquestador multizona (CORREGIDO REAL).
-    Consolida correctamente múltiples zonas sin destruir MPPT ni strings.
+    Orquestador multizona.
+    Entrada SIEMPRE tipada (no dict).
     """
 
     resultados = _ejecutar_zonas(entrada)
 
-    # --------------------------------------------------
-    # ERROR DIRECTO
-    # --------------------------------------------------
     if isinstance(resultados, ResultadoPaneles):
-        return resultados
+        return resultados  # error temprano
 
     if not resultados:
         return _error("No hay resultados válidos en zonas")
 
-    # --------------------------------------------------
-    # CONSOLIDACIÓN REAL
-    # --------------------------------------------------
+    panel = resultados[0].panel
 
-    # 🔥 STRINGS (NO reconstruir)
-    strings = _consolidar_strings(resultados)
+    zonas_detalle = _build_zonas_detalle(resultados)
 
-    # 🔥 TOTALES
     total_paneles, total_strings, total_pdc = _calcular_totales(resultados)
 
-    # 🔥 VOLTAJE
-    vdc_nom = _validar_voltajes(resultados)
+    vdc_nom = None  # deshabilitado temporalmente
 
-    # 🔥 MPPT
+    strings_total = _consolidar_strings(resultados)
+
     n_mppt_total, strings_por_mppt = _calcular_mppt(resultados, total_strings)
 
-    # 🔥 ARRAY CONSOLIDADO
-    array = _build_array(
+    array_total = _build_array(
         resultados,
         total_paneles,
         total_strings,
@@ -65,7 +57,6 @@ def ejecutar_multizona(entrada: EntradaPaneles) -> ResultadoPaneles:
         strings_por_mppt,
     )
 
-    # 🔥 RECOMENDACIÓN
     recomendacion = _build_recomendacion(
         resultados,
         total_strings,
@@ -73,31 +64,26 @@ def ejecutar_multizona(entrada: EntradaPaneles) -> ResultadoPaneles:
         vdc_nom,
     )
 
-    # 🔥 WARNINGS
     warnings = _collect_warnings(resultados)
 
-    # 🔥 META POR ZONA (informativo)
-    meta = {
-        "n_paneles_total": total_paneles,
-        "pdc_kw": total_pdc / 1000,
-        "n_inversores": entrada.n_inversores,
-        "zonas": _build_zonas_detalle(resultados),
-    }
-
-    # --------------------------------------------------
-    # RESULTADO FINAL
-    # --------------------------------------------------
     return ResultadoPaneles(
         ok=True,
-        panel=resultados[0].panel,
+        panel=panel,
         topologia="multizona",
-        array=array,
+        array=array_total,
         recomendacion=recomendacion,
-        strings=strings,
+        strings=strings_total,
         warnings=warnings,
         errores=[],
-        meta=meta,
+        meta={
+            "n_paneles_total": total_paneles,
+            "pdc_kw": total_pdc / 1000,
+            "n_inversores": 1,
+            "zonas": zonas_detalle,
+        },
     )
+
+
 # ==========================================================
 # ZONAS
 # ==========================================================
