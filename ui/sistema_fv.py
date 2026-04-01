@@ -232,7 +232,22 @@ def render(ctx):
         _render_zonas(sf)
 
     ctx.sistema_fv = sf
+    # ======================================================
+    # 🔥 TRADUCCIÓN SIMPLE (NO TOCAR NADA MÁS)
+    # ======================================================
 
+    if sf.get("usar_zonas"):
+        sf["modo"] = "multizona"
+        sf["valor"] = None
+
+    else:
+        sizing = sf.get("sizing_input", {}) or {}
+        sf["modo"] = sizing.get("modo")
+        sf["valor"] = sizing.get("valor")
+
+    # limpieza
+    if sf.get("modo") != "multizona":
+        sf["zonas"] = []
 
 # ==========================================================
 # VALIDACIÓN
