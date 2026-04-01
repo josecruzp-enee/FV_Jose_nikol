@@ -157,17 +157,17 @@ def ejecutar_estudio(
 
     except Exception as e:
 
-        import traceback
-        print("💥 ERROR EN ORQUESTADOR:")
-        print(traceback.format_exc())
+    import traceback
+    print("💥 ERROR EN ORQUESTADOR:")
+    print(traceback.format_exc())
 
-        return ResultadoProyecto(
-            sizing=None,
-            paneles=None,
-            strings=None,
-            energia=None,
-            electrical=None,
-            financiero=None,
-            ok=False,
-            errores=[str(e)]
-        )
+    return ResultadoProyecto(
+        sizing=sizing if 'sizing' in locals() else None,
+        paneles=paneles if 'paneles' in locals() else None,
+        strings=paneles.strings if 'paneles' in locals() and paneles else None,
+        energia=energia if 'energia' in locals() else None,
+        electrical=electrical if 'electrical' in locals() else None,
+        financiero=finanzas if 'finanzas' in locals() else None,
+        ok=False,
+        errores=[str(e)]
+    )
