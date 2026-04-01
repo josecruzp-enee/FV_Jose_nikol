@@ -64,11 +64,10 @@ def _ui_inputs_electricos(e):
 # ==========================================================
 # CONVERSIÓN CTX → MODELO
 # ==========================================================
-
 def _datosproyecto_desde_ctx(ctx):
 
     # ======================================================
-    # CREAR OBJETO BASE (SIN ELÉCTRICO NI EQUIPOS)
+    # CREAR OBJETO BASE
     # ======================================================
     p = Datosproyecto(
 
@@ -126,56 +125,20 @@ def _datosproyecto_desde_ctx(ctx):
     }
 
     # ======================================================
-    # EQUIPOS → NORMALIZACIÓN PARA MOTOR (CRÍTICO)
+    # EQUIPOS (CLAVE: NO TRANSFORMAR)
     # ======================================================
-    from electrical.catalogos import catalogo_paneles, catalogo_inversores
+    eq = getattr(ctx, "equipos", None)
 
-    equipos_ctx = getattr(ctx, "equipos", None)
+    if not eq:
+        raise ValueError("ctx.equipos no definido (Paso 4 no ejecutado)")
 
-    if not equipos_ctx:
-        raise ValueError("p.equipos no definido (Paso 4 no conectado)")
+    # 👉 SE PASA TAL CUAL (para que sizing funcione)
+    p.equipos = eq
 
-    panel_id = equipos_ctx.get("panel_id")
-    inv_id = equipos_ctx.get("inversor_id")
-
-    if not panel_id or not inv_id:
-        raise ValueError("Panel o inversor no seleccionado")
-
-    # 🔹 cargar catálogos
-    paneles = {p["id"]: p for p in catalogo_paneles()}
-    inversores = {i["id"]: i for i in catalogo_inversores()}
-
-    if panel_id not in paneles:
-        raise ValueError(f"Panel {panel_id} no encontrado")
-
-    if inv_id not in inversores:
-        raise ValueError(f"Inversor {inv_id} no encontrado")
-
-    panel_raw = paneles[panel_id]
-    inv_raw = inversores[inv_id]
-
-    # 🔥 NORMALIZACIÓN (LO QUE ARREGLA TU ERROR)
-    p.equipos = {
-        "panel": {
-            "pmax_w": float(panel_raw.get("pmax_w", 0)),
-            "vmp_v": float(panel_raw.get("vmp_v", 0)),
-            "voc_v": float(panel_raw.get("voc_v", 0)),
-            "imp_a": float(panel_raw.get("imp_a", 0)),
-            "isc_a": float(panel_raw.get("isc_a", 0)),
-        },
-        "inversor": {
-            "kw_ac": float(inv_raw.get("kw_ac", 0)),
-            "n_mppt": int(inv_raw.get("n_mppt", 1)),
-            "mppt_min_v": float(inv_raw.get("mppt_min_v", 0)),
-            "mppt_max_v": float(inv_raw.get("mppt_max_v", 0)),
-            "vmax_dc_v": float(inv_raw.get("vmax_dc_v", 0)),
-        },
-        "config": {
-            "sobredimension_dc_ac": equipos_ctx.get("sobredimension_dc_ac"),
-            "tension_sistema": equipos_ctx.get("tension_sistema"),
-            "strings_config": equipos_ctx.get("strings_config"),
-        }
-    }
+    # ======================================================
+    # SISTEMA FV (CRÍTICO PARA SIZING)
+    # ======================================================
+    p.sistema_fv = getattr(ctx, "sistema_fv", {})
 
     return p
 
