@@ -81,10 +81,10 @@ class EntradaPaneles:
         # ==========================
         # MULTIZONA
         # ==========================
-        if self.modo == "multizona":
+        if self.zonas:
 
-            if not self.zonas or len(self.zonas) == 0:
-                raise ValueError("Modo multizona requiere zonas válidas")
+            if len(self.zonas) == 0:
+                raise ValueError("Zonas inválidas")
 
         # ==========================
         # MODOS NORMALES
