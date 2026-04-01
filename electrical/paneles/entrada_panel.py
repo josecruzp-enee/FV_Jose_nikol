@@ -71,16 +71,32 @@ class EntradaPaneles:
     # ======================================================
     def __post_init__(self):
 
-        # 🔴 validar modo multizona
-        if self.modo == "multizona":
-            if not self.zonas or len(self.zonas) == 0:
-                raise ValueError("Modo multizona requiere zonas válidas")
+    # ======================================================
+    # VALIDACIÓN MULTIZONA
+    # ======================================================
+    if self.modo == "multizona":
 
-        # 🔴 validar modo normal
-        else:
+        if not self.zonas or len(self.zonas) == 0:
+            raise ValueError("Modo multizona requiere zonas válidas")
+
+    # ======================================================
+    # VALIDACIÓN MODOS NORMALES
+    # ======================================================
+    else:
+
+        # 🔥 SOLO exigir paneles en modo manual
+        if self.modo == "manual":
+
             if self.n_paneles_total is None or self.n_paneles_total <= 0:
-                raise ValueError("n_paneles_total inválido en modo no multizona")
+                raise ValueError("n_paneles_total requerido en modo manual")
 
-        # 🔴 validar inversores
-        if self.n_inversores <= 0:
-            raise ValueError("n_inversores debe ser >= 1")
+        # 🔥 EN OTROS MODOS:
+        # consumo / area / kw_objetivo
+        # → se permite n_paneles_total = None
+        # → paneles se dimensiona automáticamente
+
+    # ======================================================
+    # VALIDACIÓN INVERSORES
+    # ======================================================
+    if self.n_inversores <= 0:
+        raise ValueError("n_inversores debe ser >= 1")
