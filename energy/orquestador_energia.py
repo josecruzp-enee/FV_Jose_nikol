@@ -369,8 +369,8 @@ def ejecutar_energia(datos, sizing, paneles) -> EnergiaResultado:
         clima=clima_8760,
         tilt_deg=tilt,
         azimut_deg=azimuth,
-        perdidas_dc_frac=getattr(datos, "perdidas_dc_frac", 0.14),
-        sombras_frac=getattr(datos, "sombras_frac", 0.0),
+        perdidas_dc_frac=getattr(datos, "perdidas_dc_frac", 0.05),
+        sombras_frac=getattr(datos, "sombras_frac", 0.02),
         eficiencia_inversor=getattr(datos, "eficiencia_inversor", 0.97),
         perdidas_ac_frac=getattr(datos, "perdidas_ac_frac", 0.02),
     )
