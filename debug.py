@@ -63,8 +63,8 @@ def datos_debug():
 
     # 🔥 EQUIPOS
     p.equipos = {
-        "panel_id": "default",
-        "inversor_id": "default"
+        "panel_id": "canadian_450",
+        "inversor_id": "inv_5kw_2mppt"
     }
 
     # 🔥 SISTEMA FV (CLAVE PARA MULTIZONA)
