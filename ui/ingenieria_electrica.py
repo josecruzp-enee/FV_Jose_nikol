@@ -8,7 +8,6 @@ from core.aplicacion.datos_proyecto import construir_datos_proyecto
 # ==========================================================
 # HELPERS
 # ==========================================================
-
 def _asegurar_dict(ctx, key):
     if not hasattr(ctx, key) or getattr(ctx, key) is None:
         setattr(ctx, key, {})
@@ -18,7 +17,6 @@ def _asegurar_dict(ctx, key):
 # ==========================================================
 # INPUTS UI
 # ==========================================================
-
 def _ui_inputs_electricos(e):
 
     st.markdown("## ⚙️ Parámetros eléctricos")
@@ -64,7 +62,6 @@ def _ui_inputs_electricos(e):
 # ==========================================================
 # RENDER RESULTADO
 # ==========================================================
-
 def _render_resultado(resultado):
 
     st.markdown("## ⚡ Resultado ingeniería")
@@ -96,33 +93,59 @@ def _render_resultado(resultado):
 
     if electrical is None:
         st.warning("Electrical = None")
-        return
+    else:
+        try:
+            st.write(electrical)
 
-    try:
-        st.write(electrical)
-    except Exception as e:
-        st.error(f"No se pudo mostrar electrical: {e}")
+            if hasattr(electrical, "corrientes"):
+                st.write("Corrientes:", electrical.corrientes)
 
-    st.markdown("### 📊 Datos básicos")
+            if hasattr(electrical, "conductores"):
+                st.write("Conductores:", electrical.conductores)
 
-    try:
-        if hasattr(electrical, "corrientes"):
-            st.write("Corrientes:", electrical.corrientes)
+            if hasattr(electrical, "protecciones"):
+                st.write("Protecciones:", electrical.protecciones)
 
-        if hasattr(electrical, "conductores"):
-            st.write("Conductores:", electrical.conductores)
+        except Exception as e:
+            st.error(f"No se pudo mostrar detalle eléctrico: {e}")
 
-        if hasattr(electrical, "protecciones"):
-            st.write("Protecciones:", electrical.protecciones)
+    # ------------------------------------------------------
+    # MOSTRAR STRINGS FV, ARRAY Y META
+    # ------------------------------------------------------
+    st.markdown("### 🔗 Strings FV")
+    if getattr(resultado, "strings", None):
+        for i, s in enumerate(resultado.strings, 1):
+            st.write(
+                f"String {i} | MPPT {s.mppt} | Series {s.n_series} | "
+                f"Vmp {s.vmp_string_v:.2f} V | Voc {s.voc_frio_string_v:.2f} V | "
+                f"Ip {s.imp_string_a:.2f} A | Isc {s.isc_string_a:.2f} A"
+            )
+    else:
+        st.warning("Strings FV no definidos")
 
-    except Exception as e:
-        st.error(f"Error mostrando detalle: {e}")
+    st.markdown("### ⚡ Array FV")
+    array = getattr(resultado, "array", None)
+    if array:
+        st.write(f"Potencia DC total: {array.potencia_dc_w/1000:.2f} kW")
+        st.write(f"VDC nominal: {array.vdc_nom:.2f} V")
+        st.write(f"Corriente DC nominal: {array.idc_nom:.2f} A")
+        st.write(f"Nº strings por MPPT: {array.strings_por_mppt}")
+        st.write(f"Nº total de strings: {array.n_strings_total}")
+        st.write(f"Nº total de paneles: {array.n_paneles_total}")
+    else:
+        st.info("Array FV no definido")
+
+    st.markdown("### 📊 Meta")
+    meta = getattr(resultado, "meta", None)
+    if meta:
+        st.write(f"Nº total de paneles: {meta.n_paneles_total}")
+        st.write(f"Potencia DC total: {meta.pdc_kw:.2f} kW")
+        st.write(f"Nº de inversores: {meta.n_inversores}")
 
 
 # ==========================================================
 # MAIN RENDER
 # ==========================================================
-
 def render(ctx):
 
     st.markdown("# ⚡ Ingeniería eléctrica")
@@ -139,16 +162,14 @@ def render(ctx):
     if st.button("⚡ Generar ingeniería eléctrica"):
 
         try:
-            # 🔥 NUEVO BUILDER (CLAVE)
+            # Construir datos del proyecto
             p = construir_datos_proyecto(ctx)
 
             # ======================================================
             # DEBUG COMPLETO
             # ======================================================
             st.markdown("## 🧪 DEBUG INGENIERÍA")
-
             from dataclasses import asdict
-
             try:
                 st.markdown("### 📦 Datosproyecto")
                 st.json(asdict(p))
@@ -170,14 +191,18 @@ def render(ctx):
                 st.json(zonas)
 
             # ======================================================
-            # EJECUTAR
+            # EJECUTAR ESTUDIO
             # ======================================================
             deps = construir_dependencias()
             resultado = ejecutar_estudio(p, deps)
-
             setattr(ctx, "resultado", resultado)
 
             st.success("✅ Ingeniería generada")
+
+            # ======================================================
+            # Mostrar Strings FV / Array / Meta directamente
+            # ======================================================
+            _render_resultado(resultado)
 
         except Exception as ex:
             st.error("💥 Error ejecutando ingeniería")
@@ -185,53 +210,14 @@ def render(ctx):
             return
 
     # ======================================================
-    # RESULTADO
+    # MOSTRAR RESULTADO PREVIAMENTE GENERADO
     # ======================================================
     try:
         resultado = getattr(ctx, "resultado", None)
-
-        if resultado is None:
+        if resultado:
+            _render_resultado(resultado)
+        else:
             st.info("Aún no se ha generado resultado")
-            return
-
-        st.markdown("## 🧪 Estado del sistema")
-
-        estado = {
-            "sizing": "OK" if getattr(resultado, "sizing", None) else "NULL",
-            "paneles": "OK" if getattr(resultado, "strings", None) else "NULL",
-            "energia": "OK" if getattr(resultado, "energia", None) else "NULL",
-            "electrical": "OK" if getattr(resultado, "electrical", None) else "NULL",
-            "finanzas": "OK" if getattr(resultado, "financiero", None) else "NULL",
-        }
-
-        st.json(estado)
-
-        if not getattr(resultado, "ok", True):
-            st.error("❌ Proyecto con errores")
-            for err in getattr(resultado, "errores", []):
-                st.error(err)
-
-        st.markdown("## 🔎 DEBUG ELECTRICAL")
-
-        electrical = getattr(resultado, "electrical", None)
-
-        if electrical is None:
-            st.warning("Electrical = None")
-            return
-
-        st.write(electrical)
-
-        st.markdown("## 📊 Detalle eléctrico")
-
-        if hasattr(electrical, "corrientes"):
-            st.write("Corrientes:", electrical.corrientes)
-
-        if hasattr(electrical, "conductores"):
-            st.write("Conductores:", electrical.conductores)
-
-        if hasattr(electrical, "protecciones"):
-            st.write("Protecciones:", electrical.protecciones)
-
     except Exception as e:
         st.error("Error renderizando resultado")
         st.exception(e)
@@ -240,7 +226,6 @@ def render(ctx):
 # ==========================================================
 # VALIDACIÓN
 # ==========================================================
-
 def validar(ctx):
 
     resultado = getattr(ctx, "resultado", None)
