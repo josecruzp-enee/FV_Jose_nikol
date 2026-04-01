@@ -206,7 +206,7 @@ def render(ctx):
     # ===============================
     # RESULTADO
     # ===============================
-    resultado = getattr(ctx, "resultado", None)
+    resultado = ctx.get("resultado")
 
     if resultado is None:
         st.warning("⚠ No hay resultado aún")
