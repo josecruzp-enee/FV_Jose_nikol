@@ -262,7 +262,6 @@ def _mostrar_detalle(strings, electrical):
 # ==========================================================
 
 
-
 def render(ctx):
 
     # ===============================
@@ -282,14 +281,13 @@ def render(ctx):
 
             resultado = ejecutar_estudio(p, deps)
 
-            # ✅ CORRECTO (ctx es objeto)
+            # ctx es objeto
             setattr(ctx, "resultado", resultado)
 
             st.success("✅ Ingeniería generada")
 
-        except Exception as err:
+        except Exception:
             import traceback
-
             st.error("❌ Error generando ingeniería")
             st.code(traceback.format_exc())
             return
@@ -306,11 +304,16 @@ def render(ctx):
     # ===============================
     # ESTADO
     # ===============================
-    estado_ok = getattr(resultado, "ok", False)
-    errores = getattr(resultado, "errores", [])
+    try:
+        estado_ok = getattr(resultado, "ok", False)
+        errores = getattr(resultado, "errores", [])
 
-    st.write("Estado:", estado_ok)
-    st.write("Errores:", errores)
+        st.write("Estado:", estado_ok)
+        st.write("Errores:", errores)
+
+    except Exception as err:
+        st.error(f"❌ Error leyendo estado: {err}")
+        return
 
     # ===============================
     # VALIDACIÓN
@@ -319,26 +322,33 @@ def render(ctx):
         st.error("❌ Resultado no OK")
         return
 
-    if not getattr(resultado, "strings", None):
-        st.error("❌ No hay strings")
-        return
-
     if not getattr(resultado, "electrical", None):
         st.error("❌ No hay resultado electrical")
         return
 
     # ===============================
-    # DETALLE
+    # DETALLE (ROBUSTO)
     # ===============================
     try:
-        strings = resultado.strings.strings
+        strings_obj = getattr(resultado, "strings", None)
+
+        if strings_obj is None:
+            st.error("❌ strings es None")
+            return
+
+        # 🔥 manejo robusto
+        if hasattr(strings_obj, "strings"):
+            strings = strings_obj.strings
+        else:
+            strings = strings_obj  # ya es lista
+
         electrical = resultado.electrical
 
         _mostrar_detalle(strings, electrical)
 
     except Exception as err:
         st.error(f"❌ Error mostrando detalle: {err}")
-
+        st.write("DEBUG resultado:", resultado)
 
 # ==========================================================
 # VALIDACIÓN
