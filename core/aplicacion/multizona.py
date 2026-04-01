@@ -41,7 +41,7 @@ def ejecutar_multizona(entrada: EntradaPaneles) -> ResultadoPaneles:
     if strings_total:
 
         n_mppt = resultados[0].array.n_mppt
-        n_inv = resultados[0].meta.get("n_inversores", 1)
+        n_inv = getattr(resultados[0].meta, "n_inversores", 1)
 
         # (inversor, mppt, carga)
         carga = [
