@@ -1,136 +1,326 @@
 from __future__ import annotations
 
-"""
-CONTRATO MAESTRO — FV ENGINE
+from typing import List, Optional
 
-Define:
-- Resultados de cada módulo
-- Resultado final del pipeline
+# ==========================================================
+# DOMINIO / CONTRATOS
+# ==========================================================
 
-Reglas:
-- Entrada NO vive aquí
-- Solo outputs del sistema
-"""
+from electrical.paneles.entrada_panel import EntradaPaneles
+from electrical.paneles.resultado_paneles import ResultadoPaneles
+from electrical.paneles.orquestador_paneles import ejecutar_paneles
 
-from dataclasses import dataclass, field
-from typing import List, Dict, Any
-
-
-# =========================================================
-# ENERGÍA MENSUAL
-# =========================================================
-
-@dataclass(frozen=True)
-class MesEnergia:
-    mes: str
-    consumo_kwh: float
-    generacion_kwh: float
-    energia_red_kwh: float
+# ⚠️ Ajusta este import si tu clase está en otra ruta
+try:
+    from core.dominio.zona_fv import ZonaFV
+except Exception:
+    ZonaFV = object  # fallback seguro para no romper import
 
 
-# =========================================================
-# RESULTADO DEL SIZING
-# =========================================================
+# ==========================================================
+# MAIN
+# ==========================================================
 
-@dataclass(frozen=True)
-class ResultadoSizing:
+def ejecutar_multizona(entrada: EntradaPaneles) -> ResultadoPaneles:
+    """
+    Orquestador multizona.
+    Entrada SIEMPRE tipada (no dict).
+    """
 
-    n_paneles: int
-    kwp_dc: float
-    pdc_kw: float
+    resultados = _ejecutar_zonas(entrada)
 
-    kw_ac: float
-    kw_ac_total: float
+    if isinstance(resultados, ResultadoPaneles):
+        return resultados  # error temprano
 
-    dc_ac_ratio: float
+    if not resultados:
+        return _error("No hay resultados válidos en zonas")
 
-    n_inversores: int
-    paneles_por_inversor: int
+    panel = resultados[0].panel
 
-    inversor: Any
-    panel: Any
+    zonas_detalle = _build_zonas_detalle(resultados)
 
-    energia_12m: List[MesEnergia]
+    total_paneles, total_strings, total_pdc = _calcular_totales(resultados)
 
-    sugerencias: List[Dict[str, Any]] = field(default_factory=list)
+    vdc_nom = None  # deshabilitado temporalmente
 
-    ok: bool = True
-    errores: List[str] = field(default_factory=list)
+    strings_total = _consolidar_strings(resultados)
 
+    n_mppt_total, strings_por_mppt = _calcular_mppt(resultados, total_strings)
 
-# =========================================================
-# RESULTADO STRINGS
-# =========================================================
+    array_total = _build_array(
+        resultados,
+        total_paneles,
+        total_strings,
+        total_pdc,
+        vdc_nom,
+        n_mppt_total,
+        strings_por_mppt,
+    )
 
-@dataclass(frozen=True)
-class StringInfo:
+    recomendacion = _build_recomendacion(
+        resultados,
+        total_strings,
+        strings_por_mppt,
+        vdc_nom,
+    )
 
-    id: int
-    inversor: int
-    mppt: int
+    warnings = _collect_warnings(resultados)
 
-    n_series: int
-
-    vmp_string_v: float
-    voc_frio_string_v: float
-
-    imp_string_a: float
-    isc_string_a: float
-
-
-@dataclass(frozen=True)
-class ResultadoStrings:
-
-    ok: bool
-
-    n_series: int
-    n_strings_total: int
-
-    vmp_string_v: float
-    voc_string_v: float
-
-    strings: List[StringInfo]
-
-    errores: List[str] = field(default_factory=list)
-    warnings: List[str] = field(default_factory=list)
-
-
-# =========================================================
-# RESULTADO FINANCIERO
-# =========================================================
-
-@dataclass(frozen=True)
-class ResultadoFinanciero:
-
-    capex_L: float
-    opex_L: float
-
-    tir: float
-    van: float
-    payback_simple: float
-
-    flujo_12m: List[Dict[str, float]]
-
-    ok: bool = True
-    errores: List[str] = field(default_factory=list)
+    return ResultadoPaneles(
+        ok=True,
+        panel=panel,
+        topologia="multizona",
+        array=array_total,
+        recomendacion=recomendacion,
+        strings=strings_total,
+        warnings=warnings,
+        errores=[],
+        meta={
+            "n_paneles_total": total_paneles,
+            "pdc_kw": total_pdc / 1000,
+            "n_inversores": 1,
+            "zonas": zonas_detalle,
+        },
+    )
 
 
-# =========================================================
-# RESULTADO FINAL
-# =========================================================
+# ==========================================================
+# ZONAS
+# ==========================================================
 
-@dataclass
-class ResultadoProyecto:
+def _ejecutar_zonas(entrada: EntradaPaneles) -> List[ResultadoPaneles] | ResultadoPaneles:
 
-    sizing: ResultadoSizing | None
-    paneles: Any                 # 🔥 NUEVO (CRÍTICO)
-    strings: Any
-    energia: Any
-    electrical: Any
-    financiero: ResultadoFinanciero | None
+    # ======================================================
+    # MULTIZONA → UNA SOLA EJECUCIÓN
+    # ======================================================
+    if getattr(entrada, "modo", None) == "multizona":
 
-    ok: bool = True
-    errores: List[str] = field(default_factory=list)
+        zonas = getattr(entrada, "zonas", None)
 
-    trazas: Dict[str, str] = field(default_factory=dict)
-    meta: Dict[str, Any] = field(default_factory=dict)
+        if not zonas:
+            raise ValueError("Multizona sin zonas")
+
+        # 🔥 VALIDACIÓN
+        for i, z in enumerate(zonas, 1):
+
+            if not hasattr(z, "n_paneles"):
+                raise TypeError(f"Zona {i} no es tipo ZonaFV válido")
+
+            n_paneles = int(getattr(z, "n_paneles", 0) or 0)
+
+            if n_paneles <= 0:
+                raise ValueError(f"Zona {i}: n_paneles inválido")
+
+        # 🔥 CLAVE → UNA sola ejecución
+        res = ejecutar_paneles(entrada)
+
+        if not res.ok:
+            return res
+
+        # 🔥 Devolver como lista para no romper flujo
+        return [res]
+
+    # ======================================================
+    # NORMAL
+    # ======================================================
+    else:
+
+        res = ejecutar_paneles(entrada)
+
+        if not res.ok:
+            return res
+
+        return [res]
+
+# ==========================================================
+# DETALLE
+# ==========================================================
+
+def _build_zonas_detalle(resultados: List[ResultadoPaneles]) -> List[dict]:
+
+    zonas = []
+
+    for i, r in enumerate(resultados, 1):
+        zonas.append({
+            "zona": i,
+            "paneles": getattr(r.meta, "n_paneles_total", None) if r.meta else None,
+            "pdc_kw": getattr(r.meta, "pdc_kw", None) if r.meta else None,
+            "strings": len(r.strings) if r.strings else 0,
+            "vdc": r.array.vdc_nom if r.array else None,
+            "idc": r.array.idc_nom if r.array else None,
+            "isc": r.array.isc_total if r.array else None,
+        })
+
+    return zonas
+
+
+# ==========================================================
+# TOTALES
+# ==========================================================
+
+def _calcular_totales(resultados: List[ResultadoPaneles]):
+
+    total_paneles = sum(
+        (r.array.n_paneles_total if r.array else getattr(r.meta, "n_paneles_total", 0))
+        for r in resultados
+    )
+
+    total_strings = sum(
+        (r.array.n_strings_total if r.array else 0)
+        for r in resultados
+    )
+
+    total_pdc = sum(
+        (r.array.potencia_dc_w if r.array else getattr(r.meta, "pdc_kw", 0) * 1000)
+        for r in resultados
+    )
+
+    return total_paneles, total_strings, total_pdc
+
+
+# ==========================================================
+# VOLTAJE
+# ==========================================================
+
+def _validar_voltajes(resultados: List[ResultadoPaneles]):
+
+    vdc_vals = [
+        r.array.vdc_nom
+        for r in resultados
+        if (r.array and r.array.vdc_nom is not None)
+    ]
+
+    if not vdc_vals:
+        return None
+
+    if max(vdc_vals) - min(vdc_vals) > 20:
+        raise ValueError("Voltajes incompatibles entre zonas")
+
+    return vdc_vals[0]
+
+
+# ==========================================================
+# STRINGS
+# ==========================================================
+
+def _consolidar_strings(resultados: List[ResultadoPaneles]):
+
+    strings = []
+
+    for r in resultados:
+        if r.strings:
+            strings.extend(r.strings)
+
+    return strings
+
+
+# ==========================================================
+# MPPT
+# ==========================================================
+
+def _calcular_mppt(resultados: List[ResultadoPaneles], total_strings: int):
+
+    n_mppt_total = sum(
+        (r.array.n_mppt if r.array else 0)
+        for r in resultados
+    )
+
+    strings_por_mppt = (
+        max(1, total_strings // max(1, n_mppt_total))
+        if n_mppt_total > 0 else 1
+    )
+
+    return n_mppt_total, strings_por_mppt
+
+
+# ==========================================================
+# ARRAY
+# ==========================================================
+
+def _build_array(
+    resultados: List[ResultadoPaneles],
+    total_paneles: int,
+    total_strings: int,
+    total_pdc: float,
+    vdc_nom: Optional[float],
+    n_mppt_total: int,
+    strings_por_mppt: int,
+):
+
+    from electrical.paneles.resultado_paneles import ArrayFV
+
+    ref = next((r.array for r in resultados if r.array), None)
+
+    if ref is None:
+        return None
+
+    return ArrayFV(
+        potencia_dc_w=total_pdc,
+        vdc_nom=vdc_nom or ref.vdc_nom,
+        idc_nom=None,
+        isc_total=None,
+        voc_frio_array_v=ref.voc_frio_array_v,
+        n_strings_total=total_strings,
+        n_paneles_total=total_paneles,
+        strings_por_mppt=strings_por_mppt,
+        n_mppt=n_mppt_total,
+        p_panel_w=ref.p_panel_w,
+    )
+
+
+# ==========================================================
+# RECOMENDACIÓN
+# ==========================================================
+
+def _build_recomendacion(
+    resultados: List[ResultadoPaneles],
+    total_strings: int,
+    strings_por_mppt: int,
+    vdc_nom: Optional[float],
+):
+
+    from electrical.paneles.resultado_paneles import RecomendacionStrings
+
+    rec_base = resultados[0].recomendacion
+    ref = resultados[0].array
+
+    return RecomendacionStrings(
+        n_series=rec_base.n_series if rec_base else None,
+        n_strings_total=total_strings,
+        strings_por_mppt=strings_por_mppt,
+        vmp_string_v=vdc_nom or ref.vdc_nom,
+        voc_frio_string_v=ref.voc_frio_array_v,
+    )
+
+
+# ==========================================================
+# WARNINGS
+# ==========================================================
+
+def _collect_warnings(resultados: List[ResultadoPaneles]):
+
+    warnings = []
+
+    for r in resultados:
+        warnings.extend(r.warnings or [])
+
+    return warnings
+
+
+# ==========================================================
+# ERROR
+# ==========================================================
+
+def _error(msg: str) -> ResultadoPaneles:
+
+    return ResultadoPaneles(
+        ok=False,
+        panel=None,
+        topologia="multizona",
+        array=None,
+        recomendacion=None,
+        strings=[],
+        warnings=[],
+        errores=[msg],
+        meta=None,
+    )
