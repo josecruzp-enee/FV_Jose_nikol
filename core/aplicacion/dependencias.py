@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Optional
+
+# ==========================================================
+# PUERTOS
+# ==========================================================
 
 from core.aplicacion.puertos import (
     PuertoSizing,
@@ -12,27 +16,21 @@ from core.aplicacion.puertos import (
 )
 
 # ==========================================================
-# SERVICIOS
+# SERVICIOS / ORQUESTADORES
 # ==========================================================
 
 from core.servicios.sizing import calcular_sizing_unificado
-from core.aplicacion.multizona import ejecutar_multizona
+from core.aplicacion.multizona import ejecutar_multizona  # ✅ CORRECTO
 from electrical.orquestador_electrical import ejecutar_electrical
 from energy.orquestador_energia import ejecutar_energia
 from core.servicios.finanzas import ejecutar_finanzas
 
 # ==========================================================
-# DOMINIO / INPUTS
+# INPUTS / CONTRATOS
 # ==========================================================
 
 from electrical.paneles.entrada_panel import EntradaPaneles
-from electrical.catalogos.catalogos import get_panel
-from energy.contrato import EnergiaInput
 
-from energy.clima.lector_pvgis import (
-    descargar_clima_pvgis,
-    EntradaClimaPVGIS,
-)
 
 # ==========================================================
 # DEPENDENCIAS
@@ -52,6 +50,7 @@ class DependenciasEstudio:
 # ==========================================================
 
 class SizingAdapter:
+
     def ejecutar(self, datos):
 
         if datos is None:
@@ -66,33 +65,17 @@ class SizingAdapter:
 
 
 # ==========================================================
-# ADAPTER: PANELES
+# ADAPTER: PANELES (MULTIZONA)
 # ==========================================================
-'''
+
 class PanelesAdapter:
+
     def ejecutar(self, entrada: EntradaPaneles):
 
         if entrada is None:
             raise ValueError("EntradaPaneles es None")
 
-        resultado = ejecutar_paneles(entrada)
-
-        if resultado is None:
-            raise ValueError("Paneles devolvió None")
-
-        return resultado
-'''
-
-from electrical.paneles.multizona import ejecutar_multizona
-
-
-class PanelesAdapter:
-    def ejecutar(self, entrada: EntradaPaneles):
-
-        if entrada is None:
-            raise ValueError("EntradaPaneles es None")
-
-        resultado = ejecutar_multizona(entrada)   # 🔥 FIX
+        resultado = ejecutar_multizona(entrada)  # 🔥 USO CORRECTO
 
         if resultado is None:
             raise ValueError("Paneles devolvió None")
@@ -102,8 +85,9 @@ class PanelesAdapter:
 
         return resultado
 
+
 # ==========================================================
-# ADAPTER: ELECTRICAL (RÍGIDO)
+# ADAPTER: ELECTRICAL
 # ==========================================================
 
 class ElectricalAdapter:
@@ -138,16 +122,13 @@ class ElectricalAdapter:
 
 
 # ==========================================================
-# ADAPTER: ENERGÍA (RÍGIDO Y CONSISTENTE)
+# ADAPTER: ENERGÍA
 # ==========================================================
 
 class EnergiaAdapter:
 
     def ejecutar(self, datos, sizing, paneles):
 
-        # ==================================================
-        # VALIDACIÓN BÁSICA (solo esto debe hacer el adapter)
-        # ==================================================
         if datos is None:
             raise ValueError("datos es None en energía")
 
@@ -157,20 +138,20 @@ class EnergiaAdapter:
         if paneles is None:
             raise ValueError("paneles es None en energía")
 
-        # ==================================================
-        # DELEGACIÓN AL DOMINIO
-        # ==================================================
         resultado = ejecutar_energia(datos, sizing, paneles)
 
         if resultado is None:
             raise ValueError("Energía devolvió None")
 
         return resultado
+
+
 # ==========================================================
 # ADAPTER: FINANZAS
 # ==========================================================
 
 class FinanzasAdapter:
+
     def ejecutar(self, datos, sizing, energia):
 
         if datos is None:
