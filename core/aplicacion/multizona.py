@@ -15,6 +15,16 @@ from electrical.paneles.orquestador_paneles import ejecutar_paneles
 # MAIN
 # ==========================================================
 
+from __future__ import annotations
+
+from typing import List
+from dataclasses import replace
+
+from electrical.paneles.entrada_panel import EntradaPaneles
+from electrical.paneles.resultado_paneles import ResultadoPaneles
+from electrical.paneles.orquestador_paneles import ejecutar_paneles
+
+
 def ejecutar_multizona(entrada: EntradaPaneles) -> ResultadoPaneles:
 
     resultados = _ejecutar_zonas(entrada)
@@ -27,11 +37,49 @@ def ejecutar_multizona(entrada: EntradaPaneles) -> ResultadoPaneles:
 
     panel = resultados[0].panel
 
+    # ======================================================
+    # CONSOLIDACIÓN
+    # ======================================================
+
     zonas_detalle = _build_zonas_detalle(resultados)
 
     total_paneles, total_strings, total_pdc = _calcular_totales(resultados)
 
     strings_total = _consolidar_strings(resultados)
+
+    # ======================================================
+    # 🔥 FIX CRÍTICO → REBALANCEO GLOBAL DE MPPT
+    # ======================================================
+
+    if strings_total:
+
+        n_mppt = resultados[0].array.n_mppt
+        n_inv = resultados[0].meta.get("n_inversores", 1)
+
+        # (inversor, mppt, carga)
+        carga = [
+            (i, m, 0)
+            for i in range(1, n_inv + 1)
+            for m in range(1, n_mppt + 1)
+        ]
+
+        distrib = []
+
+        for _ in range(len(strings_total)):
+            carga.sort(key=lambda x: x[2])
+            i, m, c = carga[0]
+            distrib.append((i, m))
+            carga[0] = (i, m, c + 1)
+
+        # Reasignación REAL
+        strings_total = [
+            replace(s, mppt=mppt)
+            for s, (_, mppt) in zip(strings_total, distrib)
+        ]
+
+    # ======================================================
+    # MPPT / ARRAY
+    # ======================================================
 
     n_mppt_total, strings_por_mppt = _calcular_mppt(resultados, total_strings)
 
@@ -52,6 +100,10 @@ def ejecutar_multizona(entrada: EntradaPaneles) -> ResultadoPaneles:
 
     warnings = _collect_warnings(resultados)
 
+    # ======================================================
+    # RESULTADO FINAL
+    # ======================================================
+
     return ResultadoPaneles(
         ok=True,
         panel=panel,
@@ -68,8 +120,6 @@ def ejecutar_multizona(entrada: EntradaPaneles) -> ResultadoPaneles:
             "zonas": zonas_detalle,
         },
     )
-
-
 # ==========================================================
 # ZONAS (🔥 FIX REAL)
 # ==========================================================
