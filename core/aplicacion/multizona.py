@@ -90,21 +90,19 @@ def ejecutar_multizona(entrada: EntradaPaneles) -> ResultadoPaneles:
 
 def _ejecutar_zonas(entrada: EntradaPaneles) -> List[ResultadoPaneles] | ResultadoPaneles:
 
-    resultados: List[ResultadoPaneles] = []
-
     # ======================================================
-    # MULTIZONA
+    # MULTIZONA → UNA SOLA EJECUCIÓN
     # ======================================================
     if getattr(entrada, "modo", None) == "multizona":
 
-        zonas: Optional[List[ZonaFV]] = getattr(entrada, "zonas", None)
+        zonas = getattr(entrada, "zonas", None)
 
         if not zonas:
             raise ValueError("Multizona sin zonas")
 
+        # 🔥 VALIDACIÓN
         for i, z in enumerate(zonas, 1):
 
-            # 🔥 VALIDACIÓN DE TIPO (rigurosa)
             if not hasattr(z, "n_paneles"):
                 raise TypeError(f"Zona {i} no es tipo ZonaFV válido")
 
@@ -113,30 +111,17 @@ def _ejecutar_zonas(entrada: EntradaPaneles) -> List[ResultadoPaneles] | Resulta
             if n_paneles <= 0:
                 raise ValueError(f"Zona {i}: n_paneles inválido")
 
-            # 🔥 SUB-ENTRADA LIMPIA (SIN zonas)
-            sub_entrada = EntradaPaneles(
-                panel=entrada.panel,
-                inversor=entrada.inversor,
-                modo="manual",
-                n_paneles_total=n_paneles,
-                zonas=None,
-                t_min_c=entrada.t_min_c,
-                t_oper_c=entrada.t_oper_c,
-                dos_aguas=entrada.dos_aguas,
-                objetivo_dc_ac=entrada.objetivo_dc_ac,
-                pdc_kw_objetivo=entrada.pdc_kw_objetivo,
-                n_inversores=entrada.n_inversores,
-            )
+        # 🔥 CLAVE → UNA sola ejecución
+        res = ejecutar_paneles(entrada)
 
-            res = ejecutar_paneles(sub_entrada)
+        if not res.ok:
+            return res
 
-            if not res.ok:
-                return res
-
-            resultados.append(res)
+        # 🔥 Devolver como lista para no romper flujo
+        return [res]
 
     # ======================================================
-    # CASO NORMAL
+    # NORMAL
     # ======================================================
     else:
 
@@ -145,10 +130,7 @@ def _ejecutar_zonas(entrada: EntradaPaneles) -> List[ResultadoPaneles] | Resulta
         if not res.ok:
             return res
 
-        resultados.append(res)
-
-    return resultados
-
+        return [res]
 
 # ==========================================================
 # DETALLE
