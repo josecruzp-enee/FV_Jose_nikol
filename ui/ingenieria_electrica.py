@@ -104,16 +104,16 @@ def _render_resultado(resultado):
         return
 
     # ======================================================
-    # ESTADO GENERAL
+    # ESTADO GENERAL (BLINDADO)
     # ======================================================
     st.markdown("### 🧪 Estado del sistema")
 
     estado = {
-        "sizing": "OK" if resultado.sizing else "NULL",
-        "paneles": "OK" if resultado.paneles else "NULL",
-        "energia": "OK" if resultado.energia else "NULL",
-        "electrical": "OK" if resultado.electrical else "NULL",
-        "finanzas": "OK" if resultado.financiero else "NULL",
+        "sizing": "OK" if getattr(resultado, "sizing", None) else "NULL",
+        "paneles": "OK" if getattr(resultado, "strings", None) else "NULL",
+        "energia": "OK" if getattr(resultado, "energia", None) else "NULL",
+        "electrical": "OK" if getattr(resultado, "electrical", None) else "NULL",
+        "finanzas": "OK" if getattr(resultado, "financiero", None) else "NULL",
     }
 
     st.json(estado)
@@ -124,16 +124,15 @@ def _render_resultado(resultado):
     if not getattr(resultado, "ok", True):
         st.error("❌ Proyecto con errores")
 
-        if hasattr(resultado, "errores"):
-            for err in resultado.errores:
-                st.error(err)
+        for err in getattr(resultado, "errores", []):
+            st.error(err)
 
     # ======================================================
     # DEBUG ELECTRICAL
     # ======================================================
     st.markdown("### 🔎 DEBUG ELECTRICAL")
 
-    electrical = resultado.electrical
+    electrical = getattr(resultado, "electrical", None)
 
     if electrical is None:
         st.warning("Electrical = None")
@@ -183,16 +182,10 @@ def render(ctx):
     if st.button("⚡ Generar ingeniería eléctrica"):
 
         try:
-            # 🔹 construir proyecto
             p = _datosproyecto_desde_ctx(ctx)
-
-            # 🔹 dependencias
             deps = construir_dependencias()
-
-            # 🔹 ejecutar flujo completo
             resultado = ejecutar_estudio(p, deps)
 
-            # 🔥 GUARDAR EN CONTEXTO
             setattr(ctx, "resultado", resultado)
 
             st.success("✅ Ingeniería generada")
@@ -203,13 +196,24 @@ def render(ctx):
             return
 
     # ======================================================
-    # MOSTRAR RESULTADO
+    # MOSTRAR RESULTADO (SEGURO)
     # ======================================================
-    resultado = getattr(ctx, "resultado", None)
+    try:
+        resultado = getattr(ctx, "resultado", None)
 
-    if resultado:
-        _render_resultado(resultado)
+        if resultado is not None:
+            _render_resultado(resultado)
+        else:
+            st.info("Aún no se ha generado resultado")
 
+    except Exception as e:
+        st.error("Error renderizando resultado")
+        st.exception(e)
+
+
+# ==========================================================
+# VALIDACIÓN
+# ==========================================================
 
 def validar(ctx):
 
