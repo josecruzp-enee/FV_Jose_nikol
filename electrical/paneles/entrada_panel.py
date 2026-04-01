@@ -6,7 +6,7 @@ from electrical.modelos.inversor import InversorSpec
 
 
 # ==========================================================
-# ZONA FV (CORREGIDA)
+# ZONA FV (FUERTE)
 # ==========================================================
 @dataclass(frozen=True)
 class ZonaFV:
@@ -16,19 +16,19 @@ class ZonaFV:
 
 
 # ==========================================================
-# ENTRADA PANELES (CORREGIDA)
+# ENTRADA PANELES (FUERTE)
 # ==========================================================
 @dataclass(frozen=True)
 class EntradaPaneles:
 
     # ===============================
-    # ESPECIFICACIONES
+    # ESPECIFICACIONES (OBLIGATORIO)
     # ===============================
     panel: PanelSpec
     inversor: InversorSpec
 
     # ===============================
-    # CONTROL DE FLUJO
+    # CONTROL DE FLUJO (OBLIGATORIO)
     # ===============================
     modo: Literal[
         "manual",
@@ -42,7 +42,7 @@ class EntradaPaneles:
     # CONFIGURACIÓN BASE
     # ===============================
     n_paneles_total: Optional[int] = None
-    n_inversores: Optional[int] = None
+    n_inversores: int = 1  # 🔥 default fuerte (no None)
 
     # ===============================
     # MULTIZONA
@@ -66,9 +66,21 @@ class EntradaPaneles:
     # ===============================
     dos_aguas: bool = False
 
-    # ===============================
-    # 🔥 CONTEXTO ELÉCTRICO (CLAVE)
-    # ===============================
-    vac: Optional[float] = None
-    fases: Optional[int] = 1
-    fp: Optional[float] = 1.0
+    # ======================================================
+    # VALIDACIÓN INTERNA (CLAVE 🔥)
+    # ======================================================
+    def __post_init__(self):
+
+        # 🔴 validar modo multizona
+        if self.modo == "multizona":
+            if not self.zonas or len(self.zonas) == 0:
+                raise ValueError("Modo multizona requiere zonas válidas")
+
+        # 🔴 validar modo normal
+        else:
+            if self.n_paneles_total is None or self.n_paneles_total <= 0:
+                raise ValueError("n_paneles_total inválido en modo no multizona")
+
+        # 🔴 validar inversores
+        if self.n_inversores <= 0:
+            raise ValueError("n_inversores debe ser >= 1")
