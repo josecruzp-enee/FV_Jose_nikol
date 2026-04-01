@@ -147,7 +147,7 @@ def ejecutar_estudio(
         return ResultadoProyecto(
             sizing=sizing,
             paneles=paneles,
-            strings=None,
+            strings=paneles.strings,
             energia=energia,
             electrical=electrical,
             financiero=finanzas,
