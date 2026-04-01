@@ -78,46 +78,18 @@ class PotenciaArregloResultado:
 # =========================================================
 
 def calcular_potencia_arreglo(inp: PotenciaArregloInput) -> PotenciaArregloResultado:
-    """
-    Calcula los parámetros eléctricos del generador FV completo.
-
-    Modelo:
-
-        V_array = V_string
-        I_array = I_string × N_strings
-        P_array = V_array × I_array
-    """
-
-    # -----------------------------------------------------
-    # VALIDACIÓN
-    # -----------------------------------------------------
 
     if inp.n_strings_total <= 0:
         raise ValueError("n_strings_total inválido")
 
-    # -----------------------------------------------------
-    # VOLTAJE (paralelo → no cambia)
-    # -----------------------------------------------------
-
     vdc_array = inp.vmp_string_v
     voc_array = inp.voc_string_v
-
-    # -----------------------------------------------------
-    # CORRIENTE (paralelo → suma)
-    # -----------------------------------------------------
 
     idc_array = inp.imp_string_a * inp.n_strings_total
     isc_array = inp.isc_string_a * inp.n_strings_total
 
-    # -----------------------------------------------------
-    # POTENCIA CONSISTENTE
-    # -----------------------------------------------------
-
-    potencia_array = vdc_array * idc_array
-
-    # -----------------------------------------------------
-    # RESULTADO
-    # -----------------------------------------------------
+    # 🔥 FIX CRÍTICO
+    potencia_array = inp.potencia_string_w * inp.n_strings_total
 
     return PotenciaArregloResultado(
         vdc_array_v=vdc_array,
