@@ -81,7 +81,8 @@ class Datosproyecto:
     # HELPERS (opcional pero útil)
     # =====================================================
 
-    def validar_minimo(self) -> None:
+
+def validar_minimo(self) -> None:
     """
     Validación mínima antes de entrar al orquestador.
     Lanza excepción si algo crítico falta.
@@ -117,7 +118,7 @@ class Datosproyecto:
             errores.append("valor no definido para modo cobertura/offset")
 
     # =====================================================
-    # 🔥 CONSUMO (CRÍTICO)
+    # CONSUMO
     # =====================================================
     if not self.consumo_12m or len(self.consumo_12m) != 12:
         errores.append("consumo_12m inválido")
@@ -126,7 +127,7 @@ class Datosproyecto:
         errores.append("consumo anual inválido (todo en cero)")
 
     # =====================================================
-    # 🔥 PRODUCCIÓN FV (CRÍTICO)
+    # PRODUCCIÓN
     # =====================================================
     if not self.prod_base_kwh_kwp_mes or len(self.prod_base_kwh_kwp_mes) != 12:
         errores.append("prod_base_kwh_kwp_mes inválido")
@@ -135,13 +136,13 @@ class Datosproyecto:
         errores.append("producción base FV inválida (todo en cero)")
 
     # =====================================================
-    # 🔥 FACTORES FV
+    # FACTORES FV
     # =====================================================
     if not self.factores_fv_12m or len(self.factores_fv_12m) != 12:
         errores.append("factores_fv_12m inválido")
 
     # =====================================================
-    # 🔥 SISTEMA FV (ZONAS)
+    # ZONAS
     # =====================================================
     if modo == "multizona":
 
@@ -159,7 +160,7 @@ class Datosproyecto:
                 errores.append(f"Zona {i+1}: sin paneles ni área válida")
 
     # =====================================================
-    # 🔥 ELÉCTRICO
+    # ELÉCTRICO
     # =====================================================
     if not self.electrico:
         errores.append("electrico no definido")
