@@ -18,48 +18,6 @@ def _asegurar_dict(ctx, nombre: str) -> dict:
 
 
 # ==========================================================
-# DEBUG COMPLETO (ROBUSTO)
-# ==========================================================
-def mostrar_debug_completo(resultado):
-
-    st.markdown("## 🧪 INSPECCIÓN COMPLETA DEL SISTEMA")
-
-    def safe(obj):
-        try:
-            if obj is None:
-                return "None"
-            if hasattr(obj, "__dict__"):
-                return obj.__dict__
-            return str(obj)
-        except Exception as e:
-            return f"ERROR: {e}"
-
-    data = {}
-
-    try:
-        data["sizing"] = safe(getattr(resultado, "sizing", None))
-    except:
-        data["sizing"] = "ERROR"
-
-    try:
-        data["paneles"] = safe(getattr(resultado, "strings", None))
-    except:
-        data["paneles"] = "ERROR"
-
-    try:
-        data["energia"] = safe(getattr(resultado, "energia", None))
-    except:
-        data["energia"] = "ERROR"
-
-    try:
-        data["electrical"] = safe(getattr(resultado, "electrical", None))
-    except:
-        data["electrical"] = "ERROR"
-
-    st.json(data)
-
-
-# ==========================================================
 # INPUTS
 # ==========================================================
 def _ui_inputs_electricos(e: dict):
@@ -137,142 +95,44 @@ def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
         inversor_id=eq.get("inversor_id"),
     )
 
-    if sf_raw.get("zonas"):
-
-        zonas = []
-        for z in sf_raw.get("zonas", []):
-            zonas.append({"n_paneles": int(z.get("n_paneles") or 0)})
-
-        p.sistema_fv = {
-            "modo": "multizona",
-            "zonas": zonas
-        }
-
-    else:
-        sizing = sf_raw.get("sizing_input", {})
-
-        p.sistema_fv = {
-            "modo": sizing.get("modo"),
-            "valor": float(sizing.get("valor", 0))
-        }
-
     return p
 
+
+# ==========================================================
+# DETALLE
+# ==========================================================
 def _mostrar_detalle(strings, electrical):
 
     st.markdown("## ⚡ Ingeniería eléctrica")
 
-    try:
-        corr = getattr(electrical, "corrientes", None)
-        cond = getattr(electrical, "conductores", None)
-        prot = getattr(electrical, "protecciones", None)
+    corr = getattr(electrical, "corrientes", None)
+    cond = getattr(electrical, "conductores", None)
+    prot = getattr(electrical, "protecciones", None)
 
-        # ==================================================
-        # STRINGS
-        # ==================================================
-        st.markdown("### 🔋 Strings")
+    st.write("Strings:", strings)
 
-        if not strings:
-            st.warning("No hay strings disponibles")
-        else:
-            data = []
-            for i, s in enumerate(strings, 1):
-                data.append({
-                    "String": i,
-                    "Vmp (V)": getattr(s, "vmp_v", "-"),
-                    "Voc (V)": getattr(s, "voc_v", "-"),
-                    "Imp (A)": getattr(s, "imp_a", "-"),
-                    "Isc (A)": getattr(s, "isc_a", "-"),
-                })
+    if corr:
+        st.write("Corriente DC:", getattr(corr.dc, "i_diseno_a", "-"))
+        st.write("Corriente AC:", getattr(corr.ac, "i_diseno_a", "-"))
 
-            st.dataframe(data, width="stretch")
+    if cond and getattr(cond, "tramos", None):
+        st.write("Conductores:", cond.tramos)
 
-        # ==================================================
-        # CORRIENTES
-        # ==================================================
-        st.markdown("### ⚡ Corrientes")
-
-        if corr:
-            st.write("DC diseño:", getattr(corr.dc, "i_diseno_a", "-"))
-            st.write("AC diseño:", getattr(corr.ac, "i_diseno_a", "-"))
-        else:
-            st.warning("No hay corrientes calculadas")
-
-        # ==================================================
-        # CONDUCTORES
-        # ==================================================
-        st.markdown("### 🧵 Conductores")
-
-        if cond and getattr(cond, "tramos", None):
-
-            tr = cond.tramos
-
-            # DC
-            if getattr(tr, "dc_mppt", None):
-                for i, t in enumerate(tr.dc_mppt, 1):
-                    st.info(
-                        f"MPPT {i}: {t.calibre} AWG | "
-                        f"Ampacidad: {t.ampacidad_ajustada_a:.2f} A | "
-                        f"VD: {t.vd_pct:.2f}%"
-                    )
-            else:
-                st.warning("No hay conductores DC")
-
-            # AC
-            if getattr(tr, "ac", None):
-                t = tr.ac
-                st.info(
-                    f"AC: {t.calibre} AWG | "
-                    f"Ampacidad: {t.ampacidad_ajustada_a:.2f} A | "
-                    f"VD: {t.vd_pct:.2f}%"
-                )
-            else:
-                st.warning("No hay conductor AC")
-
-        else:
-            st.warning("No hay datos de conductores")
-
-        # ==================================================
-        # PROTECCIONES
-        # ==================================================
-        st.markdown("### ⚡ Protecciones")
-
-        if prot:
-
-            # Breaker AC
-            breaker = getattr(getattr(prot, "ocpd_ac", None), "tamano_a", "-")
-            st.write("Breaker AC:", breaker)
-
-            # Fusible string
-            fus = getattr(getattr(prot, "fusible_string", None), "tamano_a", None)
-            if fus:
-                st.write("Fusible string:", fus)
-            else:
-                st.write("Fusible string: No requerido")
-
-        else:
-            st.warning("No hay protecciones calculadas")
-
-    except Exception as err:
-        st.error(f"Error en detalle eléctrico: {err}")
+    if prot:
+        st.write("Protecciones:", prot)
 
 
 # ==========================================================
-# RENDER
+# RENDER (BLINDADO)
 # ==========================================================
-
-
 def render(ctx):
 
-    # ===============================
-    # INPUTS
-    # ===============================
     e = _asegurar_dict(ctx, "electrico")
     _ui_inputs_electricos(e)
 
-    # ===============================
+    # ======================================================
     # BOTÓN
-    # ===============================
+    # ======================================================
     if st.button("⚡ Generar ingeniería eléctrica"):
 
         try:
@@ -281,8 +141,8 @@ def render(ctx):
 
             resultado = ejecutar_estudio(p, deps)
 
-            # ctx es objeto
-            setattr(ctx, "resultado", resultado)
+            # 🔥 guardar en session_state (CLAVE)
+            st.session_state["resultado"] = resultado
 
             st.success("✅ Ingeniería generada")
 
@@ -292,75 +152,43 @@ def render(ctx):
             st.code(traceback.format_exc())
             return
 
-    # ===============================
-    # RESULTADO
-    # ===============================
-    resultado = getattr(ctx, "resultado", None)
+    # ======================================================
+    # RESULTADO (SEGURO)
+    # ======================================================
+    resultado = st.session_state.get("resultado")
 
     if resultado is None:
         st.warning("⚠ No hay resultado aún")
         return
 
-    # ===============================
+    # ======================================================
     # ESTADO
-    # ===============================
-    try:
-        estado_ok = getattr(resultado, "ok", False)
-        errores = getattr(resultado, "errores", [])
+    # ======================================================
+    estado_ok = getattr(resultado, "ok", False)
+    errores = getattr(resultado, "errores", [])
 
-        st.write("Estado:", estado_ok)
-        st.write("Errores:", errores)
+    st.write("Estado:", estado_ok)
+    st.write("Errores:", errores)
 
-    except Exception as err:
-        st.error(f"❌ Error leyendo estado: {err}")
-        return
-
-    # ===============================
-    # VALIDACIÓN
-    # ===============================
     if not estado_ok:
-        st.error("❌ Resultado no OK")
         return
 
     if not getattr(resultado, "electrical", None):
-        st.error("❌ No hay resultado electrical")
+        st.error("No hay electrical")
         return
 
-    # ===============================
-    # DETALLE (ROBUSTO)
-    # ===============================
+    # ======================================================
+    # DETALLE
+    # ======================================================
     try:
         strings_obj = getattr(resultado, "strings", None)
 
-        if strings_obj is None:
-            st.error("❌ strings es None")
-            return
-
-        # 🔥 manejo robusto
         if hasattr(strings_obj, "strings"):
             strings = strings_obj.strings
         else:
-            strings = strings_obj  # ya es lista
+            strings = strings_obj
 
-        electrical = resultado.electrical
+        _mostrar_detalle(strings, resultado.electrical)
 
-        _mostrar_detalle(strings, electrical)
-
-    except Exception as err:
-        st.error(f"❌ Error mostrando detalle: {err}")
-        st.write("DEBUG resultado:", resultado)
-
-# ==========================================================
-# VALIDACIÓN
-# ==========================================================
-def validar(ctx):
-
-    resultado = getattr(ctx, "resultado", None)
-
-    if not resultado:
-        return False, ["Debe generar ingeniería eléctrica"]
-
-    if not getattr(resultado, "ok", False):
-        return False, resultado.errores or ["Error en ingeniería"]
-
-    return True, []
+    except Exception as e:
+        st.error(f"Error mostrando detalle: {e}")
