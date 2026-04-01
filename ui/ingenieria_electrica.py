@@ -158,6 +158,104 @@ def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
 
     return p
 
+def _mostrar_detalle(strings, electrical):
+
+    st.markdown("## ⚡ Ingeniería eléctrica")
+
+    try:
+        corr = getattr(electrical, "corrientes", None)
+        cond = getattr(electrical, "conductores", None)
+        prot = getattr(electrical, "protecciones", None)
+
+        # ==================================================
+        # STRINGS
+        # ==================================================
+        st.markdown("### 🔋 Strings")
+
+        if not strings:
+            st.warning("No hay strings disponibles")
+        else:
+            data = []
+            for i, s in enumerate(strings, 1):
+                data.append({
+                    "String": i,
+                    "Vmp (V)": getattr(s, "vmp_v", "-"),
+                    "Voc (V)": getattr(s, "voc_v", "-"),
+                    "Imp (A)": getattr(s, "imp_a", "-"),
+                    "Isc (A)": getattr(s, "isc_a", "-"),
+                })
+
+            st.dataframe(data, width="stretch")
+
+        # ==================================================
+        # CORRIENTES
+        # ==================================================
+        st.markdown("### ⚡ Corrientes")
+
+        if corr:
+            st.write("DC diseño:", getattr(corr.dc, "i_diseno_a", "-"))
+            st.write("AC diseño:", getattr(corr.ac, "i_diseno_a", "-"))
+        else:
+            st.warning("No hay corrientes calculadas")
+
+        # ==================================================
+        # CONDUCTORES
+        # ==================================================
+        st.markdown("### 🧵 Conductores")
+
+        if cond and getattr(cond, "tramos", None):
+
+            tr = cond.tramos
+
+            # DC
+            if getattr(tr, "dc_mppt", None):
+                for i, t in enumerate(tr.dc_mppt, 1):
+                    st.info(
+                        f"MPPT {i}: {t.calibre} AWG | "
+                        f"Ampacidad: {t.ampacidad_ajustada_a:.2f} A | "
+                        f"VD: {t.vd_pct:.2f}%"
+                    )
+            else:
+                st.warning("No hay conductores DC")
+
+            # AC
+            if getattr(tr, "ac", None):
+                t = tr.ac
+                st.info(
+                    f"AC: {t.calibre} AWG | "
+                    f"Ampacidad: {t.ampacidad_ajustada_a:.2f} A | "
+                    f"VD: {t.vd_pct:.2f}%"
+                )
+            else:
+                st.warning("No hay conductor AC")
+
+        else:
+            st.warning("No hay datos de conductores")
+
+        # ==================================================
+        # PROTECCIONES
+        # ==================================================
+        st.markdown("### ⚡ Protecciones")
+
+        if prot:
+
+            # Breaker AC
+            breaker = getattr(getattr(prot, "ocpd_ac", None), "tamano_a", "-")
+            st.write("Breaker AC:", breaker)
+
+            # Fusible string
+            fus = getattr(getattr(prot, "fusible_string", None), "tamano_a", None)
+            if fus:
+                st.write("Fusible string:", fus)
+            else:
+                st.write("Fusible string: No requerido")
+
+        else:
+            st.warning("No hay protecciones calculadas")
+
+    except Exception as err:
+        st.error(f"Error en detalle eléctrico: {err}")
+
 
 # ==========================================================
 # RENDER
