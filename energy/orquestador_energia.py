@@ -60,6 +60,12 @@ def _resultado_error(inp: EnergiaInput, errores: List[str]) -> EnergiaResultado:
 # ==========================================================
 
 def _calcular_poa(h, inp):
+
+    # 🔥 SI YA VIENE DE 8760 → usar directo
+    if hasattr(h, "poa_wm2"):
+        return max(0.0, h.poa_wm2)
+
+    # 🔥 fallback (legacy)
     solar = ejecutar_solar(
         EntradaSolar(
             lat=inp.clima.latitud,
@@ -73,8 +79,8 @@ def _calcular_poa(h, inp):
             azimuth_panel_deg=inp.azimut_deg
         )
     )
-    return max(0.0, solar.poa_total_wm2)
 
+    return max(0.0, solar.poa_total_wm2)
 
 def _calcular_temperatura(poa, h, inp):
     return calcular_temperatura_celda(
