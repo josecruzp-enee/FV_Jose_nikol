@@ -51,7 +51,6 @@ def _validar_sistema_fv(datos):
 # ==========================================================
 # NORMALIZACIÓN (SIN MUTAR + DETERMINÍSTICA)
 # ==========================================================
-
 def _normalizar_zonas(zonas):
 
     def estimar_paneles(area):
@@ -62,20 +61,23 @@ def _normalizar_zonas(zonas):
     out = []
 
     for z in zonas:
+
         if not isinstance(z, dict):
             continue
 
         n = z.get("n_paneles")
 
-        # 🔥 SOLO recalcular si es None
         if n is None:
             n = estimar_paneles(z.get("area"))
 
-        # 🔥 evitar valores inválidos
         if n is None or n <= 0:
             n = 1
 
-        out.append(n)
+        out.append({
+            "n_paneles": n,
+            "azimut": z.get("azimut"),
+            "inclinacion": z.get("inclinacion"),
+        })
 
     return out
 
@@ -91,15 +93,16 @@ def _build_multizona(sf, panel, inversor, sizing):
     if not isinstance(zonas_raw, list) or not zonas_raw:
         raise ValueError("zonas inválidas en sistema_fv")
 
-    # 🔥 NORMALIZAR
     zonas_norm = _normalizar_zonas(zonas_raw)
 
-    # 🔥 VALIDACIÓN
-    if not zonas_norm:
-        raise ValueError("zonas vacías después de normalización")
-
-    # 🔥 TIPADO FUERTE
-    zonas_obj = [ZonaFV(n_paneles=n) for n in zonas_norm]
+    zonas_obj = [
+        ZonaFV(
+            n_paneles=z["n_paneles"],
+            azimut=z.get("azimut"),
+            inclinacion=z.get("inclinacion"),
+        )
+        for z in zonas_norm
+    ]
 
     return EntradaPaneles(
         panel=panel,
@@ -114,8 +117,6 @@ def _build_multizona(sf, panel, inversor, sizing):
         pdc_kw_objetivo=getattr(sizing, "pdc_kw", None),
         n_inversores=getattr(sizing, "n_inversores", 1),
     )
-
-
 # ==========================================================
 # BUILD NORMAL
 # ==========================================================
