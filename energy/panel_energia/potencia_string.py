@@ -82,47 +82,18 @@ class PotenciaStringResultado:
 # =========================================================
 
 def calcular_potencia_string(inp: PotenciaStringInput) -> PotenciaStringResultado:
-    """
-    Calcula los parámetros eléctricos de un string FV
-    (paneles en serie).
-
-    Modelo:
-
-        V_string = V_panel * N_series
-        I_string = I_panel
-        P_string = V_string * I_string
-    """
-
-    # -----------------------------------------------------
-    # VALIDACIONES
-    # -----------------------------------------------------
 
     if inp.n_series <= 0:
         raise ValueError("n_series inválido")
 
-    # -----------------------------------------------------
-    # VOLTAJES (serie)
-    # -----------------------------------------------------
-
     vmp_string = inp.vmp_panel_v * inp.n_series
     voc_string = inp.voc_panel_v * inp.n_series
-
-    # -----------------------------------------------------
-    # CORRIENTES (serie)
-    # -----------------------------------------------------
 
     imp_string = inp.imp_panel_a
     isc_string = inp.isc_panel_a
 
-    # -----------------------------------------------------
-    # POTENCIA CONSISTENTE
-    # -----------------------------------------------------
-
-    potencia_string = vmp_string * imp_string
-
-    # -----------------------------------------------------
-    # RESULTADO
-    # -----------------------------------------------------
+    # 🔥 FIX CRÍTICO
+    potencia_string = inp.p_panel_w * inp.n_series
 
     return PotenciaStringResultado(
         vmp_string_v=vmp_string,
