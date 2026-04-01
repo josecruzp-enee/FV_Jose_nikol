@@ -49,8 +49,29 @@ def _validar_sistema_fv(datos):
 
 
 # ==========================================================
-# NORMALIZACIÓN (SIN MUTAR + DETERMINÍSTICA)
+# MAPEO UI → MOTOR
 # ==========================================================
+
+def _mapear_modo_ui_a_paneles(modo_ui: str) -> str:
+
+    modo_ui = str(modo_ui).strip().lower()
+
+    if modo_ui in ["cobertura", "potencia"]:
+        return "paneles"
+
+    if modo_ui == "area":
+        return "area"
+
+    if modo_ui == "paneles":
+        return "paneles"
+
+    raise ValueError(f"Modo no soportado: {modo_ui}")
+
+
+# ==========================================================
+# NORMALIZACIÓN ZONAS
+# ==========================================================
+
 def _normalizar_zonas(zonas):
 
     def estimar_paneles(area):
@@ -60,21 +81,36 @@ def _normalizar_zonas(zonas):
 
     out = []
 
-    for z in zonas:
+    for i, z in enumerate(zonas):
 
         if not isinstance(z, dict):
             continue
 
+        modo_z = z.get("modo")
+
+        if not modo_z:
+            raise ValueError(f"Zona {i+1} sin modo")
+
+        modo_z = modo_z.lower()
+
+        if modo_z not in ["paneles", "area"]:
+            raise ValueError(f"Zona {i+1}: modo inválido ({modo_z})")
+
         n = z.get("n_paneles")
+        area = z.get("area")
 
-        if n is None:
-            n = estimar_paneles(z.get("area"))
+        if modo_z == "paneles":
+            if n is None or n <= 0:
+                raise ValueError(f"Zona {i+1}: n_paneles inválido")
 
-        if n is None or n <= 0:
-            n = 1
+        if modo_z == "area":
+            if area is None or area <= 0:
+                raise ValueError(f"Zona {i+1}: área inválida")
+            n = estimar_paneles(area)
 
         out.append({
-            "n_paneles": n,
+            "modo": modo_z,
+            "n_paneles": int(n),
             "azimut": z.get("azimut"),
             "inclinacion": z.get("inclinacion"),
         })
@@ -91,7 +127,7 @@ def _build_multizona(sf, panel, inversor, sizing):
     zonas_raw = sf.get("zonas", [])
 
     if not isinstance(zonas_raw, list) or not zonas_raw:
-        raise ValueError("zonas inválidas en sistema_fv")
+        raise ValueError("multizona sin zonas válidas")
 
     zonas_norm = _normalizar_zonas(zonas_raw)
 
@@ -108,43 +144,63 @@ def _build_multizona(sf, panel, inversor, sizing):
         panel=panel,
         inversor=inversor,
         modo="multizona",
-        n_paneles_total=None,
         zonas=zonas_obj,
+
+        n_paneles_total=None,
+
         t_min_c=getattr(sizing, "t_min_c", 25.0),
         t_oper_c=getattr(sizing, "t_oper_c", 55.0),
         dos_aguas=getattr(sizing, "dos_aguas", False),
+
         objetivo_dc_ac=getattr(sizing, "dc_ac_ratio", None),
         pdc_kw_objetivo=getattr(sizing, "pdc_kw", None),
         n_inversores=getattr(sizing, "n_inversores", 1),
     )
+
+
 # ==========================================================
 # BUILD NORMAL
 # ==========================================================
 
 def _build_normal(sf, panel, inversor, sizing):
 
-    modo = str(sf.get("modo")).strip().lower()
+    modo_ui = sf.get("modo")
     valor = sf.get("valor")
 
-    if valor is None or float(valor) <= 0:
-        raise ValueError(f"Valor inválido en sistema_fv: {sf}")
+    modo = _mapear_modo_ui_a_paneles(modo_ui)
 
-    n_paneles_total = getattr(sizing, "n_paneles", None)
+    # ==================================================
+    # PRIORIDAD: UI > sizing
+    # ==================================================
+    n_paneles_total = None
 
-    # fallback desde zonas si sizing no lo trae
-    if n_paneles_total is None and sf.get("zonas"):
-        zonas_norm = _normalizar_zonas(sf.get("zonas", []))
-        n_paneles_total = sum(zonas_norm)
+    if modo_ui == "paneles":
+        if valor is None or int(valor) <= 0:
+            raise ValueError("Valor inválido para modo paneles")
+        n_paneles_total = int(valor)
+
+    elif modo_ui in ["cobertura", "potencia"]:
+        n_paneles_total = getattr(sizing, "n_paneles", None)
+
+    elif modo_ui == "area":
+        # paneles se calcularán internamente
+        n_paneles_total = None
+
+    if modo == "paneles" and (n_paneles_total is None or n_paneles_total <= 0):
+        raise ValueError("No se pudo determinar n_paneles_total")
 
     return EntradaPaneles(
         panel=panel,
         inversor=inversor,
         modo=modo,
+
         n_paneles_total=n_paneles_total,
         zonas=None,
+
         t_min_c=getattr(sizing, "t_min_c", 25.0),
         t_oper_c=getattr(sizing, "t_oper_c", 55.0),
         dos_aguas=getattr(sizing, "dos_aguas", False),
+
         objetivo_dc_ac=getattr(sizing, "dc_ac_ratio", None),
         pdc_kw_objetivo=getattr(sizing, "pdc_kw", None),
         n_inversores=getattr(sizing, "n_inversores", 1),
@@ -165,12 +221,20 @@ def construir_entrada_paneles(datos, sizing) -> EntradaPaneles:
 
     sf = _validar_sistema_fv(datos)
 
-    # 🔥 MULTIZONA SOLO SI EL MODO LO INDICA
-    if sf.get("modo") == "multizona":
+    modo = sf.get("modo")
+
+    if not modo:
+        raise ValueError("sistema_fv sin modo")
+
+    modo = modo.lower()
+
+    # ==================================================
+    # MULTIZONA
+    # ==================================================
+    if modo == "multizona":
         return _build_multizona(sf, panel, inversor, sizing)
 
-    # 🔹 NORMAL
-    if sf.get("modo"):
-        return _build_normal(sf, panel, inversor, sizing)
-
-    raise ValueError("sistema_fv sin modo válido")
+    # ==================================================
+    # NORMAL (auto + manual simple)
+    # ==================================================
+    return _build_normal(sf, panel, inversor, sizing)
