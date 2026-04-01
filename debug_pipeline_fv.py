@@ -23,7 +23,7 @@ def add_trace(nombre, entrada, salida=None, error=None):
         "salida": salida,
         "error": error
     })
-
+trace = get_trace()
 
 def get_trace():
     return st.session_state.get("_trace", [])
