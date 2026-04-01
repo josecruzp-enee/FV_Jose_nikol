@@ -248,12 +248,23 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
         n_inversores=entrada.n_inversores,
     )
 
+    # --------------------------------------------------
+    # RECOMENDACIÓN (🔥 FIX CRÍTICO)
+    # --------------------------------------------------
+    recomendacion = RecomendacionStrings(
+        n_series=max(s.n_series for s in strings),
+        n_strings_total=len(strings),
+        strings_por_mppt=1,
+        vmp_string_v=max(s.vmp_string_v for s in strings),
+        voc_frio_string_v=max(s.voc_frio_string_v for s in strings),
+    )
+
     return ResultadoPaneles(
         ok=True,
         panel=panel,
-        topologia="string",
+        topologia="multizona",
         array=array,
-        recomendacion=strings_res.recomendacion,
+        recomendacion=recomendacion,  # 🔥 YA NO None
         strings=strings,
         warnings=warnings,
         errores=[],
