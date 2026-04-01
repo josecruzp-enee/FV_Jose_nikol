@@ -199,7 +199,7 @@ def _calcular_totales(resultados: List[ResultadoPaneles]):
 # ==========================================================
 # VOLTAJE
 # ==========================================================
-
+'''
 def _validar_voltajes(resultados: List[ResultadoPaneles]):
 
     vdc_vals = [
@@ -215,7 +215,7 @@ def _validar_voltajes(resultados: List[ResultadoPaneles]):
         raise ValueError("Voltajes incompatibles entre zonas")
 
     return vdc_vals[0]
-
+'''
 
 # ==========================================================
 # STRINGS
