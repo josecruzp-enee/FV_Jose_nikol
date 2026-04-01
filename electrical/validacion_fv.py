@@ -8,56 +8,58 @@ def validar_sistema_fv(panel, inversor, array, strings):
     warnings = []
 
     # ======================================================
-    # 1. VOC FRÍO (CRÍTICO - NEC)
+    # 1. VOC FRÍO (CORRECTO POR STRING)
     # ======================================================
     try:
-        voc_panel = getattr(panel, "voc_v", None)
-        n_paneles = int(array.vdc_nom / panel.vmp_v) if panel.vmp_v else 0
+        if strings:
+            for i, s in enumerate(strings):
+                voc_string = getattr(s, "voc_frio_string_v", None)
 
-        if voc_panel and n_paneles:
-            # Factor típico frío (puedes hacerlo dinámico luego)
-            factor_frio = 1.25
-            voc_frio = voc_panel * n_paneles * factor_frio
-
-            if voc_frio > inversor.vmax_dc_v:
-                errores.append(
-                    f"Voc frío ({voc_frio:.2f} V) excede Vdc_max ({inversor.vmax_dc_v} V)"
-                )
-
+                if voc_string and getattr(inversor, "vmax_dc_v", None):
+                    if voc_string > inversor.vmax_dc_v:
+                        errores.append(
+                            f"String {i+1}: Voc frío ({voc_string:.2f} V) excede Vdc_max ({inversor.vmax_dc_v} V)"
+                        )
     except Exception:
         warnings.append("No se pudo validar Voc frío")
 
     # ======================================================
     # 2. RANGO MPPT (Vmp)
     # ======================================================
-    if not (inversor.mppt_min_v <= array.vdc_nom <= inversor.mppt_max_v):
-        warnings.append(
-            f"Vmp ({array.vdc_nom:.2f} V) fuera de rango MPPT "
-            f"({inversor.mppt_min_v} - {inversor.mppt_max_v} V)"
-        )
+    try:
+        if not (inversor.mppt_min_v <= array.vdc_nom <= inversor.mppt_max_v):
+            warnings.append(
+                f"Vmp ({array.vdc_nom:.2f} V) fuera de rango MPPT "
+                f"({inversor.mppt_min_v} - {inversor.mppt_max_v} V)"
+            )
+    except Exception:
+        warnings.append("No se pudo validar rango MPPT")
 
     # ======================================================
     # 3. STRINGS POR MPPT
     # ======================================================
-    if array.strings_por_mppt > 2:
-        warnings.append(
-            f"Demasiados strings por MPPT ({array.strings_por_mppt})"
-        )
+    try:
+        if getattr(array, "strings_por_mppt", 0) > 2:
+            warnings.append(
+                f"Demasiados strings por MPPT ({array.strings_por_mppt})"
+            )
+    except Exception:
+        warnings.append("No se pudo validar strings por MPPT")
 
     # ======================================================
-    # 4. CORRIENTE MPPT
+    # 4. CORRIENTE MPPT (CORRECTO)
     # ======================================================
     try:
         if strings:
-            s0 = strings[0]
+            imppt_max = getattr(inversor, "imppt_max_a", None)
 
-            imp_string = getattr(s0, "imp_string_a", 0)
-            i_mppt = imp_string * array.strings_por_mppt
+            for i, s in enumerate(strings):
+                imp_string = getattr(s, "imp_string_a", 0)
+                i_mppt = imp_string * getattr(array, "strings_por_mppt", 1)
 
-            if hasattr(inversor, "imax_mppt_a") and inversor.imax_mppt_a:
-                if i_mppt > inversor.imax_mppt_a:
+                if imppt_max and i_mppt > imppt_max:
                     errores.append(
-                        f"Corriente MPPT ({i_mppt:.2f} A) excede límite ({inversor.imax_mppt_a} A)"
+                        f"String {i+1}: Corriente MPPT ({i_mppt:.2f} A) excede límite ({imppt_max} A)"
                     )
     except Exception:
         warnings.append("No se pudo validar corriente MPPT")
