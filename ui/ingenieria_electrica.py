@@ -168,14 +168,15 @@ def _render_resultado(resultado):
     # META
     # ======================================================
     st.markdown("### 📊 Meta")
-
-    meta = getattr(resultado, "paneles", None)
-
-    if meta and hasattr(meta, "meta"):
-        st.write(f"Nº total de paneles: {meta.meta.n_paneles_total}")
-        st.write(f"Potencia DC total: {meta.meta.pdc_kw:.2f} kW")
-        st.write(f"Nº de inversores: {meta.meta.n_inversores}")
-
+    paneles = getattr(resultado, "paneles", None)
+    meta = paneles.meta if paneles and hasattr(paneles, "meta") else None
+    
+    if isinstance(meta, dict):
+        st.write(f"Nº total de paneles: {meta.get('n_paneles_total', 0)}")
+        st.write(f"Potencia DC total: {meta.get('pdc_kw', 0):.2f} kW")
+        st.write(f"Nº de inversores: {meta.get('n_inversores', 0)}")
+    else:
+        st.info("Meta no disponible")
     # ======================================================
     # DEBUG COMPLETO
     # ======================================================
