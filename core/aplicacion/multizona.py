@@ -73,8 +73,7 @@ def ejecutar_multizona(entrada: EntradaPaneles) -> ResultadoPaneles:
 # ==========================================================
 # ZONAS (🔥 FIX REAL)
 # ==========================================================
-
-def _ejecutar_zonas(entrada: EntradaPaneles) -> List[ResultadoPaneles] | ResultadoPaneles:
+def _ejecutar_zonas(entrada: EntradaPaneles) -> list | ResultadoPaneles:
 
     if getattr(entrada, "modo", None) == "multizona":
 
@@ -93,8 +92,18 @@ def _ejecutar_zonas(entrada: EntradaPaneles) -> List[ResultadoPaneles] | Resulta
             n_paneles = getattr(z, "n_paneles", None)
             area = getattr(z, "area", None)
 
-            if not n_paneles and not area:
+            if (n_paneles is None or n_paneles <= 0) and (area is None or area <= 0):
                 raise ValueError(f"Zona {i} sin n_paneles ni area")
+
+            # ======================================================
+            # DEFINIR MODO CORRECTO POR ZONA (🔥 FIX CRÍTICO)
+            # ======================================================
+            if n_paneles is not None and n_paneles > 0:
+                modo_zona = "paneles"
+            elif area is not None and area > 0:
+                modo_zona = "area"
+            else:
+                raise ValueError(f"Zona {i} inválida")
 
             # ======================================================
             # CONSTRUIR ENTRADA POR ZONA
@@ -102,16 +111,16 @@ def _ejecutar_zonas(entrada: EntradaPaneles) -> List[ResultadoPaneles] | Resulta
             entrada_zona = EntradaPaneles(
                 panel=entrada.panel,
                 inversor=entrada.inversor,
-                modo=entrada.modo,  # 🔥 RESPETA modo
+                modo=modo_zona,  # 🔥 CORRECTO
             )
 
             # ======================================================
             # DATOS DE LA ZONA
             # ======================================================
-            if n_paneles:
+            if modo_zona == "paneles":
                 entrada_zona.n_paneles_total = int(n_paneles)
 
-            elif area:
+            elif modo_zona == "area":
                 entrada_zona.area = float(area)
 
             # ======================================================
@@ -143,7 +152,6 @@ def _ejecutar_zonas(entrada: EntradaPaneles) -> List[ResultadoPaneles] | Resulta
             return res
 
         return [res]
-
 
 # ==========================================================
 # DETALLE ZONAS
