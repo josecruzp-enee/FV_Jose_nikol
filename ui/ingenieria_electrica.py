@@ -162,6 +162,9 @@ def _datosproyecto_desde_ctx(ctx) -> Datosproyecto:
 # ==========================================================
 # RENDER
 # ==========================================================
+
+
+
 def render(ctx):
 
     # ===============================
@@ -181,6 +184,7 @@ def render(ctx):
 
             resultado = ejecutar_estudio(p, deps)
 
+            # ✅ CORRECTO (ctx es objeto)
             setattr(ctx, "resultado", resultado)
 
             st.success("✅ Ingeniería generada")
@@ -188,62 +192,56 @@ def render(ctx):
         except Exception as err:
             import traceback
 
-            st.error("❌ Error REAL en ingeniería")
+            st.error("❌ Error generando ingeniería")
             st.code(traceback.format_exc())
-
-            # 🔥 GUARDAR ERROR COMO RESULTADO CONTROLADO
-            class ResultadoError:
-                ok = False
-                errores = [str(err)]
-                sizing = None
-                strings = None
-                energia = None
-                electrical = None
-
-            setattr(ctx, "resultado", ResultadoError())
             return
 
     # ===============================
     # RESULTADO
     # ===============================
-    resultado = ctx.get("resultado")
+    resultado = getattr(ctx, "resultado", None)
 
     if resultado is None:
         st.warning("⚠ No hay resultado aún")
         return
 
     # ===============================
-    # ESTADO (SEGURO)
+    # ESTADO
     # ===============================
-    try:
-        estado_ok = getattr(resultado, "ok", False)
-        errores = getattr(resultado, "errores", [])
-    except Exception:
-        estado_ok = False
-        errores = ["Resultado corrupto"]
+    estado_ok = getattr(resultado, "ok", False)
+    errores = getattr(resultado, "errores", [])
 
     st.write("Estado:", estado_ok)
     st.write("Errores:", errores)
 
     # ===============================
-    # NO BLOQUEAR UI
+    # VALIDACIÓN
     # ===============================
     if not estado_ok:
-        st.warning("⚠ Ingeniería con errores (ver detalle abajo)")
+        st.error("❌ Resultado no OK")
+        return
+
+    if not getattr(resultado, "strings", None):
+        st.error("❌ No hay strings")
+        return
+
+    if not getattr(resultado, "electrical", None):
+        st.error("❌ No hay resultado electrical")
+        return
 
     # ===============================
-    # DEBUG REAL (CLAVE)
+    # DETALLE
     # ===============================
     try:
-        st.markdown("## 🧪 Datos internos")
+        strings = resultado.strings.strings
+        electrical = resultado.electrical
 
-        st.write("sizing:", getattr(resultado, "sizing", None))
-        st.write("paneles:", getattr(resultado, "strings", None))
-        st.write("energia:", getattr(resultado, "energia", None))
-        st.write("electrical:", getattr(resultado, "electrical", None))
+        _mostrar_detalle(strings, electrical)
 
-    except Exception:
-        st.warning("⚠ No se pudo mostrar debug")
+    except Exception as err:
+        st.error(f"❌ Error mostrando detalle: {err}")
+
+
 # ==========================================================
 # VALIDACIÓN
 # ==========================================================
