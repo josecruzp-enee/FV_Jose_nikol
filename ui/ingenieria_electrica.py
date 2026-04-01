@@ -181,13 +181,16 @@ def render(ctx):
 
             resultado = ejecutar_estudio(p, deps)
 
-            # 🔥 SIEMPRE GUARDAR
+            # 🔥 SIEMPRE GUARDAR (aunque esté malo)
             setattr(ctx, "resultado", resultado)
 
             st.success("✅ Ingeniería generada")
 
         except Exception as err:
             st.error(f"❌ Error generando ingeniería: {err}")
+
+            # 🔥 fallback para que no se rompa
+            setattr(ctx, "resultado", None)
             return
 
     # ===============================
@@ -200,25 +203,29 @@ def render(ctx):
         return
 
     # ===============================
-    # ESTADO
+    # ESTADO (MODO SEGURO)
     # ===============================
     try:
         estado_ok = getattr(resultado, "ok", False)
         errores = getattr(resultado, "errores", [])
-    except Exception as e:
-        import traceback
-        st.code(traceback.format_exc())
-        raise e
+    except Exception:
+        st.error("⚠ Error interno en resultado (modo seguro)")
+
+        # 🔥 fallback para evitar crash
+        estado_ok = False
+        errores = ["Error interno"]
 
     st.write("Estado:", estado_ok)
     st.write("Errores:", errores)
 
+    # ===============================
+    # NO BLOQUEAR UI
+    # ===============================
     if not estado_ok:
-        st.error("❌ Resultado no OK")
-        return
+        st.warning("⚠ Ingeniería generada con errores")
 
     # ===============================
-    # DEBUG SIMPLE (NO ROMPE)
+    # DEBUG SEGURO
     # ===============================
     try:
         st.markdown("## 🧪 Datos internos")
@@ -228,9 +235,8 @@ def render(ctx):
         st.write("energia:", getattr(resultado, "energia", None))
         st.write("electrical:", getattr(resultado, "electrical", None))
 
-    except Exception as e:
-        st.error(f"Error debug: {e}")
-
+    except Exception:
+        st.warning("⚠ No se pudo mostrar debug")
 # ==========================================================
 # VALIDACIÓN
 # ==========================================================
