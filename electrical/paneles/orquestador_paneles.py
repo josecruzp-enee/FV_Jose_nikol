@@ -15,14 +15,12 @@ from electrical.paneles.resultado_paneles import (
 from electrical.paneles.validacion_strings import (
     validar_panel,
     validar_inversor,
-    validar_parametros_generales,
 )
 
 
 # =========================================================
 # ERROR
 # =========================================================
-
 def _resultado_error(panel, errores, warnings):
     return ResultadoPaneles(
         ok=False,
@@ -40,7 +38,6 @@ def _resultado_error(panel, errores, warnings):
 # =========================================================
 # HELPERS
 # =========================================================
-
 def _resolver_dimensionado(entrada, panel):
     if entrada.n_paneles_total is not None:
         n_paneles = entrada.n_paneles_total
@@ -124,16 +121,14 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
         return _resultado_error(panel, errores, warnings)
 
     # ======================================================
-    # 🔥 MULTIZONA (CORREGIDO NIVEL INGENIERÍA)
+    # 🔥 MULTIZONA
     # ======================================================
     if entrada.zonas:
 
         strings: List[StringFV] = []
 
-        # 🔥 MPPT disponibles reales
         n_mppt_disp = inversor.n_mppt * entrada.n_inversores
 
-        # 🔴 VALIDACIÓN CRÍTICA
         if len(entrada.zonas) > n_mppt_disp:
             return _resultado_error(
                 panel,
@@ -151,7 +146,7 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
 
             strings.append(
                 StringFV(
-                    mppt=i + 1,   # 🔥 cada zona usa su MPPT
+                    mppt=i + 1,
                     n_series=n,
                     vmp_string_v=panel.vmp_v * n,
                     voc_frio_string_v=panel.voc_v * n,
@@ -164,7 +159,7 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
             return _resultado_error(panel, ["No hay zonas válidas"], warnings)
 
         # --------------------------------------------------
-        # ARRAY FV
+        # ARRAY
         # --------------------------------------------------
         n_paneles_total = sum(s.n_series for s in strings)
         pdc_kw = (n_paneles_total * panel.pmax_w) / 1000
@@ -188,6 +183,15 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
             n_inversores=entrada.n_inversores,
         )
 
+        # 🔥 FIX CRÍTICO
+        recomendacion = RecomendacionStrings(
+            n_series=max(s.n_series for s in strings),
+            n_strings_total=len(strings),
+            strings_por_mppt=1,
+            vmp_string_v=max(s.vmp_string_v for s in strings),
+            voc_frio_string_v=max(s.voc_frio_string_v for s in strings),
+        )
+
         return ResultadoPaneles(
             ok=True,
             panel=panel,
@@ -201,7 +205,7 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
         )
 
     # ======================================================
-    # NORMAL (auto / manual)
+    # NORMAL
     # ======================================================
     n_paneles, pdc_kw, err = _resolver_dimensionado(entrada, panel)
 
@@ -221,9 +225,6 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
     if not strings_res.ok:
         return _resultado_error(panel, strings_res.errores, warnings)
 
-    # ------------------------------------------------------
-    # ARRAY
-    # ------------------------------------------------------
     array = _armar_array(
         panel,
         inversor,
@@ -234,25 +235,16 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
         entrada.n_inversores,
     )
 
-    # ------------------------------------------------------
-    # STRINGS
-    # ------------------------------------------------------
     strings = _mapear_strings(strings_res)
 
-    # ------------------------------------------------------
-    # META
-    # ------------------------------------------------------
     meta = PanelesMeta(
         n_paneles_total=n_paneles,
         pdc_kw=pdc_kw,
         n_inversores=entrada.n_inversores,
     )
 
-    # --------------------------------------------------
-    # RECOMENDACIÓN (🔥 FIX CRÍTICO)
-    # --------------------------------------------------
     recomendacion = RecomendacionStrings(
-        n_series = strings[0].n_series,
+        n_series=strings[0].n_series,
         n_strings_total=len(strings),
         strings_por_mppt=1,
         vmp_string_v=max(s.vmp_string_v for s in strings),
@@ -262,9 +254,9 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
     return ResultadoPaneles(
         ok=True,
         panel=panel,
-        topologia="multizona",
+        topologia="normal",
         array=array,
-        recomendacion=recomendacion,  # 🔥 YA NO None
+        recomendacion=recomendacion,
         strings=strings,
         warnings=warnings,
         errores=[],
