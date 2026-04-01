@@ -114,23 +114,42 @@ def ejecutar_electrical(*, datos: Any, paneles: Any, sizing: Any) -> ResultadoEl
         # ==================================================
         # PARÁMETROS ELÉCTRICOS
         # ==================================================
-        inst = getattr(datos, "instalacion_electrica", None)
+        inst = getattr(datos, "electrico", None)
 
         if inst is None:
-            raise ValueError("No existe instalacion_electrica")
+            raise ValueError("datos.electrico es obligatorio")
 
-        vac = getattr(inst, "vac", None)
-        fases = getattr(inst, "fases", 1)
-        fp = getattr(inst, "fp", 1.0)
-        dist_dc_m = getattr(inst, "dist_dc_m", None)
-        dist_ac_m = getattr(inst, "dist_ac_m", None)
+        if not isinstance(inst, dict):
+            raise ValueError("electrico debe ser dict")
+
+        vac = inst.get("vac")
+        fases = inst.get("fases")
+        fp = inst.get("fp")
+        dist_dc_m = inst.get("dist_dc_m")
+        dist_ac_m = inst.get("dist_ac_m")
+
+        # ==============================
+        # VALIDACIÓN RÍGIDA
+        # ==============================
 
         if vac is None:
-            raise ValueError("Voltaje AC no definido")
+            raise ValueError("vac no definido en electrico")
 
-        # ==================================================
-        # CORRIENTES
-        # ==================================================
+        if fases is None:
+            raise ValueError("fases no definido en electrico")
+
+        if fp is None:
+            raise ValueError("fp no definido en electrico")
+
+        if dist_dc_m is None:
+            raise ValueError("dist_dc_m no definido en electrico")
+
+        if dist_ac_m is None:
+            raise ValueError("dist_ac_m no definido en electrico")
+
+
+
+        
         # ==================================================
         # CORRIENTES
         # ==================================================
