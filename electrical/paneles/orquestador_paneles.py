@@ -193,7 +193,7 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
             panel=panel,
             topologia="multizona",
             array=array,
-            recomendacion=None,
+            recomendacion=recomendacion,
             strings=strings,
             warnings=warnings,
             errores=[],
