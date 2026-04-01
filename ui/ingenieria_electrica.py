@@ -149,7 +149,7 @@ def _datosproyecto_desde_ctx(ctx):
         **sf,
         "modo": modo,  # ← CLAVE PARA QUE SIZING NO FALLE
     }
-
+    st.write("🔥 DEBUG SISTEMA FV (DESDE FUNCIÓN):", p.sistema_fv)
     return p
 
 # ==========================================================
