@@ -3,21 +3,17 @@ from __future__ import annotations
 from typing import Protocol
 
 # ==========================================================
-# DOMINIO (CONTRATO FUERTE)
+# DOMINIO (ENTRADA + CONTRATO)
 # ==========================================================
 
-from core.dominio.contrato import (
-    Datosproyecto,
-    ResultadoSizing,
-    ResultadoFinanciero,
-)
+from core.dominio.modelo import Datosproyecto  
+from core.dominio.contrato import (ResultadoSizing, ResultadoFinanciero)
 
 from electrical.paneles.resultado_paneles import ResultadoPaneles
 from electrical.resultado_electrical import ResultadoElectrico
 from energy.resultado_energia import EnergiaResultado
 
 from electrical.paneles.entrada_panel import EntradaPaneles
-
 
 # ==========================================================
 # SIZING
