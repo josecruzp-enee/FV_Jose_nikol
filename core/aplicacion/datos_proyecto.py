@@ -13,14 +13,12 @@ def construir_datos_proyecto(ctx):
         lat=float(getattr(ctx, "lat", 0) or 0),
         lon=float(getattr(ctx, "lon", 0) or 0),
 
-        # 🔥 pueden venir None
         consumo_12m=getattr(ctx, "consumo_12m", None),
 
         tarifa_energia=float(getattr(ctx, "tarifa_energia", 0) or 0),
         cargos_fijos=float(getattr(ctx, "cargos_fijos", 0) or 0),
 
         prod_base_kwh_kwp_mes=getattr(ctx, "prod_base_kwh_kwp_mes", None),
-
         factores_fv_12m=getattr(ctx, "factores_fv_12m", None),
 
         cobertura_objetivo=float(getattr(ctx, "cobertura_objetivo", 1.0) or 1.0),
@@ -34,46 +32,47 @@ def construir_datos_proyecto(ctx):
     )
 
     # ======================================================
-    # 🔥 MODO DEBUG (AUTO-DATOS PARA PRUEBAS)
+    # DEBUG (solo temporal)
     # ======================================================
-    MODO_DEBUG = True  # ⚠️ apagar en producción
+    MODO_DEBUG = True
 
     if MODO_DEBUG:
-
-        # consumo
         if not p.consumo_12m or not isinstance(p.consumo_12m, list):
             p.consumo_12m = [10000.0] * 12
 
-        # producción base
         if not p.prod_base_kwh_kwp_mes:
             p.prod_base_kwh_kwp_mes = [120.0] * 12
 
-        # factores
         if not p.factores_fv_12m:
             p.factores_fv_12m = [1.0] * 12
 
     # ======================================================
-    # NORMALIZACIÓN (TIPOS)
+    # NORMALIZACIÓN
     # ======================================================
-
     p.consumo_12m = [float(x or 0) for x in p.consumo_12m]
     p.prod_base_kwh_kwp_mes = [float(x or 0) for x in p.prod_base_kwh_kwp_mes]
     p.factores_fv_12m = [float(x or 1) for x in p.factores_fv_12m]
 
     # ======================================================
-    # ELÉCTRICO
+    # 🔴 ELÉCTRICO (RÍGIDO)
     # ======================================================
-    e = getattr(ctx, "electrico", {}) or {}
+    e = getattr(ctx, "electrico", None)
 
     if not isinstance(e, dict):
-        raise ValueError("electrico inválido")
+        raise ValueError("electrico inválido o no definido")
+
+    required = ["vac", "fases", "fp", "dist_dc_m", "dist_ac_m"]
+
+    for k in required:
+        if e.get(k) is None:
+            raise ValueError(f"electrico.{k} es obligatorio")
 
     p.electrico = {
-        "vac": float(e.get("vac", 240) or 240),
-        "fases": int(e.get("fases", 1) or 1),
-        "fp": float(e.get("fp", 1.0) or 1.0),
-        "dist_dc_m": float(e.get("dist_dc_m", 0) or 0),
-        "dist_ac_m": float(e.get("dist_ac_m", 0) or 0),
+        "vac": float(e["vac"]),
+        "fases": int(e["fases"]),
+        "fp": float(e["fp"]),
+        "dist_dc_m": float(e["dist_dc_m"]),
+        "dist_ac_m": float(e["dist_ac_m"]),
     }
 
     # ======================================================
