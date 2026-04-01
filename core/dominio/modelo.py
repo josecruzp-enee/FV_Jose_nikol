@@ -77,16 +77,12 @@ class Datosproyecto:
     # =====================================================
 
     def validar_minimo(self) -> None:
-        """
-        Validación mínima antes de entrar al orquestador.
-        Lanza excepción si algo crítico falta.
-        """
 
         errores = []
 
-        # =====================================================
+        # -------------------------------
         # BASE
-        # =====================================================
+        # -------------------------------
         if not self.equipos:
             errores.append("equipos no definido")
 
@@ -111,33 +107,33 @@ class Datosproyecto:
             if self.sistema_fv.get("valor") is None:
                 errores.append("valor no definido para modo cobertura/offset")
 
-        # =====================================================
+        # -------------------------------
         # CONSUMO
-        # =====================================================
+        # -------------------------------
         if not self.consumo_12m or len(self.consumo_12m) != 12:
             errores.append("consumo_12m inválido")
 
         elif sum(self.consumo_12m) <= 0:
             errores.append("consumo anual inválido (todo en cero)")
 
-        # =====================================================
+        # -------------------------------
         # PRODUCCIÓN
-        # =====================================================
+        # -------------------------------
         if not self.prod_base_kwh_kwp_mes or len(self.prod_base_kwh_kwp_mes) != 12:
             errores.append("prod_base_kwh_kwp_mes inválido")
 
         elif sum(self.prod_base_kwh_kwp_mes) <= 0:
             errores.append("producción base FV inválida (todo en cero)")
 
-        # =====================================================
-        # FACTORES FV
-        # =====================================================
+        # -------------------------------
+        # FACTORES
+        # -------------------------------
         if not self.factores_fv_12m or len(self.factores_fv_12m) != 12:
             errores.append("factores_fv_12m inválido")
 
-        # =====================================================
+        # -------------------------------
         # ZONAS
-        # =====================================================
+        # -------------------------------
         if modo == "multizona":
 
             zonas = self.sistema_fv.get("zonas", [])
@@ -153,9 +149,9 @@ class Datosproyecto:
                 if (n_paneles is None or n_paneles <= 0) and (area is None or area <= 0):
                     errores.append(f"Zona {i+1}: sin paneles ni área válida")
 
-        # =====================================================
+        # -------------------------------
         # ELÉCTRICO
-        # =====================================================
+        # -------------------------------
         if not self.electrico:
             errores.append("electrico no definido")
 
@@ -170,8 +166,8 @@ class Datosproyecto:
             if fases not in [1, 2, 3]:
                 errores.append("Número de fases inválido")
 
-        # =====================================================
+        # -------------------------------
         # FINAL
-        # =====================================================
+        # -------------------------------
         if errores:
             raise ValueError(" | ".join(errores))
