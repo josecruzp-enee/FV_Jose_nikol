@@ -218,10 +218,50 @@ def render(ctx):
     if st.button("⚡ Generar ingeniería eléctrica"):
 
         try:
+            # ==============================================
+            # CONSTRUIR PROYECTO
+            # ==============================================
             p = _datosproyecto_desde_ctx(ctx)
+
+            # ======================================================
+            # DEBUG COMPLETO (INGENIERÍA REAL)
+            # ======================================================
+            st.markdown("## 🧪 DEBUG INGENIERÍA")
+
+            from dataclasses import asdict
+
+            # INPUT COMPLETO
+            try:
+                st.markdown("### 📦 Datosproyecto")
+                st.json(asdict(p))
+            except Exception:
+                st.write(p)
+
+            # EQUIPOS
+            st.markdown("### ⚙️ Equipos")
+            st.json(getattr(p, "equipos", {}))
+
+            # ELÉCTRICO
+            st.markdown("### ⚡ Eléctrico")
+            st.json(getattr(p, "electrico", {}))
+
+            # STRINGS (si existe)
+            st.markdown("### 🔗 Strings FV")
+            st.write(getattr(p, "strings", "No definido"))
+
+            # MULTIZONA
+            zonas = getattr(ctx, "zonas", None)
+            if zonas:
+                st.markdown("### 🧪 Multizona")
+                st.json(zonas)
+
+            # ==============================================
+            # EJECUTAR MOTOR
+            # ==============================================
             deps = construir_dependencias()
             resultado = ejecutar_estudio(p, deps)
 
+            # GUARDAR RESULTADO
             setattr(ctx, "resultado", resultado)
 
             st.success("✅ Ingeniería generada")
@@ -232,20 +272,69 @@ def render(ctx):
             return
 
     # ======================================================
-    # MOSTRAR RESULTADO (SEGURO)
+    # MOSTRAR RESULTADO
     # ======================================================
     try:
         resultado = getattr(ctx, "resultado", None)
 
-        if resultado is not None:
-            _render_resultado(resultado)
-        else:
+        if resultado is None:
             st.info("Aún no se ha generado resultado")
+            return
+
+        # ==================================================
+        # ESTADO
+        # ==================================================
+        st.markdown("## 🧪 Estado del sistema")
+
+        estado = {
+            "sizing": "OK" if getattr(resultado, "sizing", None) else "NULL",
+            "paneles": "OK" if getattr(resultado, "strings", None) else "NULL",
+            "energia": "OK" if getattr(resultado, "energia", None) else "NULL",
+            "electrical": "OK" if getattr(resultado, "electrical", None) else "NULL",
+            "finanzas": "OK" if getattr(resultado, "financiero", None) else "NULL",
+        }
+
+        st.json(estado)
+
+        # ==================================================
+        # ERRORES
+        # ==================================================
+        if not getattr(resultado, "ok", True):
+            st.error("❌ Proyecto con errores")
+
+            for err in getattr(resultado, "errores", []):
+                st.error(err)
+
+        # ==================================================
+        # DEBUG ELECTRICAL
+        # ==================================================
+        st.markdown("## 🔎 DEBUG ELECTRICAL")
+
+        electrical = getattr(resultado, "electrical", None)
+
+        if electrical is None:
+            st.warning("Electrical = None")
+            return
+
+        st.write(electrical)
+
+        # ==================================================
+        # DETALLE BÁSICO
+        # ==================================================
+        st.markdown("## 📊 Detalle eléctrico")
+
+        if hasattr(electrical, "corrientes"):
+            st.write("Corrientes:", electrical.corrientes)
+
+        if hasattr(electrical, "conductores"):
+            st.write("Conductores:", electrical.conductores)
+
+        if hasattr(electrical, "protecciones"):
+            st.write("Protecciones:", electrical.protecciones)
 
     except Exception as e:
         st.error("Error renderizando resultado")
         st.exception(e)
-
 
 # ==========================================================
 # VALIDACIÓN
