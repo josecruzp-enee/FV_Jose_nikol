@@ -1,29 +1,22 @@
 from __future__ import annotations
 
 from typing import Any
-import streamlit as st  # 🔥 IMPORTANTE
 
 from core.dominio.contrato import ResultadoProyecto
 from core.aplicacion.dependencias import DependenciasEstudio
 
 
 # ==========================================================
-# ORQUESTADOR PRINCIPAL
+# ORQUESTADOR PRINCIPAL (LIMPIO)
 # ==========================================================
-
 def ejecutar_estudio(datos: Any, deps: DependenciasEstudio) -> ResultadoProyecto:
 
     try:
-
-        st.markdown("## 🧪 DEBUG PIPELINE FV")
 
         # ==================================================
         # 1. SIZING
         # ==================================================
         sizing = deps.sizing.ejecutar(datos)
-
-        st.write("🔹 SIZING RESULT:")
-        st.write(sizing)
 
         if sizing is None:
             raise ValueError("Sizing devolvió None")
@@ -46,13 +39,7 @@ def ejecutar_estudio(datos: Any, deps: DependenciasEstudio) -> ResultadoProyecto
 
         entrada_paneles = construir_entrada_paneles(datos, sizing)
 
-        st.write("🔹 ENTRADA PANELES:")
-        st.write(entrada_paneles)
-
         paneles = deps.paneles.ejecutar(entrada_paneles)
-
-        st.write("🔹 RESULTADO PANELES:")
-        st.write(paneles)
 
         if paneles is None:
             raise ValueError("Paneles devolvió None")
@@ -72,9 +59,6 @@ def ejecutar_estudio(datos: Any, deps: DependenciasEstudio) -> ResultadoProyecto
         # 3. ENERGÍA
         # ==================================================
         energia = deps.energia.ejecutar(datos, sizing, paneles)
-
-        st.write("🔹 RESULTADO ENERGIA:")
-        st.write(energia)
 
         if energia is None:
             raise ValueError("Energía devolvió None")
@@ -96,18 +80,11 @@ def ejecutar_estudio(datos: Any, deps: DependenciasEstudio) -> ResultadoProyecto
         electrical = None
 
         if deps.electrical:
-            try:
-                electrical = deps.electrical.ejecutar(
-                    datos=datos,
-                    paneles=paneles,
-                    sizing=sizing
-                )
-
-                st.write("🔹 RESULTADO ELECTRICAL:")
-                st.write(electrical)
-
-            except Exception as e:
-                raise RuntimeError(f"[ELECTRICAL ERROR] {str(e)}")
+            electrical = deps.electrical.ejecutar(
+                datos=datos,
+                paneles=paneles,
+                sizing=sizing
+            )
 
         # ==================================================
         # 5. FINANZAS
@@ -115,22 +92,13 @@ def ejecutar_estudio(datos: Any, deps: DependenciasEstudio) -> ResultadoProyecto
         finanzas = None
 
         if deps.finanzas:
-            try:
-                finanzas = deps.finanzas.ejecutar(
-                    datos, sizing, energia
-                )
-
-                st.write("🔹 RESULTADO FINANZAS:")
-                st.write(finanzas)
-
-            except Exception as e:
-                raise RuntimeError(f"[FINANZAS ERROR] {str(e)}")
+            finanzas = deps.finanzas.ejecutar(
+                datos, sizing, energia
+            )
 
         # ==================================================
         # RESULTADO FINAL
         # ==================================================
-        st.write("🔹 RESULTADO FINAL ARMADO")
-
         return ResultadoProyecto(
             sizing=sizing,
             strings=paneles,
@@ -142,8 +110,6 @@ def ejecutar_estudio(datos: Any, deps: DependenciasEstudio) -> ResultadoProyecto
         )
 
     except Exception as e:
-
-        st.error(f"🔥 ERROR EN PIPELINE: {e}")
 
         return ResultadoProyecto(
             sizing=None,
