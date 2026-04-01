@@ -304,3 +304,102 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
     except Exception as e:
         return _resultado_error(inp, [str(e)])
 
+def ejecutar_energia(datos, sizing, paneles) -> EnergiaResultado:
+
+    # ==================================================
+    # VALIDACIÓN BASE
+    # ==================================================
+    if datos is None:
+        return EnergiaResultado.error("datos es None")
+
+    if sizing is None:
+        return EnergiaResultado.error("sizing es None")
+
+    if paneles is None:
+        return EnergiaResultado.error("paneles es None")
+
+    # ==================================================
+    # UBICACIÓN
+    # ==================================================
+    lat = datos.lat
+    lon = datos.lon
+
+    if lat == 0 and lon == 0:
+        return EnergiaResultado.error("Lat/Lon inválidos")
+
+    # ==================================================
+    # CLIMA BASE (PVGIS)
+    # ==================================================
+    from energy.clima.lector_pvgis import (
+        descargar_clima_pvgis,
+        EntradaClimaPVGIS
+    )
+
+    clima_base = descargar_clima_pvgis(
+        EntradaClimaPVGIS(lat=lat, lon=lon)
+    )
+
+    if clima_base is None:
+        return EnergiaResultado.error("Clima PVGIS devolvió None")
+
+    # ==================================================
+    # CLIMA 8760 (usa tu archivo)
+    # ==================================================
+    from energy.clima.simulacion_8760 import simular_clima_8760
+
+    tilt = getattr(datos, "tilt_deg", 15)
+    azimuth = getattr(datos, "azimut_deg", 180)
+
+    clima_8760 = simular_clima_8760(
+        clima_base,
+        tilt=tilt,
+        azimuth=azimuth
+    )
+
+    # ==================================================
+    # PANEL
+    # ==================================================
+    from electrical.catalogos.catalogos import get_panel
+
+    if not isinstance(datos.equipos, dict):
+        return EnergiaResultado.error("datos.equipos inválido")
+
+    panel_id = datos.equipos.get("panel_id")
+
+    if not panel_id:
+        return EnergiaResultado.error("panel_id no definido")
+
+    panel_spec = get_panel(panel_id)
+
+    if panel_spec is None:
+        return EnergiaResultado.error(f"Panel no encontrado: {panel_id}")
+
+    # ==================================================
+    # ARRAY
+    # ==================================================
+    n_series = paneles.recomendacion.n_series
+    n_strings = paneles.array.n_strings_total
+    pdc_kw = paneles.array.potencia_dc_w / 1000
+
+    # ==================================================
+    # INPUT
+    # ==================================================
+    entrada = EnergiaInput(
+        n_series=n_series,
+        n_strings=n_strings,
+        pdc_kw=pdc_kw,
+        panel=panel_spec,
+        pac_nominal_kw=sizing.kw_ac,
+        clima=clima_8760,
+        tilt_deg=tilt,
+        azimut_deg=azimuth,
+        perdidas_dc_frac=getattr(datos, "perdidas_dc_frac", 0.14),
+        sombras_frac=getattr(datos, "sombras_frac", 0.0),
+        eficiencia_inversor=getattr(datos, "eficiencia_inversor", 0.97),
+        perdidas_ac_frac=getattr(datos, "perdidas_ac_frac", 0.02),
+    )
+
+    # ==================================================
+    # MOTOR
+    # ==================================================
+    return ejecutar_motor_energia(entrada)
