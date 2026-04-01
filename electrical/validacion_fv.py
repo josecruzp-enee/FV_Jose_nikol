@@ -51,7 +51,7 @@ def validar_sistema_fv(panel, inversor, array, strings):
         if strings:
             s0 = strings[0]
 
-            imp_string = s0.get("imp_string_a", 0)
+            imp_string = getattr(s0, "imp_string_a", 0)
             i_mppt = imp_string * array.strings_por_mppt
 
             if hasattr(inversor, "imax_mppt_a") and inversor.imax_mppt_a:
