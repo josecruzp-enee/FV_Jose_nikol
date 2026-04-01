@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 """
-Servicio de sizing FV — VERSIÓN ALINEADA FINAL
+Servicio de sizing FV — ALINEADO A CONTRATO
 """
 
-from typing import Any, Dict, Optional, List
+from typing import Optional, List
 from math import ceil
 
 from core.dominio.modelo import Datosproyecto
@@ -31,9 +31,6 @@ def _leer_equipos(p):
     if eq is None:
         raise ValueError("p.equipos no definido")
 
-    if hasattr(eq, "panel_id") and hasattr(eq, "inversor_id"):
-        return eq
-
     if isinstance(eq, dict):
         panel_id = eq.get("panel_id")
         inversor_id = eq.get("inversor_id")
@@ -46,15 +43,13 @@ def _leer_equipos(p):
             "inversor_id": inversor_id,
         })()
 
-    raise ValueError("Formato inválido en p.equipos")
+    return eq
 
 
 def _panel_id(eq) -> str:
     pid = str(getattr(eq, "panel_id", "")).strip()
-
     if not pid:
         raise ValueError("panel_id no definido")
-
     return pid
 
 
@@ -75,12 +70,10 @@ def _leer_panel_y_config(p: Datosproyecto):
     eq = _leer_equipos(p)
 
     panel = get_panel(_panel_id(eq))
-
     if panel is None:
         raise ValueError("Panel no encontrado")
 
     panel_w = float(getattr(panel, "pmax_w", 0.0))
-
     if panel_w <= 0:
         raise ValueError("Potencia de panel inválida")
 
@@ -110,29 +103,7 @@ def _leer_consumo(p: Datosproyecto):
 
 
 # ==========================================================
-# SIZING INPUT
-# ==========================================================
-
-def _leer_sizing_input(p: Datosproyecto):
-
-    sf = getattr(p, "sistema_fv", {}) or {}
-
-    # 🔥 NUEVO MODELO (YA NO USA sizing_input)
-    modo = sf.get("modo")
-    valor = sf.get("valor")
-
-    # ======================================================
-    # VALIDACIONES
-    # ======================================================
-    if not modo:
-        raise ValueError(f"sistema_fv sin modo: {sf}")
-
-    if modo != "multizona" and (valor is None or float(valor) <= 0):
-        raise ValueError(f"sistema_fv sin valor válido: {sf}")
-
-    return modo, valor
-# ==========================================================
-# GENERADOR (NO MULTIZONA)
+# GENERADOR (NORMAL)
 # ==========================================================
 
 def _dimensionar_generador(panel, modo, valor, consumo_anual):
@@ -230,15 +201,19 @@ def _seleccionar_inversor(pdc, dc_ac_obj, eq):
         inversor_id_forzado=_inv_id(eq),
     )
 
+    if "kw_ac" not in resultado:
+        raise ValueError(f"Inversor sin kw_ac: {resultado}")
+
+    kw_ac = float(resultado["kw_ac"])
+
+    if kw_ac <= 0:
+        raise ValueError(f"Inversor con kw_ac inválido: {resultado}")
+
     inv_id = resultado["inversor_id"]
     inv = get_inversor(inv_id)
 
-    kw_ac = float(resultado.get("kw_ac", 0))
     n_inv = int(resultado.get("n_inversores", 1))
     pac_total = float(resultado.get("kw_ac_total", kw_ac * n_inv))
-
-    if kw_ac <= 0:
-        raise ValueError("kw_ac inválido")
 
     return inv, kw_ac, n_inv, pac_total
 
@@ -252,9 +227,9 @@ def calcular_sizing_unificado(p: Datosproyecto) -> ResultadoSizing:
     panel, dc_ac_obj, eq = _leer_panel_y_config(p)
     consumo_anual = _leer_consumo(p)
 
-    sf = getattr(p, "sistema_fv", {}) or {}
+    sf = p.sistema_fv
 
-    modo = sf.get("modo")
+    modo = sf["modo"]
 
     # ======================================================
     # MULTIZONA
@@ -273,7 +248,10 @@ def calcular_sizing_unificado(p: Datosproyecto) -> ResultadoSizing:
     # ======================================================
     else:
 
-        modo, valor = _leer_sizing_input(p)
+        valor = sf["valor"]
+
+        if valor is None:
+            raise ValueError("valor requerido para sizing")
 
         n_paneles, pdc = _dimensionar_generador(
             panel,
@@ -292,6 +270,10 @@ def calcular_sizing_unificado(p: Datosproyecto) -> ResultadoSizing:
     )
 
     paneles_por_inversor = ceil(n_paneles / n_inv)
+
+    if pac_total <= 0:
+        raise ValueError("pac_total inválido")
+
     dc_ac_ratio = pdc / pac_total
 
     energia_12m: List[MesEnergia] = []
@@ -301,13 +283,15 @@ def calcular_sizing_unificado(p: Datosproyecto) -> ResultadoSizing:
         kwp_dc=round(pdc, 3),
         pdc_kw=round(pdc, 3),
 
-        kw_ac=kw_ac, 
-        kw_ac_total=pac_total, 
+        kw_ac=kw_ac,
+        kw_ac_total=pac_total,
+
         n_inversores=n_inv,
         paneles_por_inversor=paneles_por_inversor,
 
         inversor=inv,
         panel=panel,
+
         dc_ac_ratio=round(dc_ac_ratio, 3),
 
         energia_12m=energia_12m,
