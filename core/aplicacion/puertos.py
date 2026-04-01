@@ -1,6 +1,17 @@
-from typing import Protocol, Any
+from __future__ import annotations
 
-from core.dominio.contrato import ResultadoSizing
+from typing import Protocol
+
+# ==========================================================
+# DOMINIO (CONTRATO FUERTE)
+# ==========================================================
+
+from core.dominio.contrato import (
+    Datosproyecto,
+    ResultadoSizing,
+    ResultadoFinanciero,
+)
+
 from electrical.paneles.resultado_paneles import ResultadoPaneles
 from electrical.resultado_electrical import ResultadoElectrico
 from energy.resultado_energia import EnergiaResultado
@@ -13,29 +24,17 @@ from electrical.paneles.entrada_panel import EntradaPaneles
 # ==========================================================
 
 class PuertoSizing(Protocol):
-    def ejecutar(self, datos: Any) -> ResultadoSizing: ...
+    def ejecutar(self, datos: Datosproyecto) -> ResultadoSizing:
+        ...
 
 
 # ==========================================================
-# PANELES
+# PANELES / STRINGS
 # ==========================================================
 
 class PuertoPaneles(Protocol):
-    def ejecutar(self, entrada: EntradaPaneles) -> ResultadoPaneles: ...
-
-
-# ==========================================================
-# ELECTRICAL (ANTES NEC)
-# ==========================================================
-
-class PuertoElectrical(Protocol):
-    def ejecutar(
-        self,
-        *,
-        datos: Any,
-        paneles: ResultadoPaneles,
-        sizing: ResultadoSizing,
-    ) -> ResultadoElectrico: ...
+    def ejecutar(self, entrada: EntradaPaneles) -> ResultadoPaneles:
+        ...
 
 
 # ==========================================================
@@ -45,10 +44,26 @@ class PuertoElectrical(Protocol):
 class PuertoEnergia(Protocol):
     def ejecutar(
         self,
-        datos: Any,
+        datos: Datosproyecto,
         sizing: ResultadoSizing,
-        paneles: ResultadoPaneles
-    ) -> EnergiaResultado: ...
+        paneles: ResultadoPaneles,
+    ) -> EnergiaResultado:
+        ...
+
+
+# ==========================================================
+# ELECTRICAL
+# ==========================================================
+
+class PuertoElectrical(Protocol):
+    def ejecutar(
+        self,
+        *,
+        datos: Datosproyecto,
+        paneles: ResultadoPaneles,
+        sizing: ResultadoSizing,
+    ) -> ResultadoElectrico:
+        ...
 
 
 # ==========================================================
@@ -58,7 +73,8 @@ class PuertoEnergia(Protocol):
 class PuertoFinanzas(Protocol):
     def ejecutar(
         self,
-        datos: Any,
+        datos: Datosproyecto,
         sizing: ResultadoSizing,
-        energia: EnergiaResultado
-    ): ...
+        energia: EnergiaResultado,
+    ) -> ResultadoFinanciero:
+        ...
