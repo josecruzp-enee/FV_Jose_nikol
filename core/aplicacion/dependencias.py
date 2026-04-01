@@ -16,7 +16,7 @@ from core.aplicacion.puertos import (
 # ==========================================================
 
 from core.servicios.sizing import calcular_sizing_unificado
-from core.aplicaciones.multizona import ejecutar_multizona
+from core.aplicacion.multizona import ejecutar_multizona
 from electrical.orquestador_electrical import ejecutar_electrical
 from energy.orquestador_energia import ejecutar_energia
 from core.servicios.finanzas import ejecutar_finanzas
