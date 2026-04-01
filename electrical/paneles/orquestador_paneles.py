@@ -71,8 +71,8 @@ def _armar_array(
     return ArrayFV(
         potencia_dc_w=pdc_kw * 1000,
         vdc_nom=strings_res.recomendacion.vmp_string_v,
-        idc_nom=panel.imp_a * n_strings,
-        isc_total=panel.isc_a * n_strings,
+        idc_nom=None,            # 🔥 CORREGIDO
+        isc_total=None,          # 🔥 CORREGIDO
         voc_frio_array_v=strings_res.recomendacion.voc_string_v,
         n_strings_total=n_strings,
         n_paneles_total=n_paneles,
@@ -167,8 +167,8 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
         array = ArrayFV(
             potencia_dc_w=pdc_kw * 1000,
             vdc_nom=max(s.vmp_string_v for s in strings),
-            idc_nom=panel.imp_a * len(strings),
-            isc_total=panel.isc_a * len(strings),
+            idc_nom=None,            # 🔥 CORREGIDO
+            isc_total=None,          # 🔥 CORREGIDO
             voc_frio_array_v=max(s.voc_frio_string_v for s in strings),
             n_strings_total=len(strings),
             n_paneles_total=n_paneles_total,
@@ -183,7 +183,6 @@ def ejecutar_paneles(entrada: EntradaPaneles) -> ResultadoPaneles:
             n_inversores=entrada.n_inversores,
         )
 
-        # 🔥 FIX CRÍTICO
         recomendacion = RecomendacionStrings(
             n_series=max(s.n_series for s in strings),
             n_strings_total=len(strings),
