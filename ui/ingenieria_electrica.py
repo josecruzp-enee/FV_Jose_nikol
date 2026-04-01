@@ -209,3 +209,13 @@ def render(ctx):
 
     if resultado:
         _render_resultado(resultado)
+
+
+def validar(ctx):
+
+    resultado = getattr(ctx, "resultado", None)
+
+    if not resultado:
+        return False
+
+    return True
