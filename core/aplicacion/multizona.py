@@ -215,10 +215,10 @@ def _consolidar_strings(resultados: List[ResultadoPaneles]):
 
 def _calcular_mppt(resultados: List[ResultadoPaneles], total_strings: int):
 
-    n_mppt_total = sum(
-        r.array.n_mppt if r.array else 0
-        for r in resultados
-    )
+    n_inversores = resultados[0].meta.get("n_inversores", 1)
+    mppt_por_inversor = resultados[0].array.n_mppt
+
+    n_mppt_total = n_inversores * mppt_por_inversor
 
     strings_por_mppt = (
         max(1, total_strings // max(1, n_mppt_total))
