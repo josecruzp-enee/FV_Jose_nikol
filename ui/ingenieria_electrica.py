@@ -1,4 +1,5 @@
 import streamlit as st
+import pprint
 
 from core.aplicacion.dependencias import construir_dependencias
 from core.aplicacion.orquestador_estudio import ejecutar_estudio
@@ -70,11 +71,15 @@ def _render_resultado(resultado):
         st.error("Resultado es None")
         return
 
+    # ======================================================
+    # ESTADO CORREGIDO
+    # ======================================================
     st.markdown("### 🧪 Estado del sistema")
 
     estado = {
         "sizing": "OK" if getattr(resultado, "sizing", None) else "NULL",
-        "paneles": "OK" if getattr(resultado, "strings", None) else "NULL",
+        "paneles": "OK" if getattr(resultado, "paneles", None) else "NULL",
+        "strings": "OK" if getattr(resultado, "strings", None) else "NULL",
         "energia": "OK" if getattr(resultado, "energia", None) else "NULL",
         "electrical": "OK" if getattr(resultado, "electrical", None) else "NULL",
         "finanzas": "OK" if getattr(resultado, "financiero", None) else "NULL",
@@ -82,11 +87,32 @@ def _render_resultado(resultado):
 
     st.json(estado)
 
+    # ======================================================
+    # ERRORES
+    # ======================================================
     if not getattr(resultado, "ok", True):
         st.error("❌ Proyecto con errores")
         for err in getattr(resultado, "errores", []):
             st.error(err)
 
+    # ======================================================
+    # DEBUG PANELES (NUEVO)
+    # ======================================================
+    st.markdown("### 🔋 DEBUG PANELES")
+
+    paneles = getattr(resultado, "paneles", None)
+
+    if paneles:
+        st.write(paneles)
+
+        if hasattr(paneles, "array"):
+            st.write("Array interno paneles:", paneles.array)
+    else:
+        st.warning("Paneles = None")
+
+    # ======================================================
+    # DEBUG ELECTRICAL
+    # ======================================================
     st.markdown("### 🔎 DEBUG ELECTRICAL")
 
     electrical = getattr(resultado, "electrical", None)
@@ -109,38 +135,63 @@ def _render_resultado(resultado):
         except Exception as e:
             st.error(f"No se pudo mostrar detalle eléctrico: {e}")
 
-    # ------------------------------------------------------
-    # MOSTRAR STRINGS FV, ARRAY Y META
-    # ------------------------------------------------------
+    # ======================================================
+    # STRINGS (CORREGIDO)
+    # ======================================================
     st.markdown("### 🔗 Strings FV")
-    if getattr(resultado, "strings", None):
-        for i, s in enumerate(resultado.strings, 1):
+
+    strings = getattr(resultado, "strings", None)
+
+    if isinstance(strings, list) and len(strings) > 0:
+        for i, s in enumerate(strings, 1):
             st.write(
                 f"String {i} | MPPT {s.mppt} | Series {s.n_series} | "
                 f"Vmp {s.vmp_string_v:.2f} V | Voc {s.voc_frio_string_v:.2f} V | "
                 f"Ip {s.imp_string_a:.2f} A | Isc {s.isc_string_a:.2f} A"
             )
     else:
-        st.warning("Strings FV no definidos")
+        st.warning(f"Strings FV no definidos → {type(strings)}")
 
+    # ======================================================
+    # ARRAY FV
+    # ======================================================
     st.markdown("### ⚡ Array FV")
+
     array = getattr(resultado, "array", None)
+
     if array:
         st.write(f"Potencia DC total: {array.potencia_dc_w/1000:.2f} kW")
         st.write(f"VDC nominal: {array.vdc_nom:.2f} V")
-        st.write(f"Corriente DC nominal: {array.idc_nom:.2f} A")
+        st.write(f"Corriente DC nominal: {array.idc_nom}")
         st.write(f"Nº strings por MPPT: {array.strings_por_mppt}")
         st.write(f"Nº total de strings: {array.n_strings_total}")
         st.write(f"Nº total de paneles: {array.n_paneles_total}")
     else:
         st.info("Array FV no definido")
 
+    # ======================================================
+    # META
+    # ======================================================
     st.markdown("### 📊 Meta")
+
     meta = getattr(resultado, "meta", None)
+
     if meta:
         st.write(f"Nº total de paneles: {meta.n_paneles_total}")
         st.write(f"Potencia DC total: {meta.pdc_kw:.2f} kW")
         st.write(f"Nº de inversores: {meta.n_inversores}")
+
+    # ======================================================
+    # DUMP COMPLETO (NUEVO 🔥)
+    # ======================================================
+    st.markdown("### 🧠 INSPECCIÓN COMPLETA")
+
+    with st.expander("Resultado completo", expanded=False):
+        st.code(pprint.pformat(resultado), language="python")
+
+    if electrical:
+        with st.expander("Electrical completo", expanded=False):
+            st.code(pprint.pformat(electrical), language="python")
 
 
 # ==========================================================
@@ -162,14 +213,15 @@ def render(ctx):
     if st.button("⚡ Generar ingeniería eléctrica"):
 
         try:
-            # Construir datos del proyecto
             p = construir_datos_proyecto(ctx)
 
             # ======================================================
-            # DEBUG COMPLETO
+            # DEBUG ENTRADA
             # ======================================================
             st.markdown("## 🧪 DEBUG INGENIERÍA")
+
             from dataclasses import asdict
+
             try:
                 st.markdown("### 📦 Datosproyecto")
                 st.json(asdict(p))
@@ -182,7 +234,7 @@ def render(ctx):
             st.markdown("### ⚡ Eléctrico")
             st.json(getattr(p, "electrico", {}))
 
-            st.markdown("### 🔗 Strings FV")
+            st.markdown("### 🔗 Strings FV (entrada)")
             st.write(getattr(p, "strings", "No definido"))
 
             zonas = getattr(ctx, "zonas", None)
@@ -191,17 +243,15 @@ def render(ctx):
                 st.json(zonas)
 
             # ======================================================
-            # EJECUTAR ESTUDIO
+            # EJECUTAR
             # ======================================================
             deps = construir_dependencias()
             resultado = ejecutar_estudio(p, deps)
+
             setattr(ctx, "resultado", resultado)
 
             st.success("✅ Ingeniería generada")
 
-            # ======================================================
-            # Mostrar Strings FV / Array / Meta directamente
-            # ======================================================
             _render_resultado(resultado)
 
         except Exception as ex:
@@ -210,14 +260,16 @@ def render(ctx):
             return
 
     # ======================================================
-    # MOSTRAR RESULTADO PREVIAMENTE GENERADO
+    # MOSTRAR RESULTADO PREVIO
     # ======================================================
     try:
         resultado = getattr(ctx, "resultado", None)
+
         if resultado:
             _render_resultado(resultado)
         else:
             st.info("Aún no se ha generado resultado")
+
     except Exception as e:
         st.error("Error renderizando resultado")
         st.exception(e)
