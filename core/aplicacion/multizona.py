@@ -11,19 +11,6 @@ from electrical.paneles.resultado_paneles import ResultadoPaneles
 from electrical.paneles.orquestador_paneles import ejecutar_paneles
 
 
-# ==========================================================
-# MAIN
-# ==========================================================
-
-from __future__ import annotations
-
-from typing import List
-from dataclasses import replace
-
-from electrical.paneles.entrada_panel import EntradaPaneles
-from electrical.paneles.resultado_paneles import ResultadoPaneles
-from electrical.paneles.orquestador_paneles import ejecutar_paneles
-
 
 def ejecutar_multizona(entrada: EntradaPaneles) -> ResultadoPaneles:
 
