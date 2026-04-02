@@ -7,7 +7,7 @@ from reportlab.platypus import Paragraph, Spacer, PageBreak, Image
 
 from .secciones_tecnicas.resumen_tecnico import build_resumen_tecnico
 from .secciones_tecnicas.tabla_strings import crear_tabla_strings
-from .secciones_tecnicas.tabla_distribucion_strings import crear_tabla_distribucion_inversores
+#from .secciones_tecnicas.tabla_distribucion_strings import crear_tabla_distribucion_inversores
 from .secciones_tecnicas.tabla_nec import (
     crear_tabla_parametros_electricos,
     crear_tabla_dimensionamiento_nec,
