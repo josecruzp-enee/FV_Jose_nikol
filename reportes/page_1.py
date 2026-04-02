@@ -100,7 +100,7 @@ def p1_tabla_solucion_unica(datos, sizing, energia, financiero, pal, content_w):
         ["Cobertura objetivo", f"{cobertura_real*100:.1f}%",
          "Financiamiento", f"{tasa*100:.2f}% | {plazo} años | {pct*100:.0f}%"],
         ["Sistema", f"{num(kwp,2)} kWp", "CAPEX", money_L(capex)],
-        ["Producción anual est.", f"{prod_anual:,.0f} kWh/año", "DSCR", ds_txt],
+        ["Producción anual", f"{prod_anual:,.0f} kWh/año", "DSCR", ds_txt],
         ["Módulos FV", f"{n_paneles} × {panel_wp} Wp", "Estado", estado_txt],
     ]
 
