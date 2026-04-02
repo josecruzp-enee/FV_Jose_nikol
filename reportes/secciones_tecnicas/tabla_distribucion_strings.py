@@ -1,6 +1,87 @@
 from typing import List, Any
 from reportlab.platypus import Table, TableStyle
 
+from typing import List, Any
+from reportlab.platypus import Table, TableStyle
+
+
+def crear_tabla_distribucion_inversores(strings: List[Any], pal, content_w):
+
+    # -------------------------------
+    # Lectura segura
+    # -------------------------------
+    def leer(obj, campo, default=0):
+        if isinstance(obj, dict):
+            return obj.get(campo, default)
+        return getattr(obj, campo, default)
+
+    # -------------------------------
+    # Validación / normalización
+    # -------------------------------
+    if not strings:
+        return Table([["Sin datos"]], colWidths=[content_w])
+
+    strings_validos = []
+    for s in strings:
+        mppt = int(leer(s, "mppt", 0))
+        inversor = int(leer(s, "inversor", 1))  # fallback a 1
+
+        # 🔥 No descartamos: si mppt viene 0, lo llevamos a 1
+        strings_validos.append({
+            "inversor": inversor if inversor > 0 else 1,
+            "mppt": mppt if mppt > 0 else 1
+        })
+
+    if not strings_validos:
+        return Table([["Sin datos"]], colWidths=[content_w])
+
+    # -------------------------------
+    # Detectar inversores / MPPT
+    # -------------------------------
+    inversores = sorted({s["inversor"] for s in strings_validos})
+    mppts = sorted({s["mppt"] for s in strings_validos})
+
+    # -------------------------------
+    # Matriz de conteo
+    # -------------------------------
+    matriz = {(inv, mppt): 0 for inv in inversores for mppt in mppts}
+    for s in strings_validos:
+        matriz[(s["inversor"], s["mppt"])] += 1
+
+    # -------------------------------
+    # Construcción de tabla
+    # -------------------------------
+    header = ["Inversor"] + [f"MPPT {m}" for m in mppts]
+    rows = [header]
+
+    for inv in inversores:
+        row = [f"INV {inv}"]
+        for mppt in mppts:
+            val = matriz.get((inv, mppt), 0)
+            row.append(str(val) if val > 0 else "—")  # 🔥 UNA sola vez
+        rows.append(row)
+
+    # -------------------------------
+    # Anchos
+    # -------------------------------
+    colw = [content_w / len(header)] * len(header)
+
+    # -------------------------------
+    # Estilo
+    # -------------------------------
+    tabla = Table(rows, colWidths=colw)
+    tabla.setStyle(TableStyle([
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("BACKGROUND", (0, 0), (-1, 0), pal.get("SOFT", "#DDDDDD")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), pal.get("PRIMARY", "black")),
+        ("ALIGN", (1, 1), (-1, -1), "CENTER"),
+        ("GRID", (0, 0), (-1, -1), 0.3, pal.get("BORDER", "#000000")),
+        ("FONTSIZE", (0, 0), (-1, -1), 10),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ]))
+
+    return tabla
 
 def build_resumen_tecnico(resultado, pal, styles, content_w):
 
