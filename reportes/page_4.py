@@ -37,8 +37,8 @@ def tabla_impacto_mensual_anio1(resultado: Any, pal: dict, content_w: float):
         "Mes",
         "Pago actual",
         "Pago ENEE",
-        "Cuota",
-        "Total FV",
+        "Cuota ",
+        "Total Pago",
         "Ahorro mes",
         "Ahorro acumulado",
     ]
