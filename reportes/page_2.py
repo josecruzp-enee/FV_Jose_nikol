@@ -80,6 +80,12 @@ def build_page_2(resultado: Any, datos, paths, pal, styles, content_w, safe_imag
     t.setStyle(
         TableStyle([
             ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
+            # Mes centrado
+            ("ALIGN", (0, 1), (0, -1), "CENTER"),
+            # Encabezado centrado
+            ("ALIGN", (0, 0), (-1, 0), "CENTER"),
+            # Números a la derecha (ya lo tienes)
+            ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
             ("BACKGROUND", (0, -1), (-1, -1), pal["HEADER"]),
             ("TEXTCOLOR", (0, -1), (-1, -1), "white"),
             ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
