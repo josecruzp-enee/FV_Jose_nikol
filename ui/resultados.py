@@ -58,13 +58,15 @@ def _render_datos_proyecto(ctx):
 
     d = ctx.datos_proyecto
 
+    # 🔥 calcular consumo anual correctamente
+    consumo_anual = sum(getattr(d, "consumo_12m", []) or [])
+
     _tabla("📊 Datos del proyecto", {
+        "Cliente": getattr(d, "cliente", "—"),
         "Ubicación": getattr(d, "ubicacion", "—"),
-        "Consumo anual": f"{getattr(d, 'consumo_anual_kwh', 0):,.0f} kWh",
-        "Tarifa": f"L {getattr(d, 'tarifa', 0):.2f}/kWh",
+        "Consumo anual": f"{consumo_anual:,.0f} kWh",
+        "Tarifa": f"L {getattr(d, 'tarifa_energia', 0):.2f}/kWh",
     })
-
-
 # ==========================================================
 # DIMENSIONAMIENTO
 # ==========================================================
