@@ -69,12 +69,15 @@ def p1_tabla_solucion_unica(datos, sizing, energia, financiero, pal, content_w):
     kwp = float(leer(sizing, "kwp_dc", leer(sizing, "pdc_kw", 0.0)))
     capex = float(leer(financiero, "capex_L", 0.0))
 
+    # 🔥 ENERGÍA CORRECTA
     energia_12m = leer(energia, "energia_util_12m", [])
-    if isinstance(energia_12m, list) and energia_12m:
-        prod_anual = sum(energia_12m)
-    else:
-        prod_anual = 0.0
-    
+    prod_anual = sum(energia_12m) if isinstance(energia_12m, list) else 0.0
+
+    # 🔥 CONSUMO Y COBERTURA REAL
+    consumo_12m = get_field(datos, "consumo_12m", [])
+    consumo_anual = sum(consumo_12m) if isinstance(consumo_12m, list) else 0
+
+    cobertura_real = prod_anual / consumo_anual if consumo_anual > 0 else 0
 
     n_paneles = int(leer(sizing, "n_paneles", 0))
     panel_wp = int((kwp * 1000) / n_paneles) if n_paneles > 0 else 0
@@ -82,25 +85,26 @@ def p1_tabla_solucion_unica(datos, sizing, energia, financiero, pal, content_w):
     tasa = float(get_field(datos, "tasa_anual", 0.0))
     plazo = int(get_field(datos, "plazo_anios", 0))
     pct = float(get_field(datos, "porcentaje_financiado", 0.0))
-    consumo_12m = get_field(datos, "consumo_12m", [])
-    consumo_anual = sum(consumo_12m) if isinstance(consumo_12m, list) else 0
-
-    cobertura_real = prod_anual / consumo_anual if consumo_anual > 0 else 0
 
     evaluacion = leer(financiero, "evaluacion", {}) or {}
 
     estado_txt = str(evaluacion.get("estado", "")).upper().strip()
 
-    # ✅ DSCR CORRECTO
+    # 🔥 DSCR
     ds_val = evaluacion.get("dscr", None)
     ds_txt = "—" if ds_val is None else f"{ds_val:.2f}"
 
     data = [
         ["Dato", "Valor", "Dato", "Valor"],
-        ["Cobertura objetivo", f"{cobertura_real*80:.1f}%",
-         "Financiamiento", f"{tasa*100:.2f}% | {plazo} años | {pct*100:.0f}%"],
+
+        # 🔥 MOSTRAR OBJETIVO Y REAL
+        ["Cobertura objetivo", f"{get_field(datos, 'cobertura_objetivo', 0)*100:.0f}%",
+         "Cobertura real", f"{cobertura_real*100:.1f}%"],
+
         ["Sistema", f"{num(kwp,2)} kWp", "CAPEX", money_L(capex)],
+
         ["Producción anual", f"{prod_anual:,.0f} kWh/año", "DSCR", ds_txt],
+
         ["Módulos FV", f"{n_paneles} × {panel_wp} Wp", "Estado", estado_txt],
     ]
 
@@ -109,8 +113,6 @@ def p1_tabla_solucion_unica(datos, sizing, energia, financiero, pal, content_w):
 
     return [section_bar("Solución propuesta e indicadores clave", pal, content_w),
             Spacer(1, 6), t, Spacer(1, 12)]
-
-
 # =========================================================
 # DECISIÓN
 # =========================================================
@@ -167,7 +169,17 @@ def p1_conclusion(financiero, sizing, datos, pal, content_w):
     peor = float(evaluacion.get("peor_mes", 0.0))
 
     kwp = float(leer(sizing, "kwp_dc", 0.0))
-    cobertura = float(get_field(datos, "cobertura_objetivo", 0.0))
+
+    # 🔥 CALCULAR COBERTURA REAL TAMBIÉN AQUÍ
+    consumo_12m = get_field(datos, "consumo_12m", [])
+    consumo_anual = sum(consumo_12m) if isinstance(consumo_12m, list) else 0
+
+    tabla = leer(financiero, "tabla_12m", [])
+    energia_real = sum([x.get("fv_kwh", 0) for x in tabla]) if tabla else 0
+
+    cobertura_real = energia_real / consumo_anual if consumo_anual > 0 else 0
+
+    cobertura_obj = float(get_field(datos, "cobertura_objetivo", 0.0))
 
     concl = f"""
     <b>Conclusión ejecutiva</b><br/><br/>
@@ -175,11 +187,11 @@ def p1_conclusion(financiero, sizing, datos, pal, content_w):
     • DSCR: <b>{ds_txt}</b><br/>
     • Peor mes: <b>{money_L(peor)}</b><br/>
     • Sistema: {kwp:.2f} kWp<br/>
-    • Cobertura objetivo: {cobertura_real*80:.1f}%<br/>
+    • Cobertura objetivo: {cobertura_obj*100:.0f}%<br/>
+    • Cobertura real: <b>{cobertura_real*100:.1f}%</b><br/>
     """
 
     return [box_paragraph(concl, pal, content_w)]
-
 
 # =========================================================
 # ORQUESTADOR
