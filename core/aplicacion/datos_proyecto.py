@@ -4,12 +4,19 @@ from core.dominio.modelo import Datosproyecto
 def construir_datos_proyecto(ctx):
 
     # ======================================================
-    # DATOS CLIENTE (FIX)
+    # DATOS CLIENTE
     # ======================================================
     dc = getattr(ctx, "datos_cliente", {}) or {}
 
     cliente = str(dc.get("cliente", "") or "")
     ubicacion = str(dc.get("ubicacion", "") or "")
+
+    # ======================================================
+    # CONSUMO (SIMPLE Y DIRECTO)
+    # ======================================================
+    consumo_12m = getattr(ctx, "consumo_12m", [0]*12)
+    tarifa_energia = getattr(ctx, "tarifa_energia", 0)
+    cargos_fijos = getattr(ctx, "cargos_fijos", 0)
 
     # ======================================================
     # BASE
@@ -21,10 +28,10 @@ def construir_datos_proyecto(ctx):
         lat=float(getattr(ctx, "lat", 0) or 0),
         lon=float(getattr(ctx, "lon", 0) or 0),
 
-        consumo_12m=getattr(ctx, "consumo_12m", None),
+        consumo_12m=consumo_12m,
 
-        tarifa_energia=float(getattr(ctx, "tarifa_energia", 0) or 0),
-        cargos_fijos=float(getattr(ctx, "cargos_fijos", 0) or 0),
+        tarifa_energia=float(tarifa_energia),
+        cargos_fijos=float(cargos_fijos),
 
         prod_base_kwh_kwp_mes=getattr(ctx, "prod_base_kwh_kwp_mes", None),
         factores_fv_12m=getattr(ctx, "factores_fv_12m", None),
