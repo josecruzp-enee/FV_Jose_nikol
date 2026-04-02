@@ -12,7 +12,7 @@ from .page_1 import build_page_1
 from .page_2 import build_page_2
 from .page_3 import build_page_3
 from .page_4 import build_page_4
-#from .page_5 import build_page_5
+from .page_5 import build_page_5
 from .secciones_tecnicas.tabla_distribucion_strings import build_bloque_ingenieria
 
 from dataclasses import asdict, is_dataclass
@@ -95,6 +95,7 @@ def generar_pdf_profesional(resultado_proyecto: Any, datos: Any, paths: Dict[str
     story += build_page_2(resultado, datos, paths, pal, styles, content_w, safe_image)
     story += build_page_3(resultado, datos, paths, pal, styles, content_w)
     story += build_page_4(resultado, datos, paths, pal, styles, content_w)
+    story += build_page_5(resultado, datos, paths, pal, styles, content_w)
     story += build_bloque_ingenieria(resultado, pal, styles, content_w)
 
     doc.build(story)
