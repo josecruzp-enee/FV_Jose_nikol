@@ -106,7 +106,7 @@ def build_resumen_tecnico(resultado, pal, styles, content_w):
     story.append(Paragraph("Distribución de strings por inversor", styles["Heading2"]))
     story.append(Spacer(1, 8))
 
-    tabla_inv = crear_tabla_distribucion_inversores(
+    tabla_inv = crear_tabla_distribucion_string(
         strings,
         pal,
         content_w
