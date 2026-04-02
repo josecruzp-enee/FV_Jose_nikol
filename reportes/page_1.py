@@ -73,7 +73,7 @@ def p1_tabla_solucion_unica(datos, sizing, energia, financiero, pal, content_w):
     if isinstance(energia_12m, list) and energia_12m:
         prod_anual = sum(energia_12m)
     else:
-    prod_anual = 0.0
+        prod_anual = 0.0
     
 
     n_paneles = int(leer(sizing, "n_paneles", 0))
