@@ -70,7 +70,7 @@ def p1_tabla_solucion_unica(datos, sizing, energia, financiero, pal, content_w):
     capex = float(leer(financiero, "capex_L", 0.0))
 
     energia_12m = leer(energia, "energia_util_12m", [])
-    prod_anual = sum(energia_12m) if isinstance(energia_12m, list) else 0.0
+    prod = sum(getattr(energia, "energia_util_12m", []) or [])
 
     n_paneles = int(leer(sizing, "n_paneles", 0))
     panel_wp = int((kwp * 1000) / n_paneles) if n_paneles > 0 else 0
