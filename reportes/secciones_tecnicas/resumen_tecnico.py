@@ -54,78 +54,73 @@ def build_resumen_tecnico(resultado, pal, styles, content_w):
 
     story = []
 
-    sizing = leer(resultado,"sizing")
-    strings_block = leer(resultado,"strings")
-    nec = leer(resultado,"nec",{})
+    sizing = leer(resultado, "sizing")
+    strings_block = leer(resultado, "strings")  # 🔥 lista de StringFV
+    nec = leer(resultado, "nec", {})
 
-    # ------------------------------------------------------
-    # Datos sizing
-    # ------------------------------------------------------
+    # ======================================================
+    # DATOS SIZING
+    # ======================================================
 
-    kwp_dc = float(leer(sizing,"kwp_dc",leer(sizing,"pdc_kw",0)))
-    kw_ac = float(leer(sizing,"kw_ac",0))
+    kwp_dc = float(leer(sizing, "kwp_dc", leer(sizing, "pdc_kw", 0)))
+    kw_ac = float(leer(sizing, "kw_ac", 0))
 
-    n_paneles = int(leer(sizing,"n_paneles",0))
-    n_inversores = int(leer(sizing,"n_inversores",1))
+    n_paneles = int(leer(sizing, "n_paneles", 0))
+    n_inversores = int(leer(sizing, "n_inversores", 1))
 
-    # ------------------------------------------------------
-    # ARRAY (FUENTE REAL)
-    # ------------------------------------------------------
+    # ======================================================
+    # STRINGS (🔥 FIX REAL)
+    # ======================================================
 
-    array = leer(strings_block, "array", None)
+    strings = strings_block if isinstance(strings_block, list) else []
 
-    if array:
-        n_strings = int(leer(array, "n_strings_total", 0))
-        panel_wp = float(leer(array, "p_panel_w", 0))
-    else:
-        n_strings = 0
-        panel_wp = (kwp_dc*1000)/n_paneles if n_paneles else 0
-
-    # ------------------------------------------------------
-    # STRINGS
-    # ------------------------------------------------------
-
-    strings = leer(strings_block,"strings",[]) if strings_block else []
+    n_strings = len(strings)
 
     if strings:
 
         s = strings[0]
 
-        n_series = int(leer(s,"n_series",0))
+        n_series = int(leer(s, "n_series", 0))
 
-        vmp = float(leer(s,"vmp_string_v",0))
+        vmp = float(leer(s, "vmp_string_v", 0))
 
         voc = float(
-            leer(s,"voc_frio_string_v",
-            leer(s,"voc_string_v",0))
+            leer(s, "voc_frio_string_v",
+            leer(s, "voc_string_v", 0))
         )
 
-        imp = float(leer(s,"imp_string_a",0))
-        isc = float(leer(s,"isc_string_a",0))
+        imp = float(leer(s, "imp_string_a", 0))
+        isc = float(leer(s, "isc_string_a", 0))
 
     else:
 
-        n_series = vmp = voc = imp = isc = 0
+        n_series = 0
+        vmp = 0
+        voc = 0
+        imp = 0
+        isc = 0
 
-    # ------------------------------------------------------
-    # NEC
-    # ------------------------------------------------------
+    # ======================================================
+    # NEC (si existe)
+    # ======================================================
 
-    paquete = leer(nec,"paquete_nec",{})
-    corr = leer(paquete,"corrientes",{})
+    paquete = leer(nec, "paquete_nec", {})
+    corr = leer(paquete, "corrientes", {})
 
-    panel_i = leer(leer(corr,"panel",{}),"i_operacion_a",imp)
-    string_i = leer(leer(corr,"string",{}),"i_operacion_a",imp)
+    panel_i = leer(leer(corr, "panel", {}), "i_operacion_a", imp)
+    string_i = leer(leer(corr, "string", {}), "i_operacion_a", imp)
 
-    # ------------------------------------------------------
-    # Parámetros derivados
-    # ------------------------------------------------------
+    # ======================================================
+    # DERIVADOS
+    # ======================================================
 
-    potencia_inversor = kw_ac/n_inversores if n_inversores else 0
-    relacion_dc_ac = kwp_dc/kw_ac if kw_ac else 0
+    potencia_inversor = kw_ac / n_inversores if n_inversores else 0
+    relacion_dc_ac = kwp_dc / kw_ac if kw_ac else 0
 
     paneles_usados = n_paneles
     paneles_sobrantes = 0
+
+    panel_wp = (kwp_dc * 1000) / n_paneles if n_paneles else 0
 
     # ======================================================
     # TABLA SISTEMA
@@ -135,28 +130,28 @@ def build_resumen_tecnico(resultado, pal, styles, content_w):
         Paragraph("Resumen del sistema FV", styles["Heading1"])
     )
 
-    story.append(Spacer(1,10))
+    story.append(Spacer(1, 10))
 
     data = [
 
-        ["Parámetro","Valor"],
+        ["Parámetro", "Valor"],
 
-        ["Potencia DC instalada",f"{kwp_dc:.2f} kWp"],
-        ["Potencia AC instalada",f"{kw_ac:.2f} kW"],
-        ["Relación DC/AC",f"{relacion_dc_ac:.2f}"],
+        ["Potencia DC instalada", f"{kwp_dc:.2f} kWp"],
+        ["Potencia AC instalada", f"{kw_ac:.2f} kW"],
+        ["Relación DC/AC", f"{relacion_dc_ac:.2f}"],
 
-        ["Número de módulos",f"{n_paneles} × {panel_wp:.0f} Wp"],
+        ["Número de módulos", f"{n_paneles} × {panel_wp:.0f} Wp"],
 
-        ["Paneles utilizados",paneles_usados],
-        ["Paneles sobrantes",paneles_sobrantes],
+        ["Paneles utilizados", paneles_usados],
+        ["Paneles sobrantes", paneles_sobrantes],
 
         ["Número de inversores",
          f"{n_inversores} × {potencia_inversor:.1f} kW"],
     ]
 
-    story.append(tabla(data,pal,content_w))
+    story.append(tabla(data, pal, content_w))
 
-    story.append(Spacer(1,16))
+    story.append(Spacer(1, 16))
 
     # ======================================================
     # TABLA GENERADOR
@@ -166,25 +161,25 @@ def build_resumen_tecnico(resultado, pal, styles, content_w):
         Paragraph("Generador fotovoltaico", styles["Heading2"])
     )
 
-    story.append(Spacer(1,8))
+    story.append(Spacer(1, 8))
 
     data = [
 
-        ["Parámetro","Valor"],
+        ["Parámetro", "Valor"],
 
-        ["Configuración strings",f"{n_series}S × {n_strings}P"],
+        ["Configuración strings", f"{n_series}S × {n_strings}P"],
 
-        ["Voltaje operativo string (Vmp)",f"{vmp:.0f} V"],
-        ["Voltaje máximo en frío (Voc)",f"{voc:.0f} V"],
+        ["Voltaje operativo string (Vmp)", f"{vmp:.0f} V"],
+        ["Voltaje máximo en frío (Voc)", f"{voc:.0f} V"],
 
-        ["Corriente por string (Imp)",f"{string_i:.2f} A"],
-        ["Corriente de cortocircuito (Isc)",f"{isc:.2f} A"],
+        ["Corriente por string (Imp)", f"{string_i:.2f} A"],
+        ["Corriente de cortocircuito (Isc)", f"{isc:.2f} A"],
 
-        ["Strings totales",n_strings],
+        ["Strings totales", n_strings],
     ]
 
-    story.append(tabla(data,pal,content_w))
+    story.append(tabla(data, pal, content_w))
 
-    story.append(Spacer(1,16))
+    story.append(Spacer(1, 16))
 
     return story
