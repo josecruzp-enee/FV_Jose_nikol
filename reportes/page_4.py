@@ -32,16 +32,15 @@ def tabla_impacto_mensual_anio1(resultado: Any, pal: dict, content_w: float):
     tabla_12m = leer(financiero, "tabla_12m", [])
     cuota_m = float(leer(financiero, "cuota_mensual", 0.0))
 
+    # 🔥 SOLO DINERO
     header = [
         "Mes",
-        "Consumo (kWh)",
-        "FV útil (kWh)",
-        "ENEE (kWh)",
-        "Pago actual (L)",
-        "ENEE con FV (L)",
-        "FV + cuota (L)",
-        "Ahorro mes (L)",
-        "Ahorro acumulado (L)",
+        "Pago actual",
+        "Pago ENEE",
+        "Cuota",
+        "Total FV",
+        "Ahorro mes",
+        "Ahorro acumulado",
     ]
 
     rows = []
@@ -49,51 +48,44 @@ def tabla_impacto_mensual_anio1(resultado: Any, pal: dict, content_w: float):
     acum = 0.0
 
     total_pago_actual = 0.0
-    total_con_fv_enee = 0.0
-    total_fv_cuota = 0.0
+    total_enee = 0.0
+    total_total_fv = 0.0
     total_ahorro = 0.0
 
     for r in tabla_12m:
 
         mes = r.get("mes", "")
 
-        consumo = float(r.get("consumo_kwh", 0.0))
-        fv = float(r.get("fv_kwh", 0.0))
-        enee_kwh = float(r.get("kwh_enee", 0.0))
-
         pago_actual = float(r.get("factura_base_L", 0.0))
-        con_fv_enee = float(r.get("pago_enee_L", 0.0))
+        pago_enee = float(r.get("pago_enee_L", 0.0))
 
-        fv_cuota = con_fv_enee + cuota_m
-        ahorro_mes = pago_actual - fv_cuota
+        total_fv = pago_enee + cuota_m
+        ahorro_mes = pago_actual - total_fv
 
         acum += ahorro_mes
 
         total_pago_actual += pago_actual
-        total_con_fv_enee += con_fv_enee
-        total_fv_cuota += fv_cuota
+        total_enee += pago_enee
+        total_total_fv += total_fv
         total_ahorro += ahorro_mes
 
         rows.append([
             str(mes),
-            f"{consumo:,.0f}",
-            f"{fv:,.0f}",
-            f"{enee_kwh:,.0f}",
             money_L(pago_actual),
-            money_L(con_fv_enee),
-            money_L(fv_cuota),
+            money_L(pago_enee),
+            money_L(cuota_m),
+            money_L(total_fv),
             money_L(ahorro_mes),
             money_L(acum),
         ])
 
+    # 🔥 TOTAL
     rows.append([
         "TOTAL",
-        "",
-        "",
-        "",
         money_L(total_pago_actual),
-        money_L(total_con_fv_enee),
-        money_L(total_fv_cuota),
+        money_L(total_enee),
+        money_L(cuota_m * 12),
+        money_L(total_total_fv),
         money_L(total_ahorro),
         money_L(total_ahorro),
     ])
@@ -103,7 +95,7 @@ def tabla_impacto_mensual_anio1(resultado: Any, pal: dict, content_w: float):
     t = make_table(
         table_data,
         content_w,
-        ratios=[0.9,1.1,1.1,1.1,1.4,1.4,1.4,1.3,1.4],
+        ratios=[0.7,1.4,1.4,1.2,1.4,1.4,1.5],
         repeatRows=1,
     )
 
@@ -113,26 +105,28 @@ def tabla_impacto_mensual_anio1(resultado: Any, pal: dict, content_w: float):
 
     t.setStyle(TableStyle([
 
+        # 🔹 Alineación
         ("ALIGN", (0,1), (0,-1), "CENTER"),
-        ("ALIGN", (1,1), (3,-1), "RIGHT"),
-        ("ALIGN", (4,1), (-1,-1), "RIGHT"),
+        ("ALIGN", (1,1), (-1,-1), "RIGHT"),
 
-        ("FONTNAME", (7,1), (7,-1), "Helvetica-Bold"),
+        # 🔹 Ahorro en negrita
+        ("FONTNAME", (5,1), (5,-2), "Helvetica-Bold"),
 
-        ("BACKGROUND", (0,last_row), (-1,last_row), pal.get("SOFT")),
+        # 🔴 Negativos en rojo
+        *[
+            ("TEXTCOLOR", (5,i), (5,i), pal.get("BAD","red"))
+            for i, r in enumerate(tabla_12m, start=1)
+            if (float(r.get("factura_base_L",0)) - (float(r.get("pago_enee_L",0))+cuota_m)) < 0
+        ],
+
+        # 🔵 TOTAL
+        ("BACKGROUND", (0,last_row), (-1,last_row), pal.get("SOFT","#EAEAEA")),
         ("FONTNAME", (0,last_row), (-1,last_row), "Helvetica-Bold"),
-        ("LINEABOVE", (0,last_row), (-1,last_row), 1.2, pal.get("PRIMARY")),
-
-        ("TOPPADDING",(0,0),(-1,-1),4),
-        ("BOTTOMPADDING",(0,0),(-1,-1),4),
-        ("LEFTPADDING",(0,0),(-1,-1),6),
-        ("RIGHTPADDING",(0,0),(-1,-1),6),
+        ("LINEABOVE", (0,last_row), (-1,last_row), 1.2, pal.get("PRIMARY","#000000")),
 
     ]))
 
     return [t, Spacer(1, 10)]
-
-
 # =========================================================
 # PAGE 4
 # =========================================================
