@@ -94,7 +94,7 @@ def _render_energia(rp):
         st.warning("Sin datos de energía")
         return
 
-    prod = sum(getattr(energia, "energia_12m", []) or [])
+    prod = sum(getattr(energia, "energia_util_12m", []) or [])
     cons = sum(getattr(rp, "consumo_12m", []) or [])
 
     cobertura = (prod / cons * 100) if cons > 0 else 0
