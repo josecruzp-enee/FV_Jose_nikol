@@ -12,7 +12,7 @@ from .page_1 import build_page_1
 from .page_2 import build_page_2
 from .page_3 import build_page_3
 from .page_4 import build_page_4
-from .page_5 import build_page_5
+#from .page_5 import build_page_5
 from .tabla_distribucion_string import build_page_5
 
 from dataclasses import asdict, is_dataclass
