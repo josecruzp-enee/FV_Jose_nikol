@@ -13,7 +13,7 @@ from .page_2 import build_page_2
 from .page_3 import build_page_3
 from .page_4 import build_page_4
 #from .page_5 import build_page_5
-from .tabla_distribucion_strings import build_page_5
+from .tabla_distribucion_strings import build_bloque_ingenieria
 
 from dataclasses import asdict, is_dataclass
 
