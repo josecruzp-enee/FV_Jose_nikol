@@ -1,5 +1,3 @@
-#
-'''
 from __future__ import annotations
 
 from pathlib import Path
@@ -278,4 +276,4 @@ def build_page_5(resultado, datos, paths, pal, styles, content_w, safe_image=Non
         story.append(Spacer(1, 12))
 
     return story
-'''
+
