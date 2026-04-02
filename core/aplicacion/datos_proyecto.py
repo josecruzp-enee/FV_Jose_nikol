@@ -7,8 +7,9 @@ def construir_datos_proyecto(ctx):
     # BASE
     # ======================================================
     p = Datosproyecto(
-        cliente=str(getattr(ctx, "cliente", "") or ""),
-        ubicacion=str(getattr(ctx, "ubicacion", "") or ""),
+        dc = getattr(ctx, "datos_cliente", {}) or {}
+        cliente = str(dc.get("cliente", "") or "")
+        ubicacion = str(dc.get("ubicacion", "") or "")
 
         lat=float(getattr(ctx, "lat", 0) or 0),
         lon=float(getattr(ctx, "lon", 0) or 0),
