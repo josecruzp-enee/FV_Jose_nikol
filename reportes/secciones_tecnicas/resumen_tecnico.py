@@ -167,7 +167,7 @@ def build_resumen_tecnico(resultado, pal, styles, content_w):
 
         ["Parámetro", "Valor"],
 
-        ["Configuración strings", f"{n_series}S × {n_strings}P"],
+        ["Configuración strings", f"{n_series}S × {n_strings} strings"],
 
         ["Voltaje operativo string (Vmp)", f"{vmp:.0f} V"],
         ["Voltaje máximo en frío (Voc)", f"{voc:.0f} V"],
