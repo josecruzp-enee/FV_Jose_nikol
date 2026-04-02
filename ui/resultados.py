@@ -58,7 +58,6 @@ def _render_datos_proyecto(ctx):
 
     d = ctx.datos_proyecto
 
-    # 🔥 calcular consumo anual correctamente
     consumo_anual = sum(getattr(d, "consumo_12m", []) or [])
 
     _tabla("📊 Datos del proyecto", {
@@ -67,6 +66,8 @@ def _render_datos_proyecto(ctx):
         "Consumo anual": f"{consumo_anual:,.0f} kWh",
         "Tarifa": f"L {getattr(d, 'tarifa_energia', 0):.2f}/kWh",
     })
+
+
 # ==========================================================
 # DIMENSIONAMIENTO
 # ==========================================================
@@ -74,123 +75,56 @@ def _render_dimensionamiento(rp):
 
     s = rp.sizing
 
-    _tabla("⚡ Dimensionamiento", {
+    _tabla("⚡ Sistema FV", {
         "Paneles": s.n_paneles,
-        "Potencia DC": f"{s.pdc_kw:.2f} kW",
-        "Potencia AC": f"{s.kw_ac:.2f} kW",
+        "Potencia instalada": f"{s.pdc_kw:.2f} kW",
+        "Potencia inversor": f"{s.kw_ac:.2f} kW",
         "Relación DC/AC": f"{s.dc_ac_ratio:.2f}",
     })
 
 
 # ==========================================================
-# EQUIPOS
+# ENERGÍA
 # ==========================================================
-def _render_equipos(rp):
+def _render_energia(rp):
 
-    inv = rp.sizing.inversor
+    energia = getattr(rp, "energia", None)
 
-    _tabla("🔌 Inversor", {
-        "Potencia": f"{inv.kw_ac} kW",
-        "MPPT": inv.n_mppt,
-        "Voltaje DC máximo": f"{inv.vdc_max_v} V",
-        "Rango MPPT": f"{inv.mppt_min_v} - {inv.mppt_max_v} V",
+    if not energia:
+        st.warning("Sin datos de energía")
+        return
+
+    prod = sum(getattr(energia, "energia_12m", []) or [])
+    cons = sum(getattr(rp, "consumo_12m", []) or [])
+
+    cobertura = (prod / cons * 100) if cons > 0 else 0
+
+    _tabla("⚡ Energía", {
+        "Producción anual": f"{prod:,.0f} kWh",
+        "Consumo anual": f"{cons:,.0f} kWh",
+        "Cobertura": f"{cobertura:.1f} %",
     })
 
 
 # ==========================================================
-# CORRIENTES (🔥 CORREGIDO)
+# FINANZAS
 # ==========================================================
-def _render_corrientes(rp):
+def _render_finanzas(rp):
 
-    e = getattr(rp, "electrical", None)
+    f = getattr(rp, "financiero", None)
 
-    if e is None:
-        st.warning("Sin resultados eléctricos")
+    if not f:
+        st.warning("Sin datos financieros")
         return
 
-    c = getattr(e, "corrientes", None)
-
-    if not c or not getattr(c, "ok", False):
-        st.warning("Corrientes no disponibles")
-        return
-
-    _tabla("⚡ Corrientes", {
-        "Corriente string": f"{getattr(c.string, 'i_operacion_a', 0):.2f} A",
-        "Corriente DC total": f"{getattr(c.dc_total, 'i_operacion_a', 0):.2f} A",
-        "Corriente AC": f"{getattr(c.ac, 'i_operacion_a', 0):.2f} A",
+    _tabla("💰 Finanzas", {
+        "Inversión": f"L {getattr(f, 'inversion_total', 0):,.0f}",
+        "Ahorro anual": f"L {getattr(f, 'ahorro_anual', 0):,.0f}",
+        "Payback": f"{getattr(f, 'payback', 0):.1f} años",
+        "TIR": f"{getattr(f, 'tir', 0)*100:.1f} %",
     })
 
-# ==========================================================
-# CONDUCTORES (🔥 CORREGIDO)
-# ==========================================================
-def _render_conductores(rp):
 
-    e = getattr(rp, "electrical", None)
-
-    if e is None:
-        st.warning("Sin conductores")
-        return
-
-    cond = getattr(e, "conductores", None)
-
-    if not cond or not getattr(cond, "ok", False):
-        st.warning("Conductores no disponibles")
-        return
-
-    t = cond.tramos  # 🔥 FIX
-
-    dc = getattr(t, "dc", None)
-    ac = getattr(t, "ac", None)
-
-    # -----------------------------
-    # DC GLOBAL
-    # -----------------------------
-    if dc:
-        _tabla("🧵 DC Global", {
-            "Calibre": dc.calibre,
-            "Ampacidad": f"{dc.ampacidad_ajustada_a} A",
-        })
-
-    # -----------------------------
-    # MPPT (NUEVO)
-    # -----------------------------
-    if hasattr(t, "mppt") and t.mppt:
-
-        for i, m in enumerate(t.mppt):
-            _tabla(f"🔌 MPPT {i+1}", {
-                "Calibre": m.calibre,
-                "Ampacidad": f"{m.ampacidad_ajustada_a} A",
-            })
-
-    # -----------------------------
-    # AC
-    # -----------------------------
-    if ac:
-        _tabla("⚡ AC", {
-            "Calibre": ac.calibre,
-            "Ampacidad": f"{ac.ampacidad_ajustada_a} A",
-        })
-# ==========================================================
-# PROTECCIONES (🔥 CORREGIDO)
-# ==========================================================
-def _render_protecciones(rp):
-
-    e = getattr(rp, "electrical", None)
-
-    if e is None:
-        st.warning("Sin protecciones")
-        return
-
-    p = getattr(e, "protecciones", None)
-
-    if not p or not getattr(p, "ok", False):
-        st.warning("Protecciones no disponibles")
-        return
-
-    _tabla("⚠ Protecciones", {
-        "Fusible string": f"{getattr(p, 'fusible_string', '—')} A",
-        "Breaker AC": f"{getattr(p, 'ocpd_ac', {}).tamano_a if hasattr(p, 'ocpd_ac') else '—'} A",
-    })
 # ==========================================================
 # PDF
 # ==========================================================
@@ -252,10 +186,8 @@ def render(ctx):
 
     _render_datos_proyecto(ctx)
     _render_dimensionamiento(rp)
-    _render_equipos(rp)
-    _render_corrientes(rp)
-    _render_conductores(rp)
-    _render_protecciones(rp)
+    _render_energia(rp)
+    _render_finanzas(rp)
 
     stale = is_result_stale(ctx)
 
