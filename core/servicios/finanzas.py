@@ -135,28 +135,59 @@ def simular_12_meses(
 # 🔵 Evaluación mensual
 # ==========================================================
 
-def _evaluacion_mensual(tabla: List[Dict[str, float]], cuota: float) -> Dict[str, Any]:
+def _evaluacion_mensual(tabla: list, cuota: float) -> dict:
 
-    ahorros = [x["ahorro_L"] for x in tabla]
-    netos = [x["neto_L"] for x in tabla]
-    oms = [x["om_L"] for x in tabla]
+    if not tabla or len(tabla) == 0:
+        return {
+            "estado": "ERROR",
+            "nota": "Tabla financiera vacía",
+            "dscr": None,
+            "ahorro_prom": 0.0,
+            "neto_prom": 0.0,
+            "peor_mes": 0.0,
+        }
+
+    ahorros = [x.get("ahorro_L", 0.0) for x in tabla]
+    netos = [x.get("neto_L", 0.0) for x in tabla]
+    oms = [x.get("om_L", 0.0) for x in tabla]
 
     ahorro_prom = sum(ahorros) / len(ahorros)
     neto_prom = sum(netos) / len(netos)
     peor_mes = min(netos)
     om_prom = sum(oms) / len(oms)
 
-    dscr = ahorro_prom / (cuota + om_prom) if (cuota + om_prom) > 0 else 0.0
+    deuda_mensual = cuota + om_prom
 
-    if dscr >= 0.80 and peor_mes >= 0:
+    # ======================================================
+    # DSCR (CORREGIDO)
+    # ======================================================
+    if deuda_mensual > 0:
+        dscr = ahorro_prom / deuda_mensual
+    else:
+        dscr = None  # 🔥 sistema sin financiamiento
+
+    # ======================================================
+    # ESTADO (ROBUSTO)
+    # ======================================================
+    if dscr is None:
+        estado = "SIN FINANCIAMIENTO"
+        nota = "Sistema evaluado sin deuda (flujo directo)."
+
+    elif dscr >= 1.20 and peor_mes >= 0:
         estado = "VIABLE"
-        nota = "Se paga cómodamente y no hay meses negativos."
-    elif dscr >= 0.60:
+        nota = "Excelente cobertura financiera. Flujo positivo en todos los meses."
+
+    elif dscr >= 1.00:
+        estado = "ACEPTABLE"
+        nota = "Sistema sostenible. Flujo cercano al equilibrio."
+
+    elif dscr >= 0.80:
         estado = "MARGINAL"
-        nota = "Se sostiene en promedio."
+        nota = "Riesgo moderado. Algunos meses pueden ser ajustados."
+
     else:
         estado = "NO VIABLE"
-        nota = "Los ahorros no cubren bien la cuota."
+        nota = "Los ahorros no cubren adecuadamente la deuda."
 
     return {
         "estado": estado,
