@@ -210,6 +210,7 @@ def render(ctx):
             resultado = ejecutar_estudio(p, deps)
 
             setattr(ctx, "resultado", resultado)
+            st.session_state["resultado_proyecto"] = resultado
 
             st.success("✅ Ingeniería generada")
 
