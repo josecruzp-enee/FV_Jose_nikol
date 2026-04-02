@@ -205,12 +205,14 @@ def render(ctx):
 
         try:
             p = construir_datos_proyecto(ctx)
-
+            setattr(ctx, "datos_proyecto", p)
+            st.session_state["datos_proyecto"] = p
             deps = construir_dependencias()
             resultado = ejecutar_estudio(p, deps)
 
             setattr(ctx, "resultado", resultado)
             setattr(ctx, "resultado_proyecto", resultado)
+            st.session_state["resultado_proyecto"] = resultado
 
             st.success("✅ Ingeniería generada")
 
