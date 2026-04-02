@@ -97,7 +97,7 @@ def p1_tabla_solucion_unica(datos, sizing, energia, financiero, pal, content_w):
 
     data = [
         ["Dato", "Valor", "Dato", "Valor"],
-        ["Cobertura objetivo", f"{cobertura_real*100:.1f}%",
+        ["Cobertura objetivo", f"{cobertura_real*80:.1f}%",
          "Financiamiento", f"{tasa*100:.2f}% | {plazo} años | {pct*100:.0f}%"],
         ["Sistema", f"{num(kwp,2)} kWp", "CAPEX", money_L(capex)],
         ["Producción anual", f"{prod_anual:,.0f} kWh/año", "DSCR", ds_txt],
@@ -175,7 +175,7 @@ def p1_conclusion(financiero, sizing, datos, pal, content_w):
     • DSCR: <b>{ds_txt}</b><br/>
     • Peor mes: <b>{money_L(peor)}</b><br/>
     • Sistema: {kwp:.2f} kWp<br/>
-    • Cobertura objetivo: {cobertura*100:.0f}%<br/>
+    • Cobertura objetivo: {cobertura_real*80:.1f}%<br/>
     """
 
     return [box_paragraph(concl, pal, content_w)]
