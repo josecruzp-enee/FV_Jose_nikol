@@ -4,12 +4,19 @@ from core.dominio.modelo import Datosproyecto
 def construir_datos_proyecto(ctx):
 
     # ======================================================
+    # DATOS CLIENTE (FIX)
+    # ======================================================
+    dc = getattr(ctx, "datos_cliente", {}) or {}
+
+    cliente = str(dc.get("cliente", "") or "")
+    ubicacion = str(dc.get("ubicacion", "") or "")
+
+    # ======================================================
     # BASE
     # ======================================================
     p = Datosproyecto(
-        dc = getattr(ctx, "datos_cliente", {}) or {}
-        cliente = str(dc.get("cliente", "") or "")
-        ubicacion = str(dc.get("ubicacion", "") or "")
+        cliente=cliente,
+        ubicacion=ubicacion,
 
         lat=float(getattr(ctx, "lat", 0) or 0),
         lon=float(getattr(ctx, "lon", 0) or 0),
@@ -33,7 +40,7 @@ def construir_datos_proyecto(ctx):
     )
 
     # ======================================================
-    # DEBUG (solo temporal)
+    # DEBUG (temporal)
     # ======================================================
     MODO_DEBUG = True
 
@@ -55,7 +62,7 @@ def construir_datos_proyecto(ctx):
     p.factores_fv_12m = [float(x or 1) for x in p.factores_fv_12m]
 
     # ======================================================
-    # 🔴 ELÉCTRICO (RÍGIDO)
+    # ELÉCTRICO
     # ======================================================
     e = getattr(ctx, "electrico", None)
 
