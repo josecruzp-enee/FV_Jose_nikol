@@ -67,7 +67,7 @@ def build_page_2(resultado: Any, datos, paths, pal, styles, content_w, safe_imag
     story.append(Paragraph("Reporte de Demanda / Energía", styles["Title"]))
     story.append(Spacer(1, 8))
 
-    story.append(Paragraph("Energía mensual (Consumo vs FV útil vs ENEE)", styles["H2b"]))
+    story.append(Paragraph("Energía mensual (Consumo Actual vs FV Proyectado)", styles["H2b"]))
     story.append(Spacer(1, 6))
 
     # =========================
@@ -76,7 +76,7 @@ def build_page_2(resultado: Any, datos, paths, pal, styles, content_w, safe_imag
     financiero = leer(resultado, "financiero", {})
     tabla_12m = leer(financiero, "tabla_12m", [])
 
-    header = ["Mes", "Consumo (kWh)", "FV útil (kWh)", "ENEE (kWh)"]
+    header = ["Mes", "Consumo Actual (kWh)", "FV Proyectado (kWh)", "ENEE Residual (kWh)"]
 
     rows = [
         [
