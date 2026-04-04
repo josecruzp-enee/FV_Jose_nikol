@@ -207,8 +207,12 @@ def build_page_5(resultado, datos, paths, pal, styles, content_w, safe_image=Non
 
     resultado = resultado or {}
 
-    strings_block = leer(resultado, "strings", None)
-    strings = leer(strings_block, "strings", []) if strings_block else []
+    paneles = leer(resultado, "paneles", None)
+
+    if paneles and hasattr(paneles, "strings"):
+        strings = paneles.strings
+    else:
+        strings = []
 
     _section_resumen(story, resultado, pal, styles, content_w)
     _section_distribucion_strings(story, strings, pal, styles, content_w)
