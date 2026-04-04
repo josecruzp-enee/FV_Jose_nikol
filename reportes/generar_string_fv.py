@@ -14,27 +14,39 @@ def generar_string_fv(
     n_strings: int = 1
 ):
 
+    # ============================
+    # VALIDACIÓN
+    # ============================
+    if n_series <= 0 or n_strings <= 0:
+        raise ValueError("n_series y n_strings deben ser mayores a 0")
+
+    # ============================
+    # PARÁMETROS
+    # ============================
+
     panel_w = 0.5
     panel_h = 1.0
 
     gap = 0.2
     v_gap = 1.8
 
-    width = n_series * (panel_w + gap)
+    # 🔥 FIX 1: ancho correcto
+    width = n_series * panel_w + (n_series - 1) * gap
 
-    fig = plt.figure(figsize=(12, 3 + n_strings * 0.5))
+    fig = plt.figure(figsize=(12, 3 + n_strings * 0.6))
     ax = fig.add_subplot(111)
 
-    # ============================
-    # Dibujar strings
-    # ============================
-
     y_strings = []
+
+    # ============================
+    # DIBUJO STRINGS
+    # ============================
 
     for s in range(n_strings):
 
         y_offset = -s * v_gap
-        y_strings.append(y_offset + panel_h / 2)
+        y_center = y_offset + panel_h / 2
+        y_strings.append(y_center)
 
         for i in range(n_series):
 
@@ -59,46 +71,55 @@ def generar_string_fv(
 
                 ax.plot(
                     [x1, x2],
-                    [y_offset + panel_h / 2, y_offset + panel_h / 2],
+                    [y_center, y_center],
                     color="black",
                     linewidth=1
                 )
 
         # conexión string → bus
-
         ax.plot(
             [width, width + 1],
-            [y_offset + panel_h / 2, y_offset + panel_h / 2],
+            [y_center, y_center],
             color="red",
             linewidth=2
         )
 
     # ============================
-    # Bus DC
+    # BUS DC
     # ============================
 
     bus_x = width + 1
 
+    y_min = min(y_strings)
+    y_max = max(y_strings)
+
+    # 🔥 FIX 2: evitar colapso con 1 string
+    if n_strings == 1:
+        y_min -= 0.5
+        y_max += 0.5
+
     ax.plot(
         [bus_x, bus_x],
-        [min(y_strings), max(y_strings)],
+        [y_min, y_max],
         color="red",
         linewidth=3
     )
 
     # ============================
-    # Inversor
+    # INVERSOR
     # ============================
 
     inv_x = bus_x + 1.5
-    inv_y = (min(y_strings) + max(y_strings)) / 2 - 0.6
+    y_mid = (y_min + y_max) / 2
+    inv_y = y_mid - 0.6
 
     rect = Rectangle(
         (inv_x, inv_y),
         1.2,
         1.2,
         edgecolor="black",
-        facecolor="#eeeeee"
+        facecolor="#eeeeee",
+        linewidth=1.5
     )
 
     ax.add_patch(rect)
@@ -109,21 +130,20 @@ def generar_string_fv(
         "INV",
         ha="center",
         va="center",
-        fontsize=10
+        fontsize=10,
+        fontweight="bold"
     )
 
     # conexión bus → inversor
-
     ax.plot(
         [bus_x, inv_x],
-        [(min(y_strings) + max(y_strings)) / 2,
-         (min(y_strings) + max(y_strings)) / 2],
+        [y_mid, y_mid],
         color="red",
         linewidth=2
     )
 
     # ============================
-    # Texto
+    # TEXTO
     # ============================
 
     ax.set_title(
@@ -133,16 +153,17 @@ def generar_string_fv(
     )
 
     # ============================
-    # Ajustes
+    # AJUSTES
     # ============================
 
     ax.axis("off")
 
     ax.set_xlim(-0.5, inv_x + 2)
-    ax.set_ylim(min(y_strings) - 1, max(y_strings) + 2)
+    ax.set_ylim(y_min - 1, y_max + 1.5)
 
     plt.tight_layout()
 
-    plt.savefig(out_path, dpi=200, bbox_inches="tight")
+    # 🔥 FIX 3: asegurar guardado correcto
+    plt.savefig(str(out_path), dpi=200, bbox_inches="tight")
 
     plt.close()
