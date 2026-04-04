@@ -206,14 +206,21 @@ def build_page_5(resultado, datos, paths, pal, styles, content_w, safe_image=Non
     story = []
 
     resultado = resultado or {}
+    paths = paths or {}
 
+    # =========================================================
+    # OBTENER STRINGS (CORRECTO SEGÚN TU UI)
+    # =========================================================
     paneles = leer(resultado, "paneles", None)
 
-    if paneles and hasattr(paneles, "strings"):
+    if paneles and hasattr(paneles, "strings") and paneles.strings:
         strings = paneles.strings
     else:
         strings = []
 
+    # =========================================================
+    # SECCIONES
+    # =========================================================
     _section_resumen(story, resultado, pal, styles, content_w)
     _section_distribucion_strings(story, strings, pal, styles, content_w)
     _section_config_strings(story, strings, pal, styles, content_w)
@@ -221,29 +228,60 @@ def build_page_5(resultado, datos, paths, pal, styles, content_w, safe_image=Non
     _section_nec(story, resultado, pal, styles, content_w)
     _section_indicadores(story, resultado, pal, styles, content_w)
 
-    _section_potencia_horaria(story, paths or {}, styles, content_w)
-    _section_energia_horaria(story, paths or {}, styles, content_w)
-    _section_energia_mensual(story, paths or {}, styles, content_w)
+    _section_potencia_horaria(story, paths, styles, content_w)
+    _section_energia_horaria(story, paths, styles, content_w)
+    _section_energia_mensual(story, paths, styles, content_w)
 
-    # 🔥 Layout de paneles (compatible con o sin safe_image)
-    insertar_layout_paneles(story, paths or {}, styles, content_w, safe_image)
+    insertar_layout_paneles(story, paths, styles, content_w, safe_image)
 
     story.append(PageBreak())
 
-    # =========================
-    # STRING FV
-    # =========================
+    # =========================================================
+    # GENERAR STRING FV (AUTOMÁTICO)
+    # =========================================================
     string_fv_path = None
 
-    if isinstance(paths, dict):
-        string_fv_path = paths.get("string_fv")
+    try:
+        if paneles and paneles.strings:
 
-    if string_fv_path and Path(str(string_fv_path)).exists():
+            n_series = paneles.strings[0].n_series
+            n_strings = (
+                paneles.array.n_strings_total
+                if hasattr(paneles, "array") and paneles.array
+                else len(paneles.strings)
+            )
+
+            if n_series > 0 and n_strings > 0:
+
+                from pathlib import Path
+                ruta = Path("outputs/string_fv.png")
+                ruta.parent.mkdir(parents=True, exist_ok=True)
+
+                # 🔥 IMPORTANTE: importar tu función
+                from reportes.generar_string_fv import generar_string_fv
+
+                generar_string_fv(
+                    n_series=n_series,
+                    out_path=ruta,
+                    n_strings=n_strings
+                )
+
+                string_fv_path = str(ruta)
+                paths["string_fv"] = string_fv_path
+
+    except Exception as e:
+        string_fv_path = None
+
+    # =========================================================
+    # MOSTRAR STRING FV
+    # =========================================================
+    existe_imagen = string_fv_path and Path(str(string_fv_path)).exists()
+
+    if existe_imagen:
 
         story.append(Paragraph("Configuración del String Fotovoltaico", styles["Heading2"]))
         story.append(Spacer(1, 6))
 
-        # 🔥 FIX CLAVE: fallback si no hay safe_image
         if safe_image:
             img = safe_image(str(string_fv_path), max_w=content_w, max_h=300)
         else:
@@ -270,9 +308,21 @@ def build_page_5(resultado, datos, paths, pal, styles, content_w, safe_image=Non
 
     else:
 
+        msg = "No se pudo generar el diagrama del string fotovoltaico."
+
+        if not paneles or not strings:
+            msg += " (Sin datos de strings en resultado.paneles)"
+        else:
+            msg += " (Error al generar imagen o archivo no encontrado)"
+
+        story.append(Paragraph(msg, styles["BodyText"]))
+        story.append(Spacer(1, 6))
+
+        # DEBUG mínimo útil
         story.append(
             Paragraph(
-                "No se pudo generar el diagrama del string fotovoltaico.",
+                f"DEBUG → n_series={locals().get('n_series', None)}, "
+                f"n_strings={locals().get('n_strings', None)}",
                 styles["BodyText"]
             )
         )
@@ -280,4 +330,3 @@ def build_page_5(resultado, datos, paths, pal, styles, content_w, safe_image=Non
         story.append(Spacer(1, 12))
 
     return story
-
