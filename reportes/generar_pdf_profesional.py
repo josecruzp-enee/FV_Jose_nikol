@@ -10,14 +10,8 @@ from reportlab.lib.pagesizes import letter
 
 from .styles import pdf_palette, pdf_styles
 
-# 🔥 BLOQUES MIGRADOS
-from .bloques.resumen_ejecutivo import build_resumen_ejecutivo
-from .bloques.analisis_energetico import build_analisis_energetico
-
-# 🔴 TEMPORALES (AÚN NO MIGRADOS)
-from .page_3 import build_page_3
-from .page_4 import build_page_4
-from .page_5 import build_page_5
+# 🔥 IMPORT CENTRALIZADO
+from .bloques import BLOQUES_REPORTE
 
 
 # ==========================================================
@@ -35,15 +29,12 @@ def _ensure_pdf_path(paths: Dict[str, Any]) -> str:
     pdf_path = paths.get("pdf_path")
 
     if not pdf_path:
-
         out_dir = (
             paths.get("out_dir")
             or paths.get("base_dir")
             or "salidas"
         )
-
         pdf_path = str(Path(out_dir) / "reporte_evaluacion_fv.pdf")
-
         paths["pdf_path"] = pdf_path
 
     p = Path(str(pdf_path))
@@ -99,25 +90,12 @@ def generar_pdf_profesional(
         print("================================\n")
 
     # ======================================================
-    # BLOQUES DEL REPORTE
+    # ENSAMBLAJE DEL REPORTE
     # ======================================================
 
-    bloques = [
-
-        # 🔥 BLOQUES YA MIGRADOS
-        build_resumen_ejecutivo,
-        build_analisis_energetico,
-
-        # 🔴 BLOQUES PENDIENTES
-        build_page_3,
-        build_page_4,
-        build_page_5,
-    ]
-
-    for bloque in bloques:
+    for bloque in BLOQUES_REPORTE:
 
         try:
-
             story += bloque(
                 resultado_proyecto,
                 datos,
@@ -128,7 +106,6 @@ def generar_pdf_profesional(
             )
 
         except Exception as e:
-
             print(f"❌ Error en bloque {bloque.__name__}: {e}")
 
     # ======================================================
