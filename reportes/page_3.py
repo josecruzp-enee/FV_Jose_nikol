@@ -4,7 +4,7 @@ from typing import Any, Dict, List
 
 from reportlab.platypus import Paragraph, Spacer, PageBreak, TableStyle
 
-from .helpers_pdf import make_table, table_style_uniform, box_paragraph, get_field, money_L
+from reportes.bloques.helpers_pdf import make_table, table_style_uniform, box_paragraph
 
 
 # =========================================================
