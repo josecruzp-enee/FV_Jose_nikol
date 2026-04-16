@@ -10,11 +10,8 @@ from reportlab.lib.pagesizes import letter
 
 from .styles import pdf_palette, pdf_styles
 
-from .page_1 import build_page_1
-from .page_2 import build_page_2
-from .page_3 import build_page_3
-from .page_4 import build_page_4
-from .page_5 import build_page_5
+# ✅ NUEVO SISTEMA
+from .bloques import BLOQUES_REPORTE
 
 
 # ==========================================================
@@ -22,9 +19,6 @@ from .page_5 import build_page_5
 # ==========================================================
 
 def _ensure_pdf_path(paths: Dict[str, Any]) -> str:
-    """
-    Garantiza que exista una ruta válida para generar el PDF.
-    """
 
     if not isinstance(paths, dict):
         raise TypeError("`paths` debe ser dict.")
@@ -40,11 +34,9 @@ def _ensure_pdf_path(paths: Dict[str, Any]) -> str:
         )
 
         pdf_path = str(Path(out_dir) / "reporte_evaluacion_fv.pdf")
-
         paths["pdf_path"] = pdf_path
 
     p = Path(str(pdf_path))
-
     p.parent.mkdir(parents=True, exist_ok=True)
 
     return str(p)
@@ -60,35 +52,6 @@ def generar_pdf_profesional(
     paths: Dict[str, Any],
 ) -> str:
 
-    """
-    Genera el reporte PDF profesional del estudio FV.
-
-    Parámetros
-    ----------
-    resultado_proyecto :
-        Resultado completo del orquestador (ResultadoProyecto o dict).
-
-    datos :
-        Datos del proyecto / cliente.
-
-    paths :
-        Diccionario de rutas generadas por el pipeline:
-        - pdf_path
-        - charts
-        - layout_paneles
-        - string_fv
-        - etc.
-
-    Retorna
-    -------
-    str
-        Ruta del PDF generado.
-    """
-
-    # ======================================================
-    # CONFIGURACIÓN PDF
-    # ======================================================
-
     pal = pdf_palette()
     styles = pdf_styles()
 
@@ -100,19 +63,16 @@ def generar_pdf_profesional(
     )
 
     story: List = []
-
     content_w = doc.width
 
     # ======================================================
     # DEBUG OPCIONAL
     # ======================================================
 
-    nec_debug = None
-
     try:
-        nec_debug = resultado_proyecto.get("nec")
+        nec_debug = getattr(resultado_proyecto, "nec", None)
     except Exception:
-        pass
+        nec_debug = None
 
     if nec_debug:
         print("\n========== DEBUG NEC ==========")
@@ -120,24 +80,14 @@ def generar_pdf_profesional(
         print("================================\n")
 
     # ======================================================
-    # PÁGINAS DEL REPORTE
+    # BLOQUES DEL REPORTE (NUEVO MOTOR)
     # ======================================================
 
-    paginas = [
-
-        build_page_1,
-        build_page_2,
-        build_page_3,
-        build_page_4,
-        build_page_5,
-
-    ]
-
-    for pagina in paginas:
+    for bloque in BLOQUES_REPORTE:
 
         try:
 
-            story += pagina(
+            story += bloque(
                 resultado_proyecto,
                 datos,
                 paths,
@@ -148,10 +98,10 @@ def generar_pdf_profesional(
 
         except Exception as e:
 
-            print(f"Error generando página {pagina.__name__}: {e}")
+            print(f"❌ Error en bloque {bloque.__name__}: {e}")
 
     # ======================================================
-    # CONSTRUIR DOCUMENTO
+    # CONSTRUIR PDF
     # ======================================================
 
     doc.build(story)
