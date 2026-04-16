@@ -4,7 +4,7 @@ from datetime import datetime
 from reportlab.platypus import Paragraph, Spacer, PageBreak
 from reportlab.platypus import TableStyle
 
-from .helpers_pdf import (
+from reportes.pdf_utils import (
     section_bar,
     tabla_4cols,
     tabla_2cols,
