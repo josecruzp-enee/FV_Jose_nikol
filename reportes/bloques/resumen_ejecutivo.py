@@ -197,7 +197,7 @@ def p1_conclusion(financiero, sizing, datos, pal, content_w):
 # ORQUESTADOR
 # =========================================================
 
-def build_page_1(resultado, datos, paths, pal, styles, content_w, safe_image):
+def build_resumen_ejecutivo(resultado, datos, paths, pal, styles, content_w):
 
     sizing = leer(resultado, "sizing", {})
     energia = leer(resultado, "energia", {})
