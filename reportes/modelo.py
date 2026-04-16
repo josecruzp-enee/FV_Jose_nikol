@@ -304,3 +304,269 @@ MAPA_ELECTRICO = {
         }
     }
 }
+
+
+
+
+MAPA_ENERGIA = {
+
+    # =========================================
+    # CONFIGURACIÓN DEL SISTEMA
+    # =========================================
+    "sistema": {
+
+        "fuente": "resultado_energia",
+        "descripcion": "Parámetros base del sistema FV",
+
+        "variables": {
+
+            "pdc_instalada_kw": {
+                "ruta": "pdc_instalada_kw",
+                "tipo": "float",
+                "unidad": "kW",
+                "descripcion": "Potencia DC instalada del sistema",
+                "origen": "EnergiaInput",
+                "uso": "Base de indicadores energéticos",
+                "nivel": "resumen",
+                "obligatorio": True
+            },
+
+            "pac_nominal_kw": {
+                "ruta": "pac_nominal_kw",
+                "tipo": "float",
+                "unidad": "kW",
+                "descripcion": "Potencia nominal AC del inversor",
+                "origen": "EnergiaInput",
+                "uso": "Limitación de generación",
+                "nivel": "resumen",
+                "obligatorio": True
+            },
+
+            "dc_ac_ratio": {
+                "ruta": "dc_ac_ratio",
+                "tipo": "float",
+                "unidad": "-",
+                "descripcion": "Relación DC/AC del sistema",
+                "origen": "cálculo",
+                "uso": "Evaluación de sobredimensionamiento",
+                "nivel": "resumen",
+                "obligatorio": True
+            },
+        }
+    },
+
+    # =========================================
+    # ENERGÍA HORARIA
+    # =========================================
+    "energia_horaria": {
+
+        "fuente": "energia_horaria_kwh",
+        "descripcion": "Serie horaria de energía AC útil (8760)",
+
+        "variables": {
+
+            "energia_horaria_kwh": {
+                "ruta": "energia_horaria_kwh[]",
+                "tipo": "List[float]",
+                "unidad": "kWh",
+                "descripcion": "Energía AC útil por hora (post inversor y pérdidas)",
+                "origen": "ejecutar_motor_energia",
+                "uso": "Gráficas y análisis horario",
+                "nivel": "detalle",
+                "obligatorio": True
+            },
+        }
+    },
+
+    # =========================================
+    # ENERGÍA MENSUAL
+    # =========================================
+    "energia_mensual": {
+
+        "fuente": "resultado_energia",
+        "descripcion": "Balance energético mensual del sistema FV",
+
+        "variables": {
+
+            "energia_bruta_12m": {
+                "ruta": "energia_bruta_12m",
+                "tipo": "List[float]",
+                "unidad": "kWh",
+                "descripcion": "Energía DC generada antes de pérdidas",
+                "origen": "dc_bruta_kw",
+                "uso": "Análisis de pérdidas",
+                "nivel": "detalle",
+                "obligatorio": True
+            },
+
+            "energia_despues_perdidas_12m": {
+                "ruta": "energia_despues_perdidas_12m",
+                "tipo": "List[float]",
+                "unidad": "kWh",
+                "descripcion": "Energía después de pérdidas DC y antes de clipping",
+                "origen": "ac_sin_clipping_kw",
+                "uso": "Evaluación de eficiencia",
+                "nivel": "detalle",
+                "obligatorio": True
+            },
+
+            "energia_perdidas_12m": {
+                "ruta": "energia_perdidas_12m",
+                "tipo": "List[float]",
+                "unidad": "kWh",
+                "descripcion": "Pérdidas energéticas (DC + AC)",
+                "origen": "cálculo",
+                "uso": "Diagnóstico del sistema",
+                "nivel": "detalle",
+                "obligatorio": True
+            },
+
+            "energia_clipping_12m": {
+                "ruta": "energia_clipping_12m",
+                "tipo": "List[float]",
+                "unidad": "kWh",
+                "descripcion": "Energía perdida por clipping del inversor",
+                "origen": "modelo inversor",
+                "uso": "Evaluación del dimensionamiento",
+                "nivel": "detalle",
+                "obligatorio": True
+            },
+
+            "energia_util_12m": {
+                "ruta": "energia_util_12m",
+                "tipo": "List[float]",
+                "unidad": "kWh",
+                "descripcion": "Energía final útil AC",
+                "origen": "ac_final_kw",
+                "uso": "Reporte de producción",
+                "nivel": "resumen",
+                "obligatorio": True
+            },
+        }
+    },
+
+    # =========================================
+    # ENERGÍA ANUAL
+    # =========================================
+    "energia_anual": {
+
+        "fuente": "resultado_energia",
+        "descripcion": "Resumen energético anual del sistema",
+
+        "variables": {
+
+            "energia_bruta_anual": {
+                "ruta": "energia_bruta_anual",
+                "tipo": "float",
+                "unidad": "kWh",
+                "descripcion": "Energía total DC anual",
+                "origen": "dc_bruta_kw",
+                "uso": "Balance energético",
+                "nivel": "resumen",
+                "obligatorio": True
+            },
+
+            "energia_util_anual": {
+                "ruta": "energia_util_anual",
+                "tipo": "float",
+                "unidad": "kWh",
+                "descripcion": "Energía AC útil anual",
+                "origen": "ac_final_kw",
+                "uso": "Producción del sistema",
+                "nivel": "resumen",
+                "obligatorio": True
+            },
+
+            "energia_perdidas_anual": {
+                "ruta": "energia_perdidas_anual",
+                "tipo": "float",
+                "unidad": "kWh",
+                "descripcion": "Pérdidas totales del sistema",
+                "origen": "cálculo",
+                "uso": "Diagnóstico",
+                "nivel": "detalle",
+                "obligatorio": True
+            },
+
+            "energia_clipping_anual": {
+                "ruta": "energia_clipping_anual",
+                "tipo": "float",
+                "unidad": "kWh",
+                "descripcion": "Energía perdida por clipping",
+                "origen": "modelo inversor",
+                "uso": "Evaluación de diseño",
+                "nivel": "detalle",
+                "obligatorio": True
+            },
+        }
+    },
+
+    # =========================================
+    # KPIs
+    # =========================================
+    "kpis": {
+
+        "fuente": "resultado_energia",
+        "descripcion": "Indicadores clave del sistema FV",
+
+        "variables": {
+
+            "produccion_especifica_kwh_kwp": {
+                "ruta": "produccion_especifica_kwh_kwp",
+                "tipo": "float",
+                "unidad": "kWh/kWp",
+                "descripcion": "Producción específica del sistema",
+                "origen": "cálculo",
+                "uso": "Comparación de desempeño",
+                "nivel": "resumen",
+                "obligatorio": True
+            },
+
+            "performance_ratio": {
+                "ruta": "performance_ratio",
+                "tipo": "float",
+                "unidad": "-",
+                "descripcion": "Relación de desempeño del sistema",
+                "origen": "cálculo",
+                "uso": "Evaluación de eficiencia global",
+                "nivel": "resumen",
+                "obligatorio": True
+            },
+        }
+    },
+
+    # =========================================
+    # METADATA
+    # =========================================
+    "meta": {
+
+        "fuente": "resultado_energia.meta",
+        "descripcion": "Información de trazabilidad del cálculo",
+
+        "variables": {
+
+            "modelo": {
+                "ruta": "meta.modelo",
+                "tipo": "str",
+                "unidad": None,
+                "descripcion": "Tipo de modelo energético utilizado",
+                "origen": "motor_energia",
+                "uso": "Auditoría del cálculo",
+                "nivel": "detalle",
+                "obligatorio": True
+            },
+
+            "pipeline": {
+                "ruta": "meta.pipeline",
+                "tipo": "str",
+                "unidad": None,
+                "descripcion": "Pipeline de cálculo energético",
+                "origen": "motor_energia",
+                "uso": "Trazabilidad técnica",
+                "nivel": "detalle",
+                "obligatorio": True
+            },
+        }
+    }
+}
+
