@@ -198,7 +198,7 @@ def _section_energia_mensual(story, paths, styles, content_w):
 # PAGE 5
 # =========================================================
 
-def build_page_5(resultado, datos, paths, pal, styles, content_w, safe_image=None):
+def build_ingenieria_electrica((resultado, datos, paths, pal, styles, content_w, safe_image=None):
 
     from pathlib import Path
     from reportlab.platypus import Paragraph, Spacer, PageBreak, Image
