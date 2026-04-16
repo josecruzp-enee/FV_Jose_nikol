@@ -14,7 +14,7 @@ from .helpers_pdf import (
     get_field,
 )
 
-from ui.rutas import money_L, num
+from reportes.pdf_utils import money_L, num
 
 
 # =========================================================
