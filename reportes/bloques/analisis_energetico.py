@@ -6,7 +6,7 @@ from typing import Any
 from reportlab.lib.units import inch
 from reportlab.platypus import Spacer, Paragraph, Table, TableStyle, PageBreak
 
-from .helpers_pdf import make_table, table_style_uniform, box_paragraph, get_field
+from reportes.pdf_utils import make_table, table_style_uniform, box_paragraph, get_field
 
 
 # =========================================================
