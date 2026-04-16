@@ -78,7 +78,7 @@ def amortizacion_anual(
 # PAGE 3
 # =========================================================
 
-def build_page_3(
+def build_analisis_financiero
     resultado: Dict[str, Any],
     datos: Any,
     paths: Dict[str, Any],
