@@ -570,3 +570,92 @@ MAPA_ENERGIA = {
     }
 }
 
+
+
+MAPA_CORE = {
+
+    "descripcion": "Estructura global del resultado del estudio FV",
+
+    "variables": {
+
+        "sizing": {
+            "ruta": "resultado.sizing",
+            "tipo": "ResultadoSizing",
+            "descripcion": "Resultado del dimensionamiento inicial del sistema",
+            "origen": "deps.sizing",
+            "uso": "Base del sistema FV",
+            "nivel": "core",
+            "obligatorio": True
+        },
+
+        "paneles": {
+            "ruta": "resultado.paneles",
+            "tipo": "ResultadoPaneles",
+            "descripcion": "Configuración física del sistema FV (strings, array)",
+            "origen": "deps.paneles",
+            "uso": "Entrada para energía y electrical",
+            "nivel": "core",
+            "obligatorio": True
+        },
+
+        "strings": {
+            "ruta": "resultado.strings",
+            "tipo": "List[StringFV]",
+            "descripcion": "Lista directa de strings (alias de paneles.strings)",
+            "origen": "paneles.strings",
+            "uso": "Acceso rápido en reportes",
+            "nivel": "core",
+            "obligatorio": False
+        },
+
+        "energia": {
+            "ruta": "resultado.energia",
+            "tipo": "EnergiaResultado",
+            "descripcion": "Resultado del modelo energético 8760",
+            "origen": "deps.energia",
+            "uso": "Producción energética y KPIs",
+            "nivel": "core",
+            "obligatorio": True
+        },
+
+        "electrical": {
+            "ruta": "resultado.electrical",
+            "tipo": "ResultadoElectrico",
+            "descripcion": "Dimensionamiento eléctrico completo del sistema",
+            "origen": "deps.electrical",
+            "uso": "Protecciones, conductores y validaciones",
+            "nivel": "core",
+            "obligatorio": False
+        },
+
+        "financiero": {
+            "ruta": "resultado.financiero",
+            "tipo": "ResultadoFinanciero",
+            "descripcion": "Evaluación económica del proyecto",
+            "origen": "deps.finanzas",
+            "uso": "Análisis económico y toma de decisión",
+            "nivel": "core",
+            "obligatorio": False
+        },
+
+        "ok": {
+            "ruta": "resultado.ok",
+            "tipo": "bool",
+            "descripcion": "Indica si el estudio completo es válido",
+            "origen": "core",
+            "uso": "Control de flujo global",
+            "nivel": "core",
+            "obligatorio": True
+        },
+
+        "errores": {
+            "ruta": "resultado.errores",
+            "tipo": "List[str]",
+            "descripcion": "Lista de errores del estudio",
+            "origen": "core",
+            "uso": "Debug y validación",
+            "nivel": "core",
+            "obligatorio": True
+        }
+    }
+}
