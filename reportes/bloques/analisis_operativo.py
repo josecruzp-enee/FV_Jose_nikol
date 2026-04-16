@@ -131,7 +131,7 @@ def tabla_impacto_mensual_anio1(resultado: Any, pal: dict, content_w: float):
 # PAGE 4
 # =========================================================
 
-def build_page_4(
+def build_analisis_operativo(
     resultado: Any,
     datos: Any,
     paths: Dict[str, Any],
