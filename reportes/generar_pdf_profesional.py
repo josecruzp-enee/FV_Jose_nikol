@@ -10,11 +10,11 @@ from reportlab.lib.pagesizes import letter
 
 from .styles import pdf_palette, pdf_styles
 
-# 🔥 NUEVO BLOQUE
+# 🔥 BLOQUES MIGRADOS
 from .bloques.resumen_ejecutivo import build_resumen_ejecutivo
+from .bloques.analisis_energetico import build_analisis_energetico
 
-# 🔴 TEMPORAL (AÚN NO MIGRADOS)
-from .page_2 import build_page_2
+# 🔴 TEMPORALES (AÚN NO MIGRADOS)
 from .page_3 import build_page_3
 from .page_4 import build_page_4
 from .page_5 import build_page_5
@@ -104,11 +104,11 @@ def generar_pdf_profesional(
 
     bloques = [
 
-        # 🔥 NUEVO (ya migrado)
+        # 🔥 BLOQUES YA MIGRADOS
         build_resumen_ejecutivo,
+        build_analisis_energetico,
 
-        # 🔴 TEMPORALES (migración progresiva)
-        build_page_2,
+        # 🔴 BLOQUES PENDIENTES
         build_page_3,
         build_page_4,
         build_page_5,
