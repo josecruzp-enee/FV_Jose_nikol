@@ -1,12 +1,18 @@
+# -*- coding: utf-8 -*-
 from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
 
 from reportlab.lib.units import inch
-from reportlab.platypus import Spacer, Paragraph, Table, TableStyle, PageBreak
+from reportlab.platypus import Spacer, Paragraph, Table, TableStyle, PageBreak, Image
 
-from reportes.pdf_utils import make_table, table_style_uniform, box_paragraph, get_field
+from reportes.helpers_pdf import (
+    make_table,
+    table_style_uniform,
+    box_paragraph,
+    get_field,
+)
 
 
 # =========================================================
@@ -20,7 +26,7 @@ def build_analisis_energetico(
     pal,
     styles,
     content_w,
-    safe_image=None
+    safe_image=None,  # 🔥 OPCIONAL
 ):
 
     story = []
@@ -35,22 +41,21 @@ def build_analisis_energetico(
     story.append(Spacer(1, 6))
 
     # =====================================================
-    # DATA (SEGURO Y COMPATIBLE)
+    # DATA SEGURA
     # =====================================================
     financiero = getattr(resultado, "financiero", None)
 
     if not financiero or not isinstance(financiero, dict):
-        story.append(Paragraph("No hay información financiera disponible.", styles["BodyText"]))
+        story.append(Paragraph("No hay información energética disponible.", styles["BodyText"]))
         story.append(PageBreak())
         return story
 
     tabla_12m = financiero.get("tabla_12m", [])
 
     # =====================================================
-    # HEADER
+    # TABLA
     # =====================================================
     header = ["Mes", "Consumo (kWh)", "FV (kWh)", "ENEE (kWh)"]
-
     rows = []
 
     for r in tabla_12m:
@@ -64,9 +69,6 @@ def build_analisis_energetico(
             f"{float(r.get('kwh_enee', 0)):,.0f}",
         ])
 
-    # =====================================================
-    # TOTALES
-    # =====================================================
     total_consumo = sum(float(r.get("consumo_kwh", 0)) for r in tabla_12m if isinstance(r, dict))
     total_fv = sum(float(r.get("fv_kwh", 0)) for r in tabla_12m if isinstance(r, dict))
     total_enee = sum(float(r.get("kwh_enee", 0)) for r in tabla_12m if isinstance(r, dict))
@@ -78,39 +80,36 @@ def build_analisis_energetico(
         f"{total_enee:,.0f}",
     ])
 
-    # =====================================================
-    # TABLA
-    # =====================================================
-    t = make_table(
+    tabla = make_table(
         [header] + rows,
         content_w,
         ratios=[0.7, 2.1, 2.1, 2.1],
         repeatRows=1
     )
 
-    t.setStyle(table_style_uniform(pal, font_header=8, font_body=8))
+    tabla.setStyle(table_style_uniform(pal, font_header=8, font_body=8))
 
-    t.setStyle(TableStyle([
+    tabla.setStyle(TableStyle([
         ("ALIGN", (0, 1), (0, -1), "CENTER"),
         ("ALIGN", (0, 0), (-1, 0), "CENTER"),
         ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
-        ("BACKGROUND", (0, -1), (-1, -1), pal.get("HEADER", "#1f3b5c")),
+        ("BACKGROUND", (0, -1), (-1, -1), pal.get("PRIMARY")),
         ("TEXTCOLOR", (0, -1), (-1, -1), "white"),
         ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
     ]))
 
-    story.append(t)
+    story.append(tabla)
     story.append(Spacer(1, 10))
 
     # =====================================================
-    # GRÁFICAS
+    # GRÁFICAS (ROBUSTO)
     # =====================================================
     GAP = 10
     CH_W = (content_w - GAP) / 2.0
     CH_H = 2.2 * inch
 
-    chart_mes = paths.get("chart_energia_mensual")
-    chart_dia = paths.get("chart_energia_diaria")
+    chart_mes = paths.get("chart_energia_mensual") if isinstance(paths, dict) else None
+    chart_dia = paths.get("chart_energia_diaria") if isinstance(paths, dict) else None
 
     if (
         chart_mes and chart_dia and
@@ -118,11 +117,21 @@ def build_analisis_energetico(
         Path(str(chart_dia)).exists()
     ):
 
-        img1 = safe_image(str(chart_mes), max_w=CH_W, max_h=CH_H)
-        img2 = safe_image(str(chart_dia), max_w=CH_W, max_h=CH_H)
+        # 🔥 CONTROL SAFE_IMAGE
+        if safe_image:
+            img1 = safe_image(str(chart_mes), max_w=CH_W, max_h=CH_H)
+            img2 = safe_image(str(chart_dia), max_w=CH_W, max_h=CH_H)
+        else:
+            img1 = Image(str(chart_mes))
+            img2 = Image(str(chart_dia))
+
+            img1.drawWidth = CH_W
+            img1.drawHeight = CH_H
+
+            img2.drawWidth = CH_W
+            img2.drawHeight = CH_H
 
         if img1 and img2:
-
             charts = Table([[img1, img2]], colWidths=[CH_W, CH_W])
 
             charts.setStyle(TableStyle([
