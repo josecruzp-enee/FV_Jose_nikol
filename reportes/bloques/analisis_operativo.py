@@ -1,16 +1,22 @@
+# -*- coding: utf-8 -*-
 from __future__ import annotations
 
 from typing import Any, Dict, List
 
 from reportlab.platypus import Paragraph, Spacer, TableStyle, PageBreak
 
-from reportes.pdf_utils import make_table, table_style_uniform, box_paragraph, money_L
+# ✅ IMPORT CORRECTO (CAPA DE COMPATIBILIDAD)
+from reportes.helpers_pdf import (
+    make_table,
+    table_style_uniform,
+    box_paragraph,
+    money_L,
+)
 
 
 # =========================================================
 # LECTURA SEGURA
 # =========================================================
-
 def leer(obj, campo, default=None):
 
     if obj is None:
@@ -29,15 +35,14 @@ def tabla_impacto_mensual_anio1(resultado: Any, pal: dict, content_w: float):
 
     financiero = leer(resultado, "financiero", {}) or {}
 
-    tabla_12m = leer(financiero, "tabla_12m", [])
+    tabla_12m = leer(financiero, "tabla_12m", []) or []
     cuota_m = float(leer(financiero, "cuota_mensual", 0.0))
 
-    # 🔥 SOLO DINERO
     header = [
         "Mes",
         "Pago actual",
         "Pago ENEE",
-        "Cuota ",
+        "Cuota",
         "Total Pago",
         "Ahorro mes",
         "Ahorro acumulado",
@@ -46,13 +51,15 @@ def tabla_impacto_mensual_anio1(resultado: Any, pal: dict, content_w: float):
     rows = []
 
     acum = 0.0
-
     total_pago_actual = 0.0
     total_enee = 0.0
     total_total_fv = 0.0
     total_ahorro = 0.0
 
     for r in tabla_12m:
+
+        if not isinstance(r, dict):
+            continue
 
         mes = r.get("mes", "")
 
@@ -95,7 +102,7 @@ def tabla_impacto_mensual_anio1(resultado: Any, pal: dict, content_w: float):
     t = make_table(
         table_data,
         content_w,
-        ratios=[0.7,1.4,1.4,1.2,1.4,1.4,1.5],
+        ratios=[0.7, 1.4, 1.4, 1.2, 1.4, 1.4, 1.5],
         repeatRows=1,
     )
 
@@ -105,32 +112,31 @@ def tabla_impacto_mensual_anio1(resultado: Any, pal: dict, content_w: float):
 
     t.setStyle(TableStyle([
 
-        # 🔹 Alineación
-        ("ALIGN", (0,1), (0,-1), "CENTER"),
-        ("ALIGN", (1,1), (-1,-1), "RIGHT"),
+        ("ALIGN", (0, 1), (0, -1), "CENTER"),
+        ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
 
-        # 🔹 Ahorro en negrita
-        ("FONTNAME", (5,1), (5,-2), "Helvetica-Bold"),
+        ("FONTNAME", (5, 1), (5, -2), "Helvetica-Bold"),
 
-        # 🔴 Negativos en rojo
         *[
-            ("TEXTCOLOR", (5,i), (5,i), pal.get("BAD","red"))
+            ("TEXTCOLOR", (5, i), (5, i), pal.get("BAD", "red"))
             for i, r in enumerate(tabla_12m, start=1)
-            if (float(r.get("factura_base_L",0)) - (float(r.get("pago_enee_L",0))+cuota_m)) < 0
+            if isinstance(r, dict)
+            and (float(r.get("factura_base_L", 0)) -
+                 (float(r.get("pago_enee_L", 0)) + cuota_m)) < 0
         ],
 
-        # 🔵 TOTAL
-        ("BACKGROUND", (0,last_row), (-1,last_row), pal.get("SOFT","#EAEAEA")),
-        ("FONTNAME", (0,last_row), (-1,last_row), "Helvetica-Bold"),
-        ("LINEABOVE", (0,last_row), (-1,last_row), 1.2, pal.get("PRIMARY","#000000")),
+        ("BACKGROUND", (0, last_row), (-1, last_row), pal.get("SOFT", "#EAEAEA")),
+        ("FONTNAME", (0, last_row), (-1, last_row), "Helvetica-Bold"),
+        ("LINEABOVE", (0, last_row), (-1, last_row), 1.2, pal.get("PRIMARY", "#000000")),
 
     ]))
 
     return [t, Spacer(1, 10)]
-# =========================================================
-# PAGE 4
-# =========================================================
 
+
+# =========================================================
+# BLOQUE OPERATIVO
+# =========================================================
 def build_analisis_operativo(
     resultado: Any,
     datos: Any,
@@ -148,12 +154,15 @@ def build_analisis_operativo(
     story.append(Paragraph("Comparación mensual — Año 1", styles["H2b"]))
     story.append(Spacer(1, 6))
 
-    story += tabla_impacto_mensual_anio1(resultado, pal, content_w)
+    # 🔥 TABLA (SIEMPRE SEGURA)
+    tabla = tabla_impacto_mensual_anio1(resultado, pal, content_w)
+
+    if tabla:
+        story += tabla
 
     # =====================================================
     # CONFIGURACIÓN DC
     # =====================================================
-
     strings_block = leer(resultado, "strings", None)
     strings = leer(strings_block, "strings", []) if strings_block else []
 
@@ -165,7 +174,6 @@ def build_analisis_operativo(
         lines = []
 
         for s in strings:
-
             lines.append(
                 f"MPPT {leer(s,'mppt','')}: "
                 f"{leer(s,'n_series','')} módulos en serie "
@@ -182,7 +190,6 @@ def build_analisis_operativo(
     # =====================================================
     # RESUMEN NEC
     # =====================================================
-
     nec_block = leer(resultado, "nec", {})
     nec_paq = leer(nec_block, "paquete_nec", {})
 
@@ -194,11 +201,8 @@ def build_analisis_operativo(
         story.append(Spacer(1, 6))
 
         lines = [
-
             f"I DC diseño: {resumen_pdf.get('i_dc_nom', '—')} A",
-
             f"I AC diseño: {resumen_pdf.get('i_ac_nom', '—')} A",
-
         ]
 
         story.append(
