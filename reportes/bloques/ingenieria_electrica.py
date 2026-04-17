@@ -234,35 +234,24 @@ def build_ingenieria_electrica(resultado, datos, paths, pal, styles, content_w, 
     string_fv_path = None
 
     try:
-        if paneles and paneles.strings:
-
-            n_series = paneles.strings[0].n_series
-            n_strings = (
-                paneles.array.n_strings_total
-                if hasattr(paneles, "array") and paneles.array
-                else len(paneles.strings)
+        if paneles and hasattr(paneles, "strings") and paneles.strings:
+            strings = paneles.strings  
+            from pathlib import Path
+            ruta = Path("outputs/string_fv.png")
+            ruta.parent.mkdir(parents=True, exist_ok=True)
+            from reportes.generar_string_fv import generar_string_fv
+            
+            generar_string_fv(
+                strings,
+                ruta
             )
-
-            if n_series > 0 and n_strings > 0:
-
-                from pathlib import Path
-                ruta = Path("outputs/string_fv.png")
-                ruta.parent.mkdir(parents=True, exist_ok=True)
-
-                # 🔥 IMPORTANTE: importar tu función
-                from reportes.generar_string_fv import generar_string_fv
-
-                generar_string_fv(
-                    n_series=n_series,
-                    out_path=ruta,
-                    n_strings=n_strings
-                )
-
-                string_fv_path = str(ruta)
-                paths["string_fv"] = string_fv_path
-
+            string_fv_path = str(ruta)
+            paths["string_fv"] = string_fv_path
     except Exception as e:
+        print("Error generando string FV:", e)
         string_fv_path = None
+
+            
 
     # =========================================================
     # MOSTRAR STRING FV
