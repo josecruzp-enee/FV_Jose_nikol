@@ -1,10 +1,3 @@
-from __future__ import annotations
-
-from pathlib import Path
-from typing import Any
-
-from reportlab.platypus import Paragraph, Spacer, PageBreak, Image
-
 from ..secciones_tecnicas.resumen_tecnico import build_resumen_tecnico
 from ..secciones_tecnicas.tabla_strings import crear_tabla_strings
 from ..secciones_tecnicas.tabla_nec import (
@@ -13,7 +6,7 @@ from ..secciones_tecnicas.tabla_nec import (
     crear_tabla_indicadores,
 )
 from ..secciones_tecnicas.layout_paneles import insertar_layout_paneles
-
+from ..secciones_tecnicas.tabla_distribucion_strings import crear_tabla_distribucion_inversores
 
 # =========================================================
 # LECTURA SEGURA
