@@ -18,22 +18,23 @@ def generar_string_fv(strings, out_path, *_, **__):
     # ==============================
     grupos = {}
     for s in strings:
-        key = (getattr(s, "inversor", 1), getattr(s, "mppt", 1))
-        grupos.setdefault(key, []).append(s)
+        inv = getattr(s, "inversor", 1)
+        mppt = getattr(s, "mppt", 1)
+        grupos.setdefault((inv, mppt), []).append(s)
 
     # ==============================
-    # POSICIONES FIJAS (CLAVE)
+    # CONFIGURACIÓN VISUAL
     # ==============================
+    panel_w = 0.5
+    panel_h = 1.0
+    gap = 0.15
+
     X_PANEL = 0
-    X_STRING_END = 6
-    X_MPPT = 8
-    X_INV = 12
+    X_STRING = 7
+    X_MPPT = 9
+    X_INV = 13
 
-    panel_w = 0.4
-    panel_h = 0.8
-    gap = 0.1
-
-    fig, ax = plt.subplots(figsize=(14, 6))
+    fig, ax = plt.subplots(figsize=(16, 6))
 
     y_base = 0
     conexiones = {}
@@ -43,13 +44,17 @@ def generar_string_fv(strings, out_path, *_, **__):
     # ==============================
     for (inv, mppt), grupo in sorted(grupos.items()):
 
-        y = y_base
-
-        for s in grupo:
+        for idx, s in enumerate(grupo):
 
             n = s.n_series
+            y = y_base - idx * 2.5
 
-            # PANEL
+            y_pos = y + 0.7
+            y_neg = y + 0.3
+
+            # ==========================
+            # PANELES
+            # ==========================
             for i in range(n):
                 x = X_PANEL + i * (panel_w + gap)
 
@@ -58,76 +63,85 @@ def generar_string_fv(strings, out_path, *_, **__):
                     panel_w,
                     panel_h,
                     edgecolor="#0B2E4A",
-                    facecolor="#1F2A37"
+                    facecolor="#1F2A37",
+                    linewidth=1
                 ))
 
+                # conexión serie
                 if i < n - 1:
                     ax.plot(
                         [x + panel_w, x + panel_w + gap],
-                        [y + panel_h/2]*2,
-                        color="black"
+                        [y + panel_h/2, y + panel_h/2],
+                        color="black",
+                        linewidth=1
                     )
 
-            # PUNTO DE SALIDA (REAL)
-            y_pos = y + 0.55
-            y_neg = y + 0.25
+            x_end = X_PANEL + n * (panel_w + gap)
 
-            # terminal string
-            ax.plot(X_STRING_END, y_pos, "ro")
-            ax.plot(X_STRING_END, y_neg, "ko")
+            # ==========================
+            # SALIDA DEL STRING (+ / -)
+            # ==========================
+            ax.plot([x_end, X_STRING], [y_pos, y_pos], color="red", linewidth=2)
+            ax.plot([x_end, X_STRING], [y_neg, y_neg], color="black", linewidth=2)
 
-            # cable hasta MPPT
-            ax.plot([X_STRING_END, X_MPPT], [y_pos, y_pos], "r", lw=2)
-            ax.plot([X_STRING_END, X_MPPT], [y_neg, y_neg], "k", lw=2)
+            # terminal
+            ax.plot(X_STRING, y_pos, "ro")
+            ax.plot(X_STRING, y_neg, "ko")
 
         # ==============================
-        # MPPT (BORNE REAL)
+        # MPPT
         # ==============================
-        ax.plot(X_MPPT, y_pos, "ro")
-        ax.plot(X_MPPT, y_neg, "ko")
+        y_mppt_pos = y_pos
+        y_mppt_neg = y_neg
 
-        ax.text(X_MPPT, y + 0.8, f"MPPT {mppt}", ha="center")
+        ax.plot(X_MPPT, y_mppt_pos, "ro")
+        ax.plot(X_MPPT, y_mppt_neg, "ko")
 
-        conexiones.setdefault(inv, []).append((y_pos, y_neg))
+        ax.text(X_MPPT, y_mppt_pos + 0.6, f"MPPT {mppt}", ha="center")
 
-        y_base -= 2
+        conexiones.setdefault(inv, []).append((y_mppt_pos, y_mppt_neg))
+
+        y_base -= 4
 
     # ==============================
-    # INVERSOR (BORNERA REAL)
+    # INVERSOR
     # ==============================
     for inv, pts in conexiones.items():
 
         y_vals = [y for p in pts for y in p]
         y_mid = sum(y_vals) / len(y_vals)
 
-        # caja
+        # caja inversor
         ax.add_patch(Rectangle(
-            (X_INV, y_mid - 1),
-            2,
-            2,
+            (X_INV, y_mid - 1.2),
+            2.5,
+            2.4,
             edgecolor="black",
-            facecolor="#eeeeee"
+            facecolor="#eeeeee",
+            linewidth=1.5
         ))
 
-        ax.text(X_INV + 1, y_mid, f"INV {inv}", ha="center", va="center")
+        ax.text(X_INV + 1.25, y_mid, f"INV {inv}", ha="center", va="center", fontsize=10)
 
-        # entradas
+        # ==============================
+        # CONEXIONES LIMPIAS (SIN CRUCES)
+        # ==============================
         for (y_pos, y_neg) in pts:
 
-            # terminal inversor
+            # + (rojo)
+            ax.plot([X_MPPT, X_INV], [y_pos, y_pos], color="red", linewidth=2)
             ax.plot(X_INV, y_pos, "ro")
-            ax.plot(X_INV, y_neg, "ko")
 
-            # conexión limpia horizontal
-            ax.plot([X_MPPT, X_INV], [y_pos, y_pos], "r", lw=2)
-            ax.plot([X_MPPT, X_INV], [y_neg, y_neg], "k", lw=2)
+            # - (negro)
+            ax.plot([X_MPPT, X_INV], [y_neg, y_neg], color="black", linewidth=2)
+            ax.plot(X_INV, y_neg, "ko")
 
     # ==============================
     # FINAL
     # ==============================
-    ax.set_title("Configuración FV (Topología Correcta)")
+    ax.set_title("Configuración FV (Topología Profesional)")
     ax.axis("off")
 
     plt.tight_layout()
-    plt.savefig(out_path, dpi=200)
+    plt.savefig(out_path, dpi=200, bbox_inches="tight")
     plt.close()
