@@ -1,99 +1,120 @@
 # -*- coding: utf-8 -*-
-from reportlab.lib.pagesizes import landscape, letter
-from reportlab.platypus import SimpleDocTemplate
-from reportlab.pdfgen import canvas
-from reportlab.lib import colors
+from __future__ import annotations
+
+import matplotlib
+matplotlib.use("Agg")
+
+import matplotlib.pyplot as plt
+from matplotlib.patches import Rectangle
 
 
-def generar_lamina_fv(strings, out_path):
+def generar_string_fv(strings, out_path, *_, **__):
 
-    c = canvas.Canvas(out_path, pagesize=landscape(letter))
+    if not strings:
+        raise ValueError("Lista vacía")
 
-    width, height = landscape(letter)
+    # ==============================
+    # AGRUPAR POR MPPT
+    # ==============================
+    grupos = {}
+    for s in strings:
+        key = (getattr(s, "inversor", 1), getattr(s, "mppt", 1))
+        grupos.setdefault(key, []).append(s)
 
-    # =========================
-    # TÍTULO
-    # =========================
-    c.setFont("Helvetica-Bold", 14)
-    c.drawCentredString(
-        width / 2,
-        height - 40,
-        "CONFIGURACIÓN DEL GENERADOR FOTOVOLTAICO (TOPOLOGÍA REAL)"
-    )
+    # ==============================
+    # CONFIG
+    # ==============================
+    X_PANEL = 0
+    X_MPPT = 8
+    X_INV = 12
 
-    # =========================
-    # SECCIONES (líneas)
-    # =========================
-    c.setStrokeColor(colors.grey)
-    c.setDash(3, 3)
+    panel_w = 0.4
+    panel_h = 0.8
+    gap = 0.1
 
-    c.line(350, 100, 350, height - 80)
-    c.line(500, 100, 500, height - 80)
-    c.line(650, 100, 650, height - 80)
+    fig, ax = plt.subplots(figsize=(14, 6))
 
-    c.setDash()
+    y_base = 2
+    conexiones = {}
 
-    # =========================
-    # STRINGS
-    # =========================
-    y = height - 150
+    # ==============================
+    # DIBUJAR STRINGS
+    # ==============================
+    for (inv, mppt), grupo in sorted(grupos.items()):
 
-    for i, s in enumerate(strings):
-
+        s = grupo[0]
         n = s.n_series
-
-        c.setFont("Helvetica", 9)
-        c.drawString(40, y + 10, f"STRING {i+1}")
-        c.drawString(40, y - 5, f"{n} MÓDULOS")
+        y = y_base
 
         # paneles
-        x = 120
-        for j in range(n):
-            c.setFillColorRGB(0.12, 0.18, 0.28)
-            c.rect(x, y, 20, 40, fill=1)
+        for i in range(n):
+            x = X_PANEL + i * (panel_w + gap)
 
-            x += 25
+            ax.add_patch(Rectangle(
+                (x, y),
+                panel_w,
+                panel_h,
+                edgecolor="#0B2E4A",
+                facecolor="#1F2A37"
+            ))
 
-        # cables
-        c.setStrokeColor(colors.red)
-        c.line(x, y + 25, 500, y + 25)
+            if i < n - 1:
+                ax.plot(
+                    [x + panel_w, x + panel_w + gap],
+                    [y + panel_h/2]*2,
+                    color="black"
+                )
 
-        c.setStrokeColor(colors.black)
-        c.line(x, y + 10, 500, y + 10)
+        x_end = X_PANEL + n * (panel_w + gap)
 
-        # MPPT
-        c.setStrokeColor(colors.black)
-        c.rect(500, y + 15, 20, 20)
+        # polos
+        y_pos = y + 0.6
+        y_neg = y + 0.3
 
-        c.setFillColor(colors.red)
-        c.drawString(505, y + 20, "+")
+        # cables hacia MPPT
+        ax.plot([x_end, X_MPPT], [y_pos, y_pos], "r", lw=2)
+        ax.plot([x_end, X_MPPT], [y_neg, y_neg], "k", lw=2)
 
-        c.setFillColor(colors.black)
-        c.drawString(505, y + 5, "-")
+        # bornes MPPT
+        ax.plot(X_MPPT, y_pos, "ro")
+        ax.plot(X_MPPT, y_neg, "ko")
 
-        # hacia inversor
-        c.setStrokeColor(colors.red)
-        c.line(520, y + 25, 650, y + 25)
+        ax.text(X_MPPT, y + 1, f"MPPT {mppt}", ha="center")
 
-        c.setStrokeColor(colors.black)
-        c.line(520, y + 10, 650, y + 10)
+        conexiones.setdefault(inv, []).append((y_pos, y_neg))
 
-        y -= 120
+        y_base -= 2
 
-    # =========================
+    # ==============================
     # INVERSOR
-    # =========================
-    c.setStrokeColor(colors.black)
-    c.setFillColorRGB(0.93, 0.93, 0.93)
+    # ==============================
+    for inv, pts in conexiones.items():
 
-    c.rect(650, height/2 - 100, 180, 200, fill=1)
+        y_vals = [y for p in pts for y in p]
+        y_mid = sum(y_vals) / len(y_vals)
 
-    c.setFillColor(colors.black)
-    c.drawCentredString(740, height/2, "INVERSOR 1")
+        # caja inversor
+        ax.add_patch(Rectangle(
+            (X_INV, y_mid - 1),
+            2,
+            2,
+            edgecolor="black",
+            facecolor="#eeeeee"
+        ))
 
-    # =========================
+        ax.text(X_INV + 1, y_mid, f"INV {inv}", ha="center")
+
+        for (y_pos, y_neg) in pts:
+            ax.plot([X_MPPT, X_INV], [y_pos, y_pos], "r", lw=2)
+            ax.plot([X_MPPT, X_INV], [y_neg, y_neg], "k", lw=2)
+
+            ax.plot(X_INV, y_pos, "ro")
+            ax.plot(X_INV, y_neg, "ko")
+
+    # ==============================
     # FINAL
-    # =========================
-    c.save()
-
-    return out_path
+    # ==============================
+    ax.axis("off")
+    plt.tight_layout()
+    plt.savefig(out_path, dpi=200)
+    plt.close()
