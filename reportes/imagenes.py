@@ -4,6 +4,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+import matplotlib
+matplotlib.use("Agg")
+
+import matplotlib.pyplot as plt
+from matplotlib.patches import Rectangle
+
 
 # =========================================================
 # BASE PATHS
@@ -53,16 +59,10 @@ def _as_float(x: Any, default: float = 0.0) -> float:
 # =========================================================
 
 def inferir_n_paneles(res: Any) -> int:
-    """
-    Inferencia tolerante para layout (NO ingeniería).
-    """
 
-    # --- sizing
     sizing = res.get("sizing") if isinstance(res, dict) else getattr(res, "sizing", None)
 
-    # --- objeto
     if sizing and not isinstance(sizing, dict):
-
         n = _as_int(getattr(sizing, "n_paneles", 0))
         if n > 0:
             return n
@@ -71,9 +71,7 @@ def inferir_n_paneles(res: Any) -> int:
         if n > 0:
             return n
 
-    # --- dict
     if isinstance(sizing, dict):
-
         n = _as_int(sizing.get("n_paneles"), 0)
         if n > 0:
             return n
@@ -82,12 +80,10 @@ def inferir_n_paneles(res: Any) -> int:
         if n > 0:
             return n
 
-    # --- fallback
     n = _as_int(res.get("n_paneles") if isinstance(res, dict) else getattr(res, "n_paneles", 0))
     if n > 0:
         return n
 
-    # --- heurística por potencia
     kwp = None
 
     if isinstance(sizing, dict):
@@ -120,7 +116,85 @@ def inferir_n_paneles(res: Any) -> int:
 
 
 # =========================================================
-# PIPELINE DE ARTEFACTOS (LIMPIO)
+# GENERADOR STRING FV (IMAGEN)
+# =========================================================
+
+def generar_string_fv_imagen(strings, out_path):
+
+    if not strings:
+        return None
+
+    out_path = Path(out_path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    grupos = {}
+    for s in strings:
+        inv = getattr(s, "inversor", 1)
+        mppt = getattr(s, "mppt", 1)
+        grupos.setdefault((inv, mppt), []).append(s)
+
+    fig, ax = plt.subplots(figsize=(14, 6))
+
+    panel_w, panel_h, gap = 0.45, 0.9, 0.12
+    X_MPPT = 8
+    X_INV = 12
+
+    y_base = 2
+    conexiones = {}
+
+    for (inv, mppt), grupo in grupos.items():
+
+        s = grupo[0]
+        n = s.n_series
+        y = y_base
+
+        for i in range(n):
+            x = i * (panel_w + gap)
+
+            ax.add_patch(Rectangle(
+                (x, y),
+                panel_w,
+                panel_h,
+                edgecolor="black",
+                facecolor="#1e293b"
+            ))
+
+            if i < n - 1:
+                ax.plot(
+                    [x + panel_w, x + panel_w + gap],
+                    [y + panel_h/2]*2,
+                    color="black"
+                )
+
+        x_end = n * (panel_w + gap)
+
+        y_pos = y + 0.65
+        y_neg = y + 0.35
+
+        ax.plot([x_end, X_MPPT], [y_pos, y_pos], "r", lw=2)
+        ax.plot([x_end, X_MPPT], [y_neg, y_neg], "k", lw=2)
+
+        conexiones.setdefault(inv, []).append((y_pos, y_neg))
+
+        y_base -= 2.5
+
+    for inv, pts in conexiones.items():
+        for (y_pos, y_neg) in pts:
+            ax.plot([X_MPPT, X_INV], [y_pos, y_pos], "r", lw=2)
+            ax.plot([X_MPPT, X_INV], [y_neg, y_neg], "k", lw=2)
+            ax.plot(X_INV, y_pos, "ro")
+            ax.plot(X_INV, y_neg, "ko")
+
+    ax.axis("off")
+    plt.tight_layout()
+    plt.savefig(out_path, dpi=200, bbox_inches="tight")
+    plt.close()
+
+    return str(out_path)
+
+
+# =========================================================
+# PIPELINE DE ARTEFACTOS
 # =========================================================
 
 def generar_artefactos(
@@ -132,24 +206,15 @@ def generar_artefactos(
     max_cols: int = 7,
     gap_cumbrera_m: float = 0.35,
 ) -> Dict[str, str]:
-    """
-    Genera artefactos gráficos del proyecto FV.
-
-    ✔ charts → generar_charts
-    ✔ layout → generar_layout_paneles
-    ✔ paths unificados
-    """
 
     from reportes.generar_charts import generar_charts
     from reportes.generar_layout_paneles import generar_layout_paneles
 
-    # --- paths base
     paths = construir_paths_salida(out_dir)
 
-    # =====================================================
-    # CHARTS (motor único)
-    # =====================================================
-
+    # =========================
+    # CHARTS
+    # =========================
     charts = generar_charts(
         res,
         paths["charts_dir"],
@@ -159,10 +224,9 @@ def generar_artefactos(
     if charts:
         paths.update({k: str(v) for k, v in charts.items()})
 
-    # =====================================================
-    # LAYOUT DE PANELES
-    # =====================================================
-
+    # =========================
+    # LAYOUT PANELES
+    # =========================
     n_paneles = inferir_n_paneles(res)
 
     if n_paneles > 0:
@@ -173,5 +237,17 @@ def generar_artefactos(
             dos_aguas=bool(dos_aguas),
             gap_cumbrera_m=float(gap_cumbrera_m),
         )
+
+    # =========================
+    # STRING FV (NUEVO)
+    # =========================
+    strings = getattr(res, "strings", None)
+
+    if strings:
+        path_string = Path(paths["out_dir"]) / "string_fv.png"
+
+        generar_string_fv_imagen(strings, path_string)
+
+        paths["string_fv"] = str(path_string)
 
     return paths
