@@ -1,165 +1,146 @@
 # -*- coding: utf-8 -*-
-from reportlab.platypus import SimpleDocTemplate, Spacer, Table
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import landscape, letter
-from reportlab.graphics.shapes import Drawing, Rect, Line, String, Image
+from __future__ import annotations
+
+import matplotlib
+matplotlib.use("Agg")
+
+import matplotlib.pyplot as plt
+from matplotlib.patches import Rectangle
 
 
-def generar_lamina_fv(pdf_path,
-                      panel_img=None,
-                      mc4_img=None,
-                      inversor_img=None):
+def generar_string_fv(strings, out_path, *_, **__):
 
-    doc = SimpleDocTemplate(pdf_path, pagesize=landscape(letter))
-    elements = []
+    if not strings:
+        raise ValueError("Lista vacía")
 
-    # =========================
-    # DIBUJO BASE
-    # =========================
-    d = Drawing(1000, 420)
+    # ==============================
+    # AGRUPAR POR MPPT
+    # ==============================
+    grupos = {}
+    for s in strings:
+        inv = getattr(s, "inversor", 1)
+        mppt = getattr(s, "mppt", 1)
+        grupos.setdefault((inv, mppt), []).append(s)
 
-    # ---- TÍTULO
-    d.add(String(300, 390,
-        "CONFIGURACIÓN DEL GENERADOR FOTOVOLTAICO (TOPOLOGÍA REAL)",
-        fontSize=14))
+    # ==============================
+    # CONFIG
+    # ==============================
+    X_PANEL = 0
+    X_MPPT = 9
+    X_INV = 13
 
-    # ---- LÍNEAS DE SECCIÓN
-    for x in [350, 550, 750]:
-        d.add(Line(x, 40, x, 360, strokeColor=colors.lightblue, strokeDashArray=[4,3]))
+    panel_w = 0.45
+    panel_h = 0.9
+    gap = 0.12
 
-    # ---- ENCABEZADOS
-    d.add(String(120, 350, "STRING FV\n(MÓDULOS EN SERIE)", fontSize=9))
-    d.add(String(420, 350, "SALIDA DC", fontSize=9))
-    d.add(String(620, 350, "ENTRADA MPPT", fontSize=9))
-    d.add(String(820, 350, "INVERSOR", fontSize=9))
+    fig, ax = plt.subplots(figsize=(16, 8))
 
-    # =========================
-    # FUNCIÓN STRING
-    # =========================
-    def dibujar_string(x, y, n, label):
+    # ==============================
+    # SECCIONES
+    # ==============================
+    for x in [X_MPPT - 0.5, X_INV - 0.5]:
+        ax.plot([x, x], [-4, 4], linestyle="--", linewidth=0.8, color="#cbd5e1")
 
-        d.add(String(x-80, y+10, label, fontSize=9))
+    y_base = 2
+    conexiones = {}
 
-        for i in range(n):
-
-            px = x + i * 22
-
-            # panel (imagen o fallback)
-            if panel_img:
-                d.add(Image(px, y, 18, 30, panel_img))
-            else:
-                d.add(Rect(px, y, 18, 30,
-                           fillColor=colors.HexColor("#1e293b")))
-
-            # conexión
-            if i < n-1:
-                d.add(Line(px+18, y+15, px+22, y+15))
-
-        x_end = x + n * 22
-
-        # cables
-        d.add(Line(x_end, y+20, x_end+100, y+20,
-                   strokeColor=colors.red, strokeWidth=2))
-
-        d.add(Line(x_end, y+10, x_end+100, y+10,
-                   strokeColor=colors.black, strokeWidth=2))
-
-        # MC4 (si existe)
-        if mc4_img:
-            d.add(Image(x_end+40, y+12, 30, 10, mc4_img))
-
-        return x_end + 100
-
-    # =========================
+    # ==============================
     # STRINGS
-    # =========================
-    x_salida_1 = dibujar_string(80, 260, 10, "STRING 1\n10 módulos")
-    x_salida_2 = dibujar_string(80, 120, 8, "STRING 2\n8 módulos")
+    # ==============================
+    for (inv, mppt), grupo in sorted(grupos.items()):
 
-    # =========================
-    # MPPT
-    # =========================
-    def dibujar_mppt(x, y, label):
+        s = grupo[0]
+        n = s.n_series
+        y = y_base
 
-        d.add(String(x, y+40, label, fontSize=9))
+        ax.text(-0.5, y + 0.3,
+                f"STRING {mppt}\n{n} MÓDULOS",
+                ha="right", fontsize=9)
 
-        # +
-        d.add(Rect(x, y+15, 20, 20, strokeColor=colors.red))
-        d.add(String(x+7, y+20, "+"))
+        # paneles
+        for i in range(n):
+            x = X_PANEL + i * (panel_w + gap)
 
-        # -
-        d.add(Rect(x, y-5, 20, 20, strokeColor=colors.black))
-        d.add(String(x+7, y, "-"))
+            ax.add_patch(Rectangle(
+                (x, y),
+                panel_w,
+                panel_h,
+                edgecolor="#0B2E4A",
+                facecolor="#1F2A37"
+            ))
 
-        return x + 20
+            if i < n - 1:
+                ax.plot(
+                    [x + panel_w, x + panel_w + gap],
+                    [y + panel_h / 2]*2,
+                    color="#2b2b2b",
+                    linewidth=1
+                )
 
-    x_mppt = 550
+        x_end = X_PANEL + n * (panel_w + gap)
 
-    dibujar_mppt(x_mppt, 260, "MPPT 1")
-    dibujar_mppt(x_mppt, 120, "MPPT 2")
+        # separación + y -
+        y_pos = y + 0.65
+        y_neg = y + 0.35
 
-    # =========================
+        # cables a MPPT
+        ax.plot([x_end, X_MPPT], [y_pos, y_pos], "r", lw=2)
+        ax.plot([x_end, X_MPPT], [y_neg, y_neg], "k", lw=2)
+
+        # bornes MPPT
+        ax.plot(X_MPPT, y_pos, "ro")
+        ax.plot(X_MPPT, y_neg, "ko")
+
+        conexiones.setdefault(inv, []).append((y_pos, y_neg))
+
+        y_base -= 2.5
+
+    # ==============================
     # INVERSOR
-    # =========================
-    inv_x = 780
-    inv_y = 120
+    # ==============================
+    for inv, pts in conexiones.items():
 
-    if inversor_img:
-        d.add(Image(inv_x, inv_y, 180, 180, inversor_img))
-    else:
-        d.add(Rect(inv_x, inv_y, 180, 180,
-                   fillColor=colors.lightgrey))
-        d.add(String(inv_x+40, inv_y+140, "INVERSOR 1"))
+        y_vals = [y for p in pts for y in p]
+        y_mid = sum(y_vals) / len(y_vals)
 
-    # conexiones
-    def conectar(y):
+        ax.add_patch(Rectangle(
+            (X_INV, y_mid - 1.5),
+            2.5,
+            3,
+            edgecolor="black",
+            facecolor="#eeeeee",
+            linewidth=1.5
+        ))
 
-        d.add(Line(x_mppt+20, y+25, inv_x, y+25,
-                   strokeColor=colors.red, strokeWidth=2))
+        ax.text(X_INV + 1.25, y_mid,
+                f"INVERSOR {inv}",
+                ha="center", va="center", fontsize=10)
 
-        d.add(Line(x_mppt+20, y+5, inv_x, y+5,
-                   strokeColor=colors.black, strokeWidth=2))
+        # conexiones escalonadas
+        for i, (y_pos, y_neg) in enumerate(pts):
 
-        d.add(Rect(inv_x-5, y+23, 6, 6, fillColor=colors.red))
-        d.add(Rect(inv_x-5, y+3, 6, 6, fillColor=colors.black))
+            x_mid = X_INV - 0.8
+            offset = 0.5 + i * 0.3
 
-    conectar(260)
-    conectar(120)
+            # positivo
+            ax.plot([X_MPPT, x_mid], [y_pos, y_pos], "r", lw=2)
+            ax.plot([x_mid, x_mid], [y_pos, y_pos - offset], "r", lw=2)
+            ax.plot([x_mid, X_INV], [y_pos - offset, y_pos - offset], "r", lw=2)
+            ax.plot(X_INV, y_pos - offset, "ro")
 
-    elements.append(d)
+            # negativo
+            ax.plot([X_MPPT, x_mid], [y_neg, y_neg], "k", lw=2)
+            ax.plot([x_mid, x_mid], [y_neg, y_neg - offset], "k", lw=2)
+            ax.plot([x_mid, X_INV], [y_neg - offset, y_neg - offset], "k", lw=2)
+            ax.plot(X_INV, y_neg - offset, "ko")
 
-    elements.append(Spacer(1, 20))
+    # ==============================
+    # FINAL
+    # ==============================
+    ax.set_xlim(-1, 17)
+    ax.set_ylim(-4, 4)
+    ax.axis("off")
 
-    # =========================
-    # TABLA
-    # =========================
-    data = [
-        ["MPPT", "N° STRINGS", "MÓDULOS", "TOTAL"],
-        ["MPPT 1", "1", "10", "10"],
-        ["MPPT 2", "1", "8", "8"]
-    ]
-
-    table = Table(data)
-    table.setStyle([
-        ("GRID", (0,0), (-1,-1), 1, colors.black),
-        ("BACKGROUND", (0,0), (-1,0), colors.lightgrey)
-    ])
-
-    elements.append(table)
-
-    # =========================
-    # GENERAR PDF
-    # =========================
-    doc.build(elements)
-
-
-# =========================
-# EJECUCIÓN
-# =========================
-if __name__ == "__main__":
-    generar_lamina_fv(
-        "lamina_fv_final.pdf",
-        panel_img=None,       # 👉 pon ruta PNG si tienes
-        mc4_img=None,
-        inversor_img=None
-    )
+    plt.tight_layout()
+    plt.savefig(out_path, dpi=200, bbox_inches="tight")
+    plt.close()
