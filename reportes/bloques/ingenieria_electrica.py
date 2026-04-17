@@ -7,7 +7,8 @@ from ..secciones_tecnicas.tabla_nec import (
 )
 from ..secciones_tecnicas.layout_paneles import insertar_layout_paneles
 from ..secciones_tecnicas.tabla_distribucion_strings import crear_tabla_distribucion_inversores
-
+from pathlib import Path
+from reportlab.platypus import Paragraph, Spacer, PageBreak, Image
 # =========================================================
 # LECTURA SEGURA
 # =========================================================
@@ -192,8 +193,7 @@ def _section_energia_mensual(story, paths, styles, content_w):
 
 def build_ingenieria_electrica(resultado, datos, paths, pal, styles, content_w, safe_image=None):
 
-    from pathlib import Path
-    from reportlab.platypus import Paragraph, Spacer, PageBreak, Image
+    
 
     story = []
 
