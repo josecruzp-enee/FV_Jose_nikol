@@ -8,14 +8,6 @@ from matplotlib.patches import Rectangle
 
 
 def generar_string_fv(strings, out_path, *_, **__):
-    """
-    Generador de strings FV inteligente.
-
-    ✔ Detecta MPPT automáticamente
-    ✔ Dibuja paralelo SOLO cuando aplica
-    ✔ Soporta múltiples inversores
-    ✔ Mantiene compatibilidad con imports existentes
-    """
 
     if not strings:
         raise ValueError("Lista de strings vacía")
@@ -33,7 +25,7 @@ def generar_string_fv(strings, out_path, *_, **__):
         grupos.setdefault(key, []).append(s)
 
     # =====================================================
-    # PARÁMETROS GRÁFICOS
+    # PARÁMETROS
     # =====================================================
     panel_w = 0.5
     panel_h = 1.0
@@ -47,10 +39,11 @@ def generar_string_fv(strings, out_path, *_, **__):
     conexiones_inv = {}
 
     # =====================================================
-    # DIBUJAR STRINGS POR MPPT
+    # DIBUJAR STRINGS
     # =====================================================
-    for (inv, mppt), grupo in grupos.items():
+    for (inv, mppt) in sorted(grupos.keys()):
 
+        grupo = grupos[(inv, mppt)]
         y_strings = []
 
         for idx, s in enumerate(grupo):
@@ -60,9 +53,7 @@ def generar_string_fv(strings, out_path, *_, **__):
             y_center = y_offset + panel_h / 2
             y_strings.append(y_center)
 
-            # -------------------------
-            # MÓDULOS
-            # -------------------------
+            # módulos
             for i in range(n_series):
 
                 x = i * (panel_w + gap)
@@ -96,15 +87,15 @@ def generar_string_fv(strings, out_path, *_, **__):
             )
 
         # =====================================================
-        # CONEXIÓN MPPT
+        # MPPT (PARALELO SOLO SI APLICA)
         # =====================================================
         x_mppt = width + 0.8
 
         if len(grupo) > 1:
-            # paralelo
             y_min = min(y_strings)
             y_max = max(y_strings)
 
+            # bus vertical (paralelo real)
             ax.plot(
                 [x_mppt, x_mppt],
                 [y_min, y_max],
@@ -114,7 +105,6 @@ def generar_string_fv(strings, out_path, *_, **__):
 
             y_mppt = (y_min + y_max) / 2
         else:
-            # directo
             y_mppt = y_strings[0]
 
         # salida MPPT
@@ -139,17 +129,20 @@ def generar_string_fv(strings, out_path, *_, **__):
         y_global -= (len(grupo) * v_gap + 1)
 
     # =====================================================
-    # INVERSORES
+    # INVERSORES (ENTRADAS SEPARADAS ✔)
     # =====================================================
     for inv, puntos in conexiones_inv.items():
 
         x_inv = max(p[0] for p in puntos) + 1.5
         y_vals = [p[1] for p in puntos]
 
-        y_mid = sum(y_vals) / len(y_vals)
+        y_min = min(y_vals)
+        y_max = max(y_vals)
+        y_inv = (y_min + y_max) / 2
 
+        # inversor
         rect = Rectangle(
-            (x_inv, y_mid - 0.6),
+            (x_inv, y_inv - 0.6),
             1.5,
             1.2,
             edgecolor="black",
@@ -160,7 +153,7 @@ def generar_string_fv(strings, out_path, *_, **__):
 
         ax.text(
             x_inv + 0.75,
-            y_mid,
+            y_inv,
             f"INV {inv}",
             ha="center",
             va="center",
@@ -168,10 +161,11 @@ def generar_string_fv(strings, out_path, *_, **__):
             fontweight="bold"
         )
 
+        # 🔥 CLAVE: entradas independientes (NO unión)
         for (x, y) in puntos:
             ax.plot(
                 [x, x_inv],
-                [y, y_mid],
+                [y, y],   # ← AQUÍ ESTÁ LA CORRECCIÓN REAL
                 color="red",
                 linewidth=2
             )
