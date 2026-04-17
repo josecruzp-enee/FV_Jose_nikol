@@ -2,20 +2,16 @@ from typing import List, Any
 from reportlab.platypus import Table, TableStyle
 
 
-# ==========================================================
-# TABLA — CONFIGURACIÓN DE STRINGS
-# ==========================================================
-
 def crear_tabla_strings(strings: List[Any], pal, content_w):
 
     if not strings:
         return None
 
-    # ------------------------------------------------------
-    # Lectura segura dict / dataclass
-    # ------------------------------------------------------
+    # ======================================================
+    # LECTURA SEGURA
+    # ======================================================
 
-    def leer(obj, campo, default=0):
+    def leer(obj, campo, default=None):
 
         if obj is None:
             return default
@@ -25,24 +21,44 @@ def crear_tabla_strings(strings: List[Any], pal, content_w):
 
         return getattr(obj, campo, default)
 
-    # ------------------------------------------------------
-    # Calcular paralelos por MPPT
-    # ------------------------------------------------------
+    def to_int(x, default=0):
+        try:
+            return int(x)
+        except Exception:
+            return default
+
+    def to_float(x, default=0.0):
+        try:
+            return float(x)
+        except Exception:
+            return default
+
+    def fmt_int(x):
+        return str(to_int(x)) if x is not None else "—"
+
+    def fmt_float(x, dec=2):
+        try:
+            return f"{float(x):.{dec}f}"
+        except Exception:
+            return "—"
+
+    # ======================================================
+    # CONTEO POR MPPT
+    # ======================================================
 
     conteo_mppt = {}
 
     for s in strings:
 
-        inv = int(leer(s, "inversor"))
-        mppt = int(leer(s, "mppt"))
+        inv = to_int(leer(s, "inversor"))
+        mppt = to_int(leer(s, "mppt"))
 
         key = (inv, mppt)
-
         conteo_mppt[key] = conteo_mppt.get(key, 0) + 1
 
-    # ------------------------------------------------------
-    # Encabezado
-    # ------------------------------------------------------
+    # ======================================================
+    # ENCABEZADO
+    # ======================================================
 
     header = [
         "String",
@@ -58,57 +74,55 @@ def crear_tabla_strings(strings: List[Any], pal, content_w):
 
     rows = [header]
 
-    # ------------------------------------------------------
-    # Ordenar strings
-    # ------------------------------------------------------
+    # ======================================================
+    # ORDENAMIENTO SEGURO
+    # ======================================================
 
     strings = sorted(
         strings,
         key=lambda s: (
-            leer(s, "inversor"),
-            leer(s, "mppt"),
-            leer(s, "id"),
+            to_int(leer(s, "inversor")),
+            to_int(leer(s, "mppt")),
+            to_int(leer(s, "id")),
         )
     )
 
-    # ------------------------------------------------------
-    # Construir filas
-    # ------------------------------------------------------
+    # ======================================================
+    # FILAS
+    # ======================================================
 
     for s in strings:
 
-        inv = int(leer(s, "inversor"))
-        mppt = int(leer(s, "mppt"))
+        inv = to_int(leer(s, "inversor"))
+        mppt = to_int(leer(s, "mppt"))
 
         paralelos = conteo_mppt.get((inv, mppt), 1)
 
         voc = (
             leer(s, "voc_frio_string_v")
             or leer(s, "voc_string_v")
-            or 0
         )
 
         rows.append([
 
-            int(leer(s, "id")),
+            fmt_int(leer(s, "id")),
             inv,
             mppt,
 
-            int(leer(s, "n_series")),
-
+            fmt_int(leer(s, "n_series")),
             paralelos,
 
-            f"{float(leer(s,'vmp_string_v')):.0f}",
-            f"{float(voc):.0f}",
+            fmt_float(leer(s, "vmp_string_v"), 0),
+            fmt_float(voc, 0),
 
-            f"{float(leer(s,'imp_string_a')):.2f}",
-            f"{float(leer(s,'isc_string_a')):.2f}",
+            fmt_float(leer(s, "imp_string_a"), 2),
+            fmt_float(leer(s, "isc_string_a"), 2),
 
         ])
 
-    # ------------------------------------------------------
-    # Anchos de columna
-    # ------------------------------------------------------
+    # ======================================================
+    # ANCHOS
+    # ======================================================
 
     colw = [
 
