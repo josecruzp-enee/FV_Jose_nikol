@@ -1,146 +1,99 @@
 # -*- coding: utf-8 -*-
-from __future__ import annotations
-
-import matplotlib
-matplotlib.use("Agg")
-
-import matplotlib.pyplot as plt
-from matplotlib.patches import Rectangle
+from reportlab.lib.pagesizes import landscape, letter
+from reportlab.platypus import SimpleDocTemplate
+from reportlab.pdfgen import canvas
+from reportlab.lib import colors
 
 
-def generar_string_fv(strings, out_path, *_, **__):
+def generar_lamina_fv(strings, out_path):
 
-    if not strings:
-        raise ValueError("Lista vacía")
+    c = canvas.Canvas(out_path, pagesize=landscape(letter))
 
-    # ==============================
-    # AGRUPAR POR MPPT
-    # ==============================
-    grupos = {}
-    for s in strings:
-        inv = getattr(s, "inversor", 1)
-        mppt = getattr(s, "mppt", 1)
-        grupos.setdefault((inv, mppt), []).append(s)
+    width, height = landscape(letter)
 
-    # ==============================
-    # CONFIG
-    # ==============================
-    X_PANEL = 0
-    X_MPPT = 9
-    X_INV = 13
+    # =========================
+    # TÍTULO
+    # =========================
+    c.setFont("Helvetica-Bold", 14)
+    c.drawCentredString(
+        width / 2,
+        height - 40,
+        "CONFIGURACIÓN DEL GENERADOR FOTOVOLTAICO (TOPOLOGÍA REAL)"
+    )
 
-    panel_w = 0.45
-    panel_h = 0.9
-    gap = 0.12
+    # =========================
+    # SECCIONES (líneas)
+    # =========================
+    c.setStrokeColor(colors.grey)
+    c.setDash(3, 3)
 
-    fig, ax = plt.subplots(figsize=(16, 8))
+    c.line(350, 100, 350, height - 80)
+    c.line(500, 100, 500, height - 80)
+    c.line(650, 100, 650, height - 80)
 
-    # ==============================
-    # SECCIONES
-    # ==============================
-    for x in [X_MPPT - 0.5, X_INV - 0.5]:
-        ax.plot([x, x], [-4, 4], linestyle="--", linewidth=0.8, color="#cbd5e1")
+    c.setDash()
 
-    y_base = 2
-    conexiones = {}
-
-    # ==============================
+    # =========================
     # STRINGS
-    # ==============================
-    for (inv, mppt), grupo in sorted(grupos.items()):
+    # =========================
+    y = height - 150
 
-        s = grupo[0]
+    for i, s in enumerate(strings):
+
         n = s.n_series
-        y = y_base
 
-        ax.text(-0.5, y + 0.3,
-                f"STRING {mppt}\n{n} MÓDULOS",
-                ha="right", fontsize=9)
+        c.setFont("Helvetica", 9)
+        c.drawString(40, y + 10, f"STRING {i+1}")
+        c.drawString(40, y - 5, f"{n} MÓDULOS")
 
         # paneles
-        for i in range(n):
-            x = X_PANEL + i * (panel_w + gap)
+        x = 120
+        for j in range(n):
+            c.setFillColorRGB(0.12, 0.18, 0.28)
+            c.rect(x, y, 20, 40, fill=1)
 
-            ax.add_patch(Rectangle(
-                (x, y),
-                panel_w,
-                panel_h,
-                edgecolor="#0B2E4A",
-                facecolor="#1F2A37"
-            ))
+            x += 25
 
-            if i < n - 1:
-                ax.plot(
-                    [x + panel_w, x + panel_w + gap],
-                    [y + panel_h / 2]*2,
-                    color="#2b2b2b",
-                    linewidth=1
-                )
+        # cables
+        c.setStrokeColor(colors.red)
+        c.line(x, y + 25, 500, y + 25)
 
-        x_end = X_PANEL + n * (panel_w + gap)
+        c.setStrokeColor(colors.black)
+        c.line(x, y + 10, 500, y + 10)
 
-        # separación + y -
-        y_pos = y + 0.65
-        y_neg = y + 0.35
+        # MPPT
+        c.setStrokeColor(colors.black)
+        c.rect(500, y + 15, 20, 20)
 
-        # cables a MPPT
-        ax.plot([x_end, X_MPPT], [y_pos, y_pos], "r", lw=2)
-        ax.plot([x_end, X_MPPT], [y_neg, y_neg], "k", lw=2)
+        c.setFillColor(colors.red)
+        c.drawString(505, y + 20, "+")
 
-        # bornes MPPT
-        ax.plot(X_MPPT, y_pos, "ro")
-        ax.plot(X_MPPT, y_neg, "ko")
+        c.setFillColor(colors.black)
+        c.drawString(505, y + 5, "-")
 
-        conexiones.setdefault(inv, []).append((y_pos, y_neg))
+        # hacia inversor
+        c.setStrokeColor(colors.red)
+        c.line(520, y + 25, 650, y + 25)
 
-        y_base -= 2.5
+        c.setStrokeColor(colors.black)
+        c.line(520, y + 10, 650, y + 10)
 
-    # ==============================
+        y -= 120
+
+    # =========================
     # INVERSOR
-    # ==============================
-    for inv, pts in conexiones.items():
+    # =========================
+    c.setStrokeColor(colors.black)
+    c.setFillColorRGB(0.93, 0.93, 0.93)
 
-        y_vals = [y for p in pts for y in p]
-        y_mid = sum(y_vals) / len(y_vals)
+    c.rect(650, height/2 - 100, 180, 200, fill=1)
 
-        ax.add_patch(Rectangle(
-            (X_INV, y_mid - 1.5),
-            2.5,
-            3,
-            edgecolor="black",
-            facecolor="#eeeeee",
-            linewidth=1.5
-        ))
+    c.setFillColor(colors.black)
+    c.drawCentredString(740, height/2, "INVERSOR 1")
 
-        ax.text(X_INV + 1.25, y_mid,
-                f"INVERSOR {inv}",
-                ha="center", va="center", fontsize=10)
-
-        # conexiones escalonadas
-        for i, (y_pos, y_neg) in enumerate(pts):
-
-            x_mid = X_INV - 0.8
-            offset = 0.5 + i * 0.3
-
-            # positivo
-            ax.plot([X_MPPT, x_mid], [y_pos, y_pos], "r", lw=2)
-            ax.plot([x_mid, x_mid], [y_pos, y_pos - offset], "r", lw=2)
-            ax.plot([x_mid, X_INV], [y_pos - offset, y_pos - offset], "r", lw=2)
-            ax.plot(X_INV, y_pos - offset, "ro")
-
-            # negativo
-            ax.plot([X_MPPT, x_mid], [y_neg, y_neg], "k", lw=2)
-            ax.plot([x_mid, x_mid], [y_neg, y_neg - offset], "k", lw=2)
-            ax.plot([x_mid, X_INV], [y_neg - offset, y_neg - offset], "k", lw=2)
-            ax.plot(X_INV, y_neg - offset, "ko")
-
-    # ==============================
+    # =========================
     # FINAL
-    # ==============================
-    ax.set_xlim(-1, 17)
-    ax.set_ylim(-4, 4)
-    ax.axis("off")
+    # =========================
+    c.save()
 
-    plt.tight_layout()
-    plt.savefig(out_path, dpi=200, bbox_inches="tight")
-    plt.close()
+    return out_path
