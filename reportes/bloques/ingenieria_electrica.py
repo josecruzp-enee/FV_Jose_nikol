@@ -193,15 +193,13 @@ def _section_energia_mensual(story, paths, styles, content_w):
 
 def build_ingenieria_electrica(resultado, datos, paths, pal, styles, content_w, safe_image=None):
 
-    
-
     story = []
 
     resultado = resultado or {}
     paths = paths or {}
 
     # =========================================================
-    # OBTENER STRINGS (CORRECTO SEGÚN TU UI)
+    # OBTENER STRINGS (CORRECTO)
     # =========================================================
     paneles = leer(resultado, "paneles", None)
 
@@ -229,29 +227,26 @@ def build_ingenieria_electrica(resultado, datos, paths, pal, styles, content_w, 
     story.append(PageBreak())
 
     # =========================================================
-    # GENERAR STRING FV (AUTOMÁTICO)
+    # GENERAR STRING FV (CORRECTO)
     # =========================================================
     string_fv_path = None
 
     try:
-        if paneles and hasattr(paneles, "strings") and paneles.strings:
-            strings = paneles.strings  
-            from pathlib import Path
+        if strings:
+
             ruta = Path("outputs/string_fv.png")
             ruta.parent.mkdir(parents=True, exist_ok=True)
+
             from reportes.generar_string_fv import generar_string_fv
-            
-            generar_string_fv(
-                strings,
-                ruta
-            )
+
+            generar_string_fv(strings, ruta)
+
             string_fv_path = str(ruta)
             paths["string_fv"] = string_fv_path
+
     except Exception as e:
         print("Error generando string FV:", e)
         string_fv_path = None
-
-            
 
     # =========================================================
     # MOSTRAR STRING FV
@@ -276,11 +271,13 @@ def build_ingenieria_electrica(resultado, datos, paths, pal, styles, content_w, 
 
         story.append(Spacer(1, 12))
 
+        # 🔥 TEXTO CORRECTO (NO MIENTE)
         story.append(
             Paragraph(
-                "String representativo del generador fotovoltaico. "
-                "Todos los strings del sistema tienen la misma configuración "
-                "y se conectan en paralelo al inversor.",
+                "Configuración real del generador fotovoltaico. "
+                "Cada string se conecta a su respectivo MPPT del inversor. "
+                "Solo se presentan conexiones en paralelo cuando múltiples strings "
+                "comparten el mismo MPPT.",
                 styles["BodyText"]
             )
         )
@@ -291,7 +288,7 @@ def build_ingenieria_electrica(resultado, datos, paths, pal, styles, content_w, 
 
         msg = "No se pudo generar el diagrama del string fotovoltaico."
 
-        if not paneles or not strings:
+        if not strings:
             msg += " (Sin datos de strings en resultado.paneles)"
         else:
             msg += " (Error al generar imagen o archivo no encontrado)"
@@ -299,11 +296,10 @@ def build_ingenieria_electrica(resultado, datos, paths, pal, styles, content_w, 
         story.append(Paragraph(msg, styles["BodyText"]))
         story.append(Spacer(1, 6))
 
-        # DEBUG mínimo útil
+        # 🔥 DEBUG REAL (NO basura vieja)
         story.append(
             Paragraph(
-                f"DEBUG → n_series={locals().get('n_series', None)}, "
-                f"n_strings={locals().get('n_strings', None)}",
+                f"DEBUG → strings_detectados={len(strings)}",
                 styles["BodyText"]
             )
         )
