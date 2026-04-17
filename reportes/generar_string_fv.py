@@ -23,10 +23,10 @@ def generar_string_fv(strings, out_path, *_, **__):
         grupos.setdefault((inv, mppt), []).append(s)
 
     # ==============================
-    # LAYOUT (FIJO)
+    # CONFIGURACIÓN
     # ==============================
     X_PANEL = 0
-    X_STRING = 6
+    X_STRING_END = 6
     X_MPPT = 9
     X_INV = 13
 
@@ -44,10 +44,11 @@ def generar_string_fv(strings, out_path, *_, **__):
             ha="center", fontsize=14, fontweight="bold")
 
     # ==============================
-    # SECCIONES (LÍNEAS GUÍA)
+    # SECCIONES
     # ==============================
-    for x in [X_STRING - 0.5, X_MPPT - 0.5, X_INV - 0.5]:
-        ax.plot([x, x], [-4, 4], linestyle="--", linewidth=1, color="#9aa5b1")
+    for x in [X_STRING_END - 0.5, X_MPPT - 0.5, X_INV - 0.5]:
+        ax.plot([x, x], [-4, 4],
+                linestyle="--", linewidth=0.8, color="#cbd5e1")
 
     ax.text(1.5, 3, "STRING FV\n(MÓDULOS EN SERIE)", ha="center", fontsize=10)
     ax.text(7, 3, "SALIDA DC\nDEL STRING", ha="center", fontsize=10)
@@ -67,14 +68,11 @@ def generar_string_fv(strings, out_path, *_, **__):
 
         y = y_base
 
-        # texto string
         ax.text(-0.5, y + 0.3,
                 f"STRING {mppt}\n{n} MÓDULOS",
                 ha="right", fontsize=9)
 
-        # ==========================
-        # PANELES
-        # ==========================
+        # paneles
         for i in range(n):
             x = X_PANEL + i * (panel_w + gap)
 
@@ -89,29 +87,31 @@ def generar_string_fv(strings, out_path, *_, **__):
             if i < n - 1:
                 ax.plot(
                     [x + panel_w, x + panel_w + gap],
-                    [y + panel_h / 2] * 2,
-                    color="black",
+                    [y + panel_h / 2]*2,
+                    color="#2b2b2b",
                     linewidth=1
                 )
 
         x_end = X_PANEL + n * (panel_w + gap)
 
-        y_pos = y + 0.7
-        y_neg = y + 0.25
+        # separación + y -
+        sep = 0.25
+        y_pos = y + 0.65
+        y_neg = y_pos - sep
 
         # ==========================
-        # CABLES STRING → MPPT
+        # STRING → MPPT
         # ==========================
-        ax.plot([x_end, X_MPPT], [y_pos, y_pos], color="red", linewidth=2)
-        ax.plot([x_end, X_MPPT], [y_neg, y_neg], color="black", linewidth=2)
+        ax.plot([x_end, X_MPPT], [y_pos, y_pos], "r", lw=2)
+        ax.plot([x_end, X_MPPT], [y_neg, y_neg], "#2b2b2b", lw=2)
 
-        # terminal MPPT
-        ax.add_patch(Rectangle((X_MPPT - 0.2, y_pos - 0.1), 0.4, 0.4,
-                               edgecolor="red", facecolor="white"))
+        # bornes MPPT
+        ax.add_patch(Rectangle((X_MPPT - 0.25, y_pos - 0.15),
+                               0.5, 0.5, edgecolor="red", facecolor="white", linewidth=1.5))
         ax.text(X_MPPT, y_pos + 0.05, "+", ha="center", color="red")
 
-        ax.add_patch(Rectangle((X_MPPT - 0.2, y_neg - 0.1), 0.4, 0.4,
-                               edgecolor="black", facecolor="white"))
+        ax.add_patch(Rectangle((X_MPPT - 0.25, y_neg - 0.15),
+                               0.5, 0.5, edgecolor="#2b2b2b", facecolor="white", linewidth=1.5))
         ax.text(X_MPPT, y_neg + 0.05, "–", ha="center")
 
         ax.text(X_MPPT, y + 1.1, f"MPPT {mppt}", ha="center", fontsize=9)
@@ -128,6 +128,7 @@ def generar_string_fv(strings, out_path, *_, **__):
         y_vals = [y for p in pts for y in p]
         y_mid = sum(y_vals) / len(y_vals)
 
+        # caja inversor
         ax.add_patch(Rectangle(
             (X_INV, y_mid - 1.5),
             2.5,
@@ -141,16 +142,27 @@ def generar_string_fv(strings, out_path, *_, **__):
                 f"INVERSOR {inv}",
                 ha="center", va="center", fontsize=10)
 
-        # conexiones
-        for (y_pos, y_neg) in pts:
+        # ==============================
+        # CONEXIÓN ESCALONADA (CLAVE)
+        # ==============================
+        for i, (y_pos, y_neg) in enumerate(pts):
 
-            ax.plot([X_MPPT + 0.2, X_INV], [y_pos, y_pos],
-                    color="red", linewidth=2)
-            ax.plot([X_MPPT + 0.2, X_INV], [y_neg, y_neg],
-                    color="black", linewidth=2)
+            offset_x = 0.8
+            offset_y = 0.5 + i * 0.3  # evita que se monten
 
-            ax.plot(X_INV, y_pos, "ro")
-            ax.plot(X_INV, y_neg, "ko")
+            x_mid = X_INV - offset_x
+
+            # POSITIVO
+            ax.plot([X_MPPT + 0.2, x_mid], [y_pos, y_pos], "r", lw=2)
+            ax.plot([x_mid, x_mid], [y_pos, y_pos - offset_y], "r", lw=2)
+            ax.plot([x_mid, X_INV], [y_pos - offset_y, y_pos - offset_y], "r", lw=2)
+            ax.plot(X_INV, y_pos - offset_y, "ro")
+
+            # NEGATIVO
+            ax.plot([X_MPPT + 0.2, x_mid], [y_neg, y_neg], "#2b2b2b", lw=2)
+            ax.plot([x_mid, x_mid], [y_neg, y_neg - offset_y], "#2b2b2b", lw=2)
+            ax.plot([x_mid, X_INV], [y_neg - offset_y, y_neg - offset_y], "#2b2b2b", lw=2)
+            ax.plot(X_INV, y_neg - offset_y, "ko")
 
     # ==============================
     # FINAL
