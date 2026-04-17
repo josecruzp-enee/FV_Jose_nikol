@@ -20,7 +20,7 @@ def build_analisis_energetico(
     pal,
     styles,
     content_w,
-    safe_image,
+    safe_image=None
 ):
 
     story = []
