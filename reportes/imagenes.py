@@ -133,7 +133,7 @@ def generar_artefactos(
     # STRING FV (INTEGRADO COMPLETO)
     # =====================================================
     try:
-        strings = getattr(res, "strings", None)
+        strings = res.get("strings") if isinstance(res, dict) else getattr(res, "strings", None)
 
         if strings:
 
