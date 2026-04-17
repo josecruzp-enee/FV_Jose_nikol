@@ -21,9 +21,6 @@ def _ensure_dir(p: Path) -> Path:
 
 
 def construir_paths_salida(base_dir: str | Path) -> Dict[str, str]:
-    """
-    Contrato único de rutas de salida para artefactos.
-    """
     base = Path(base_dir)
     _ensure_dir(base)
 
@@ -55,7 +52,7 @@ def _as_float(x: Any, default: float = 0.0) -> float:
 
 
 # =========================================================
-# INFERENCIA DE PANELES (SOLO VISUAL)
+# INFERENCIA DE PANELES
 # =========================================================
 
 def inferir_n_paneles(res: Any) -> int:
@@ -84,117 +81,11 @@ def inferir_n_paneles(res: Any) -> int:
     if n > 0:
         return n
 
-    kwp = None
-
-    if isinstance(sizing, dict):
-        kwp = sizing.get("kwp_dc") or sizing.get("kwp_recomendado")
-    else:
-        kwp = getattr(sizing, "kwp_dc", None) or getattr(sizing, "kwp_recomendado", None)
-
-    if kwp is None:
-        kwp = res.get("kwp_dc") if isinstance(res, dict) else getattr(res, "kwp_dc", None)
-
-    kwp = _as_float(kwp, 0.0)
-    if kwp <= 0:
-        return 0
-
-    panel_wp = None
-
-    if isinstance(sizing, dict):
-        panel_wp = sizing.get("panel_wp")
-    else:
-        panel_wp = getattr(sizing, "panel_wp", None)
-
-    if panel_wp is None:
-        panel_wp = res.get("panel_wp") if isinstance(res, dict) else getattr(res, "panel_wp", None)
-
-    panel_wp = _as_float(panel_wp, 550.0)
-    if panel_wp <= 0:
-        panel_wp = 550.0
-
-    return max(0, int(round((kwp * 1000.0) / panel_wp)))
+    return 0
 
 
 # =========================================================
-# GENERADOR STRING FV (IMAGEN)
-# =========================================================
-
-def generar_string_fv_imagen(strings, out_path):
-
-    if not strings:
-        return None
-
-    out_path = Path(out_path)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-
-    grupos = {}
-    for s in strings:
-        inv = getattr(s, "inversor", 1)
-        mppt = getattr(s, "mppt", 1)
-        grupos.setdefault((inv, mppt), []).append(s)
-
-    fig, ax = plt.subplots(figsize=(14, 6))
-
-    panel_w, panel_h, gap = 0.45, 0.9, 0.12
-    X_MPPT = 8
-    X_INV = 12
-
-    y_base = 2
-    conexiones = {}
-
-    for (inv, mppt), grupo in grupos.items():
-
-        s = grupo[0]
-        n = s.n_series
-        y = y_base
-
-        for i in range(n):
-            x = i * (panel_w + gap)
-
-            ax.add_patch(Rectangle(
-                (x, y),
-                panel_w,
-                panel_h,
-                edgecolor="black",
-                facecolor="#1e293b"
-            ))
-
-            if i < n - 1:
-                ax.plot(
-                    [x + panel_w, x + panel_w + gap],
-                    [y + panel_h/2]*2,
-                    color="black"
-                )
-
-        x_end = n * (panel_w + gap)
-
-        y_pos = y + 0.65
-        y_neg = y + 0.35
-
-        ax.plot([x_end, X_MPPT], [y_pos, y_pos], "r", lw=2)
-        ax.plot([x_end, X_MPPT], [y_neg, y_neg], "k", lw=2)
-
-        conexiones.setdefault(inv, []).append((y_pos, y_neg))
-
-        y_base -= 2.5
-
-    for inv, pts in conexiones.items():
-        for (y_pos, y_neg) in pts:
-            ax.plot([X_MPPT, X_INV], [y_pos, y_pos], "r", lw=2)
-            ax.plot([X_MPPT, X_INV], [y_neg, y_neg], "k", lw=2)
-            ax.plot(X_INV, y_pos, "ro")
-            ax.plot(X_INV, y_neg, "ko")
-
-    ax.axis("off")
-    plt.tight_layout()
-    plt.savefig(out_path, dpi=200, bbox_inches="tight")
-    plt.close()
-
-    return str(out_path)
-
-
-# =========================================================
-# PIPELINE DE ARTEFACTOS
+# PIPELINE
 # =========================================================
 
 def generar_artefactos(
@@ -225,7 +116,7 @@ def generar_artefactos(
         paths.update({k: str(v) for k, v in charts.items()})
 
     # =========================
-    # LAYOUT PANELES
+    # LAYOUT
     # =========================
     n_paneles = inferir_n_paneles(res)
 
@@ -238,16 +129,85 @@ def generar_artefactos(
             gap_cumbrera_m=float(gap_cumbrera_m),
         )
 
-    # =========================
-    # STRING FV (NUEVO)
-    # =========================
-    strings = getattr(res, "strings", None)
+    # =====================================================
+    # STRING FV (INTEGRADO COMPLETO)
+    # =====================================================
+    try:
+        strings = getattr(res, "strings", None)
 
-    if strings:
-        path_string = Path(paths["out_dir"]) / "string_fv.png"
+        if strings:
 
-        generar_string_fv_imagen(strings, path_string)
+            path_string = (Path(paths["out_dir"]) / "string_fv.png").resolve()
+            path_string.parent.mkdir(parents=True, exist_ok=True)
 
-        paths["string_fv"] = str(path_string)
+            # ===== DIBUJO =====
+            grupos = {}
+            for s in strings:
+                inv = getattr(s, "inversor", 1)
+                mppt = getattr(s, "mppt", 1)
+                grupos.setdefault((inv, mppt), []).append(s)
+
+            fig, ax = plt.subplots(figsize=(12, 5))
+
+            panel_w, panel_h, gap = 0.5, 1.0, 0.15
+            X_MPPT, X_INV = 7.5, 10.5
+
+            y_base = 2.0
+            conexiones = []
+
+            for (inv, mppt), grupo in sorted(grupos.items()):
+                s = grupo[0]
+                n = int(getattr(s, "n_series", 0) or 0)
+
+                y = y_base
+
+                for i in range(n):
+                    x = i * (panel_w + gap)
+
+                    ax.add_patch(Rectangle(
+                        (x, y),
+                        panel_w,
+                        panel_h,
+                        edgecolor="black",
+                        facecolor="#1e293b"
+                    ))
+
+                    if i < n - 1:
+                        ax.plot(
+                            [x + panel_w, x + panel_w + gap],
+                            [y + panel_h / 2]*2,
+                            color="black"
+                        )
+
+                x_end = n * (panel_w + gap)
+
+                y_pos = y + 0.7
+                y_neg = y + 0.3
+
+                ax.plot([x_end, X_MPPT], [y_pos, y_pos], "r", lw=2)
+                ax.plot([x_end, X_MPPT], [y_neg, y_neg], "k", lw=2)
+
+                conexiones.append((y_pos, y_neg))
+
+                y_base -= 2.2
+
+            for (y_pos, y_neg) in conexiones:
+                ax.plot([X_MPPT, X_INV], [y_pos, y_pos], "r", lw=2)
+                ax.plot([X_MPPT, X_INV], [y_neg, y_neg], "k", lw=2)
+                ax.plot(X_INV, y_pos, "ro")
+                ax.plot(X_INV, y_neg, "ko")
+
+            ax.axis("off")
+            plt.tight_layout()
+            plt.savefig(path_string, dpi=200, bbox_inches="tight")
+            plt.close()
+
+            if path_string.exists():
+                paths["string_fv"] = str(path_string)
+            else:
+                print("❌ No se creó string_fv.png")
+
+    except Exception as e:
+        print("❌ ERROR STRING FV:", e)
 
     return paths
