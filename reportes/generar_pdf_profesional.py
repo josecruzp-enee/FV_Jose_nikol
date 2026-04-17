@@ -106,7 +106,7 @@ def generar_pdf_profesional(
             )
 
         except Exception as e:
-            print(f"❌ Error en bloque {bloque.__name__}: {e}")
+            raise Exception(f"❌ Error en bloque {bloque.__name__}: {e}")
 
     # ======================================================
     # CONSTRUIR PDF
