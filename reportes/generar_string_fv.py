@@ -20,6 +20,7 @@ def generar_string_fv(strings, out_path, *_, **__):
     for s in strings:
         inv = getattr(s, "inversor", 1)
         mppt = getattr(s, "mppt", 1)
+
         grupos.setdefault((inv, mppt), []).append(s)
 
     # =====================================================
@@ -37,7 +38,7 @@ def generar_string_fv(strings, out_path, *_, **__):
     conexiones_inv = {}
 
     # =====================================================
-    # STRINGS
+    # DIBUJAR STRINGS
     # =====================================================
     for (inv, mppt) in sorted(grupos.keys()):
 
@@ -82,7 +83,7 @@ def generar_string_fv(strings, out_path, *_, **__):
             ax.plot([width, width + 0.8], [y_center - 0.25, y_center - 0.25], color="black", linewidth=2)
 
         # =====================================================
-        # MPPT (PARALELO SI APLICA)
+        # MPPT (PARALELO SOLO SI APLICA)
         # =====================================================
         x_mppt = width + 0.8
 
@@ -90,7 +91,7 @@ def generar_string_fv(strings, out_path, *_, **__):
             y_min = min(y_strings)
             y_max = max(y_strings)
 
-            # buses
+            # buses + y -
             ax.plot([x_mppt, x_mppt], [y_min, y_max], color="red", linewidth=3)
             ax.plot([x_mppt, x_mppt], [y_min - 0.25, y_max - 0.25], color="black", linewidth=3)
 
@@ -102,10 +103,21 @@ def generar_string_fv(strings, out_path, *_, **__):
         ax.plot([x_mppt, x_mppt + 1], [y_mppt, y_mppt], color="red", linewidth=2)
         ax.plot([x_mppt, x_mppt + 1], [y_mppt - 0.25, y_mppt - 0.25], color="black", linewidth=2)
 
-        conexiones_inv.setdefault(inv, []).append((x_mppt + 1, y_mppt))
+        # 🔥 GUARDAR + Y -
+        conexiones_inv.setdefault(inv, []).append({
+            "x": x_mppt + 1,
+            "y_pos": y_mppt,
+            "y_neg": y_mppt - 0.25
+        })
 
         # etiqueta
-        ax.text(x_mppt, y_mppt + 0.5, f"MPPT {mppt}", ha="center", fontsize=8)
+        ax.text(
+            x_mppt,
+            y_mppt + 0.5,
+            f"MPPT {mppt}",
+            ha="center",
+            fontsize=8
+        )
 
         y_global -= (len(grupo) * v_gap + 1)
 
@@ -114,8 +126,8 @@ def generar_string_fv(strings, out_path, *_, **__):
     # =====================================================
     for inv, puntos in conexiones_inv.items():
 
-        x_inv = max(p[0] for p in puntos) + 1.5
-        y_vals = [p[1] for p in puntos]
+        x_inv = max(p["x"] for p in puntos) + 1.5
+        y_vals = [p["y_pos"] for p in puntos]
 
         y_min = min(y_vals)
         y_max = max(y_vals)
@@ -143,30 +155,35 @@ def generar_string_fv(strings, out_path, *_, **__):
         )
 
         # =====================================================
-        # ENTRADAS MPPT (+ y - SEPARADAS)
+        # ENTRADAS MPPT (SEPARADAS)
         # =====================================================
         n = len(puntos)
 
-        for i, (x, y) in enumerate(puntos):
+        for i, p in enumerate(puntos):
+
+            x = p["x"]
+            y_pos = p["y_pos"]
+            y_neg = p["y_neg"]
 
             y_entry = y_inv + ((i - (n - 1) / 2) * 0.5)
-
-            # positivo
-            ax.plot([x, x_inv], [y, y], color="red", linewidth=2)
-            ax.plot([x_inv, x_inv], [y, y_entry], color="red", linewidth=2)
-            ax.plot([x_inv, x_inv + 0.2], [y_entry, y_entry], color="red", linewidth=2)
-
-            # negativo
-            y_neg = y - 0.25
             y_entry_neg = y_entry - 0.25
 
+            # positivo
+            ax.plot([x, x_inv], [y_pos, y_pos], color="red", linewidth=2)
+            ax.plot([x_inv, x_inv], [y_pos, y_entry], color="red", linewidth=2)
+            ax.plot([x_inv, x_inv + 0.25], [y_entry, y_entry], color="red", linewidth=2)
+
+            # negativo
             ax.plot([x, x_inv], [y_neg, y_neg], color="black", linewidth=2)
             ax.plot([x_inv, x_inv], [y_neg, y_entry_neg], color="black", linewidth=2)
-            ax.plot([x_inv, x_inv + 0.2], [y_entry_neg, y_entry_neg], color="black", linewidth=2)
+            ax.plot([x_inv, x_inv + 0.25], [y_entry_neg, y_entry_neg], color="black", linewidth=2)
 
-            # símbolos
-            ax.text(x_inv + 0.25, y_entry, "+", color="red", fontsize=9)
-            ax.text(x_inv + 0.25, y_entry_neg, "–", color="black", fontsize=9)
+            # bornes
+            ax.plot(x_inv + 0.3, y_entry, marker='o', color='red', markersize=4)
+            ax.plot(x_inv + 0.3, y_entry_neg, marker='o', color='black', markersize=4)
+
+            ax.text(x_inv + 0.4, y_entry, "+", color="red", fontsize=9)
+            ax.text(x_inv + 0.4, y_entry_neg, "–", color="black", fontsize=9)
 
     # =====================================================
     # FINAL
