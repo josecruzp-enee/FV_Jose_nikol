@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from __future__ import annotations
 
 from reportlab.platypus import Paragraph, Spacer, Table, TableStyle
@@ -8,38 +9,35 @@ from reportlab.platypus import Paragraph, Spacer, Table, TableStyle
 # ==========================================================
 
 def leer(obj, campo, default=None):
-
     if obj is None:
         return default
-
     if isinstance(obj, dict):
         return obj.get(campo, default)
-
     return getattr(obj, campo, default)
 
 
 # ==========================================================
-# Tabla estilizada
+# TABLA ESTILIZADA
 # ==========================================================
 
 def tabla(data, pal, content_w):
 
-    tbl = Table(data, colWidths=[content_w*0.55, content_w*0.45])
+    tbl = Table(data, colWidths=[content_w * 0.55, content_w * 0.45])
 
     tbl.setStyle(TableStyle([
 
-        ("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),
-        ("BACKGROUND",(0,0),(-1,0),pal["SOFT"]),
-        ("TEXTCOLOR",(0,0),(-1,0),pal["PRIMARY"]),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("BACKGROUND", (0, 0), (-1, 0), pal["SOFT"]),
+        ("TEXTCOLOR", (0, 0), (-1, 0), pal["PRIMARY"]),
 
-        ("ALIGN",(1,1),(-1,-1),"RIGHT"),
+        ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
 
-        ("GRID",(0,0),(-1,-1),0.3,pal["BORDER"]),
+        ("GRID", (0, 0), (-1, -1), 0.3, pal["BORDER"]),
 
-        ("FONTSIZE",(0,0),(-1,-1),10),
+        ("FONTSIZE", (0, 0), (-1, -1), 10),
 
-        ("TOPPADDING",(0,0),(-1,-1),6),
-        ("BOTTOMPADDING",(0,0),(-1,-1),6),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
 
     ]))
 
@@ -47,16 +45,20 @@ def tabla(data, pal, content_w):
 
 
 # ==========================================================
-# Render resumen técnico
+# RESUMEN TÉCNICO
 # ==========================================================
 
 def build_resumen_tecnico(resultado, pal, styles, content_w):
 
     story = []
 
-    sizing = leer(resultado, "sizing")
-    strings_block = leer(resultado, "strings")  # 🔥 lista de StringFV
-    nec = leer(resultado, "nec", {})
+    # ======================================================
+    # FUENTES CORRECTAS (SEGÚN TU MODELO)
+    # ======================================================
+
+    sizing = leer(resultado, "sizing", {})
+    paneles = leer(resultado, "paneles", None)
+    corr = leer(resultado, "corrientes", {})
 
     # ======================================================
     # DATOS SIZING
@@ -69,12 +71,25 @@ def build_resumen_tecnico(resultado, pal, styles, content_w):
     n_inversores = int(leer(sizing, "n_inversores", 1))
 
     # ======================================================
-    # STRINGS (🔥 FIX REAL)
+    # STRINGS DESDE paneles (CORRECTO)
     # ======================================================
 
-    strings = strings_block if isinstance(strings_block, list) else []
+    if paneles and hasattr(paneles, "strings") and paneles.strings:
+        strings = paneles.strings
+    else:
+        strings = []
 
-    n_strings = len(strings)
+    # ======================================================
+    # ARRAY (FUENTE REAL)
+    # ======================================================
+
+    array = leer(paneles, "array", {}) if paneles else {}
+
+    n_strings = leer(array, "n_strings_total", len(strings))
+
+    # ======================================================
+    # VARIABLES DE STRING
+    # ======================================================
 
     if strings:
 
@@ -93,7 +108,6 @@ def build_resumen_tecnico(resultado, pal, styles, content_w):
         isc = float(leer(s, "isc_string_a", 0))
 
     else:
-
         n_series = 0
         vmp = 0
         voc = 0
@@ -101,13 +115,9 @@ def build_resumen_tecnico(resultado, pal, styles, content_w):
         isc = 0
 
     # ======================================================
-    # NEC (si existe)
+    # CORRIENTES (SEGÚN MODELO)
     # ======================================================
 
-    paquete = leer(nec, "paquete_nec", {})
-    corr = leer(paquete, "corrientes", {})
-
-    panel_i = leer(leer(corr, "panel", {}), "i_operacion_a", imp)
     string_i = leer(leer(corr, "string", {}), "i_operacion_a", imp)
 
     # ======================================================
@@ -120,16 +130,13 @@ def build_resumen_tecnico(resultado, pal, styles, content_w):
     paneles_usados = n_paneles
     paneles_sobrantes = 0
 
-    panel_wp = (kwp_dc * 1000) / n_paneles if n_paneles else 0
+    panel_wp = (kwp_dc * 1000 / n_paneles) if n_paneles > 0 else 0
 
     # ======================================================
     # TABLA SISTEMA
     # ======================================================
 
-    story.append(
-        Paragraph("Resumen del sistema FV", styles["Heading1"])
-    )
-
+    story.append(Paragraph("Resumen del sistema FV", styles["Heading1"]))
     story.append(Spacer(1, 10))
 
     data = [
@@ -150,17 +157,13 @@ def build_resumen_tecnico(resultado, pal, styles, content_w):
     ]
 
     story.append(tabla(data, pal, content_w))
-
     story.append(Spacer(1, 16))
 
     # ======================================================
-    # TABLA GENERADOR
+    # TABLA GENERADOR FV
     # ======================================================
 
-    story.append(
-        Paragraph("Generador fotovoltaico", styles["Heading2"])
-    )
-
+    story.append(Paragraph("Generador fotovoltaico", styles["Heading2"]))
     story.append(Spacer(1, 8))
 
     data = [
@@ -179,7 +182,6 @@ def build_resumen_tecnico(resultado, pal, styles, content_w):
     ]
 
     story.append(tabla(data, pal, content_w))
-
     story.append(Spacer(1, 16))
 
     return story
