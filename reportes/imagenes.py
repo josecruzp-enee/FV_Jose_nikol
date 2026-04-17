@@ -44,19 +44,11 @@ def _as_int(x: Any, default: int = 0) -> int:
         return int(default)
 
 
-def _as_float(x: Any, default: float = 0.0) -> float:
-    try:
-        return float(x) if x is not None else float(default)
-    except Exception:
-        return float(default)
-
-
 # =========================================================
 # INFERENCIA DE PANELES
 # =========================================================
 
 def inferir_n_paneles(res: Any) -> int:
-
     sizing = res.get("sizing") if isinstance(res, dict) else getattr(res, "sizing", None)
 
     if sizing and not isinstance(sizing, dict):
@@ -85,7 +77,7 @@ def inferir_n_paneles(res: Any) -> int:
 
 
 # =========================================================
-# PIPELINE
+# PIPELINE PRINCIPAL
 # =========================================================
 
 def generar_artefactos(
@@ -103,9 +95,9 @@ def generar_artefactos(
 
     paths = construir_paths_salida(out_dir)
 
-    # =========================
+    # =====================================================
     # CHARTS
-    # =========================
+    # =====================================================
     charts = generar_charts(
         res,
         paths["charts_dir"],
@@ -115,9 +107,9 @@ def generar_artefactos(
     if charts:
         paths.update({k: str(v) for k, v in charts.items()})
 
-    # =========================
-    # LAYOUT
-    # =========================
+    # =====================================================
+    # LAYOUT PANELES
+    # =====================================================
     n_paneles = inferir_n_paneles(res)
 
     if n_paneles > 0:
@@ -130,31 +122,41 @@ def generar_artefactos(
         )
 
     # =====================================================
-    # STRING FV (INTEGRADO COMPLETO)
+    # STRING FV (ALINEADO)
     # =====================================================
     try:
         strings = res.get("strings") if isinstance(res, dict) else getattr(res, "strings", None)
 
-        if strings:
+        if not strings:
+            print("❌ No hay strings en res")
+        else:
+            print(f"✔ Strings detectados: {len(strings)}")
 
             path_string = (Path(paths["out_dir"]) / "string_fv.png").resolve()
             path_string.parent.mkdir(parents=True, exist_ok=True)
 
-            # ===== DIBUJO =====
+            # ---------- AGRUPAR ----------
             grupos = {}
             for s in strings:
                 inv = getattr(s, "inversor", 1)
                 mppt = getattr(s, "mppt", 1)
                 grupos.setdefault((inv, mppt), []).append(s)
 
-            fig, ax = plt.subplots(figsize=(12, 5))
+            # ---------- CONFIG ----------
+            panel_w = 0.5
+            panel_h = 1.0
+            gap = 0.15
 
-            panel_w, panel_h, gap = 0.5, 1.0, 0.15
-            X_MPPT, X_INV = 7.5, 10.5
+            X_PANEL = 0
+            X_MPPT = 8
+            X_INV = 12
 
-            y_base = 2.0
-            conexiones = []
+            fig, ax = plt.subplots(figsize=(14, 6))
 
+            y_base = 0
+            conexiones = {}
+
+            # ---------- STRINGS ----------
             for (inv, mppt), grupo in sorted(grupos.items()):
                 s = grupo[0]
                 n = int(getattr(s, "n_series", 0) or 0)
@@ -162,40 +164,61 @@ def generar_artefactos(
                 y = y_base
 
                 for i in range(n):
-                    x = i * (panel_w + gap)
+                    x = X_PANEL + i * (panel_w + gap)
 
                     ax.add_patch(Rectangle(
                         (x, y),
                         panel_w,
                         panel_h,
-                        edgecolor="black",
-                        facecolor="#1e293b"
+                        edgecolor="#0B2E4A",
+                        facecolor="#1F2A37"
                     ))
 
                     if i < n - 1:
                         ax.plot(
                             [x + panel_w, x + panel_w + gap],
-                            [y + panel_h / 2]*2,
+                            [y + panel_h/2, y + panel_h/2],
                             color="black"
                         )
 
-                x_end = n * (panel_w + gap)
+                x_end = X_PANEL + n * (panel_w + gap)
 
-                y_pos = y + 0.7
-                y_neg = y + 0.3
+                y_pos = y + panel_h * 0.7
+                y_neg = y + panel_h * 0.3
 
                 ax.plot([x_end, X_MPPT], [y_pos, y_pos], "r", lw=2)
                 ax.plot([x_end, X_MPPT], [y_neg, y_neg], "k", lw=2)
 
-                conexiones.append((y_pos, y_neg))
+                ax.plot(X_MPPT, y_pos, "ro")
+                ax.plot(X_MPPT, y_neg, "ko")
 
-                y_base -= 2.2
+                ax.text(X_MPPT, y + panel_h + 0.3, f"MPPT {mppt}", ha="center")
 
-            for (y_pos, y_neg) in conexiones:
-                ax.plot([X_MPPT, X_INV], [y_pos, y_pos], "r", lw=2)
-                ax.plot([X_MPPT, X_INV], [y_neg, y_neg], "k", lw=2)
-                ax.plot(X_INV, y_pos, "ro")
-                ax.plot(X_INV, y_neg, "ko")
+                conexiones.setdefault(inv, []).append((y_pos, y_neg))
+
+                y_base -= 2.5
+
+            # ---------- INVERSOR ----------
+            for inv, pts in conexiones.items():
+                y_vals = [yy for (yp, yn) in pts for yy in (yp, yn)]
+                y_mid = sum(y_vals) / len(y_vals)
+
+                ax.add_patch(Rectangle(
+                    (X_INV, y_mid - 1),
+                    2,
+                    2,
+                    edgecolor="black",
+                    facecolor="#eeeeee"
+                ))
+
+                ax.text(X_INV + 1, y_mid, f"INV {inv}", ha="center")
+
+                for (y_pos, y_neg) in pts:
+                    ax.plot([X_MPPT, X_INV], [y_pos, y_pos], "r", lw=2)
+                    ax.plot([X_MPPT, X_INV], [y_neg, y_neg], "k", lw=2)
+
+                    ax.plot(X_INV, y_pos, "ro")
+                    ax.plot(X_INV, y_neg, "ko")
 
             ax.axis("off")
             plt.tight_layout()
