@@ -20,9 +20,7 @@ def generar_string_fv(strings, out_path, *_, **__):
     for s in strings:
         inv = getattr(s, "inversor", 1)
         mppt = getattr(s, "mppt", 1)
-
-        key = (inv, mppt)
-        grupos.setdefault(key, []).append(s)
+        grupos.setdefault((inv, mppt), []).append(s)
 
     # =====================================================
     # PARÁMETROS
@@ -39,7 +37,7 @@ def generar_string_fv(strings, out_path, *_, **__):
     conexiones_inv = {}
 
     # =====================================================
-    # DIBUJAR STRINGS
+    # STRINGS
     # =====================================================
     for (inv, mppt) in sorted(grupos.keys()):
 
@@ -55,7 +53,6 @@ def generar_string_fv(strings, out_path, *_, **__):
 
             # módulos
             for i in range(n_series):
-
                 x = i * (panel_w + gap)
 
                 rect = Rectangle(
@@ -78,16 +75,14 @@ def generar_string_fv(strings, out_path, *_, **__):
 
             width = n_series * panel_w + (n_series - 1) * gap
 
-            # salida string
-            ax.plot(
-                [width, width + 0.8],
-                [y_center, y_center],
-                color="red",
-                linewidth=2
-            )
+            # 🔴 POSITIVO
+            ax.plot([width, width + 0.8], [y_center, y_center], color="red", linewidth=2)
+
+            # ⚫ NEGATIVO
+            ax.plot([width, width + 0.8], [y_center - 0.25, y_center - 0.25], color="black", linewidth=2)
 
         # =====================================================
-        # MPPT (PARALELO SOLO SI APLICA)
+        # MPPT (PARALELO SI APLICA)
         # =====================================================
         x_mppt = width + 0.8
 
@@ -95,41 +90,27 @@ def generar_string_fv(strings, out_path, *_, **__):
             y_min = min(y_strings)
             y_max = max(y_strings)
 
-            # bus vertical (paralelo real)
-            ax.plot(
-                [x_mppt, x_mppt],
-                [y_min, y_max],
-                color="red",
-                linewidth=3
-            )
+            # buses
+            ax.plot([x_mppt, x_mppt], [y_min, y_max], color="red", linewidth=3)
+            ax.plot([x_mppt, x_mppt], [y_min - 0.25, y_max - 0.25], color="black", linewidth=3)
 
             y_mppt = (y_min + y_max) / 2
         else:
             y_mppt = y_strings[0]
 
-        # salida MPPT
-        ax.plot(
-            [x_mppt, x_mppt + 1],
-            [y_mppt, y_mppt],
-            color="red",
-            linewidth=2
-        )
+        # salida MPPT (+ y -)
+        ax.plot([x_mppt, x_mppt + 1], [y_mppt, y_mppt], color="red", linewidth=2)
+        ax.plot([x_mppt, x_mppt + 1], [y_mppt - 0.25, y_mppt - 0.25], color="black", linewidth=2)
 
         conexiones_inv.setdefault(inv, []).append((x_mppt + 1, y_mppt))
 
         # etiqueta
-        ax.text(
-            x_mppt,
-            y_mppt + 0.4,
-            f"MPPT {mppt}",
-            ha="center",
-            fontsize=8
-        )
+        ax.text(x_mppt, y_mppt + 0.5, f"MPPT {mppt}", ha="center", fontsize=8)
 
         y_global -= (len(grupo) * v_gap + 1)
 
     # =====================================================
-    # INVERSORES (ENTRADAS SEPARADAS ✔)
+    # INVERSORES
     # =====================================================
     for inv, puntos in conexiones_inv.items():
 
@@ -142,9 +123,9 @@ def generar_string_fv(strings, out_path, *_, **__):
 
         # inversor
         rect = Rectangle(
-            (x_inv, y_inv - 0.6),
-            1.5,
-            1.2,
+            (x_inv, y_inv - 0.8),
+            1.8,
+            1.6,
             edgecolor="black",
             facecolor="#eeeeee",
             linewidth=1.5
@@ -152,7 +133,7 @@ def generar_string_fv(strings, out_path, *_, **__):
         ax.add_patch(rect)
 
         ax.text(
-            x_inv + 0.75,
+            x_inv + 0.9,
             y_inv,
             f"INV {inv}",
             ha="center",
@@ -161,14 +142,31 @@ def generar_string_fv(strings, out_path, *_, **__):
             fontweight="bold"
         )
 
-        # 🔥 CLAVE: entradas independientes (NO unión)
-        for (x, y) in puntos:
-            ax.plot(
-                [x, x_inv],
-                [y, y],   # ← AQUÍ ESTÁ LA CORRECCIÓN REAL
-                color="red",
-                linewidth=2
-            )
+        # =====================================================
+        # ENTRADAS MPPT (+ y - SEPARADAS)
+        # =====================================================
+        n = len(puntos)
+
+        for i, (x, y) in enumerate(puntos):
+
+            y_entry = y_inv + ((i - (n - 1) / 2) * 0.5)
+
+            # positivo
+            ax.plot([x, x_inv], [y, y], color="red", linewidth=2)
+            ax.plot([x_inv, x_inv], [y, y_entry], color="red", linewidth=2)
+            ax.plot([x_inv, x_inv + 0.2], [y_entry, y_entry], color="red", linewidth=2)
+
+            # negativo
+            y_neg = y - 0.25
+            y_entry_neg = y_entry - 0.25
+
+            ax.plot([x, x_inv], [y_neg, y_neg], color="black", linewidth=2)
+            ax.plot([x_inv, x_inv], [y_neg, y_entry_neg], color="black", linewidth=2)
+            ax.plot([x_inv, x_inv + 0.2], [y_entry_neg, y_entry_neg], color="black", linewidth=2)
+
+            # símbolos
+            ax.text(x_inv + 0.25, y_entry, "+", color="red", fontsize=9)
+            ax.text(x_inv + 0.25, y_entry_neg, "–", color="black", fontsize=9)
 
     # =====================================================
     # FINAL
