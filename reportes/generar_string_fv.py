@@ -13,22 +13,21 @@ def generar_string_fv(strings, out_path, *_, **__):
     if not strings:
         raise ValueError("Lista vacía")
 
-    # =====================================================
+    # ==============================
     # AGRUPAR POR MPPT
-    # =====================================================
+    # ==============================
     grupos = {}
-
     for s in strings:
         key = (getattr(s, "inversor", 1), getattr(s, "mppt", 1))
         grupos.setdefault(key, []).append(s)
 
-    # =====================================================
-    # CONFIGURACIÓN DE COLUMNAS (CLAVE)
-    # =====================================================
-    X_PANELES = 0
-    X_SALIDA = 6
-    X_MPPT   = 8
-    X_INV    = 11
+    # ==============================
+    # POSICIONES FIJAS (CLAVE)
+    # ==============================
+    X_PANEL = 0
+    X_STRING_END = 6
+    X_MPPT = 8
+    X_INV = 12
 
     panel_w = 0.4
     panel_h = 0.8
@@ -37,27 +36,25 @@ def generar_string_fv(strings, out_path, *_, **__):
     fig, ax = plt.subplots(figsize=(14, 6))
 
     y_base = 0
-    conexiones_inv = {}
+    conexiones = {}
 
-    # =====================================================
+    # ==============================
     # DIBUJAR STRINGS
-    # =====================================================
+    # ==============================
     for (inv, mppt), grupo in sorted(grupos.items()):
 
-        y_string = y_base
+        y = y_base
 
         for s in grupo:
 
             n = s.n_series
 
-            # -------------------------
-            # PANELES
-            # -------------------------
+            # PANEL
             for i in range(n):
-                x = X_PANELES + i * (panel_w + gap)
+                x = X_PANEL + i * (panel_w + gap)
 
                 ax.add_patch(Rectangle(
-                    (x, y_string),
+                    (x, y),
                     panel_w,
                     panel_h,
                     edgecolor="#0B2E4A",
@@ -67,43 +64,43 @@ def generar_string_fv(strings, out_path, *_, **__):
                 if i < n - 1:
                     ax.plot(
                         [x + panel_w, x + panel_w + gap],
-                        [y_string + panel_h/2]*2,
+                        [y + panel_h/2]*2,
                         color="black"
                     )
 
-            x_end = X_PANELES + n * (panel_w + gap)
+            # PUNTO DE SALIDA (REAL)
+            y_pos = y + 0.55
+            y_neg = y + 0.25
 
-            # -------------------------
-            # SALIDA (+ y -)
-            # -------------------------
-            y_pos = y_string + 0.55
-            y_neg = y_string + 0.25
+            # terminal string
+            ax.plot(X_STRING_END, y_pos, "ro")
+            ax.plot(X_STRING_END, y_neg, "ko")
 
-            ax.plot([x_end, X_SALIDA], [y_pos, y_pos], color="red", lw=2)
-            ax.plot([x_end, X_SALIDA], [y_neg, y_neg], color="black", lw=2)
+            # cable hasta MPPT
+            ax.plot([X_STRING_END, X_MPPT], [y_pos, y_pos], "r", lw=2)
+            ax.plot([X_STRING_END, X_MPPT], [y_neg, y_neg], "k", lw=2)
 
-        # -------------------------
-        # MPPT
-        # -------------------------
-        ax.text(X_MPPT, y_string + 0.5, f"MPPT {mppt}", fontsize=10)
+        # ==============================
+        # MPPT (BORNE REAL)
+        # ==============================
+        ax.plot(X_MPPT, y_pos, "ro")
+        ax.plot(X_MPPT, y_neg, "ko")
 
-        # línea hacia MPPT
-        ax.plot([X_SALIDA, X_MPPT], [y_pos, y_pos], color="red", lw=2)
-        ax.plot([X_SALIDA, X_MPPT], [y_neg, y_neg], color="black", lw=2)
+        ax.text(X_MPPT, y + 0.8, f"MPPT {mppt}", ha="center")
 
-        conexiones_inv.setdefault(inv, []).append((y_pos, y_neg))
+        conexiones.setdefault(inv, []).append((y_pos, y_neg))
 
         y_base -= 2
 
-    # =====================================================
-    # INVERSOR
-    # =====================================================
-    for inv, puntos in conexiones_inv.items():
+    # ==============================
+    # INVERSOR (BORNERA REAL)
+    # ==============================
+    for inv, pts in conexiones.items():
 
-        y_vals = [y for p in puntos for y in p]
-        y_mid = sum(y_vals)/len(y_vals)
+        y_vals = [y for p in pts for y in p]
+        y_mid = sum(y_vals) / len(y_vals)
 
-        # caja inversor
+        # caja
         ax.add_patch(Rectangle(
             (X_INV, y_mid - 1),
             2,
@@ -114,18 +111,20 @@ def generar_string_fv(strings, out_path, *_, **__):
 
         ax.text(X_INV + 1, y_mid, f"INV {inv}", ha="center", va="center")
 
-        # conexiones
-        for (y_pos, y_neg) in puntos:
+        # entradas
+        for (y_pos, y_neg) in pts:
 
-            ax.plot([X_MPPT, X_INV], [y_pos, y_pos], color="red", lw=2)
-            ax.plot([X_MPPT, X_INV], [y_neg, y_neg], color="black", lw=2)
-
+            # terminal inversor
             ax.plot(X_INV, y_pos, "ro")
             ax.plot(X_INV, y_neg, "ko")
 
-    # =====================================================
+            # conexión limpia horizontal
+            ax.plot([X_MPPT, X_INV], [y_pos, y_pos], "r", lw=2)
+            ax.plot([X_MPPT, X_INV], [y_neg, y_neg], "k", lw=2)
+
+    # ==============================
     # FINAL
-    # =====================================================
+    # ==============================
     ax.set_title("Configuración FV (Topología Correcta)")
     ax.axis("off")
 
