@@ -157,6 +157,10 @@ def _paneles() -> Dict[str, PanelSpec]:
         noct_c = float(termico.get("noct_c", 45.0))
 
         out[pid] = PanelSpec(
+            id=pid,
+            marca=str(p["marca"]),
+            nombre=str(p["nombre"]),
+            codigo=str(p["codigo"]),
             pmax_w=float(stc["pmax_w"]),
             vmp_v=float(stc["vmp_v"]),
             voc_v=float(stc["voc_v"]),
@@ -195,6 +199,10 @@ def _inversores() -> Dict[str, InversorSpec]:
         imppt = _opt_num(dc, "imppt_max_a", f"inversores.{iid}.entrada_dc")
 
         out[iid] = InversorSpec(
+            id=iid,
+            marca=str(inv["marca"]),
+            nombre=str(inv["nombre"]),
+            codigo=str(inv["codigo"]),
             kw_ac=kw_ac,
             n_mppt=int(dc["n_mppt"]),
             mppt_min_v=float(dc["mppt_min_v"]),
