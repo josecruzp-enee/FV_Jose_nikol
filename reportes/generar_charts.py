@@ -276,6 +276,7 @@ def generar_charts(
     res,
     out_dir=None,
     vista_resultados=None
+    proyecto=None,
 ):
 
     base = _mkdir_charts(out_dir)
@@ -363,11 +364,12 @@ def generar_charts(
 
     consumo_horario_24h_kwh = {}
 
-    proyecto = (
-        res.get("proyecto")
-        if isinstance(res, dict)
-        else getattr(res, "proyecto", None)
-    )
+        if proyecto is None:
+        proyecto = (
+            res.get("proyecto")
+            if isinstance(res, dict)
+            else getattr(res, "proyecto", None)
+        )
 
     if proyecto:
         consumo_horario_24h_kwh = getattr(
