@@ -244,6 +244,8 @@ def calcular_corrientes(inp: CorrientesInput) -> ResultadoCorrientes:
     print("I diseño:", i_ac_diseno)
 
     ac = NivelCorriente(i_ac_operacion, i_ac_diseno)
+    ac_total = ac
+    ac_inversor = ac
 
     print("\n########################################")
     print("🔥 DEBUG CORRIENTES FIN")
