@@ -81,6 +81,6 @@ class ResultadoProyecto:
     energia: Any
     electrical: Any
     financiero: Optional[ResultadoFinanciero]
-
+    optimizacion_economica: Any = None
     ok: bool = True
     errores: List[str] = field(default_factory=list)
