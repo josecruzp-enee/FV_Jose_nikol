@@ -288,6 +288,35 @@ def _dimensionar_generador(
             cobertura_objetivo
         )
 
+        # ======================================================
+    # OPTIMIZACIÓN ECONÓMICA
+    # ======================================================
+    elif modo == "optimizacion_economica":
+
+        cobertura = 1.0
+
+        if _hay_consumo_horario_valido(
+            consumo_horario_24h_kwh
+        ):
+
+            n_paneles, pdc_kw = (
+                _dimensionar_generador_por_consumo_horario(
+                    panel=panel,
+                    cobertura=cobertura,
+                    consumo_horario_24h_kwh=consumo_horario_24h_kwh,
+                )
+            )
+
+            return n_paneles, pdc_kw
+
+        energia_objetivo = consumo_anual * cobertura
+
+        kwp_obj = (
+            energia_objetivo /
+            energia_por_kwp_anual
+        )
+
+    
     # ======================================================
     # ÁREA
     # ======================================================
