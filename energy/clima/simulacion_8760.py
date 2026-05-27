@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import List
-
+from datetime import timedelta
 # ----------------------------------------------------------
 # DEPENDENCIAS
 # ----------------------------------------------------------
@@ -70,7 +70,7 @@ def simular_clima_8760(
             SolarInput(
                 latitud_deg=clima.latitud,
                 longitud_deg=clima.longitud,
-                fecha_hora=hora.timestamp
+                fecha_hora=hora.timestamp - timedelta(hours=6)
             )
         )
 
