@@ -155,7 +155,7 @@ def ejecutar_electrical(*, datos: Any, paneles: Any, sizing: Any) -> ResultadoEl
         # ==================================================
         corrientes_input = CorrientesInput(
             paneles=paneles,
-            kw_ac=sizing.kw_ac,
+            kw_ac=getattr(sizing, "kw_ac_total", sizing.kw_ac),
             vac=vac,
             fases=fases,
             fp=fp,
