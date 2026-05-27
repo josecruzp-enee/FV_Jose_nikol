@@ -102,6 +102,7 @@ def generar_artefactos(
         res,
         paths["charts_dir"],
         vista_resultados=vista_resultados or {},
+        proyecto=p,
     )
 
     if charts:
