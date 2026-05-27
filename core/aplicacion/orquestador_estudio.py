@@ -181,6 +181,11 @@ def ejecutar_estudio(
                     f"Energía optimizada inválida: {energia.errores}"
                 )
 
+            # ==================================================
+            # Resultado de optimización disponible para PDF
+            # ==================================================
+            energia.optimizacion_economica = resultado_opt
+
         # ==================================================
         # 4. ELECTRICAL
         # ==================================================
