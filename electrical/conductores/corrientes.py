@@ -50,6 +50,7 @@ class ResultadoCorrientes:
         ac: NivelCorriente,
         mppt_detalle: Optional[List[NivelCorriente]] = None,
         strings_detalle: Optional[List[NivelCorriente]] = None,
+        inversores_detalle: Optional[List[NivelCorriente]] = None,
     ):
         return ResultadoCorrientes(
             ok=True,
@@ -64,6 +65,7 @@ class ResultadoCorrientes:
             strings_detalle=strings_detalle or [],
             errores=[],
             warnings=[],
+            inversores_detalle=inversores_detalle or [],
         )
 
     # =========================
@@ -85,6 +87,7 @@ class ResultadoCorrientes:
             strings_detalle=[],
             errores=[msg],
             warnings=[],
+            inversores_detalle=[],
         )
 
 
