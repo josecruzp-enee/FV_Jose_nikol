@@ -126,7 +126,7 @@ def _chart_potencia_horaria(
 
     for idx, valor in enumerate(energia_horaria_kwh):
 
-        hora = idx % 24
+        hora = (idx - 6) % 24
 
         suma[hora] += float(valor)
         conteo[hora] += 1
@@ -174,7 +174,7 @@ def _chart_energia_horaria(
 
     for idx, valor in enumerate(energia_horaria_kwh):
 
-        hora = idx % 24
+        hora = (idx - 6) % 24
 
         suma[hora] += float(valor)
         conteo[hora] += 1
