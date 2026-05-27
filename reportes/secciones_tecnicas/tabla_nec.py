@@ -104,7 +104,8 @@ def crear_tabla_dimensionamiento_nec(resultado, pal, content_w):
     niveles = [
         ("panel", "Panel", None, None),
         ("string", "String", fusible, cond_dc),
-        ("mppt", "MPPT crítico", ocpd_dc, cond_dc),
+        ("mppt", "MPPT crítico", None, cond_dc),
+        ("ac_inversor", "AC por inversor", None, "—"),
         ("ac", "AC total del sistema", ocpd_ac, cond_ac),
     ]
 
