@@ -165,6 +165,41 @@ def _leer_consumo(p: Datosproyecto):
     return consumo_anual_kwh(consumo_12m)
 
 
+def _dimensionar_generador_por_consumo_horario(
+    *,
+    panel,
+    cobertura: float,
+    consumo_horario_24h_kwh,
+):
+    """
+    Dimensiona el generador FV usando consumo horario 24h.
+
+    Criterio:
+    - Usa el consumo diurno como base técnica.
+    - La cobertura se aplica sobre la energía diurna aprovechable.
+    - Evita que el sizing dependa únicamente del consumo mensual/anual.
+    """
+
+    consumo_diurno_diario = _consumo_diurno_diario_kwh(
+        consumo_horario_24h_kwh=consumo_horario_24h_kwh,
+        hora_inicio=6,
+        hora_fin=18,
+    )
+
+    energia_objetivo_diaria = consumo_diurno_diario * cobertura
+
+    horas_solares_equivalentes = 4.5
+
+    kwp_obj = energia_objetivo_diaria / horas_solares_equivalentes
+
+    n_paneles = int(ceil((kwp_obj * 1000) / panel.pmax_w))
+
+    if n_paneles <= 0:
+        raise ValueError("Sizing horario inválido: n_paneles <= 0")
+
+    pdc_kw = (n_paneles * panel.pmax_w) / 1000
+
+    return n_paneles, pdc_kw
 # ==========================================================
 # GENERADOR
 # ==========================================================
@@ -183,12 +218,17 @@ def _dimensionar_generador(
 
         cobertura = _clamp(float(valor) / 100.0, 0.1, 2.0)
 
-        energia_objetivo = _energia_objetivo_cobertura(
-            consumo_anual=consumo_anual,
-            cobertura=cobertura,
-            consumo_horario_24h_kwh=consumo_horario_24h_kwh,
-        )
+        if _hay_consumo_horario_valido(consumo_horario_24h_kwh):
 
+            n_paneles, pdc_kw = _dimensionar_generador_por_consumo_horario(
+                panel=panel,
+                cobertura=cobertura,
+                consumo_horario_24h_kwh=consumo_horario_24h_kwh,
+            )
+
+            return n_paneles, pdc_kw
+
+        energia_objetivo = consumo_anual * cobertura
         kwp_obj = energia_objetivo / energia_por_kwp_anual
 
     elif modo == "area":
