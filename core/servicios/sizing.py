@@ -214,48 +214,139 @@ def _dimensionar_generador(
 
     energia_por_kwp_anual = 1500.0
 
+    # ======================================================
+    # COBERTURA ENERGÉTICA
+    # ======================================================
     if modo == "cobertura":
 
-        cobertura = _clamp(float(valor) / 100.0, 0.1, 2.0)
+        cobertura = _clamp(
+            float(valor) / 100.0,
+            0.1,
+            2.0,
+        )
 
-        if _hay_consumo_horario_valido(consumo_horario_24h_kwh):
+        if _hay_consumo_horario_valido(
+            consumo_horario_24h_kwh
+        ):
 
-            n_paneles, pdc_kw = _dimensionar_generador_por_consumo_horario(
-                panel=panel,
-                cobertura=cobertura,
-                consumo_horario_24h_kwh=consumo_horario_24h_kwh,
+            n_paneles, pdc_kw = (
+                _dimensionar_generador_por_consumo_horario(
+                    panel=panel,
+                    cobertura=cobertura,
+                    consumo_horario_24h_kwh=consumo_horario_24h_kwh,
+                )
             )
 
             return n_paneles, pdc_kw
 
-        energia_objetivo = consumo_anual * cobertura
-        kwp_obj = energia_objetivo / energia_por_kwp_anual
+        energia_objetivo = (
+            consumo_anual * cobertura
+        )
 
+        kwp_obj = (
+            energia_objetivo /
+            energia_por_kwp_anual
+        )
+
+    # ======================================================
+    # ELIMINACIÓN CONSUMO DIURNO
+    # ======================================================
+    elif modo == "eliminacion_diurna":
+
+        cobertura_objetivo = _clamp(
+            float(valor) / 100.0,
+            0.01,
+            1.00,
+        )
+
+        if not _hay_consumo_horario_valido(
+            consumo_horario_24h_kwh
+        ):
+            raise ValueError(
+                "Se requiere perfil horario "
+                "para eliminación diurna"
+            )
+
+        consumo_diurno_diario = (
+            _consumo_diurno_diario_kwh(
+                consumo_horario_24h_kwh=
+                consumo_horario_24h_kwh,
+                hora_inicio=6,
+                hora_fin=18,
+            )
+        )
+
+        horas_solares_equivalentes = 4.5
+
+        kwp_base = (
+            consumo_diurno_diario /
+            horas_solares_equivalentes
+        )
+
+        kwp_obj = (
+            kwp_base *
+            cobertura_objetivo
+        )
+
+    # ======================================================
+    # ÁREA
+    # ======================================================
     elif modo == "area":
 
         area = float(valor)
+
         area_util = area * 0.75
+
         kwp_obj = area_util / 5.0
 
+    # ======================================================
+    # POTENCIA OBJETIVO
+    # ======================================================
     elif modo == "kw_objetivo":
 
         kwp_obj = float(valor)
 
+    # ======================================================
+    # PANELES
+    # ======================================================
     elif modo == "paneles":
 
         n_paneles = int(valor)
 
         if n_paneles <= 0:
-            raise ValueError("Número de paneles inválido")
+            raise ValueError(
+                "Número de paneles inválido"
+            )
 
-        pdc_kw = (n_paneles * panel.pmax_w) / 1000
+        pdc_kw = (
+            n_paneles *
+            panel.pmax_w
+        ) / 1000
+
         return n_paneles, pdc_kw
 
+    # ======================================================
+    # ERROR
+    # ======================================================
     else:
-        raise ValueError(f"Modo inválido: {modo}")
+        raise ValueError(
+            f"Modo inválido: {modo}"
+        )
 
-    n_paneles = int(ceil((kwp_obj * 1000) / panel.pmax_w))
-    pdc_kw = (n_paneles * panel.pmax_w) / 1000
+    # ======================================================
+    # CONVERSIÓN FINAL
+    # ======================================================
+    n_paneles = int(
+        ceil(
+            (kwp_obj * 1000) /
+            panel.pmax_w
+        )
+    )
+
+    pdc_kw = (
+        n_paneles *
+        panel.pmax_w
+    ) / 1000
 
     return n_paneles, pdc_kw
 
