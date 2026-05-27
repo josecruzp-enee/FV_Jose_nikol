@@ -207,7 +207,6 @@ def optimizar_kwp_maximo_ahorro(
     kwp_min: float = 1.0,
     kwp_max: float = 500.0,
     paso_kwp: float = 1.0,
-    mejora_minima_l_anual: float = 1000.0,
 ) -> dict:
 
     demanda_8760 = construir_demanda_8760_desde_24h(
@@ -215,40 +214,27 @@ def optimizar_kwp_maximo_ahorro(
         n_horas=len(energia_horaria_base_kwh),
     )
 
-    demanda_total = sum(
-        float(d or 0.0)
-        for d in demanda_8760
-    )
-
-    if demanda_total <= 0:
-        raise ValueError("Demanda 8760 inválida o vacía")
-
     fv_unitario = construir_perfil_unitario_fv_8760(
         energia_horaria_kwh=energia_horaria_base_kwh,
         pdc_kw_base=pdc_kw_base,
     )
 
+    crf = calcular_factor_recuperacion_capital(
+        tasa_descuento_anual=tasa_descuento_anual,
+        vida_util_anios=vida_util_anios,
+    )
+
     mejor = None
-    anterior = None
+    tabla_evaluacion = []
 
     kwp = float(kwp_min)
 
     while kwp <= kwp_max:
 
-        n_paneles = int(
-            ceil(
-                (kwp * 1000.0) /
-                panel_w
-            )
-        )
+        n_paneles = int(ceil((kwp * 1000.0) / panel_w))
+        pdc_kw_real = n_paneles * panel_w / 1000.0
 
-        pdc_kw_real = (
-            n_paneles *
-            panel_w /
-            1000.0
-        )
-
-        balance = evaluar_balance_8760(
+        r = evaluar_balance_8760(
             demanda_8760_kwh=demanda_8760,
             fv_unitario_8760_kwh_kwp=fv_unitario,
             kwp=pdc_kw_real,
@@ -256,52 +242,44 @@ def optimizar_kwp_maximo_ahorro(
             precio_inyeccion_l_kwh=precio_inyeccion_l_kwh,
         )
 
-        r = evaluar_economia_sistema(
-            resultado_balance=balance,
-            pdc_kw_real=pdc_kw_real,
-            costo_l_kwp=costo_l_kwp,
-            tasa_descuento_anual=tasa_descuento_anual,
-            vida_util_anios=vida_util_anios,
+        capex_estimado_l = pdc_kw_real * costo_l_kwp
+        costo_anualizado_l = capex_estimado_l * crf
+
+        beneficio_bruto_l_anual = float(
+            r.get("beneficio_l_anual", 0.0) or 0.0
+        )
+
+        beneficio_neto_l_anual = (
+            beneficio_bruto_l_anual -
+            costo_anualizado_l
         )
 
         r["n_paneles"] = n_paneles
         r["pdc_kw"] = pdc_kw_real
         r["kwp"] = pdc_kw_real
 
-        if anterior is None:
-            r["beneficio_marginal_l_anual"] = (
-                r["beneficio_neto_l_anual"]
-            )
-        else:
-            r["beneficio_marginal_l_anual"] = (
-                r["beneficio_neto_l_anual"]
-                - anterior["beneficio_neto_l_anual"]
-            )
+        r["costo_l_kwp"] = costo_l_kwp
+        r["capex_estimado_l"] = capex_estimado_l
+        r["factor_recuperacion_capital"] = crf
+        r["costo_anualizado_l"] = costo_anualizado_l
+
+        r["beneficio_bruto_l_anual"] = beneficio_bruto_l_anual
+        r["beneficio_neto_l_anual"] = beneficio_neto_l_anual
+
+        tabla_evaluacion.append(dict(r))
 
         if (
             mejor is None
-            or r["beneficio_neto_l_anual"]
-            > mejor["beneficio_neto_l_anual"]
+            or beneficio_neto_l_anual > mejor["beneficio_neto_l_anual"]
         ):
-            mejor = r
+            mejor = dict(r)
 
-        if (
-            anterior is not None
-            and r["beneficio_marginal_l_anual"]
-            < mejora_minima_l_anual
-        ):
-            break
-
-        anterior = r
         kwp += paso_kwp
 
     if mejor is None:
-        raise ValueError(
-            "No se pudo optimizar el sistema FV"
-        )
+        raise ValueError("No se pudo optimizar el sistema FV")
 
-    mejor["criterio_optimizacion"] = (
-        "Máximo beneficio neto anual"
-    )
+    mejor["criterio_optimizacion"] = "Máximo beneficio neto anual"
+    mejor["tabla_evaluacion"] = tabla_evaluacion
 
     return mejor
