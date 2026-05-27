@@ -292,3 +292,81 @@ def crear_tabla_indicadores(resultado, pal, content_w):
     ]))
 
     return tbl
+
+# ==========================================================
+# TABLA 4 — ANÁLISIS DE CAÍDA DE VOLTAJE
+# ==========================================================
+def crear_tabla_caida_voltaje(resultado, pal, content_w):
+
+    electrical = getattr(resultado, "electrical", None)
+    conductores = getattr(electrical, "conductores", None) if electrical else None
+
+    tramos = getattr(conductores, "tramos", None) if conductores else None
+
+    if tramos is None:
+        return Table([["SIN DATOS DE CAÍDA DE VOLTAJE"]])
+
+    dc_mppt = getattr(tramos, "dc_mppt", []) or []
+    ac_inversores = getattr(tramos, "ac_inversores", []) or []
+    ac_principal = getattr(tramos, "ac_principal", None)
+
+    rows = [
+        [
+            "Circuito",
+            "Conductor",
+            "Longitud",
+            "Corriente diseño",
+            "VD",
+            "Límite",
+            "Estado",
+        ]
+    ]
+
+    def agregar_fila(tramo):
+
+        calibre = getattr(tramo, "calibre", "—")
+        material = getattr(tramo, "material", "")
+
+        cumple_vd = getattr(tramo, "cumple_vd", False)
+
+        rows.append([
+            getattr(tramo, "nombre", "—"),
+            f"{calibre} {material}".strip(),
+            f'{getattr(tramo, "l_m", 0):.1f} m',
+            f'{getattr(tramo, "i_diseno_a", 0):.2f} A',
+            f'{getattr(tramo, "vd_pct", 0):.2f} %',
+            f'≤ {getattr(tramo, "vd_obj_pct", 0):.2f} %',
+            "OK" if cumple_vd else "NO CUMPLE",
+        ])
+
+    for tramo in dc_mppt:
+        agregar_fila(tramo)
+
+    for tramo in ac_inversores:
+        agregar_fila(tramo)
+
+    if ac_principal is not None:
+        agregar_fila(ac_principal)
+
+    colw = [
+        content_w * 0.22,
+        content_w * 0.14,
+        content_w * 0.13,
+        content_w * 0.16,
+        content_w * 0.10,
+        content_w * 0.10,
+        content_w * 0.15,
+    ]
+
+    tbl = Table(rows, colWidths=colw, repeatRows=1)
+
+    tbl.setStyle(TableStyle([
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("BACKGROUND", (0, 0), (-1, 0), pal["SOFT"]),
+        ("TEXTCOLOR", (0, 0), (-1, 0), pal["PRIMARY"]),
+        ("ALIGN", (2, 1), (-1, -1), "RIGHT"),
+        ("GRID", (0, 0), (-1, -1), 0.3, pal["BORDER"]),
+        ("FONTSIZE", (0, 0), (-1, -1), 8),
+    ]))
+
+    return tbl
