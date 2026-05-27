@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from core.dominio.modelo import Datosproyecto
 from core.dominio.contrato import ResultadoProyecto
-
+from core.servicios.optimizacion_fv import optimizar_kwp_maximo_ahorro
 from core.aplicacion.dependencias import DependenciasEstudio
 
 
@@ -85,6 +85,58 @@ def ejecutar_estudio(
                 errores=energia.errores or ["Error en energía"]
             )
 
+
+
+
+                # ==================================================
+        # 3.1 OPTIMIZACIÓN ECONÓMICA
+        # ==================================================
+        modo_sistema = getattr(datos, "sistema_fv", {}) or {}
+        modo_actual = modo_sistema.get("modo")
+
+        if modo_actual == "optimizacion_economica":
+
+            demanda_24h = getattr(
+                datos,
+                "consumo_horario_24h_kwh",
+                {}
+            ) or {}
+
+            if not demanda_24h:
+                raise ValueError(
+                    "Optimización económica requiere perfil horario de consumo."
+                )
+
+            panel_w = float(getattr(sizing.panel, "pmax_w", 0.0) or 0.0)
+
+            if panel_w <= 0:
+                raise ValueError("Potencia de panel inválida para optimización.")
+
+            resultado_opt = optimizar_kwp_maximo_ahorro(
+                demanda_24h=demanda_24h,
+                energia_horaria_base_kwh=energia.energia_horaria_kwh,
+                pdc_kw_base=float(sizing.pdc_kw),
+                panel_w=panel_w,
+                tarifa_compra_l_kwh=float(getattr(datos, "tarifa_energia", 0.0) or 0.0),
+                precio_inyeccion_l_kwh=2.20,
+                kwp_min=1.0,
+                kwp_max=500.0,
+                paso_kwp=1.0,
+                mejora_minima_l_anual=1000.0,
+            )
+
+            datos.sistema_fv["modo"] = "kw_objetivo"
+            datos.sistema_fv["valor"] = float(resultado_opt["pdc_kw"])
+            datos.sistema_fv["optimizacion_economica"] = resultado_opt
+
+            # Recalcular con tamaño óptimo
+            sizing = deps.sizing.ejecutar(datos)
+
+            entrada_paneles = construir_entrada_paneles(datos, sizing)
+            paneles = deps.paneles.ejecutar(entrada_paneles)
+
+            energia = deps.energia.ejecutar(datos, sizing, paneles)
+            
         # ==================================================
         # 4. ELECTRICAL
         # ==================================================
