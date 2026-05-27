@@ -404,22 +404,27 @@ def _section_layout_preliminar(story, resultado, pal, styles, content_w):
     if layout is None:
         return
 
+    if isinstance(layout, dict):
+        layout = layout.get("layout") or layout
+
+    def val(campo, default=None):
+        if isinstance(layout, dict):
+            return layout.get(campo, default)
+        return getattr(layout, campo, default)
+
     story.append(Paragraph("Layout preliminar del sistema FV", styles["Heading2"]))
     story.append(Spacer(1, 6))
 
     data = [
         ["Concepto", "Valor"],
-        ["Cantidad de paneles", f"{layout.n_paneles:,}"],
-        ["Área por panel", f"{layout.area_panel_m2:,.2f} m²"],
-        ["Área bruta de paneles", f"{layout.area_bruta_m2:,.2f} m²"],
-        ["Factor de ocupación", f"{layout.factor_ocupacion:,.2f}"],
-        ["Área necesaria estimada", f"{layout.area_necesaria_m2:,.2f} m²"],
-        ["Distribución preliminar", f"{layout.filas} filas × {layout.columnas} columnas"],
-        ["Paneles colocados", f"{layout.paneles_colocados:,}"],
-        ["Espacios sobrantes en cuadrícula", f"{layout.paneles_sobrantes:,}"],
-        ["Ancho total estimado", f"{layout.ancho_total_m:,.2f} m"],
-        ["Largo total estimado", f"{layout.largo_total_m:,.2f} m"],
-        ["Área rectangular estimada", f"{layout.area_rectangular_m2:,.2f} m²"],
+        ["Cantidad de paneles", f"{int(val('n_paneles', 0)):,}"],
+        ["Filas", f"{int(val('filas', 0)):,}"],
+        ["Columnas", f"{int(val('columnas', 0)):,}"],
+        ["Paneles colocados", f"{int(val('paneles_colocados', 0)):,}"],
+        ["Espacios sobrantes", f"{int(val('paneles_sobrantes', 0)):,}"],
+        ["Ancho total estimado", f"{float(val('ancho_total_m', 0.0)):,.2f} m"],
+        ["Largo total estimado", f"{float(val('largo_total_m', 0.0)):,.2f} m"],
+        ["Área rectangular estimada", f"{float(val('area_rectangular_m2', 0.0)):,.2f} m²"],
     ]
 
     tabla = Table(
@@ -446,7 +451,8 @@ def _section_layout_preliminar(story, resultado, pal, styles, content_w):
 
     story.append(
         Paragraph(
-            layout.nota,
+            "Layout preliminar informativo. No considera obstáculos, sombras, "
+            "orientación real ni verificación estructural.",
             styles["BodyText"]
         )
     )
