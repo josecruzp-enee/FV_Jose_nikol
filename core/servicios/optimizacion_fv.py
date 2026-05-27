@@ -190,6 +190,25 @@ def evaluar_economia_sistema(
 
     return resultado
 
+def calcular_factor_recuperacion_capital(
+    *,
+    tasa_descuento_anual: float,
+    vida_util_anios: int,
+) -> float:
+
+    if vida_util_anios <= 0:
+        raise ValueError("vida_util_anios inválida")
+
+    i = float(tasa_descuento_anual)
+
+    if i <= 0:
+        return 1.0 / vida_util_anios
+
+    return (
+        i * (1.0 + i) ** vida_util_anios
+    ) / (
+        (1.0 + i) ** vida_util_anios - 1.0
+    )
 
 def optimizar_kwp_maximo_ahorro(
     *,
