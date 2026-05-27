@@ -58,45 +58,13 @@ from .catalogos_yaml import (
 # Catálogo base (fallback)
 # ==========================================================
 
+# ==========================================================
+# Catálogo base (fallback)
+# ==========================================================
+
 _PANELES: Dict[str, Panel] = {}
 
-    "panel_550w": Panel(
-        id="panel_550w",
-        marca="",
-        nombre="",
-        codigo="",
-
-        pmax_w=550.0,
-        vmp_v=41.5,
-        voc_v=49.5,
-        imp_a=13.25,
-        isc_a=14.10,
-        coef_voc_pct_c=-0.28,
-        coef_vmp_pct_c=-0.34,
-        coef_potencia_pct_c=-0.35,
-        noct_c=45.0,
-    )
-
-}
-
-
 _INVERSORES: Dict[str, Inversor] = {}
-
-    "inv_5kw_2mppt": Inversor(
-        id="inv_5kw_2mppt",
-        marca="",
-        nombre="",
-        codigo="",
-
-        kw_ac=5.0,
-        n_mppt=2,
-        mppt_min_v=120.0,
-        mppt_max_v=480.0,
-        vdc_max_v=550.0,
-        imppt_max_a=15.0,
-    )
-
-}
 
 
 _DATA_DIR = Path("data")
