@@ -148,7 +148,12 @@ def ejecutar_electrical(*, datos: Any, paneles: Any, sizing: Any) -> ResultadoEl
             raise ValueError("dist_ac_m no definido en electrico")
 
 
-
+        debug_inversor = {
+        "sizing.kw_ac": getattr(sizing, "kw_ac", None),
+        "sizing.kw_ac_total": getattr(sizing, "kw_ac_total", None),
+        "sizing.n_inversores": getattr(sizing, "n_inversores", None),
+        "sizing.ratio_real": getattr(sizing, "ratio_real", None),
+        }
         
         # ==================================================
         # CORRIENTES
