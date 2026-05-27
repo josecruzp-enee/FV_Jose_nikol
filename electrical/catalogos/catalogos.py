@@ -61,6 +61,11 @@ from .catalogos_yaml import (
 _PANELES: Dict[str, Panel] = {
 
     "panel_550w": Panel(
+        id="panel_550w",
+        marca="",
+        nombre="",
+        codigo="",
+
         pmax_w=550.0,
         vmp_v=41.5,
         voc_v=49.5,
@@ -78,6 +83,11 @@ _PANELES: Dict[str, Panel] = {
 _INVERSORES: Dict[str, Inversor] = {
 
     "inv_5kw_2mppt": Inversor(
+        id="inv_5kw_2mppt",
+        marca="",
+        nombre="",
+        codigo="",
+
         kw_ac=5.0,
         n_mppt=2,
         mppt_min_v=120.0,
