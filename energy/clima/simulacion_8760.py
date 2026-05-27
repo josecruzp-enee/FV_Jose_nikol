@@ -70,7 +70,7 @@ def simular_clima_8760(
             SolarInput(
                 latitud_deg=clima.latitud,
                 longitud_deg=clima.longitud,
-                fecha_hora=hora.timestamp - timedelta(hours=6)
+                fecha_hora=hora.timestamp
             )
         )
 
