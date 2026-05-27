@@ -111,25 +111,43 @@ def _chart_diaria(meses: List[str], energia: List[float], path: Path):
     plt.close()
 
 
-def _chart_potencia_horaria(pdc_kw: float, path: Path):
+def _chart_potencia_horaria(
+    energia_horaria_kwh: List[float],
+    path: Path
+):
+
+    if not energia_horaria_kwh:
+        energia_horaria_kwh = [0.0] * 8760
 
     horas = list(range(24))
-    potencia = []
 
-    PR = 0.82
+    suma = [0.0] * 24
+    conteo = [0] * 24
+
+    for idx, valor in enumerate(energia_horaria_kwh):
+
+        hora = idx % 24
+
+        suma[hora] += float(valor)
+        conteo[hora] += 1
+
+    potencia_promedio = []
 
     for h in horas:
 
-        if 6 <= h <= 18:
-            ang = (h - 6) / 12 * math.pi
-            irr = math.sin(ang)
+        if conteo[h] == 0:
+            potencia_promedio.append(0.0)
         else:
-            irr = 0
-
-        potencia.append(pdc_kw * irr * PR)
+            potencia_promedio.append(
+                suma[h] / conteo[h]
+            )
 
     plt.figure()
-    plt.plot(horas, potencia, marker="o")
+    plt.plot(
+        horas,
+        potencia_promedio,
+        marker="o"
+    )
 
     plt.title("Perfil horario de potencia FV")
     plt.xlabel("Hora")
@@ -141,26 +159,42 @@ def _chart_potencia_horaria(pdc_kw: float, path: Path):
     plt.savefig(path, dpi=160)
     plt.close()
 
+def _chart_energia_horaria(
+    energia_horaria_kwh: List[float],
+    path: Path
+):
 
-def _chart_energia_horaria(pdc_kw: float, path: Path):
+    if not energia_horaria_kwh:
+        energia_horaria_kwh = [0.0] * 8760
 
     horas = list(range(24))
-    energia = []
 
-    PR = 0.82
+    suma = [0.0] * 24
+    conteo = [0] * 24
+
+    for idx, valor in enumerate(energia_horaria_kwh):
+
+        hora = idx % 24
+
+        suma[hora] += float(valor)
+        conteo[hora] += 1
+
+    energia_promedio = []
 
     for h in horas:
 
-        if 6 <= h <= 18:
-            ang = (h - 6) / 12 * math.pi
-            irr = math.sin(ang)
+        if conteo[h] == 0:
+            energia_promedio.append(0.0)
         else:
-            irr = 0
-
-        energia.append(pdc_kw * irr * PR)
+            energia_promedio.append(
+                suma[h] / conteo[h]
+            )
 
     plt.figure()
-    plt.bar(horas, energia)
+    plt.bar(
+        horas,
+        energia_promedio
+    )
 
     plt.title("Energía generada por hora")
     plt.xlabel("Hora")
@@ -171,7 +205,6 @@ def _chart_energia_horaria(pdc_kw: float, path: Path):
     plt.tight_layout()
     plt.savefig(path, dpi=160)
     plt.close()
-
 
 def _chart_anual(energia_anual: float, path: Path):
 
@@ -202,17 +235,23 @@ def generar_charts(
     # DATOS ENERGÍA (NO SE CALCULA AQUÍ)
     # ======================================================
 
-    energia = res.get("energia") if isinstance(res, dict) else getattr(res, "energia", None)
+    energia = (
+        res.get("energia")
+        if isinstance(res, dict)
+        else getattr(res, "energia", None)
+    )
 
     if energia:
-        energia_raw = list(getattr(energia, "energia_util_12m", []))
+        energia_raw = list(
+            getattr(energia, "energia_util_12m", [])
+        )
         energia_mensual = _extraer_energia(energia_raw)
     else:
         energia_mensual = [0] * 12
 
     meses = [
-        "Ene","Feb","Mar","Abr","May","Jun",
-        "Jul","Ago","Sep","Oct","Nov","Dic"
+        "Ene", "Feb", "Mar", "Abr", "May", "Jun",
+        "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"
     ]
 
     energia_anual = sum(energia_mensual)
@@ -230,23 +269,43 @@ def generar_charts(
 
     # diaria
     energia_diaria = [
-        e/d if d else 0 for e, d in zip(energia_mensual, DIAS_MES)
+        e / d if d else 0
+        for e, d in zip(energia_mensual, DIAS_MES)
     ]
 
     p2 = base / "fv_energia_diaria.png"
     _chart_diaria(meses, energia_diaria, p2)
     paths["chart_energia_diaria"] = str(p2)
 
-    # potencia
-    pdc_kw = _leer_pdc_kw(res)
+    # ======================================================
+    # SERIE HORARIA REAL 8760
+    # ======================================================
 
+    energia_horaria = []
+
+    if energia:
+        energia_horaria = list(
+            getattr(
+                energia,
+                "energia_horaria_kwh",
+                []
+            )
+        )
+
+    # potencia horaria real desde 8760
     p3 = base / "fv_potencia_horaria.png"
-    _chart_potencia_horaria(pdc_kw, p3)
+    _chart_potencia_horaria(
+        energia_horaria,
+        p3
+    )
     paths["chart_potencia_horaria"] = str(p3)
 
-    # energía horaria
+    # energía horaria real desde 8760
     p4 = base / "fv_energia_horaria.png"
-    _chart_energia_horaria(pdc_kw, p4)
+    _chart_energia_horaria(
+        energia_horaria,
+        p4
+    )
     paths["chart_energia_horaria"] = str(p4)
 
     # anual
