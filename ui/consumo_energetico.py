@@ -16,40 +16,40 @@ def obtener_perfil_kw_gasolinera_24h() -> Dict[int, float]:
     Perfil inicial editable en kW promedio por hora.
 
     Caso típico:
-    - Gasolinera 24h
-    - Tienda / food
+    - Gasolinera pequeña / mini market
+    - Operación 24h
     - Menor actividad en madrugada
 
-    Cada valor representa potencia promedio durante esa hora.
-    Como cada bloque dura 1 hora:
-    kW promedio = kWh de esa hora.
+    Consumo aproximado:
+    - 33.3 kWh/día
+    - ~1000 kWh/mes
     """
 
     return {
-        0: 15.0,
-        1: 12.0,
-        2: 9.0,
-        3: 9.0,
-        4: 12.0,
-        5: 17.0,
-        6: 25.0,
-        7: 30.0,
-        8: 33.0,
-        9: 35.0,
-        10: 36.0,
-        11: 37.0,
-        12: 39.0,
-        13: 37.0,
-        14: 36.0,
-        15: 35.0,
-        16: 33.0,
-        17: 32.0,
-        18: 30.0,
-        19: 28.0,
-        20: 27.0,
-        21: 24.0,
-        22: 20.0,
-        23: 17.0,
+        0: 0.82,
+        1: 0.65,
+        2: 0.49,
+        3: 0.49,
+        4: 0.65,
+        5: 0.93,
+        6: 1.36,
+        7: 1.64,
+        8: 1.80,
+        9: 1.91,
+        10: 1.96,
+        11: 2.02,
+        12: 2.13,
+        13: 2.02,
+        14: 1.96,
+        15: 1.91,
+        16: 1.80,
+        17: 1.75,
+        18: 1.64,
+        19: 1.53,
+        20: 1.47,
+        21: 1.31,
+        22: 1.09,
+        23: 0.93,
     }
 # ======================================================
 # VALIDACIONES PERFIL HORARIO
