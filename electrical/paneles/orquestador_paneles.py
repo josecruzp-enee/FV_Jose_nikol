@@ -85,14 +85,16 @@ def _armar_array(
 def _mapear_strings(strings_res):
     return [
         StringFV(
-            mppt=s.mppt,
+            id=idx + 1,
+            inversor=getattr(s, "inversor", 1),
+            mppt=getattr(s, "mppt", 1),
             n_series=s.n_series,
             vmp_string_v=s.vmp_string_v,
             voc_frio_string_v=s.voc_frio_string_v,
             imp_string_a=s.imp_string_a,
             isc_string_a=s.isc_string_a,
         )
-        for s in strings_res.strings
+        for idx, s in enumerate(strings_res.strings)
     ]
 
 
