@@ -397,7 +397,61 @@ def _section_energia_mensual(story, paths, styles, content_w):
         "No se pudo generar la gráfica de generación mensual."
     )
 
+def _section_layout_preliminar(story, resultado, pal, styles, content_w):
 
+    layout = leer(resultado, "layout_preliminar", None)
+
+    if layout is None:
+        return
+
+    story.append(Paragraph("Layout preliminar del sistema FV", styles["Heading2"]))
+    story.append(Spacer(1, 6))
+
+    data = [
+        ["Concepto", "Valor"],
+        ["Cantidad de paneles", f"{layout.n_paneles:,}"],
+        ["Área por panel", f"{layout.area_panel_m2:,.2f} m²"],
+        ["Área bruta de paneles", f"{layout.area_bruta_m2:,.2f} m²"],
+        ["Factor de ocupación", f"{layout.factor_ocupacion:,.2f}"],
+        ["Área necesaria estimada", f"{layout.area_necesaria_m2:,.2f} m²"],
+        ["Distribución preliminar", f"{layout.filas} filas × {layout.columnas} columnas"],
+        ["Paneles colocados", f"{layout.paneles_colocados:,}"],
+        ["Espacios sobrantes en cuadrícula", f"{layout.paneles_sobrantes:,}"],
+        ["Ancho total estimado", f"{layout.ancho_total_m:,.2f} m"],
+        ["Largo total estimado", f"{layout.largo_total_m:,.2f} m"],
+        ["Área rectangular estimada", f"{layout.area_rectangular_m2:,.2f} m²"],
+    ]
+
+    tabla = Table(
+        data,
+        colWidths=[
+            content_w * 0.45,
+            content_w * 0.55,
+        ],
+        repeatRows=1,
+    )
+
+    tabla.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0B3551")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 8),
+        ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+        ("GRID", (0, 0), (-1, -1), 0.25, colors.lightgrey),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+    ]))
+
+    story.append(tabla)
+    story.append(Spacer(1, 8))
+
+    story.append(
+        Paragraph(
+            layout.nota,
+            styles["BodyText"]
+        )
+    )
+
+    story.append(Spacer(1, 12))
 # =========================================================
 # PAGE 5
 # =========================================================
@@ -435,7 +489,7 @@ def build_ingenieria_electrica(resultado, datos, paths, pal, styles, content_w, 
     _section_demanda_vs_fv_horaria(story, paths, styles, content_w)
     _section_energia_mensual(story, paths, styles, content_w)
     _section_optimizacion_economica(story, resultado, pal, styles, content_w)
-
+    _section_layout_preliminar(story, resultado, pal, styles, content_w)
     insertar_layout_paneles(story, paths, styles, content_w, safe_image)
 
     story.append(PageBreak())
