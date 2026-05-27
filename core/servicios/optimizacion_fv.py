@@ -209,6 +209,8 @@ def optimizar_kwp_maximo_ahorro(
     paso_kwp: float = 1.0,
 ) -> dict:
 
+    dscr_minimo = 1.25
+
     demanda_8760 = construir_demanda_8760_desde_24h(
         demanda_24h=demanda_24h,
         n_horas=len(energia_horaria_base_kwh),
@@ -224,7 +226,6 @@ def optimizar_kwp_maximo_ahorro(
         vida_util_anios=vida_util_anios,
     )
 
-    mejor = None
     tabla_evaluacion = []
 
     kwp = float(kwp_min)
@@ -254,6 +255,12 @@ def optimizar_kwp_maximo_ahorro(
             costo_anualizado_l
         )
 
+        dscr = (
+            beneficio_bruto_l_anual / costo_anualizado_l
+            if costo_anualizado_l > 0
+            else 0.0
+        )
+
         r["n_paneles"] = n_paneles
         r["pdc_kw"] = pdc_kw_real
         r["kwp"] = pdc_kw_real
@@ -265,44 +272,36 @@ def optimizar_kwp_maximo_ahorro(
 
         r["beneficio_bruto_l_anual"] = beneficio_bruto_l_anual
         r["beneficio_neto_l_anual"] = beneficio_neto_l_anual
+        r["dscr"] = dscr
 
         tabla_evaluacion.append(dict(r))
 
-        if (
-            mejor is None
-            or beneficio_neto_l_anual > mejor["beneficio_neto_l_anual"]
-        ):
-            mejor = dict(r)
-
-                # ==========================================
-        # PARADA ECONÓMICA
-        # ==========================================
-        if mejor is not None:
-
-            beneficio_actual = (
-                r["beneficio_neto_l_anual"]
-            )
-
-            beneficio_mejor = (
-                mejor["beneficio_neto_l_anual"]
-            )
-
-            delta = (
-                beneficio_actual -
-                beneficio_mejor
-            )
-
-            # si ya estamos empeorando mucho,
-            # no tiene sentido seguir creciendo
-            if delta < -50000:
-                break
-                
         kwp += paso_kwp
 
-    if mejor is None:
+    if not tabla_evaluacion:
         raise ValueError("No se pudo optimizar el sistema FV")
 
-    mejor["criterio_optimizacion"] = "Máximo beneficio neto anual"
+    candidatos = [
+        r for r in tabla_evaluacion
+        if float(r.get("dscr", 0.0) or 0.0) >= dscr_minimo
+    ]
+
+    if candidatos:
+        mejor = min(
+            candidatos,
+            key=lambda r: float(r.get("capex_estimado_l", 0.0) or 0.0)
+        )
+        criterio = f"Menor CAPEX con DSCR ≥ {dscr_minimo:.2f}"
+    else:
+        mejor = max(
+            tabla_evaluacion,
+            key=lambda r: float(r.get("dscr", 0.0) or 0.0)
+        )
+        criterio = f"No hubo sistemas con DSCR ≥ {dscr_minimo:.2f}; se eligió el mayor DSCR disponible"
+
+    mejor = dict(mejor)
+    mejor["criterio_optimizacion"] = criterio
+    mejor["dscr_minimo"] = dscr_minimo
     mejor["tabla_evaluacion"] = tabla_evaluacion
 
     return mejor
