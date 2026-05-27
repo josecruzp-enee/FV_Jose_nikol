@@ -276,7 +276,7 @@ def generar_charts(
     res,
     out_dir=None,
     vista_resultados=None
-    proyecto=None,
+    proyecto=datos_proyecto,
 ):
 
     base = _mkdir_charts(out_dir)
