@@ -171,13 +171,19 @@ def _section_optimizacion_economica(
     content_w
 ):
 
-    energia = leer(
+    opt = leer(
         resultado,
-        "energia",
+        "optimizacion_economica",
         None
     )
 
-    opt = None
+    if not opt:
+
+        energia = leer(
+            resultado,
+            "energia",
+            None
+        )
 
     if energia is not None:
         opt = leer(
