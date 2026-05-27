@@ -59,6 +59,7 @@ def _render_dimensionamiento(sf):
             [
                 "Cobertura energética (%)",
                 "Eliminación consumo diurno (%)",
+                "Optimización económica",
                 "Área (m²)",
                 "Potencia (kW)",
             ],
@@ -104,6 +105,19 @@ def _render_dimensionamiento(sf):
                 "valor": float(valor)
             }
 
+        elif auto_op == "Optimización económica":
+
+            st.caption(
+                "Busca el tamaño FV con mayor beneficio económico, "
+                "considerando autoconsumo e inyección a red."
+            )
+
+            sf["modo"] = "optimizacion_economica"
+            sf["sizing_input"] = {
+                "modo": "optimizacion_economica",
+                "valor": 1.0
+            }
+
         elif auto_op == "Área (m²)":
 
             valor = st.number_input(
@@ -147,9 +161,6 @@ def _render_dimensionamiento(sf):
             key="manual_metodo"
         )
 
-        # --------------------------------------------------
-        # MANUAL SIMPLE
-        # --------------------------------------------------
         if manual_op == "Cantidad de paneles":
 
             valor = st.number_input(
@@ -168,9 +179,6 @@ def _render_dimensionamiento(sf):
             sf["usar_zonas"] = False
             sf["zonas"] = []
 
-        # --------------------------------------------------
-        # MULTIZONA
-        # --------------------------------------------------
         else:
 
             sf["usar_zonas"] = True
