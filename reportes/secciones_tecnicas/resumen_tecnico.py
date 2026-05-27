@@ -476,6 +476,23 @@ def build_resumen_tecnico(resultado, pal, styles, content_w):
     )
 
     # ======================================================
+    # COMPARATIVA DE INVERSORES
+    # ======================================================
+
+    comparativa_inversores = leer(
+        sizing,
+        "comparativa_inversores",
+        leer(resultado, "comparativa_inversores", [])
+    )
+
+    story.extend(
+        construir_tabla_comparativa_inversores_pdf(
+            comparativa_inversores,
+            styles,
+        )
+    )
+    
+    # ======================================================
     # FICHA TÉCNICA DEL INVERSOR
     # ======================================================
 
