@@ -35,6 +35,12 @@ No contiene lógica ni cálculos.
 @dataclass(frozen=True)
 class PanelSpec:
 
+    # identificación catálogo
+    id: str
+    marca: str
+    nombre: str
+    codigo: str
+
     # potencia
     pmax_w: float
 
@@ -49,9 +55,8 @@ class PanelSpec:
     # coeficientes temperatura
     coef_voc_pct_c: float
     coef_vmp_pct_c: float
-    coef_potencia_pct_c: float   
-    noct_c: float                
-
+    coef_potencia_pct_c: float
+    noct_c: float
 
 # ==========================================================
 # PARÁMETROS DE CABLEADO
