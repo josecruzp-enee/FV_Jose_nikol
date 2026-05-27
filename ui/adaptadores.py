@@ -1,5 +1,5 @@
 from __future__ import annotations
-
+from typing import Dict, List
 """
 ADAPTADORES UI → CORE
 FV Engine
@@ -36,7 +36,7 @@ Esto mantiene:
     arquitectura limpia
 """
 
-from typing import List
+
 
 from core.dominio.modelo import Datosproyecto
 
@@ -98,6 +98,26 @@ def datosproyecto_desde_ctx(ctx) -> Datosproyecto:
 
     cobertura = float(s.get("offset_pct", 80.0)) / 100.0
 
+
+    # ------------------------------------------------------
+    # Perfil horario técnico de consumo
+    # ------------------------------------------------------
+
+    perfil_kw_24h: Dict[int, float] = {
+        int(hora): float(kw)
+        for hora, kw in getattr(ctx, "perfil_kw_24h", {}).items()
+    }
+
+    consumo_horario_24h_kwh: Dict[int, float] = {
+        int(hora): float(kwh)
+        for hora, kwh in getattr(ctx, "consumo_horario_24h_kwh", {}).items()
+    }
+
+    resumen_perfil_consumo: Dict[str, float] = {
+        str(k): float(v)
+        for k, v in getattr(ctx, "resumen_perfil_consumo", {}).items()
+    }
+    
     # ------------------------------------------------------
     # Construcción del modelo de dominio
     # ------------------------------------------------------
@@ -119,6 +139,14 @@ def datosproyecto_desde_ctx(ctx) -> Datosproyecto:
         tarifa_energia=float(c.get("tarifa_energia_L_kwh", 0.0)),
         cargos_fijos=float(c.get("cargos_fijos_L_mes", 0.0)),
 
+        # ===============================
+        # Perfil horario técnico
+        # ===============================
+
+        perfil_kw_24h=perfil_kw_24h,
+        consumo_horario_24h_kwh=consumo_horario_24h_kwh,
+        resumen_perfil_consumo=resumen_perfil_consumo,
+        
         # ===============================
         # Producción solar
         # ===============================
