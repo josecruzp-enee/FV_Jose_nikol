@@ -142,6 +142,7 @@ def _ejecutar_pipeline_pdf(ctx, rp):
         arte = generar_artefactos(
             res=rp,
             out_dir=paths.get("out_dir", "salidas"),
+            proyecto=ctx.datos_proyecto,
             vista_resultados={},
             dos_aguas=True,
         )
