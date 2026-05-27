@@ -38,10 +38,29 @@ class Datosproyecto:
     tarifa_energia: float
     cargos_fijos: float
 
+    # =====================================================
+    # PERFIL HORARIO TÉCNICO DE CONSUMO
+    # =====================================================
+
+    # perfil ingresado por usuario (kW promedio por hora)
+    perfil_kw_24h: Dict[int, float] = field(default_factory=dict)
+
+    # energía equivalente horaria (kWh)
+    # para integración con motor FV 8760
+    consumo_horario_24h_kwh: Dict[int, float] = field(default_factory=dict)
+
+    # métricas de consistencia del perfil
+    resumen_perfil_consumo: Dict[str, float] = field(default_factory=dict)
+
     # -------------------------------
     # Producción FV
     # -------------------------------
-    prod_base_kwh_kwp_mes: List[float]
+
+    # producción base mensual por kWp
+    # antes estaba tipado como List[float]
+    # pero el sistema realmente usa float
+    prod_base_kwh_kwp_mes: float
+
     factores_fv_12m: List[float]
 
     cobertura_objetivo: float
@@ -117,13 +136,26 @@ class Datosproyecto:
             errores.append("consumo anual inválido (todo en cero)")
 
         # -------------------------------
+        # PERFIL HORARIO TÉCNICO
+        # -------------------------------
+        if self.perfil_kw_24h:
+
+            if len(self.perfil_kw_24h) != 24:
+                errores.append("perfil_kw_24h inválido")
+
+            if any(v < 0 for v in self.perfil_kw_24h.values()):
+                errores.append("perfil_kw_24h contiene negativos")
+
+        if self.consumo_horario_24h_kwh:
+
+            if len(self.consumo_horario_24h_kwh) != 24:
+                errores.append("consumo_horario_24h_kwh inválido")
+
+        # -------------------------------
         # PRODUCCIÓN
         # -------------------------------
-        if not self.prod_base_kwh_kwp_mes or len(self.prod_base_kwh_kwp_mes) != 12:
+        if self.prod_base_kwh_kwp_mes <= 0:
             errores.append("prod_base_kwh_kwp_mes inválido")
-
-        elif sum(self.prod_base_kwh_kwp_mes) <= 0:
-            errores.append("producción base FV inválida (todo en cero)")
 
         # -------------------------------
         # FACTORES
@@ -146,8 +178,14 @@ class Datosproyecto:
                 n_paneles = z.get("n_paneles")
                 area = z.get("area")
 
-                if (n_paneles is None or n_paneles <= 0) and (area is None or area <= 0):
-                    errores.append(f"Zona {i+1}: sin paneles ni área válida")
+                if (
+                    (n_paneles is None or n_paneles <= 0)
+                    and
+                    (area is None or area <= 0)
+                ):
+                    errores.append(
+                        f"Zona {i+1}: sin paneles ni área válida"
+                    )
 
         # -------------------------------
         # ELÉCTRICO
@@ -156,6 +194,7 @@ class Datosproyecto:
             errores.append("electrico no definido")
 
         else:
+
             vac = self.electrico.get("vac", 0)
 
             if vac <= 0:
