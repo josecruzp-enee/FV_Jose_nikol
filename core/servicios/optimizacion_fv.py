@@ -209,7 +209,7 @@ def optimizar_kwp_maximo_ahorro(
     paso_kwp: float = 1.0,
 ) -> dict:
 
-    beneficio_minimo_pct = 0.90
+    beneficio_minimo_pct = 0.95
 
     demanda_8760 = construir_demanda_8760_desde_24h(
         demanda_24h=demanda_24h,
