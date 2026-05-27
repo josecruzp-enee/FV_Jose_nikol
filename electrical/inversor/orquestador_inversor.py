@@ -36,7 +36,7 @@ def sugerir_configuraciones_inversor(pdc_kw, dc_ac_obj, max_inv=4):
 
             dc_ac = pdc_kw / pac_total
 
-            if 1.1 <= dc_ac <= 1.3:
+            if 1.2 <= dc_ac <= 1.3:
 
                 soluciones.append({
                     "config": combo,
