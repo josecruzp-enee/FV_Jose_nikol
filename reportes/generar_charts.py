@@ -276,7 +276,7 @@ def generar_charts(
     res,
     out_dir=None,
     vista_resultados=None,
-    proyecto=datos_proyecto,
+    proyecto=None,
 ):
 
     base = _mkdir_charts(out_dir)
@@ -312,12 +312,10 @@ def generar_charts(
     # GRÁFICAS
     # ======================================================
 
-    # mensual
     p1 = base / "fv_energia_mensual.png"
     _chart_mensual(meses, energia_mensual, p1)
     paths["chart_energia_mensual"] = str(p1)
 
-    # diaria
     energia_diaria = [
         e / d if d else 0
         for e, d in zip(energia_mensual, DIAS_MES)
@@ -342,7 +340,6 @@ def generar_charts(
             )
         )
 
-    # potencia horaria real desde 8760
     p3 = base / "fv_potencia_horaria.png"
     _chart_potencia_horaria(
         energia_horaria,
@@ -350,7 +347,6 @@ def generar_charts(
     )
     paths["chart_potencia_horaria"] = str(p3)
 
-    # energía horaria real desde 8760
     p4 = base / "fv_energia_horaria.png"
     _chart_energia_horaria(
         energia_horaria,
@@ -364,7 +360,7 @@ def generar_charts(
 
     consumo_horario_24h_kwh = {}
 
-        if proyecto is None:
+    if proyecto is None:
         proyecto = (
             res.get("proyecto")
             if isinstance(res, dict)
@@ -379,11 +375,13 @@ def generar_charts(
         ) or {}
 
     p6 = base / "demanda_vs_fv_horaria.png"
+
     _chart_demanda_vs_fv_horaria(
         consumo_horario_24h_kwh,
         energia_horaria,
         p6,
     )
+
     paths["chart_demanda_vs_fv_horaria"] = str(p6)
 
     # anual
