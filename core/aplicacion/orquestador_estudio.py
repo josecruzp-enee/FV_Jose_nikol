@@ -265,9 +265,12 @@ def ejecutar_estudio(
         # ==================================================
         # 5.1 LAYOUT PRELIMINAR FV
         # ==================================================
+        panel = getattr(sizing, "panel", None)
+
         layout_preliminar = construir_layout_preliminar_fv(
-            sizing=sizing,
-            panel=getattr(sizing, "panel", None),
+            n_paneles=int(getattr(sizing, "n_paneles", 0) or 0),
+            largo_panel_m=getattr(panel, "largo_m", None),
+            ancho_panel_m=getattr(panel, "ancho_m", None),
             factor_ocupacion=0.75,
             separacion_x_m=0.20,
             separacion_y_m=0.40,
