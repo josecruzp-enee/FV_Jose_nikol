@@ -165,8 +165,13 @@ def _chart_demanda_vs_fv_horaria(
     path: Path,
 ):
     """
-    Grafica demanda promedio horaria del cliente vs generación FV promedio horaria.
-    Incluye excedente FV, déficit/red y resumen energético diario.
+    Grafica demanda original, generación FV y demanda neta desde red.
+
+    Variables:
+    - demanda: consumo original del cliente.
+    - fv_promedio: generación FV promedio horaria.
+    - demanda_neta_red: energía que todavía compra a la red.
+    - excedente: energía FV no autoconsumida.
     """
 
     if not energia_horaria_kwh:
@@ -202,7 +207,7 @@ def _chart_demanda_vs_fv_horaria(
         for d, f in zip(demanda, fv_promedio)
     ]
 
-    deficit = [
+    demanda_neta_red = [
         max(d - f, 0.0)
         for d, f in zip(demanda, fv_promedio)
     ]
@@ -211,24 +216,36 @@ def _chart_demanda_vs_fv_horaria(
     energia_fv = sum(fv_promedio)
     energia_autoconsumo = sum(autoconsumo)
     energia_excedente = sum(excedente)
-    energia_deficit = sum(deficit)
+    energia_red = sum(demanda_neta_red)
 
-    cobertura_diurna = (
+    cobertura_directa = (
         energia_autoconsumo / energia_demanda * 100
+        if energia_demanda > 0
+        else 0.0
+    )
+
+    reduccion_red = (
+        (1 - energia_red / energia_demanda) * 100
         if energia_demanda > 0
         else 0.0
     )
 
     plt.figure(figsize=(11, 5.5))
 
+    # ======================================================
+    # CURVA DEMANDA ORIGINAL
+    # ======================================================
     plt.plot(
         horas,
         demanda,
         marker="o",
         linewidth=2,
-        label="Demanda cliente"
+        label="Demanda original"
     )
 
+    # ======================================================
+    # CURVA GENERACIÓN FV
+    # ======================================================
     plt.plot(
         horas,
         fv_promedio,
@@ -237,31 +254,49 @@ def _chart_demanda_vs_fv_horaria(
         label="Generación FV"
     )
 
-    plt.fill_between(
+    # ======================================================
+    # CURVA DEMANDA NETA DESDE RED
+    # ======================================================
+    plt.plot(
         horas,
-        demanda,
-        fv_promedio,
-        where=[fv_promedio[i] >= demanda[i] for i in horas],
-        alpha=0.20,
-        label="Excedente FV"
+        demanda_neta_red,
+        marker="o",
+        linewidth=2,
+        linestyle="--",
+        label="Demanda neta desde red"
     )
 
+    # ======================================================
+    # ÁREA DE REDUCCIÓN POR FV
+    # ======================================================
     plt.fill_between(
         horas,
         demanda,
+        demanda_neta_red,
+        alpha=0.18,
+        label="Demanda reducida por FV"
+    )
+
+    # ======================================================
+    # EXCEDENTE FV
+    # ======================================================
+    plt.fill_between(
+        horas,
         fv_promedio,
-        where=[fv_promedio[i] < demanda[i] for i in horas],
-        alpha=0.15,
-        label="Déficit cubierto por red"
+        demanda,
+        where=[fv_promedio[i] > demanda[i] for i in horas],
+        alpha=0.25,
+        label="Excedente FV"
     )
 
     texto = (
         f"Demanda diaria: {energia_demanda:.1f} kWh\n"
         f"Generación FV: {energia_fv:.1f} kWh\n"
         f"Autoconsumo: {energia_autoconsumo:.1f} kWh\n"
+        f"Energía desde red: {energia_red:.1f} kWh\n"
         f"Excedente FV: {energia_excedente:.1f} kWh\n"
-        f"Déficit/red: {energia_deficit:.1f} kWh\n"
-        f"Cobertura directa: {cobertura_diurna:.1f}%"
+        f"Cobertura directa: {cobertura_directa:.1f}%\n"
+        f"Reducción compra red: {reduccion_red:.1f}%"
     )
 
     plt.text(
@@ -274,7 +309,7 @@ def _chart_demanda_vs_fv_horaria(
         bbox=dict(boxstyle="round", alpha=0.15)
     )
 
-    plt.title("Comparación horaria: Demanda del cliente vs Generación FV")
+    plt.title("Reducción de demanda por generación fotovoltaica")
     plt.xlabel("Hora del día")
     plt.ylabel("Energía promedio horaria (kWh)")
     plt.xticks(range(24))
@@ -284,7 +319,6 @@ def _chart_demanda_vs_fv_horaria(
     plt.tight_layout()
     plt.savefig(path, dpi=160)
     plt.close()
-
 def _chart_energia_horaria(
     energia_horaria_kwh: List[float],
     path: Path
