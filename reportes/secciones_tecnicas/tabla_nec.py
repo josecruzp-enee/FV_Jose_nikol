@@ -185,7 +185,12 @@ def crear_tabla_indicadores(resultado, pal, content_w):
 
     n_mppt_total = n_inv * mppt_por_inv
 
-    strings_por_mppt = getattr(paneles, "strings_por_mppt", 1) if paneles else 1
+    array = getattr(paneles, "array", None) if paneles else None
+
+    strings_por_mppt = (
+        getattr(array, "strings_por_mppt", 1)
+        if array else 1
+    )
 
     capacidad_total_strings = n_mppt_total * strings_por_mppt
 
