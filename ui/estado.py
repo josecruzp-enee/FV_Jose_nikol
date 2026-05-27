@@ -62,6 +62,22 @@ class WizardCtx:
         }
     )
 
+    # Variables planas legacy / compatibilidad
+    consumo_12m: List[float] = field(default_factory=lambda: [0.0] * 12)
+    tarifa_energia: float = 0.0
+    cargos_fijos: float = 0.0
+
+    # Perfil horario técnico de consumo
+    perfil_kw_24h: Dict[int, float] = field(default_factory=dict)
+
+    # Energía horaria equivalente para autoconsumo técnico
+    # Como cada intervalo es de 1 hora:
+    # kW promedio = kWh del intervalo
+    consumo_horario_24h_kwh: Dict[int, float] = field(default_factory=dict)
+
+    # Resumen de consistencia del perfil horario
+    resumen_perfil_consumo: Dict[str, float] = field(default_factory=dict)
+
     # ------------------------------------------------------
     # Sistema FV (inputs técnicos)
     # ------------------------------------------------------
