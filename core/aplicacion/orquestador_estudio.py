@@ -256,6 +256,7 @@ def ejecutar_estudio(
             energia=energia,
             electrical=electrical,
             financiero=finanzas,
+            optimizacion_economica=optimizacion_economica,
             ok=True,
             errores=[]
         )
@@ -273,6 +274,11 @@ def ejecutar_estudio(
             energia=energia if 'energia' in locals() else None,
             electrical=electrical if 'electrical' in locals() else None,
             financiero=finanzas if 'finanzas' in locals() else None,
+            optimizacion_economica=(
+                optimizacion_economica 
+                if 'optimizacion_economica' in locals() 
+                else None
+            ),
             ok=False,
             errores=[str(e)]
         )
