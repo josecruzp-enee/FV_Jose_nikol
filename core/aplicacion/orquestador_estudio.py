@@ -9,10 +9,25 @@ from core.aplicacion.dependencias import DependenciasEstudio
 # ==========================================================
 # ORQUESTADOR PRINCIPAL
 # ==========================================================
+# ==========================================================
+# ORQUESTADOR PRINCIPAL
+# ==========================================================
 def ejecutar_estudio(
     datos: Datosproyecto,
     deps: DependenciasEstudio
 ) -> ResultadoProyecto:
+
+    # ======================================================
+    # Variables base
+    # Importante: se inicializan para que no fallen
+    # en modos distintos a optimización económica.
+    # ======================================================
+    sizing = None
+    paneles = None
+    energia = None
+    electrical = None
+    finanzas = None
+    optimizacion_economica = None
 
     try:
 
@@ -34,6 +49,7 @@ def ejecutar_estudio(
                 energia=None,
                 electrical=None,
                 financiero=None,
+                optimizacion_economica=None,
                 ok=False,
                 errores=sizing.errores or ["Error en sizing"]
             )
@@ -57,6 +73,7 @@ def ejecutar_estudio(
                 energia=None,
                 electrical=None,
                 financiero=None,
+                optimizacion_economica=None,
                 ok=False,
                 errores=paneles.errores or ["Error en paneles"]
             )
@@ -77,6 +94,7 @@ def ejecutar_estudio(
                 energia=energia,
                 electrical=None,
                 financiero=None,
+                optimizacion_economica=None,
                 ok=False,
                 errores=energia.errores or ["Error en energía"]
             )
@@ -120,7 +138,7 @@ def ejecutar_estudio(
                     "Potencia de panel inválida para optimización."
                 )
 
-            resultado_opt = optimizar_kwp_maximo_ahorro(
+            optimizacion_economica = optimizar_kwp_maximo_ahorro(
                 demanda_24h=demanda_24h,
                 energia_horaria_base_kwh=energia_horaria,
                 pdc_kw_base=float(sizing.pdc_kw),
@@ -144,8 +162,8 @@ def ejecutar_estudio(
 
             datos.sistema_fv["modo_original"] = "optimizacion_economica"
             datos.sistema_fv["modo"] = "kw_objetivo"
-            datos.sistema_fv["valor"] = float(resultado_opt["pdc_kw"])
-            datos.sistema_fv["optimizacion_economica"] = resultado_opt
+            datos.sistema_fv["valor"] = float(optimizacion_economica["pdc_kw"])
+            datos.sistema_fv["optimizacion_economica"] = optimizacion_economica
 
             # ==================================================
             # Recalcular con tamaño óptimo
@@ -181,11 +199,6 @@ def ejecutar_estudio(
                     f"Energía optimizada inválida: {energia.errores}"
                 )
 
-            # ==================================================
-            # Resultado de optimización disponible para PDF
-            # ==================================================
-            energia.optimizacion_economica = resultado_opt
-
         # ==================================================
         # 4. ELECTRICAL
         # ==================================================
@@ -210,6 +223,7 @@ def ejecutar_estudio(
                     energia=energia,
                     electrical=electrical,
                     financiero=None,
+                    optimizacion_economica=optimizacion_economica,
                     ok=False,
                     errores=electrical.errores or ["Error en electrical"]
                 )
@@ -238,6 +252,7 @@ def ejecutar_estudio(
                     energia=energia,
                     electrical=electrical,
                     financiero=finanzas,
+                    optimizacion_economica=optimizacion_economica,
                     ok=False,
                     errores=getattr(
                         finanzas,
@@ -268,17 +283,13 @@ def ejecutar_estudio(
         print(traceback.format_exc())
 
         return ResultadoProyecto(
-            sizing=sizing if 'sizing' in locals() else None,
-            paneles=paneles if 'paneles' in locals() else None,
-            strings=paneles.strings if 'paneles' in locals() and paneles else None,
-            energia=energia if 'energia' in locals() else None,
-            electrical=electrical if 'electrical' in locals() else None,
-            financiero=finanzas if 'finanzas' in locals() else None,
-            optimizacion_economica=(
-                optimizacion_economica 
-                if 'optimizacion_economica' in locals() 
-                else None
-            ),
+            sizing=sizing,
+            paneles=paneles,
+            strings=paneles.strings if paneles else None,
+            energia=energia,
+            electrical=electrical,
+            financiero=finanzas,
+            optimizacion_economica=optimizacion_economica,
             ok=False,
             errores=[str(e)]
         )
