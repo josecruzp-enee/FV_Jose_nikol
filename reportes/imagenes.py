@@ -112,7 +112,27 @@ def generar_artefactos(
     # =====================================================
     # LAYOUT PANELES
     # =====================================================
+        # =====================================================
+    # LAYOUT PANELES
+    # =====================================================
     n_paneles = inferir_n_paneles(res)
+
+    # -----------------------------------------------------
+    # Detectar modo del sistema FV
+    # -----------------------------------------------------
+    sf = {}
+
+    try:
+        sf = getattr(proyecto, "sistema_fv", {}) or {}
+    except Exception:
+        sf = {}
+
+    modo_sistema = sf.get("modo")
+    zonas = sf.get("zonas", [])
+
+    # guardar para PDF
+    paths["modo_sistema"] = modo_sistema
+    paths["zonas"] = zonas
 
     if n_paneles > 0:
         generar_layout_paneles(
@@ -121,8 +141,12 @@ def generar_artefactos(
             max_cols=max_cols,
             dos_aguas=bool(dos_aguas),
             gap_cumbrera_m=float(gap_cumbrera_m),
+            modo_sistema=modo_sistema,
+            zonas=zonas,
         )
 
+
+    
     # =====================================================
     # STRING FV (ALINEADO)
     # =====================================================
