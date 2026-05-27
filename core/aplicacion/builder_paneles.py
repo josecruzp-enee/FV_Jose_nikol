@@ -59,8 +59,15 @@ def _mapear_modo_ui_a_paneles(modo_ui: str):
     if modo_ui == "paneles":
         return "manual"
 
-    if modo_ui in ["cobertura", "potencia", "consumo", "kw_objetivo"]:
-        return "consumo"   # 🔥 automático
+    if modo_ui in [
+        "cobertura",
+        "potencia",
+        "consumo",
+        "kw_objetivo",
+        "eliminacion_diurna",
+        "optimizacion_economica",
+    ]:
+        return "consumo"
 
     if modo_ui == "area":
         return "area"
@@ -170,6 +177,9 @@ def _build_normal(sf, panel, inversor, sizing):
     # ==================================================
     # PRIORIDAD: UI > sizing
     # ==================================================
+        # ==================================================
+    # PRIORIDAD: UI > sizing
+    # ==================================================
     n_paneles_total = None
 
     if modo_ui == "paneles":
@@ -177,14 +187,22 @@ def _build_normal(sf, panel, inversor, sizing):
             raise ValueError("Valor inválido para modo paneles")
         n_paneles_total = int(valor)
 
-    elif modo_ui in ["cobertura", "potencia"]:
+    elif modo_ui in [
+        "cobertura",
+        "potencia",
+        "kw_objetivo",
+        "eliminacion_diurna",
+        "optimizacion_economica",
+    ]:
         n_paneles_total = getattr(sizing, "n_paneles", None)
 
     elif modo_ui == "area":
         # paneles se calcularán internamente
         n_paneles_total = None
 
-    if modo == "paneles" and (n_paneles_total is None or n_paneles_total <= 0):
+    if modo == "manual" and (
+        n_paneles_total is None or n_paneles_total <= 0
+    ):
         raise ValueError("No se pudo determinar n_paneles_total")
 
     return EntradaPaneles(
