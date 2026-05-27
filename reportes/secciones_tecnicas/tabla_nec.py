@@ -30,14 +30,16 @@ def crear_tabla_parametros_electricos(resultado, pal, content_w):
     mppt_nom, mppt_dis = leer("mppt")
     dc_nom, dc_dis = leer("dc_total")
     ac_nom, ac_dis = leer("ac")
-
+    ac_inv_nom, ac_inv_dis = leer("ac_inversor")
+    
     rows = [
         ["Nivel", "Corriente operación (A)", "Corriente diseño (A)"],
         ["Panel", panel_nom, panel_dis],
         ["String", string_nom, string_dis],
         ["MPPT crítico", mppt_nom, mppt_dis],
         ["DC total del Arreglo", dc_nom, dc_dis],
-        ["AC total del Sistema", ac_nom, ac_dis],
+        ["AC por inversor", ac_inv_nom, ac_inv_dis],
+        ["AC total del sistema", ac_nom, ac_dis],
     ]
 
     colw = [content_w * 0.4, content_w * 0.3, content_w * 0.3]
