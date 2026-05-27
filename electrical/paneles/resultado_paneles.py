@@ -25,6 +25,8 @@ class StringFV:
     imp_string_a: float
     isc_string_a: float
 
+    inversor: int = 1
+    id: int = 0
 
 # =========================================================
 # RECOMENDACIÓN
