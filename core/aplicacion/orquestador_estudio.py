@@ -4,7 +4,7 @@ from core.dominio.modelo import Datosproyecto
 from core.dominio.contrato import ResultadoProyecto
 from core.servicios.optimizacion_fv import optimizar_kwp_maximo_ahorro
 from core.aplicacion.dependencias import DependenciasEstudio
-
+from core.servicios.layout import construir_layout_preliminar_fv
 
 # ==========================================================
 # ORQUESTADOR PRINCIPAL
@@ -28,6 +28,7 @@ def ejecutar_estudio(
     electrical = None
     finanzas = None
     optimizacion_economica = None
+    layout_preliminar = None
 
     try:
 
@@ -262,6 +263,18 @@ def ejecutar_estudio(
                 )
 
         # ==================================================
+        # 5.1 LAYOUT PRELIMINAR FV
+        # ==================================================
+        layout_preliminar = construir_layout_preliminar_fv(
+            sizing=sizing,
+            panel=getattr(sizing, "panel", None),
+            factor_ocupacion=0.75,
+            separacion_x_m=0.20,
+            separacion_y_m=0.40,
+            max_columnas=None,
+        )
+        
+        # ==================================================
         # RESULTADO FINAL
         # ==================================================
         return ResultadoProyecto(
@@ -271,6 +284,7 @@ def ejecutar_estudio(
             energia=energia,
             electrical=electrical,
             financiero=finanzas,
+            layout_preliminar=layout_preliminar,
             optimizacion_economica=optimizacion_economica,
             ok=True,
             errores=[]
@@ -289,6 +303,7 @@ def ejecutar_estudio(
             energia=energia,
             electrical=electrical,
             financiero=finanzas,
+            layout_preliminar=layout_preliminar,
             optimizacion_economica=optimizacion_economica,
             ok=False,
             errores=[str(e)]
