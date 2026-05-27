@@ -209,21 +209,40 @@ def calcular_protecciones(
         print("🔥 DEBUG PROTECCIONES GLOBAL")
         print("==============================")
 
-        print("AC diseño:", corr.ac.i_diseno_a)
+        print("AC total diseño:", corr.ac_total.i_diseno_a)
+        print("AC inversor diseño:", corr.ac_inversor.i_diseno_a)
         print("String diseño:", corr.string.i_diseno_a)
 
         print("MPPT DETALLE:", getattr(corr, "mppt_detalle", None))
         print("LEN MPPT:", len(getattr(corr, "mppt_detalle", [])))
+
+        inversores_detalle = getattr(corr, "inversores_detalle", [])
+
+        ocpd_ac_principal = _ocpd(
+            corr.ac_total.i_diseno_a,
+            "NEC 690.8 / 210.20(A) — principal AC"
+        )
+
+        ocpd_ac_inversores = [
+            _ocpd(
+                inv.i_diseno_a,
+                "NEC 690.8 / 210.20(A) — salida inversor"
+            )
+            for inv in inversores_detalle
+        ]
 
         return ResultadoProtecciones(
             ok=True,
             errores=[],
             warnings=warnings,
 
-            ocpd_ac=_ocpd(
-                corr.ac.i_diseno_a,
-                "NEC 690.8 / 210.20(A)"
-            ),
+            # Compatibilidad histórica:
+            # se mantiene como protección AC principal.
+            ocpd_ac=ocpd_ac_principal,
+
+            # Nuevo modelo AC separado.
+            ocpd_ac_inversores=ocpd_ac_inversores,
+            ocpd_ac_principal=ocpd_ac_principal,
 
             ocpd_dc_array=OCPDResultado(
                 i_diseno_a=0.0,
@@ -250,14 +269,18 @@ def calcular_protecciones(
 
         print("💥 ERROR EN PROTECCIONES:", str(e))
 
+        cero_ocpd = OCPDResultado(0.0, 0, "")
+
         return ResultadoProtecciones(
             ok=False,
             errores=errores,
             warnings=warnings,
 
-            ocpd_ac=OCPDResultado(0.0, 0, ""),
+            ocpd_ac=cero_ocpd,
+            ocpd_ac_inversores=[],
+            ocpd_ac_principal=cero_ocpd,
 
-            ocpd_dc_array=OCPDResultado(0.0, 0, ""),
+            ocpd_dc_array=cero_ocpd,
 
             fusible_string=FusibleStringResultado(
                 False, None, None, None, "error"
