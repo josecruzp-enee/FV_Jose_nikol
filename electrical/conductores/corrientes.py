@@ -282,3 +282,42 @@ def calcular_corrientes(inp: CorrientesInput) -> ResultadoCorrientes:
         strings_detalle=strings,
         inversores_detalle=inversores_detalle,
     )
+
+
+# ==========================================================
+# RESUMEN TÉCNICO DEL MÓDULO
+# ==========================================================
+#
+# Este módulo calcula las corrientes eléctricas principales del sistema FV.
+#
+# Entradas principales:
+# - paneles: resultado del dimensionamiento de paneles y strings.
+# - kw_ac: potencia AC total del sistema.
+# - vac: voltaje AC del sistema.
+# - fases: 1 o 3.
+# - fp: factor de potencia.
+# - n_inversores: cantidad de inversores.
+# - factor_dc: factor de diseño DC, normalmente 1.25.
+# - factor_ac: factor de diseño AC, normalmente 1.25.
+#
+# Salidas principales:
+# - panel: corriente de un panel.
+# - string: corriente de un string.
+# - mppt: MPPT crítico, es decir, el de mayor corriente de diseño.
+# - dc_total: suma de todos los MPPT.
+# - ac_inversor: corriente AC de diseño por cada inversor.
+# - ac_total / ac: corriente AC total del sistema.
+# - mppt_detalle: lista de corrientes por cada MPPT real.
+# - inversores_detalle: lista de corrientes AC individuales por inversor.
+#
+# Criterio importante:
+# - Los strings en paralelo dentro de un mismo MPPT suman corriente.
+# - Cada MPPT se calcula agrupando por (inversor, mppt).
+# - La corriente AC total se divide entre n_inversores para obtener ac_inversor.
+# - inversores_detalle permite dimensionar conductores y protecciones
+#   separados para cada salida de inversor.
+#
+# Este módulo NO selecciona calibres, protecciones ni canalizaciones.
+# Solo calcula corrientes. El dimensionamiento de conductores debe hacerse
+# en el módulo de conductores usando mppt_detalle e inversores_detalle.
+# ==========================================================
