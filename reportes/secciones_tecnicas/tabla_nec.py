@@ -77,39 +77,43 @@ def crear_tabla_dimensionamiento_nec(resultado, pal, content_w):
     # ======================================================
 
     tramos = getattr(conductores, "tramos", None) if conductores else None
+
     dc_mppt = getattr(tramos, "dc_mppt", []) if tramos else []
-    ac_tramo = getattr(tramos, "ac", None) if tramos else None
+    ac_inversores = getattr(tramos, "ac_inversores", []) if tramos else []
+    ac_principal = getattr(tramos, "ac_principal", None) if tramos else None
 
     cond_dc = "—"
-    cond_ac = "—"
+    cond_ac_principal = "—"
 
     for t in dc_mppt:
-        cond_dc = f'{getattr(t,"calibre","—")} {getattr(t,"material","")}'
+        cond_dc = f'{getattr(t, "calibre", "—")} {getattr(t, "material", "")}'
 
-    if ac_tramo:
-        cond_ac = f'{getattr(ac_tramo,"calibre","—")} {getattr(ac_tramo,"material","")}'
+    if ac_principal:
+        cond_ac_principal = f'{getattr(ac_principal, "calibre", "—")} {getattr(ac_principal, "material", "")}'
 
     # ======================================================
     # PROTECCIONES
     # ======================================================
 
-    ocpd_ac = getattr(prot, "ocpd_ac", None) if prot else None
-    ocpd_dc = getattr(prot, "ocpd_dc_array", None) if prot else None
+    ocpd_ac_inversores = getattr(prot, "ocpd_ac_inversores", []) if prot else []
+    ocpd_ac_principal = getattr(prot, "ocpd_ac_principal", None) if prot else None
     fusible = getattr(prot, "fusible_string", None) if prot else None
 
     rows = [
         ["Circuito", "I operación", "I diseño", "Protección", "Conductor"],
     ]
 
-    niveles = [
-        ("panel", "Panel", None, None),
+    # ======================================================
+    # FILAS DC BASE
+    # ======================================================
+
+    niveles_base = [
+        ("panel", "Panel", None, "—"),
         ("string", "String", fusible, cond_dc),
         ("mppt", "MPPT crítico", None, cond_dc),
-        ("ac_inversor", "AC por inversor", None, "—"),
-        ("ac", "AC total del sistema", ocpd_ac, cond_ac),
     ]
 
-    for key, nombre, p, c in niveles:
+    for key, nombre, p, c in niveles_base:
 
         d = getattr(corr, key, None)
 
@@ -120,7 +124,7 @@ def crear_tabla_dimensionamiento_nec(resultado, pal, content_w):
         i_op = f"{getattr(d, 'i_operacion_a', 0):.2f}"
         i_dis = f"{getattr(d, 'i_diseno_a', 0):.2f}"
 
-        prot_txt = f'{getattr(p,"tamano_a","—")} A' if p else "—"
+        prot_txt = f'{getattr(p, "tamano_a", "—")} A' if p else "—"
         cond_txt = c if c else "—"
 
         rows.append([
@@ -130,6 +134,59 @@ def crear_tabla_dimensionamiento_nec(resultado, pal, content_w):
             prot_txt,
             cond_txt
         ])
+
+    # ======================================================
+    # FILAS AC POR INVERSOR
+    # ======================================================
+
+    inversores_corr = getattr(corr, "inversores_detalle", [])
+
+    if inversores_corr:
+
+        for idx, inv_corr in enumerate(inversores_corr):
+
+            p = ocpd_ac_inversores[idx] if idx < len(ocpd_ac_inversores) else None
+            c = ac_inversores[idx] if idx < len(ac_inversores) else None
+
+            cond_txt = (
+                f'{getattr(c, "calibre", "—")} {getattr(c, "material", "")}'
+                if c else "—"
+            )
+
+            prot_txt = f'{getattr(p, "tamano_a", "—")} A' if p else "—"
+
+            rows.append([
+                f"AC inversor {idx + 1}",
+                f"{getattr(inv_corr, 'i_operacion_a', 0):.2f}",
+                f"{getattr(inv_corr, 'i_diseno_a', 0):.2f}",
+                prot_txt,
+                cond_txt
+            ])
+
+    else:
+        d = getattr(corr, "ac_inversor", None)
+
+        rows.append([
+            "AC por inversor",
+            f"{getattr(d, 'i_operacion_a', 0):.2f}" if d else "—",
+            f"{getattr(d, 'i_diseno_a', 0):.2f}" if d else "—",
+            "—",
+            "—",
+        ])
+
+    # ======================================================
+    # FILA AC PRINCIPAL
+    # ======================================================
+
+    d = getattr(corr, "ac_total", getattr(corr, "ac", None))
+
+    rows.append([
+        "AC total del sistema",
+        f"{getattr(d, 'i_operacion_a', 0):.2f}" if d else "—",
+        f"{getattr(d, 'i_diseno_a', 0):.2f}" if d else "—",
+        f'{getattr(ocpd_ac_principal, "tamano_a", "—")} A' if ocpd_ac_principal else "—",
+        cond_ac_principal,
+    ])
 
     colw = [
         content_w * 0.22,
@@ -142,16 +199,15 @@ def crear_tabla_dimensionamiento_nec(resultado, pal, content_w):
     tbl = Table(rows, colWidths=colw)
 
     tbl.setStyle(TableStyle([
-        ("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),
-        ("BACKGROUND",(0,0),(-1,0),pal["SOFT"]),
-        ("TEXTCOLOR",(0,0),(-1,0),pal["PRIMARY"]),
-        ("ALIGN",(1,1),(2,-1),"RIGHT"),
-        ("GRID",(0,0),(-1,-1),0.3,pal["BORDER"]),
-        ("FONTSIZE",(0,0),(-1,-1),10),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("BACKGROUND", (0, 0), (-1, 0), pal["SOFT"]),
+        ("TEXTCOLOR", (0, 0), (-1, 0), pal["PRIMARY"]),
+        ("ALIGN", (1, 1), (2, -1), "RIGHT"),
+        ("GRID", (0, 0), (-1, -1), 0.3, pal["BORDER"]),
+        ("FONTSIZE", (0, 0), (-1, -1), 10),
     ]))
 
     return tbl
-
 
 # ==========================================================
 # TABLA 3 — INDICADORES TÉCNICOS
