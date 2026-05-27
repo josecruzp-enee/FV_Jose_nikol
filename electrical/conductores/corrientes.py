@@ -99,7 +99,8 @@ class CorrientesInput:
     vac: float
     fases: int
     fp: float
-
+    n_inversores: int = 1
+    
     factor_dc: float = 1.25
     factor_ac: float = 1.25
 
@@ -246,6 +247,12 @@ def calcular_corrientes(inp: CorrientesInput) -> ResultadoCorrientes:
     ac = NivelCorriente(i_ac_operacion, i_ac_diseno)
     ac_total = ac
     ac_inversor = ac
+    n_inv = max(int(getattr(inp, "n_inversores", 1) or 1), 1)
+
+    ac_inversor = NivelCorriente(
+        i_operacion_a=ac.i_operacion_a / n_inv,
+        i_diseno_a=ac.i_diseno_a / n_inv,
+    )
 
     print("\n########################################")
     print("🔥 DEBUG CORRIENTES FIN")
