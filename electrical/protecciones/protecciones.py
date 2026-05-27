@@ -290,3 +290,34 @@ def calcular_protecciones(
 
             fusible_mppt=[]
         )
+
+# ==========================================================
+# RESUMEN TÉCNICO DEL MÓDULO
+# ==========================================================
+#
+# Este módulo calcula protecciones eléctricas del sistema FV.
+#
+# Responsabilidad:
+# - Seleccionar OCPD estándar según corriente de diseño.
+# - Calcular protección AC principal del sistema.
+# - Calcular protecciones AC individuales por inversor.
+# - Calcular protecciones por MPPT.
+# - Evaluar si se requiere fusible por string.
+#
+# Salidas AC:
+# - ocpd_ac:
+#     Compatibilidad histórica. Representa el OCPD AC principal.
+# - ocpd_ac_principal:
+#     Protección del alimentador AC total del sistema.
+# - ocpd_ac_inversores:
+#     Lista de protecciones individuales para cada salida de inversor.
+#
+# Criterio:
+# - corr.ac_total se usa para la protección AC principal.
+# - corr.inversores_detalle se usa para protecciones por inversor.
+# - corr.mppt_detalle se usa para protecciones por MPPT.
+#
+# Este módulo NO calcula corrientes.
+# Este módulo NO selecciona conductores.
+# Este módulo NO calcula caída de tensión.
+# ==========================================================
