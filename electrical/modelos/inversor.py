@@ -39,6 +39,12 @@ class InversorSpec:
     Especificación eléctrica mínima de un inversor FV.
     """
 
+    # identificación catálogo
+    id: str
+    marca: str
+    nombre: str
+    codigo: str
+
     # potencia AC nominal del inversor
     kw_ac: float
 
@@ -54,7 +60,6 @@ class InversorSpec:
 
     # corriente máxima por MPPT (datasheet)
     imppt_max_a: float | None = None
-
 
 # ==========================================================
 # PARÁMETROS GENERALES DE CABLEADO
