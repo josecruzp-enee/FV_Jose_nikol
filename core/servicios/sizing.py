@@ -1,298 +1,207 @@
 from __future__ import annotations
 
 """
-Servicio de sizing FV — ALINEADO A CONTRATO
+MODELO DE ENTRADA — FV ENGINE
+
+Reglas:
+- Una sola fuente de verdad para Datosproyecto
+- Tipado fuerte en el contenedor
+- Campos dinámicos controlados como dict
+- Sin duplicaciones
 """
 
-from typing import Optional, List
-from math import ceil
+from dataclasses import dataclass, field
+from typing import List, Dict, Any
 
-from core.dominio.modelo import Datosproyecto
-from core.dominio.contrato import ResultadoSizing, MesEnergia
 
-from core.servicios.consumo import consumo_anual_kwh
+# =========================================================
+# DATOS DEL PROYECTO (ENTRADA ÚNICA DEL SISTEMA)
+# =========================================================
 
-from electrical.catalogos import get_panel, get_inversor
-from electrical.inversor.orquestador_inversor import ejecutar_inversor_desde_sizing
+@dataclass
+class Datosproyecto:
 
+    # -------------------------------
+    # Información general
+    # -------------------------------
+    cliente: str
+    ubicacion: str
 
-# ==========================================================
-# HELPERS
-# ==========================================================
+    lat: float
+    lon: float
 
-def _clamp(x: float, lo: float, hi: float) -> float:
-    return max(lo, min(hi, float(x)))
+    # -------------------------------
+    # Consumo
+    # -------------------------------
+    consumo_12m: List[float]
 
+    tarifa_energia: float
+    cargos_fijos: float
 
-def _leer_equipos(p):
+    # -------------------------------
+    # Producción FV
+    # -------------------------------
+    prod_base_kwh_kwp_mes: float
+    factores_fv_12m: List[float]
 
-    eq = getattr(p, "equipos", None)
+    cobertura_objetivo: float
 
-    if eq is None:
-        raise ValueError("p.equipos no definido")
+    # -------------------------------
+    # Costos
+    # -------------------------------
+    costo_usd_kwp: float
+    tcambio: float
 
-    if isinstance(eq, dict):
-        panel_id = eq.get("panel_id")
-        inversor_id = eq.get("inversor_id")
+    # -------------------------------
+    # Financiamiento
+    # -------------------------------
+    tasa_anual: float
+    plazo_anios: int
+    porcentaje_financiado: float
 
-        if not panel_id or not inversor_id:
-            raise ValueError("Datos incompletos en p.equipos")
+    # -------------------------------
+    # O&M
+    # -------------------------------
+    om_anual_pct: float = 0.0
 
-        return type("EquiposTmp", (), {
-            "panel_id": panel_id,
-            "inversor_id": inversor_id,
-        })()
+    # =====================================================
+    # PERFIL HORARIO TÉCNICO DE CONSUMO
+    # =====================================================
 
-    return eq
+    perfil_kw_24h: Dict[int, float] = field(default_factory=dict)
+    consumo_horario_24h_kwh: Dict[int, float] = field(default_factory=dict)
+    resumen_perfil_consumo: Dict[str, float] = field(default_factory=dict)
 
+    # =====================================================
+    # CAMPOS DEL PIPELINE (DICT CONTROLADO)
+    # =====================================================
 
-def _panel_id(eq) -> str:
-    pid = str(getattr(eq, "panel_id", "")).strip()
-    if not pid:
-        raise ValueError("panel_id no definido")
-    return pid
+    sistema_fv: Dict[str, Any] = field(default_factory=dict)
+    equipos: Dict[str, Any] = field(default_factory=dict)
+    electrico: Dict[str, Any] = field(default_factory=dict)
 
+    # =====================================================
+    # VALIDACIÓN
+    # =====================================================
 
-def _inv_id(eq) -> Optional[str]:
-    v = getattr(eq, "inversor_id", None)
-    if v is None:
-        return None
-    v = str(v).strip()
-    return v if v else None
+    def validar_minimo(self) -> None:
 
+        errores = []
 
-# ==========================================================
-# PANEL + CONFIG
-# ==========================================================
+        # -------------------------------
+        # BASE
+        # -------------------------------
+        if not self.equipos:
+            errores.append("equipos no definido")
 
-def _leer_panel_y_config(p: Datosproyecto):
+        if not self.sistema_fv:
+            errores.append("sistema_fv no definido")
 
-    eq = _leer_equipos(p)
+        if self.lat == 0 and self.lon == 0:
+            errores.append("lat/lon inválidos (0,0)")
 
-    panel = get_panel(_panel_id(eq))
-    if panel is None:
-        raise ValueError("Panel no encontrado")
+        if "panel_id" not in self.equipos:
+            errores.append("panel_id no definido en equipos")
 
-    panel_w = float(getattr(panel, "pmax_w", 0.0))
-    if panel_w <= 0:
-        raise ValueError("Potencia de panel inválida")
+        if "inversor_id" not in self.equipos:
+            errores.append("inversor_id no definido en equipos")
 
-    dc_ac_obj = _clamp(
-        float(getattr(eq, "sobredimension_dc_ac", 1.20)),
-        1.0,
-        2.0,
-    )
+        modo = self.sistema_fv.get("modo")
 
-    return panel, dc_ac_obj, eq
+        if not modo:
+            errores.append("modo no definido en sistema_fv")
 
-
-# ==========================================================
-# CONSUMO
-# ==========================================================
-
-def _leer_consumo(p: Datosproyecto):
-
-    consumo_12m = list(getattr(p, "consumo_12m", []) or [])
-
-    if len(consumo_12m) != 12:
-        raise ValueError("consumo_12m debe tener 12 valores")
-
-    consumo_12m = [float(x or 0.0) for x in consumo_12m]
-
-    return consumo_anual_kwh(consumo_12m)
-
-
-# ==========================================================
-# GENERADOR (NORMAL)
-# ==========================================================
-
-def _dimensionar_generador(panel, modo, valor, consumo_anual):
-
-    energia_por_kwp_anual = 1500.0
-
-    if modo == "cobertura":
-
-        cobertura = _clamp(float(valor) / 100.0, 0.1, 2.0)
-        kwp_obj = (consumo_anual * cobertura) / energia_por_kwp_anual
-
-    elif modo == "area":
-
-        area = float(valor)
-        area_util = area * 0.75
-        kwp_obj = area_util / 5.0
-
-    elif modo == "kw_objetivo":
-
-        kwp_obj = float(valor)
-
-    elif modo == "paneles":
-
-        n_paneles = int(valor)
-
-        if n_paneles <= 0:
-            raise ValueError("Número de paneles inválido")
-
-        pdc_kw = (n_paneles * panel.pmax_w) / 1000
-        return n_paneles, pdc_kw
-
-    else:
-        raise ValueError(f"Modo inválido: {modo}")
-
-    n_paneles = int(ceil((kwp_obj * 1000) / panel.pmax_w))
-    pdc_kw = (n_paneles * panel.pmax_w) / 1000
-
-    return n_paneles, pdc_kw
-
-
-# ==========================================================
-# MULTIZONA
-# ==========================================================
-
-def _dimensionar_por_zonas(panel, zonas):
-
-    total_paneles = 0
-    total_pdc = 0
-
-    for i, z in enumerate(zonas):
-
-        if "n_paneles" in z:
-
-            n_paneles = int(z.get("n_paneles") or 0)
-
-            if n_paneles <= 0:
-                raise ValueError(f"Zona {i+1}: paneles inválidos")
-
-            pdc_kw = (n_paneles * panel.pmax_w) / 1000
-
-        elif "area" in z:
-
-            area = float(z.get("area") or 0.0)
-
-            if area <= 0:
-                raise ValueError(f"Zona {i+1}: área inválida")
-
-            area_util = area * 0.75
-            kwp_obj = area_util / 5.0
-
-            n_paneles = int(ceil((kwp_obj * 1000) / panel.pmax_w))
-            pdc_kw = (n_paneles * panel.pmax_w) / 1000
+        if modo in ["cobertura", "offset"]:
+            if self.sistema_fv.get("valor") is None:
+                errores.append("valor no definido para modo cobertura/offset")
+
+        # -------------------------------
+        # CONSUMO
+        # -------------------------------
+        if not self.consumo_12m or len(self.consumo_12m) != 12:
+            errores.append("consumo_12m inválido")
+
+        elif sum(self.consumo_12m) <= 0:
+            errores.append("consumo anual inválido (todo en cero)")
+
+        # -------------------------------
+        # PERFIL HORARIO TÉCNICO
+        # -------------------------------
+        if self.perfil_kw_24h:
+
+            if len(self.perfil_kw_24h) != 24:
+                errores.append("perfil_kw_24h inválido")
+
+            if any(float(v or 0.0) < 0 for v in self.perfil_kw_24h.values()):
+                errores.append("perfil_kw_24h contiene valores negativos")
+
+        if self.consumo_horario_24h_kwh:
+
+            if len(self.consumo_horario_24h_kwh) != 24:
+                errores.append("consumo_horario_24h_kwh inválido")
+
+            if any(float(v or 0.0) < 0 for v in self.consumo_horario_24h_kwh.values()):
+                errores.append("consumo_horario_24h_kwh contiene valores negativos")
+
+        # -------------------------------
+        # PRODUCCIÓN
+        # -------------------------------
+        if self.prod_base_kwh_kwp_mes is None:
+            errores.append("prod_base_kwh_kwp_mes inválido")
+
+        elif float(self.prod_base_kwh_kwp_mes) <= 0:
+            errores.append("prod_base_kwh_kwp_mes debe ser mayor que cero")
+
+        # -------------------------------
+        # FACTORES
+        # -------------------------------
+        if not self.factores_fv_12m or len(self.factores_fv_12m) != 12:
+            errores.append("factores_fv_12m inválido")
+
+        # -------------------------------
+        # ZONAS
+        # -------------------------------
+        if modo == "multizona":
+
+            zonas = self.sistema_fv.get("zonas", [])
+
+            if not zonas:
+                errores.append("modo multizona sin zonas")
+
+            for i, z in enumerate(zonas):
+
+                n_paneles = z.get("n_paneles")
+                area = z.get("area")
+
+                if (
+                    (n_paneles is None or n_paneles <= 0)
+                    and
+                    (area is None or area <= 0)
+                ):
+                    errores.append(
+                        f"Zona {i+1}: sin paneles ni área válida"
+                    )
+
+        # -------------------------------
+        # ELÉCTRICO
+        # -------------------------------
+        if not self.electrico:
+            errores.append("electrico no definido")
 
         else:
-            raise ValueError(f"Zona {i+1}: configuración inválida")
 
-        total_paneles += n_paneles
-        total_pdc += pdc_kw
+            vac = self.electrico.get("vac", 0)
 
-    if total_paneles <= 0:
-        raise ValueError("Multizona inválido")
+            if vac <= 0:
+                errores.append("Voltaje AC inválido")
 
-    return total_paneles, total_pdc
+            fases = self.electrico.get("fases", 0)
 
+            if fases not in [1, 2, 3]:
+                errores.append("Número de fases inválido")
 
-# ==========================================================
-# INVERSOR
-# ==========================================================
-
-def _seleccionar_inversor(pdc, dc_ac_obj, eq):
-
-    resultado = ejecutar_inversor_desde_sizing(
-        pdc_kw=pdc,
-        dc_ac_obj=dc_ac_obj,
-        inversor_id_forzado=_inv_id(eq),
-    )
-
-    if "kw_ac" not in resultado:
-        raise ValueError(f"Inversor sin kw_ac: {resultado}")
-
-    kw_ac = float(resultado["kw_ac"])
-
-    if kw_ac <= 0:
-        raise ValueError(f"Inversor con kw_ac inválido: {resultado}")
-
-    inv_id = resultado["inversor_id"]
-    inv = get_inversor(inv_id)
-
-    n_inv = int(resultado.get("n_inversores", 1))
-    pac_total = float(resultado.get("kw_ac_total", kw_ac * n_inv))
-
-    return inv, kw_ac, n_inv, pac_total
-
-
-# ==========================================================
-# API PRINCIPAL
-# ==========================================================
-
-def calcular_sizing_unificado(p: Datosproyecto) -> ResultadoSizing:
-
-    panel, dc_ac_obj, eq = _leer_panel_y_config(p)
-    consumo_anual = _leer_consumo(p)
-
-    sf = p.sistema_fv
-
-    modo = sf["modo"]
-
-    # ======================================================
-    # MULTIZONA
-    # ======================================================
-    if modo == "multizona":
-
-        zonas = sf.get("zonas", [])
-
-        if not zonas:
-            raise ValueError("Multizona sin zonas")
-
-        n_paneles, pdc = _dimensionar_por_zonas(panel, zonas)
-
-    # ======================================================
-    # NORMAL
-    # ======================================================
-    else:
-
-        valor = sf["valor"]
-
-        if valor is None:
-            raise ValueError("valor requerido para sizing")
-
-        n_paneles, pdc = _dimensionar_generador(
-            panel,
-            modo,
-            valor,
-            consumo_anual
-        )
-
-    # ======================================================
-    # INVERSOR
-    # ======================================================
-    inv, kw_ac, n_inv, pac_total = _seleccionar_inversor(
-        pdc,
-        dc_ac_obj,
-        eq
-    )
-
-    paneles_por_inversor = ceil(n_paneles / n_inv)
-
-    if pac_total <= 0:
-        raise ValueError("pac_total inválido")
-
-    dc_ac_ratio = pdc / pac_total
-
-    energia_12m: List[MesEnergia] = []
-
-    return ResultadoSizing(
-        n_paneles=n_paneles,
-        kwp_dc=round(pdc, 3),
-        pdc_kw=round(pdc, 3),
-
-        kw_ac=kw_ac,
-        kw_ac_total=pac_total,
-
-        n_inversores=n_inv,
-        paneles_por_inversor=paneles_por_inversor,
-
-        inversor=inv,
-        panel=panel,
-
-        dc_ac_ratio=round(dc_ac_ratio, 3),
-
-        energia_12m=energia_12m,
-    )
+        # -------------------------------
+        # FINAL
+        # -------------------------------
+        if errores:
+            raise ValueError(" | ".join(errores))
