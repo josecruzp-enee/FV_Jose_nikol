@@ -215,7 +215,7 @@ def _dimensionar_generador(
     energia_por_kwp_anual = 1500.0
 
     # ======================================================
-    # COBERTURA ENERGÉTICA
+    # COBERTURA ENERGÉTICA ANUAL
     # ======================================================
     if modo == "cobertura":
 
@@ -225,23 +225,9 @@ def _dimensionar_generador(
             2.0,
         )
 
-        if _hay_consumo_horario_valido(
-            consumo_horario_24h_kwh
-        ):
-
-            n_paneles, pdc_kw = (
-                _dimensionar_generador_por_consumo_horario(
-                    panel=panel,
-                    cobertura=cobertura,
-                    consumo_horario_24h_kwh=consumo_horario_24h_kwh,
-                )
-            )
-
-            return n_paneles, pdc_kw
-
-        energia_objetivo = (
-            consumo_anual * cobertura
-        )
+        # Cobertura energética siempre se calcula sobre
+        # el consumo anual total.
+        energia_objetivo = consumo_anual * cobertura
 
         kwp_obj = (
             energia_objetivo /
@@ -249,7 +235,7 @@ def _dimensionar_generador(
         )
 
     # ======================================================
-    # ELIMINACIÓN CONSUMO DIURNO
+    # ELIMINACIÓN / COBERTURA DEL CONSUMO DIURNO
     # ======================================================
     elif modo == "eliminacion_diurna":
 
@@ -288,7 +274,7 @@ def _dimensionar_generador(
             cobertura_objetivo
         )
 
-        # ======================================================
+    # ======================================================
     # OPTIMIZACIÓN ECONÓMICA
     # ======================================================
     elif modo == "optimizacion_economica":
@@ -316,7 +302,6 @@ def _dimensionar_generador(
             energia_por_kwp_anual
         )
 
-    
     # ======================================================
     # ÁREA
     # ======================================================
@@ -378,6 +363,7 @@ def _dimensionar_generador(
     ) / 1000
 
     return n_paneles, pdc_kw
+
 
 
 # ==========================================================
