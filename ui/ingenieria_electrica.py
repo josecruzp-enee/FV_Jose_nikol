@@ -133,7 +133,8 @@ def _render_resultado(resultado):
             ["String", c.string.i_operacion_a, c.string.i_diseno_a],
             *[
                 [f"MPPT {i+1}", m.i_operacion_a, m.i_diseno_a] 
-                for i, m in enumerate(c.mppt_detalle)
+                mppt_detalle = getattr(c, "mppt_detalle", []) or []
+                for i, m in enumerate(mppt_detalle):
             ],
             ["DC Total", c.dc_total.i_operacion_a, c.dc_total.i_diseno_a],
             ["AC", c.ac.i_operacion_a, c.ac.i_diseno_a],
