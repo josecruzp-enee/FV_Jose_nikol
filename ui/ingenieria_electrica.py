@@ -84,17 +84,30 @@ def _render_resultado(resultado):
 
     if strings:
         data = []
+
         for i, s in enumerate(strings, 1):
             data.append([
-                i, s.mppt, s.n_series,
-                s.vmp_string_v, s.voc_frio_string_v,
-                s.imp_string_a, s.isc_string_a
+                i,
+                s.mppt,
+                s.n_series,
+                s.vmp_string_v,
+                s.voc_frio_string_v,
+                s.imp_string_a,
+                s.isc_string_a,
             ])
 
-        df = pd.DataFrame(data, columns=[
-            "#", "MPPT", "Series",
-            "Vmp (V)", "Voc (V)", "Imp (A)", "Isc (A)"
-        ])
+        df = pd.DataFrame(
+            data,
+            columns=[
+                "#",
+                "MPPT",
+                "Series",
+                "Vmp (V)",
+                "Voc frío (V)",
+                "Imp (A)",
+                "Isc (A)",
+            ],
+        )
 
         st.dataframe(df, width="stretch")
     else:
@@ -111,13 +124,15 @@ def _render_resultado(resultado):
 
         col1, col2, col3 = st.columns(3)
 
-        col1.metric("Potencia DC", f"{a.potencia_dc_w/1000:.2f} kW")
+        col1.metric("Potencia DC", f"{a.potencia_dc_w / 1000:.2f} kW")
         col2.metric("Voltaje DC", f"{a.vdc_nom:.2f} V")
         col3.metric("Corriente DC", f"{a.idc_nom:.2f} A" if a.idc_nom else "—")
 
         col1.metric("Strings", a.n_strings_total)
         col2.metric("Paneles", a.n_paneles_total)
         col3.metric("MPPT", a.n_mppt)
+    else:
+        st.warning("Sin datos de array FV")
 
     # ======================================================
     # CORRIENTES
@@ -127,18 +142,33 @@ def _render_resultado(resultado):
         st.markdown("### ⚡ Corrientes")
 
         c = electrical.corrientes
+        mppt_detalle = getattr(c, "mppt_detalle", []) or []
 
-        df = pd.DataFrame([
+        filas = [
             ["Panel", c.panel.i_operacion_a, c.panel.i_diseno_a],
             ["String", c.string.i_operacion_a, c.string.i_diseno_a],
-            *[
-                [f"MPPT {i+1}", m.i_operacion_a, m.i_diseno_a] 
-                mppt_detalle = getattr(c, "mppt_detalle", []) or []
-                for i, m in enumerate(mppt_detalle):
-            ],
+        ]
+
+        for i, m in enumerate(mppt_detalle):
+            filas.append([
+                f"MPPT {i + 1}",
+                m.i_operacion_a,
+                m.i_diseno_a,
+            ])
+
+        filas.extend([
             ["DC Total", c.dc_total.i_operacion_a, c.dc_total.i_diseno_a],
             ["AC", c.ac.i_operacion_a, c.ac.i_diseno_a],
-        ], columns=["Nivel", "I operación (A)", "I diseño (A)"])
+        ])
+
+        df = pd.DataFrame(
+            filas,
+            columns=[
+                "Nivel",
+                "I operación (A)",
+                "I diseño (A)",
+            ],
+        )
 
         st.dataframe(df, width="stretch")
 
@@ -151,11 +181,18 @@ def _render_resultado(resultado):
 
         p = electrical.protecciones
 
-        df = pd.DataFrame([
-            ["Breaker AC", p.ocpd_ac.tamano_a, p.ocpd_ac.norma],
-            ["OCPD DC", p.ocpd_dc_array.tamano_a, p.ocpd_dc_array.norma],
-            ["Fusible", "Sí" if p.fusible_string.requerido else "No", p.fusible_string.nota],
-        ], columns=["Elemento", "Valor", "Norma"])
+        df = pd.DataFrame(
+            [
+                ["Breaker AC", p.ocpd_ac.tamano_a, p.ocpd_ac.norma],
+                ["OCPD DC", p.ocpd_dc_array.tamano_a, p.ocpd_dc_array.norma],
+                [
+                    "Fusible",
+                    "Sí" if p.fusible_string.requerido else "No",
+                    p.fusible_string.nota,
+                ],
+            ],
+            columns=["Elemento", "Valor", "Norma"],
+        )
 
         st.dataframe(df, width="stretch")
 
@@ -175,13 +212,20 @@ def _render_resultado(resultado):
                 t.material,
                 t.i_diseno_a,
                 t.vd_pct,
-                "✔" if t.cumple else "❌"
+                "✔" if t.cumple else "❌",
             ])
 
-        df = pd.DataFrame(data, columns=[
-            "Tramo", "Calibre", "Material",
-            "I diseño", "VD (%)", "Cumple"
-        ])
+        df = pd.DataFrame(
+            data,
+            columns=[
+                "Tramo",
+                "Calibre",
+                "Material",
+                "I diseño",
+                "VD (%)",
+                "Cumple",
+            ],
+        )
 
         st.dataframe(df, width="stretch")
 
@@ -190,8 +234,6 @@ def _render_resultado(resultado):
     # ======================================================
     with st.expander("🧠 Debug completo"):
         st.code(pprint.pformat(resultado), language="python")
-
-
 # ==========================================================
 # MAIN
 # ==========================================================
