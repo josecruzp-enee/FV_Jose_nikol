@@ -164,6 +164,7 @@ def ejecutar_electrical(*, datos: Any, paneles: Any, sizing: Any) -> ResultadoEl
             vac=vac,
             fases=fases,
             fp=fp,
+            n_inversores=getattr(sizing, "n_inversores", 1),
         )
 
         corrientes = calcular_corrientes(corrientes_input)
