@@ -274,6 +274,83 @@ def data_ficha_inversor(inversor, kw_ac_unitario, kw_ac_total, n_inversores):
          f'{float(leer(inversor, "imppt_max_a", 0) or 0):.2f} A'],
     ]
 
+def construir_tabla_comparativa_inversores_pdf(comparativa_inversores, styles):
+    """
+    Construye tabla PDF de comparación de inversores.
+    Requiere resultado["comparativa_inversores"].
+    """
+
+    from reportlab.platypus import Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib import colors
+    from reportlab.lib.units import cm
+
+    elementos = []
+
+    if not comparativa_inversores:
+        return elementos
+
+    elementos.append(Paragraph("Comparativa de inversores", styles["Heading2"]))
+
+    data = [[
+        "Opción",
+        "Configuración",
+        "kW AC total",
+        "DC/AC",
+        "N° inv.",
+        "Estado",
+        "Motivo",
+    ]]
+
+    for fila in comparativa_inversores:
+        data.append([
+            fila.get("opcion", ""),
+            fila.get("configuracion", ""),
+            f"{fila.get('kw_ac_total', 0):.2f}",
+            f"{fila.get('dc_ac_real', fila.get('ratio_real', 0)):.2f}",
+            fila.get("n_inversores", ""),
+            fila.get("estado", ""),
+            Paragraph(str(fila.get("motivo", "")), styles["Normal"]),
+        ])
+
+    tabla = Table(
+        data,
+        colWidths=[
+            1.2 * cm,
+            3.0 * cm,
+            2.2 * cm,
+            1.6 * cm,
+            1.5 * cm,
+            2.2 * cm,
+            6.0 * cm,
+        ],
+        repeatRows=1,
+    )
+
+    tabla.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1F4E78")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("ALIGN", (0, 0), (-1, 0), "CENTER"),
+        ("ALIGN", (0, 1), (5, -1), "CENTER"),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("GRID", (0, 0), (-1, -1), 0.35, colors.grey),
+        ("FONTSIZE", (0, 0), (-1, -1), 7),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+    ]))
+
+    # Resaltar opción óptima
+    for i, fila in enumerate(comparativa_inversores, start=1):
+        if fila.get("estado") == "ÓPTIMO":
+            tabla.setStyle(TableStyle([
+                ("BACKGROUND", (0, i), (-1, i), colors.HexColor("#D9EAD3")),
+                ("FONTNAME", (0, i), (-1, i), "Helvetica-Bold"),
+            ]))
+
+    elementos.append(tabla)
+    elementos.append(Spacer(1, 10))
+
+    return elementos
 
 # ==========================================================
 # RESUMEN TÉCNICO
