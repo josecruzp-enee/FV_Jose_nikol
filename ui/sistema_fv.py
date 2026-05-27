@@ -56,32 +56,79 @@ def _render_dimensionamiento(sf):
 
         auto_op = st.radio(
             "Método automático",
-            ["Cobertura (%)", "Área (m²)", "Potencia (kW)"],
+            [
+                "Cobertura energética (%)",
+                "Eliminación consumo diurno (%)",
+                "Área (m²)",
+                "Potencia (kW)",
+            ],
             key="auto_metodo"
         )
 
-        if auto_op == "Cobertura (%)":
-            valor = st.number_input("Cobertura (%)", 1.0, 200.0, 80.0)
+        if auto_op == "Cobertura energética (%)":
 
-            sf["modo"] = "cobertura"  # 🔥 FIX
+            valor = st.number_input(
+                "Cobertura energética (%)",
+                1.0,
+                200.0,
+                80.0
+            )
+
+            st.caption(
+                "Dimensiona el sistema con base en una cobertura energética general."
+            )
+
+            sf["modo"] = "cobertura"
             sf["sizing_input"] = {
                 "modo": "cobertura",
                 "valor": float(valor)
             }
 
-        elif auto_op == "Área (m²)":
-            valor = st.number_input("Área (m²)", 1.0, 10000.0, 100.0)
+        elif auto_op == "Eliminación consumo diurno (%)":
 
-            sf["modo"] = "area"  # 🔥 FIX
+            valor = st.number_input(
+                "Eliminación consumo diurno (%)",
+                1.0,
+                100.0,
+                80.0
+            )
+
+            st.caption(
+                "Dimensiona el sistema buscando reducir la compra de energía "
+                "durante las horas solares, usando el perfil horario del cliente."
+            )
+
+            sf["modo"] = "eliminacion_diurna"
+            sf["sizing_input"] = {
+                "modo": "eliminacion_diurna",
+                "valor": float(valor)
+            }
+
+        elif auto_op == "Área (m²)":
+
+            valor = st.number_input(
+                "Área (m²)",
+                1.0,
+                10000.0,
+                100.0
+            )
+
+            sf["modo"] = "area"
             sf["sizing_input"] = {
                 "modo": "area",
                 "valor": float(valor)
             }
 
         elif auto_op == "Potencia (kW)":
-            valor = st.number_input("Potencia (kW)", 0.1, 1000.0, 10.0)
 
-            sf["modo"] = "kw_objetivo"  # 🔥 FIX
+            valor = st.number_input(
+                "Potencia (kW)",
+                0.1,
+                1000.0,
+                10.0
+            )
+
+            sf["modo"] = "kw_objetivo"
             sf["sizing_input"] = {
                 "modo": "kw_objetivo",
                 "valor": float(valor)
@@ -105,9 +152,14 @@ def _render_dimensionamiento(sf):
         # --------------------------------------------------
         if manual_op == "Cantidad de paneles":
 
-            valor = st.number_input("Paneles", 1, 10000, 30)
+            valor = st.number_input(
+                "Paneles",
+                1,
+                10000,
+                30
+            )
 
-            sf["modo"] = "paneles"  # 🔥 FIX
+            sf["modo"] = "paneles"
             sf["sizing_input"] = {
                 "modo": "paneles",
                 "valor": int(valor)
@@ -117,18 +169,17 @@ def _render_dimensionamiento(sf):
             sf["zonas"] = []
 
         # --------------------------------------------------
-        # MULTIZONA (🔥 CLAVE)
+        # MULTIZONA
         # --------------------------------------------------
         else:
 
             sf["usar_zonas"] = True
 
-            sf["modo"] = "multizona"  # 🔥 FIX CRÍTICO
+            sf["modo"] = "multizona"
             sf["sizing_input"] = {
                 "modo": "multizona"
             }
 
-            # inicialización segura
             if not sf.get("zonas"):
                 sf["zonas"] = [{
                     "nombre": "Zona 1",
