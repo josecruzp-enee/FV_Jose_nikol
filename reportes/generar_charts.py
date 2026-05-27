@@ -198,7 +198,7 @@ def _chart_demanda_vs_fv_horaria(
 
     plt.title("Demanda del cliente vs Generación FV")
     plt.xlabel("Hora")
-    plt.ylabel("kWh por hora / kW promedio")
+    plt.ylabel("Energía horaria promedio (kWh)")
     plt.xticks(range(24))
     plt.grid(True)
     plt.legend()
