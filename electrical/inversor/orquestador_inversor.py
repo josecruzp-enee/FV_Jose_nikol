@@ -1,5 +1,7 @@
 from typing import Dict, Any, Optional
 from itertools import product
+from math import ceil
+
 from electrical.catalogos.catalogos_yaml import (
     get_inversor,
     ids_inversores,
@@ -7,23 +9,238 @@ from electrical.catalogos.catalogos_yaml import (
 
 
 # ======================================================
-# 🔥 NUEVO: SUGERENCIAS DE CONFIGURACIÓN
+# CATÁLOGO AUXILIAR
 # ======================================================
-def sugerir_configuraciones_inversor(pdc_kw, dc_ac_obj, max_inv=4):
 
+def obtener_catalogo_inversores() -> list[Dict[str, Any]]:
     catalogo = []
 
     for iid in ids_inversores():
         inv = get_inversor(iid)
-        if inv and inv.kw_ac > 0:
-            catalogo.append({
-                "id": iid,
-                "kw": float(inv.kw_ac)
-            })
 
+        if inv is None:
+            continue
+
+        pac = float(inv.kw_ac)
+
+        if pac <= 0:
+            continue
+
+        catalogo.append({
+            "id": iid,
+            "kw": pac,
+        })
+
+    return catalogo
+
+
+# ======================================================
+# FORMATO
+# ======================================================
+
+def formatear_configuracion(config) -> str:
+    conteo = {}
+
+    for inv in config:
+        key = (inv["id"], inv["kw"])
+        conteo[key] = conteo.get(key, 0) + 1
+
+    partes = []
+
+    for (iid, kw), cantidad in conteo.items():
+        partes.append(f"{cantidad}×{kw:.1f} kW")
+
+    return " + ".join(partes)
+
+
+# ======================================================
+# VALIDACIONES
+# ======================================================
+
+def validar_entradas_inversor(
+    *,
+    pdc_kw: float,
+    dc_ac_obj: float,
+) -> None:
+
+    if pdc_kw <= 0:
+        raise ValueError("pdc_kw inválido")
+
+    if dc_ac_obj <= 0:
+        raise ValueError("dc_ac_obj inválido")
+
+
+# ======================================================
+# CÁLCULO BASE
+# ======================================================
+
+def calcular_cantidad_inversores(
+    pdc_kw: float,
+    pac_inversor_kw: float,
+    dc_ac_obj: float,
+) -> Dict[str, float]:
+
+    if pac_inversor_kw <= 0:
+        raise ValueError("pac_inversor_kw inválido")
+
+    kw_ac_obj = pdc_kw / dc_ac_obj
+    n_inversores = ceil(kw_ac_obj / pac_inversor_kw)
+    kw_ac_total = n_inversores * pac_inversor_kw
+    ratio_real = pdc_kw / kw_ac_total if kw_ac_total > 0 else 0
+
+    return {
+        "n_inversores": n_inversores,
+        "kw_ac": pac_inversor_kw,
+        "kw_ac_total": kw_ac_total,
+        "ratio_real": ratio_real,
+        "kw_ac_obj": kw_ac_obj,
+    }
+
+
+# ======================================================
+# EVALUACIÓN DE OPCIÓN
+# ======================================================
+
+def evaluar_opcion_inversor(
+    *,
+    pdc_kw: float,
+    dc_ac_obj: float,
+    inversor_id: str,
+    pac_inversor_kw: float,
+    tolerancia_dc_ac: float = 0.15,
+) -> Dict[str, Any]:
+
+    calc = calcular_cantidad_inversores(
+        pdc_kw=pdc_kw,
+        pac_inversor_kw=pac_inversor_kw,
+        dc_ac_obj=dc_ac_obj,
+    )
+
+    ratio_real = float(calc["ratio_real"])
+    n_inversores = int(calc["n_inversores"])
+    kw_ac_total = float(calc["kw_ac_total"])
+
+    desviacion = abs(ratio_real - dc_ac_obj)
+
+    dc_ac_min = max(0.01, dc_ac_obj - tolerancia_dc_ac)
+    dc_ac_max = dc_ac_obj + tolerancia_dc_ac
+
+    dentro_rango = dc_ac_min <= ratio_real <= dc_ac_max
+
+    if dentro_rango:
+        estado = "ACEPTABLE"
+        motivo = "DC/AC dentro del rango permitido."
+        penalizacion_rango = 0
+    elif ratio_real > dc_ac_max:
+        estado = "NO RECOMENDADO"
+        motivo = "DC/AC alto; posible sobredimensionamiento DC o clipping."
+        penalizacion_rango = 1
+    else:
+        estado = "NO RECOMENDADO"
+        motivo = "DC/AC bajo; inversor sobredimensionado respecto al arreglo."
+        penalizacion_rango = 1
+
+    score = (
+        penalizacion_rango,
+        desviacion,
+        n_inversores,
+        kw_ac_total,
+    )
+
+    return {
+        "inversor_id": inversor_id,
+        "configuracion": f"{n_inversores}×{pac_inversor_kw:.1f} kW",
+        "n_inversores": n_inversores,
+        "kw_ac": pac_inversor_kw,
+        "kw_ac_total": kw_ac_total,
+        "dc_ac_real": ratio_real,
+        "ratio_real": ratio_real,
+        "kw_ac_obj": calc["kw_ac_obj"],
+        "desviacion_dc_ac": desviacion,
+        "estado": estado,
+        "motivo": motivo,
+        "score": score,
+    }
+
+
+# ======================================================
+# TABLA COMPARATIVA
+# ======================================================
+
+def generar_tabla_comparativa_inversores(
+    *,
+    pdc_kw: float,
+    dc_ac_obj: float,
+    tolerancia_dc_ac: float = 0.15,
+) -> list[Dict[str, Any]]:
+
+    catalogo = obtener_catalogo_inversores()
+
+    tabla = []
+
+    for inv in catalogo:
+        fila = evaluar_opcion_inversor(
+            pdc_kw=pdc_kw,
+            dc_ac_obj=dc_ac_obj,
+            inversor_id=inv["id"],
+            pac_inversor_kw=inv["kw"],
+            tolerancia_dc_ac=tolerancia_dc_ac,
+        )
+
+        tabla.append(fila)
+
+    tabla.sort(key=lambda x: x["score"])
+
+    for i, fila in enumerate(tabla, 1):
+        fila["opcion"] = i
+
+        if i == 1 and fila["estado"] == "ACEPTABLE":
+            fila["estado"] = "ÓPTIMO"
+            fila["motivo"] = (
+                "Mejor opción: DC/AC cercano al objetivo, "
+                "menor cantidad de inversores y potencia AC adecuada."
+            )
+
+        fila.pop("score", None)
+
+    return tabla
+
+
+def obtener_opcion_optima(
+    *,
+    pdc_kw: float,
+    dc_ac_obj: float,
+) -> Optional[Dict[str, Any]]:
+
+    tabla = generar_tabla_comparativa_inversores(
+        pdc_kw=pdc_kw,
+        dc_ac_obj=dc_ac_obj,
+    )
+
+    if not tabla:
+        return None
+
+    return tabla[0]
+
+
+# ======================================================
+# SUGERENCIAS DE CONFIGURACIÓN
+# ======================================================
+
+def sugerir_configuraciones_inversor(
+    pdc_kw,
+    dc_ac_obj,
+    max_inv=4,
+    tolerancia_dc_ac=0.15,
+):
+
+    catalogo = obtener_catalogo_inversores()
     soluciones = []
 
     pac_obj = pdc_kw / dc_ac_obj
+
+    dc_ac_min = max(0.01, dc_ac_obj - tolerancia_dc_ac)
+    dc_ac_max = dc_ac_obj + tolerancia_dc_ac
 
     for n in range(1, max_inv + 1):
 
@@ -36,101 +253,135 @@ def sugerir_configuraciones_inversor(pdc_kw, dc_ac_obj, max_inv=4):
 
             dc_ac = pdc_kw / pac_total
 
-            if 1.2 <= dc_ac <= 1.3:
+            if not (dc_ac_min <= dc_ac <= dc_ac_max):
+                continue
 
-                soluciones.append({
-                    "config": combo,
-                    "pac_total": pac_total,
-                    "dc_ac": round(dc_ac, 2),
-                    "error": abs(pac_total - pac_obj)
-                })
+            soluciones.append({
+                "config": combo,
+                "pac_total": pac_total,
+                "dc_ac": round(dc_ac, 2),
+                "error": abs(pac_total - pac_obj),
+                "n_inversores": n,
+            })
 
-    soluciones.sort(key=lambda x: x["error"])
+    soluciones.sort(
+        key=lambda x: (
+            abs(x["dc_ac"] - dc_ac_obj),
+            x["n_inversores"],
+            x["pac_total"],
+            x["error"],
+        )
+    )
 
     return soluciones[:5]
 
 
-def formatear_configuracion(config):
-
-    conteo = {}
-
-    for inv in config:
-        key = (inv["id"], inv["kw"])
-        conteo[key] = conteo.get(key, 0) + 1
-
-    partes = []
-
-    for (iid, kw), cantidad in conteo.items():
-        partes.append(f"{cantidad}×{kw} kW")
-
-    return " + ".join(partes)
-
-from math import ceil
-
-# ======================================================
-# CÁLCULO DE CANTIDAD DE INVERSORES
-# ======================================================
-def calcular_cantidad_inversores(
-    pdc_kw: float,
-    pac_inversor_kw: float,
-    dc_ac_obj: float,
-) -> Dict[str, float]:
-    """
-    Calcula número de inversores necesarios.
-
-    Retorna:
-        n_inversores
-        kw_ac
-        kw_ac_total
-        ratio_real
-        kw_ac_obj
-    """
-
-    if pac_inversor_kw <= 0:
-        raise ValueError("pac_inversor_kw inválido")
-
-    # Potencia AC objetivo
-    kw_ac_obj = pdc_kw / dc_ac_obj
-
-    # Número de inversores (siempre entero hacia arriba)
-    n_inversores = ceil(kw_ac_obj / pac_inversor_kw)
-
-    # Potencia total instalada
-    kw_ac_total = n_inversores * pac_inversor_kw
-
-    # Ratio real DC/AC
-    ratio_real = pdc_kw / kw_ac_total if kw_ac_total > 0 else 0
-
-    return {
-        "n_inversores": n_inversores,
-        "kw_ac": pac_inversor_kw,
-        "kw_ac_total": kw_ac_total,
-        "ratio_real": ratio_real,
-        "kw_ac_obj": kw_ac_obj,
-    }
-
-# ======================================================
-# API PRINCIPAL
-# ======================================================
-
-# ======================================================
-# VALIDACIONES
-# ======================================================
-
-def validar_entradas_inversor(
+def construir_sugerencias_inversor(
     *,
     pdc_kw: float,
     dc_ac_obj: float,
-) -> None:
-    """
-    Valida entradas principales del prediseño de inversores.
-    """
+) -> list[Dict[str, Any]]:
 
-    if pdc_kw <= 0:
-        raise ValueError("pdc_kw inválido")
+    sugerencias = sugerir_configuraciones_inversor(
+        pdc_kw=pdc_kw,
+        dc_ac_obj=dc_ac_obj,
+    )
 
-    if dc_ac_obj <= 0:
-        raise ValueError("dc_ac_obj inválido")
+    return [
+        {
+            "descripcion": formatear_configuracion(s["config"]),
+            "pac_total": s["pac_total"],
+            "dc_ac": s["dc_ac"],
+            "n_inversores": s["n_inversores"],
+        }
+        for s in sugerencias
+    ]
+
+
+# ======================================================
+# SELECCIÓN AUTOMÁTICA
+# ======================================================
+
+def resolver_inversor_automatico_actual(
+    *,
+    pdc_kw: float,
+    dc_ac_obj: float,
+) -> Optional[Dict[str, Any]]:
+
+    optimo = obtener_opcion_optima(
+        pdc_kw=pdc_kw,
+        dc_ac_obj=dc_ac_obj,
+    )
+
+    if optimo is None:
+        return None
+
+    return {
+        "inversor_id": optimo["inversor_id"],
+        "n_inversores": optimo["n_inversores"],
+        "kw_ac": optimo["kw_ac"],
+        "kw_ac_total": optimo["kw_ac_total"],
+        "ratio_real": optimo["ratio_real"],
+        "kw_ac_obj": optimo["kw_ac_obj"],
+        "seleccion_forzada": False,
+        "advertencia": None,
+        "alternativa_recomendada": None,
+    }
+
+
+# ======================================================
+# ADVERTENCIA PARA INVERSOR FORZADO
+# ======================================================
+
+def construir_advertencia_inversor_forzado(
+    *,
+    resultado_forzado: Dict[str, Any],
+    alternativa_optima: Optional[Dict[str, Any]],
+) -> tuple[Optional[str], Optional[Dict[str, Any]]]:
+
+    if alternativa_optima is None:
+        return None, None
+
+    id_forzado = resultado_forzado.get("inversor_id")
+    id_optimo = alternativa_optima.get("inversor_id")
+
+    if id_forzado == id_optimo:
+        return None, None
+
+    n_forzado = int(resultado_forzado.get("n_inversores", 0))
+    n_optimo = int(alternativa_optima.get("n_inversores", 0))
+
+    kw_forzado = float(resultado_forzado.get("kw_ac_total", 0))
+    kw_optimo = float(alternativa_optima.get("kw_ac_total", 0))
+
+    mejor_por_simplicidad = (
+        n_optimo > 0
+        and n_forzado > n_optimo
+        and kw_optimo <= kw_forzado
+    )
+
+    if not mejor_por_simplicidad:
+        return None, None
+
+    alternativa = {
+        "inversor_id": alternativa_optima["inversor_id"],
+        "configuracion": alternativa_optima["configuracion"],
+        "n_inversores": alternativa_optima["n_inversores"],
+        "kw_ac": alternativa_optima["kw_ac"],
+        "kw_ac_total": alternativa_optima["kw_ac_total"],
+        "ratio_real": alternativa_optima["ratio_real"],
+        "estado": alternativa_optima["estado"],
+        "motivo": alternativa_optima["motivo"],
+    }
+
+    advertencia = (
+        f"La selección manual requiere {n_forzado} inversores "
+        f"para {kw_forzado:.2f} kW AC. "
+        f"La opción óptima es {alternativa_optima['configuracion']} "
+        f"con {kw_optimo:.2f} kW AC total."
+    )
+
+    return advertencia, alternativa
 
 
 # ======================================================
@@ -143,13 +394,6 @@ def resolver_inversor_forzado(
     dc_ac_obj: float,
     inversor_id_forzado: str,
 ) -> Optional[Dict[str, Any]]:
-    """
-    Resuelve el caso en que el usuario o el flujo envía un inversor específico.
-
-    Mantiene la lógica actual:
-    - Si el inversor existe, calcula cantidad por DC/AC objetivo.
-    - Si no existe, devuelve None para permitir fallback automático.
-    """
 
     inv = get_inversor(inversor_id_forzado)
 
@@ -168,95 +412,39 @@ def resolver_inversor_forzado(
         dc_ac_obj=dc_ac_obj,
     )
 
-    return {
+    resultado_forzado = {
         "inversor_id": inversor_id_forzado,
         **calc,
-        "sugerencias": [],
+        "seleccion_forzada": True,
     }
 
-
-# ======================================================
-# SELECCIÓN AUTOMÁTICA ACTUAL
-# ======================================================
-
-def resolver_inversor_automatico_actual(
-    *,
-    pdc_kw: float,
-    dc_ac_obj: float,
-) -> Optional[Dict[str, Any]]:
-    """
-    Ejecuta la selección automática actual.
-
-    Mantiene la lógica existente:
-    - Recorre el catálogo.
-    - Calcula cantidad por DC/AC objetivo.
-    - Selecciona la alternativa con menor potencia AC total.
-    """
-
-    mejor_total = None
-    mejor_resultado = None
-    mejor_id = None
-
-    for iid in ids_inversores():
-
-        inv = get_inversor(iid)
-
-        if inv is None:
-            continue
-
-        pac = float(inv.kw_ac)
-
-        if pac <= 0:
-            continue
-
-        calc = calcular_cantidad_inversores(
-            pdc_kw=pdc_kw,
-            pac_inversor_kw=pac,
-            dc_ac_obj=dc_ac_obj,
-        )
-
-        pac_total = calc["kw_ac_total"]
-
-        if mejor_total is None or pac_total < mejor_total:
-            mejor_total = pac_total
-            mejor_resultado = calc
-            mejor_id = iid
-
-    if mejor_resultado is None:
-        return None
-
-    return {
-        "inversor_id": mejor_id,
-        **mejor_resultado,
-    }
-
-
-# ======================================================
-# SUGERENCIAS FORMATEADAS
-# ======================================================
-
-def construir_sugerencias_inversor(
-    *,
-    pdc_kw: float,
-    dc_ac_obj: float,
-) -> list[Dict[str, Any]]:
-    """
-    Genera sugerencias de configuración para UI.
-    """
-
-    sugerencias = sugerir_configuraciones_inversor(
-        pdc_kw,
-        dc_ac_obj,
+    alternativa_optima = obtener_opcion_optima(
+        pdc_kw=pdc_kw,
+        dc_ac_obj=dc_ac_obj,
     )
 
-    return [
-        {
-            "descripcion": formatear_configuracion(s["config"]),
-            "pac_total": s["pac_total"],
-            "dc_ac": s["dc_ac"],
-        }
-        for s in sugerencias
-    ]
+    advertencia, alternativa = construir_advertencia_inversor_forzado(
+        resultado_forzado=resultado_forzado,
+        alternativa_optima=alternativa_optima,
+    )
+
+    sugerencias_fmt = construir_sugerencias_inversor(
+        pdc_kw=pdc_kw,
+        dc_ac_obj=dc_ac_obj,
+    )
+
+    tabla_comparativa = generar_tabla_comparativa_inversores(
+        pdc_kw=pdc_kw,
+        dc_ac_obj=dc_ac_obj,
+    )
+
+    return {
+        **resultado_forzado,
+        "sugerencias": sugerencias_fmt,
+        "comparativa_inversores": tabla_comparativa,
+        "advertencia": advertencia,
+        "alternativa_recomendada": alternativa,
+    }
 
 
 # ======================================================
@@ -269,12 +457,6 @@ def ejecutar_inversor_desde_sizing(
     dc_ac_obj: float,
     inversor_id_forzado: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """
-    Orquesta el prediseño de inversores desde sizing.
-
-    Mantiene el comportamiento actual.
-    No optimiza todavía por ventana DC/AC.
-    """
 
     validar_entradas_inversor(
         pdc_kw=pdc_kw,
@@ -297,6 +479,16 @@ def ejecutar_inversor_desde_sizing(
         dc_ac_obj=dc_ac_obj,
     )
 
+    tabla_comparativa = generar_tabla_comparativa_inversores(
+        pdc_kw=pdc_kw,
+        dc_ac_obj=dc_ac_obj,
+    )
+
+    sugerencias_fmt = construir_sugerencias_inversor(
+        pdc_kw=pdc_kw,
+        dc_ac_obj=dc_ac_obj,
+    )
+
     if resultado_automatico is None:
         print("[WARN] No se encontró ningún inversor válido")
 
@@ -304,16 +496,29 @@ def ejecutar_inversor_desde_sizing(
             "inversor_id": None,
             "kw_ac_total": 0,
             "n_inversores": 0,
-            "dc_ac": 0,
+            "kw_ac": 0,
+            "ratio_real": 0,
+            "kw_ac_obj": 0,
+            "seleccion_forzada": False,
+            "advertencia": None,
+            "alternativa_recomendada": None,
             "sugerencias": [],
+            "comparativa_inversores": [],
         }
-
-    sugerencias_fmt = construir_sugerencias_inversor(
-        pdc_kw=pdc_kw,
-        dc_ac_obj=dc_ac_obj,
-    )
 
     return {
         **resultado_automatico,
         "sugerencias": sugerencias_fmt,
+        "comparativa_inversores": tabla_comparativa,
     }
+
+
+# ======================================================
+# NOTA DE MANTENIMIENTO
+# ======================================================
+# Este módulo ahora:
+# 1. Respeta la selección manual del usuario.
+# 2. Genera una tabla comparativa de inversores.
+# 3. Marca una opción como ÓPTIMO.
+# 4. En modo automático usa la opción óptima.
+# 5. En modo manual advierte si existe una opción más simple.
