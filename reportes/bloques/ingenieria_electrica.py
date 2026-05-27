@@ -196,6 +196,23 @@ def _section_energia_horaria(story, paths, styles, content_w):
         "No se pudo generar la gráfica de energía horaria."
     )
 
+def _section_demanda_vs_fv_horaria(story, paths, styles, content_w):
+
+    story.append(Paragraph("Demanda del cliente vs generación fotovoltaica", styles["Heading2"]))
+    story.append(Spacer(1, 6))
+
+    chart = None
+
+    if isinstance(paths, dict):
+        chart = paths.get("chart_demanda_vs_fv_horaria")
+
+    _insert_chart(
+        story,
+        chart,
+        styles,
+        content_w,
+        "No se pudo generar la gráfica de demanda del cliente vs generación FV."
+    )
 
 def _section_energia_mensual(story, paths, styles, content_w):
 
@@ -250,6 +267,7 @@ def build_ingenieria_electrica(resultado, datos, paths, pal, styles, content_w, 
 
     _section_potencia_horaria(story, paths, styles, content_w)
     _section_energia_horaria(story, paths, styles, content_w)
+    _section_demanda_vs_fv_horaria(story, paths, styles, content_w)
     _section_energia_mensual(story, paths, styles, content_w)
 
     insertar_layout_paneles(story, paths, styles, content_w, safe_image)
