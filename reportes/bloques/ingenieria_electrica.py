@@ -171,6 +171,11 @@ def _section_optimizacion_economica(
     content_w
 ):
 
+    # ======================================================
+    # Leer optimización económica
+    # Nuevo contrato: resultado.optimizacion_economica
+    # Fallback: resultado.energia.optimizacion_economica
+    # ======================================================
     opt = leer(
         resultado,
         "optimizacion_economica",
@@ -185,12 +190,12 @@ def _section_optimizacion_economica(
             None
         )
 
-    if energia is not None:
-        opt = leer(
-            energia,
-            "optimizacion_economica",
-            None
-        )
+        if energia is not None:
+            opt = leer(
+                energia,
+                "optimizacion_economica",
+                None
+            )
 
     if not opt:
         return
@@ -217,15 +222,12 @@ def _section_optimizacion_economica(
 
         incluir = False
 
-        # ±25 kWp alrededor del óptimo
         if abs(pdc - pdc_optimo) <= 25:
             incluir = True
 
-        # cada 10 kWp
         if int(round(pdc)) % 10 == 0:
             incluir = True
 
-        # óptimo exacto
         if abs(pdc - pdc_optimo) < 0.5:
             incluir = True
 
@@ -295,55 +297,14 @@ def _section_optimizacion_economica(
 
     tabla_pdf.setStyle(TableStyle([
 
-        (
-            "BACKGROUND",
-            (0, 0),
-            (-1, 0),
-            colors.HexColor("#0B3551")
-        ),
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0B3551")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 6),
+        ("ALIGN", (0, 0), (-1, -1), "RIGHT"),
+        ("ALIGN", (0, 0), (0, -1), "CENTER"),
+        ("GRID", (0, 0), (-1, -1), 0.25, colors.lightgrey),
 
-        (
-            "TEXTCOLOR",
-            (0, 0),
-            (-1, 0),
-            colors.white
-        ),
-
-        (
-            "FONTNAME",
-            (0, 0),
-            (-1, 0),
-            "Helvetica-Bold"
-        ),
-
-        (
-            "FONTSIZE",
-            (0, 0),
-            (-1, -1),
-            6
-        ),
-
-        (
-            "ALIGN",
-            (0, 0),
-            (-1, -1),
-            "RIGHT"
-        ),
-
-        (
-            "ALIGN",
-            (0, 0),
-            (0, -1),
-            "CENTER"
-        ),
-
-        (
-            "GRID",
-            (0, 0),
-            (-1, -1),
-            0.25,
-            colors.lightgrey
-        ),
     ]))
 
     story.append(tabla_pdf)
