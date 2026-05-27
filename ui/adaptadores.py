@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Dict, List
+
 """
 ADAPTADORES UI → CORE
 FV Engine
@@ -7,36 +7,9 @@ FV Engine
 Este módulo implementa los adaptadores que traducen los datos
 capturados por la interfaz de usuario (WizardCtx / SessionState)
 hacia los modelos de dominio utilizados por el motor FV.
-
-FRONTERA DEL MÓDULO
--------------------
-
-Entrada:
-    WizardCtx (estado de la UI)
-
-Salida:
-    Datosproyecto (modelo del core)
-
-RESPONSABILIDAD
----------------
-
-Este módulo NO realiza cálculos.
-
-Solo transforma estructuras de datos:
-
-    UI  →  Core
-
-La UI nunca debe construir directamente los modelos del core.
-Siempre debe pasar por este adaptador.
-
-Esto mantiene:
-
-    separación de capas
-    estabilidad de contratos
-    arquitectura limpia
 """
 
-
+from typing import Dict, List
 
 from core.dominio.modelo import Datosproyecto
 
@@ -49,39 +22,29 @@ def datosproyecto_desde_ctx(ctx) -> Datosproyecto:
     """
     Traduce WizardCtx → Datosproyecto.
 
-    La UI captura datos en diferentes secciones del wizard:
-
-        datos_cliente
-        consumo
-        sistema_fv
-
-    Este adaptador los convierte en el modelo de entrada
-    que espera el motor del sistema FV.
-
-    Parámetros
-    ----------
-    ctx :
-        Objeto de estado del wizard (UI)
-
-    Retorna
-    -------
-    Datosproyecto
-        Modelo de entrada del motor FV
+    Este módulo NO calcula.
+    Solo transforma datos UI → Core.
     """
 
     # ------------------------------------------------------
     # Secciones del wizard
     # ------------------------------------------------------
 
-    dc = ctx.datos_cliente
-    c = ctx.consumo
-    s = ctx.sistema_fv
+    dc = getattr(ctx, "datos_cliente", {}) or {}
+    c = getattr(ctx, "consumo", {}) or {}
+    s = getattr(ctx, "sistema_fv", {}) or {}
+
+    equipos = getattr(ctx, "equipos", {}) or {}
+    electrico = getattr(ctx, "electrico", {}) or {}
 
     # ------------------------------------------------------
     # Consumo mensual
     # ------------------------------------------------------
 
-    consumo_12m: List[float] = [float(x) for x in c.get("kwh_12m", [0] * 12)]
+    consumo_12m: List[float] = [
+        float(x)
+        for x in c.get("kwh_12m", [0.0] * 12)
+    ]
 
     # ------------------------------------------------------
     # Producción base FV
@@ -89,8 +52,10 @@ def datosproyecto_desde_ctx(ctx) -> Datosproyecto:
 
     prod_base = float(s.get("produccion_base", 145.0))
 
-    # factores de ajuste mensual FV
-    factores = [float(x) for x in s.get("factores_fv_12m", [1.0] * 12)]
+    factores = [
+        float(x)
+        for x in s.get("factores_fv_12m", [1.0] * 12)
+    ]
 
     # ------------------------------------------------------
     # Cobertura objetivo
@@ -98,6 +63,23 @@ def datosproyecto_desde_ctx(ctx) -> Datosproyecto:
 
     cobertura = float(s.get("offset_pct", 80.0)) / 100.0
 
+    # ------------------------------------------------------
+    # Ubicación
+    # ------------------------------------------------------
+
+    lat = float(
+        dc.get(
+            "lat",
+            dc.get("latitud", 0.0),
+        )
+    )
+
+    lon = float(
+        dc.get(
+            "lon",
+            dc.get("longitud", 0.0),
+        )
+    )
 
     # ------------------------------------------------------
     # Perfil horario técnico de consumo
@@ -117,7 +99,7 @@ def datosproyecto_desde_ctx(ctx) -> Datosproyecto:
         str(k): float(v)
         for k, v in getattr(ctx, "resumen_perfil_consumo", {}).items()
     }
-    
+
     # ------------------------------------------------------
     # Construcción del modelo de dominio
     # ------------------------------------------------------
@@ -131,6 +113,9 @@ def datosproyecto_desde_ctx(ctx) -> Datosproyecto:
         cliente=str(dc.get("cliente", "")).strip(),
         ubicacion=str(dc.get("ubicacion", "")).strip(),
 
+        lat=lat,
+        lon=lon,
+
         # ===============================
         # Consumo energético
         # ===============================
@@ -139,14 +124,10 @@ def datosproyecto_desde_ctx(ctx) -> Datosproyecto:
         tarifa_energia=float(c.get("tarifa_energia_L_kwh", 0.0)),
         cargos_fijos=float(c.get("cargos_fijos_L_mes", 0.0)),
 
-        # ===============================
-        # Perfil horario técnico
-        # ===============================
-
         perfil_kw_24h=perfil_kw_24h,
         consumo_horario_24h_kwh=consumo_horario_24h_kwh,
         resumen_perfil_consumo=resumen_perfil_consumo,
-        
+
         # ===============================
         # Producción solar
         # ===============================
@@ -167,6 +148,14 @@ def datosproyecto_desde_ctx(ctx) -> Datosproyecto:
         porcentaje_financiado=float(s.get("porcentaje_financiado", 1.0)),
 
         om_anual_pct=float(s.get("om_anual_pct", 0.01)),
+
+        # ===============================
+        # Diccionarios controlados pipeline
+        # ===============================
+
+        sistema_fv=dict(s),
+        equipos=dict(equipos),
+        electrico=dict(electrico),
     )
 
     return datos
