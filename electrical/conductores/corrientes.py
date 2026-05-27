@@ -26,6 +26,8 @@ class ResultadoCorrientes:
     string: NivelCorriente
     mppt: NivelCorriente
     dc_total: NivelCorriente
+    ac_inversor: NivelCorriente
+    ac_total: NivelCorriente
     ac: NivelCorriente
 
     mppt_detalle: List[NivelCorriente]
