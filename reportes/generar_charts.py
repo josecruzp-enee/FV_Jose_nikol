@@ -159,6 +159,54 @@ def _chart_potencia_horaria(
     plt.savefig(path, dpi=160)
     plt.close()
 
+def _chart_demanda_vs_fv_horaria(
+    consumo_horario_24h_kwh: dict,
+    energia_horaria_kwh: List[float],
+    path: Path,
+):
+    """
+    Grafica demanda promedio horaria del cliente vs generación FV promedio horaria.
+    """
+
+    if not energia_horaria_kwh:
+        energia_horaria_kwh = [0.0] * 8760
+
+    horas = list(range(24))
+
+    demanda = [
+        float(consumo_horario_24h_kwh.get(h, 0.0) or 0.0)
+        for h in horas
+    ]
+
+    suma_fv = [0.0] * 24
+    conteo = [0] * 24
+
+    for idx, valor in enumerate(energia_horaria_kwh):
+        hora = (idx - 6) % 24
+        suma_fv[hora] += float(valor or 0.0)
+        conteo[hora] += 1
+
+    fv_promedio = [
+        suma_fv[h] / conteo[h] if conteo[h] else 0.0
+        for h in horas
+    ]
+
+    plt.figure(figsize=(10, 5))
+
+    plt.plot(horas, demanda, marker="o", label="Demanda cliente")
+    plt.plot(horas, fv_promedio, marker="o", label="Generación FV")
+
+    plt.title("Demanda del cliente vs Generación FV")
+    plt.xlabel("Hora")
+    plt.ylabel("kWh por hora / kW promedio")
+    plt.xticks(range(24))
+    plt.grid(True)
+    plt.legend()
+
+    plt.tight_layout()
+    plt.savefig(path, dpi=160)
+    plt.close()
+
 def _chart_energia_horaria(
     energia_horaria_kwh: List[float],
     path: Path
@@ -219,6 +267,51 @@ def _chart_anual(energia_anual: float, path: Path):
     plt.close()
 
 
+# ==========================================================
+# DEMANDA VS FV
+# ==========================================================
+def _chart_demanda_vs_fv_horaria(
+    consumo_horario_24h_kwh: dict,
+    energia_horaria_kwh: List[float],
+    path: Path,
+):
+    if not energia_horaria_kwh:
+        energia_horaria_kwh = [0.0] * 8760
+
+    horas = list(range(24))
+
+    demanda = [
+        float(consumo_horario_24h_kwh.get(h, 0.0) or 0.0)
+        for h in horas
+    ]
+
+    suma_fv = [0.0] * 24
+    conteo = [0] * 24
+
+    for idx, valor in enumerate(energia_horaria_kwh):
+        hora = (idx - 6) % 24
+        suma_fv[hora] += float(valor or 0.0)
+        conteo[hora] += 1
+
+    fv_promedio = [
+        suma_fv[h] / conteo[h] if conteo[h] else 0.0
+        for h in horas
+    ]
+
+    plt.figure(figsize=(10, 5))
+    plt.plot(horas, demanda, marker="o", label="Demanda cliente")
+    plt.plot(horas, fv_promedio, marker="o", label="Generación FV")
+
+    plt.title("Demanda del cliente vs Generación FV")
+    plt.xlabel("Hora")
+    plt.ylabel("kWh por hora / kW promedio")
+    plt.xticks(range(24))
+    plt.grid(True)
+    plt.legend()
+
+    plt.tight_layout()
+    plt.savefig(path, dpi=160)
+    plt.close()
 # ==========================================================
 # GENERADOR PRINCIPAL (LIMPIO)
 # ==========================================================
@@ -307,6 +400,33 @@ def generar_charts(
         p4
     )
     paths["chart_energia_horaria"] = str(p4)
+
+    # ======================================================
+    # DEMANDA CLIENTE VS GENERACIÓN FV
+    # ======================================================
+
+    consumo_horario_24h_kwh = {}
+
+    proyecto = (
+        res.get("proyecto")
+        if isinstance(res, dict)
+        else getattr(res, "proyecto", None)
+    )
+
+    if proyecto:
+        consumo_horario_24h_kwh = getattr(
+            proyecto,
+            "consumo_horario_24h_kwh",
+            {}
+        ) or {}
+
+    p6 = base / "demanda_vs_fv_horaria.png"
+    _chart_demanda_vs_fv_horaria(
+        consumo_horario_24h_kwh,
+        energia_horaria,
+        p6,
+    )
+    paths["chart_demanda_vs_fv_horaria"] = str(p6)
 
     # anual
     p5 = base / "fv_energia_anual.png"
