@@ -44,7 +44,9 @@ class ResultadoSizing:
 
     dc_ac_ratio: float
     energia_12m: List[MesEnergia]
-
+    comparativa_inversores: list = field(default_factory=list)
+    advertencia_inversor: str | None = None
+    alternativa_recomendada: dict | None = None
     ok: bool = True
     errores: List[str] = field(default_factory=list)
 
