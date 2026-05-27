@@ -65,7 +65,8 @@ def build_resumen_tecnico(resultado, pal, styles, content_w):
     # ======================================================
 
     kwp_dc = float(leer(sizing, "kwp_dc", leer(sizing, "pdc_kw", 0)))
-    kw_ac = float(leer(sizing, "kw_ac", 0))
+    kw_ac_unitario = float(leer(sizing, "kw_ac", 0))
+    kw_ac_total = float(leer(sizing, "kw_ac_total", kw_ac_unitario))
 
     n_paneles = int(leer(sizing, "n_paneles", 0))
     n_inversores = int(leer(sizing, "n_inversores", 1))
@@ -124,8 +125,8 @@ def build_resumen_tecnico(resultado, pal, styles, content_w):
     # DERIVADOS
     # ======================================================
 
-    potencia_inversor = kw_ac / n_inversores if n_inversores else 0
-    relacion_dc_ac = kwp_dc / kw_ac if kw_ac else 0
+    potencia_inversor = kw_ac_unitario
+    relacion_dc_ac = kwp_dc / kw_ac_total if kw_ac_total else 0
 
     paneles_usados = n_paneles
     paneles_sobrantes = 0
@@ -144,7 +145,7 @@ def build_resumen_tecnico(resultado, pal, styles, content_w):
         ["Parámetro", "Valor"],
 
         ["Potencia DC instalada", f"{kwp_dc:.2f} kWp"],
-        ["Potencia AC instalada", f"{kw_ac:.2f} kW"],
+        ["Potencia AC instalada", f"{kw_ac_total:.2f} kW"],
         ["Relación DC/AC", f"{relacion_dc_ac:.2f}"],
 
         ["Número de módulos", f"{n_paneles} × {panel_wp:.0f} Wp"],
