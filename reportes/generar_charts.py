@@ -166,6 +166,7 @@ def _chart_demanda_vs_fv_horaria(
 ):
     """
     Grafica demanda promedio horaria del cliente vs generación FV promedio horaria.
+    Incluye excedente FV, déficit/red y resumen energético diario.
     """
 
     if not energia_horaria_kwh:
@@ -191,17 +192,94 @@ def _chart_demanda_vs_fv_horaria(
         for h in horas
     ]
 
-    plt.figure(figsize=(10, 5))
+    autoconsumo = [
+        min(d, f)
+        for d, f in zip(demanda, fv_promedio)
+    ]
 
-    plt.plot(horas, demanda, marker="o", label="Demanda cliente")
-    plt.plot(horas, fv_promedio, marker="o", label="Generación FV")
+    excedente = [
+        max(f - d, 0.0)
+        for d, f in zip(demanda, fv_promedio)
+    ]
 
-    plt.title("Demanda del cliente vs Generación FV")
-    plt.xlabel("Hora")
-    plt.ylabel("Energía horaria promedio (kWh)")
+    deficit = [
+        max(d - f, 0.0)
+        for d, f in zip(demanda, fv_promedio)
+    ]
+
+    energia_demanda = sum(demanda)
+    energia_fv = sum(fv_promedio)
+    energia_autoconsumo = sum(autoconsumo)
+    energia_excedente = sum(excedente)
+    energia_deficit = sum(deficit)
+
+    cobertura_diurna = (
+        energia_autoconsumo / energia_demanda * 100
+        if energia_demanda > 0
+        else 0.0
+    )
+
+    plt.figure(figsize=(11, 5.5))
+
+    plt.plot(
+        horas,
+        demanda,
+        marker="o",
+        linewidth=2,
+        label="Demanda cliente"
+    )
+
+    plt.plot(
+        horas,
+        fv_promedio,
+        marker="o",
+        linewidth=2,
+        label="Generación FV"
+    )
+
+    plt.fill_between(
+        horas,
+        demanda,
+        fv_promedio,
+        where=[fv_promedio[i] >= demanda[i] for i in horas],
+        alpha=0.20,
+        label="Excedente FV"
+    )
+
+    plt.fill_between(
+        horas,
+        demanda,
+        fv_promedio,
+        where=[fv_promedio[i] < demanda[i] for i in horas],
+        alpha=0.15,
+        label="Déficit cubierto por red"
+    )
+
+    texto = (
+        f"Demanda diaria: {energia_demanda:.1f} kWh\n"
+        f"Generación FV: {energia_fv:.1f} kWh\n"
+        f"Autoconsumo: {energia_autoconsumo:.1f} kWh\n"
+        f"Excedente FV: {energia_excedente:.1f} kWh\n"
+        f"Déficit/red: {energia_deficit:.1f} kWh\n"
+        f"Cobertura directa: {cobertura_diurna:.1f}%"
+    )
+
+    plt.text(
+        0.02,
+        0.97,
+        texto,
+        transform=plt.gca().transAxes,
+        fontsize=8,
+        verticalalignment="top",
+        bbox=dict(boxstyle="round", alpha=0.15)
+    )
+
+    plt.title("Comparación horaria: Demanda del cliente vs Generación FV")
+    plt.xlabel("Hora del día")
+    plt.ylabel("Energía promedio horaria (kWh)")
     plt.xticks(range(24))
-    plt.grid(True)
-    plt.legend()
+    plt.grid(True, alpha=0.35)
+    plt.legend(loc="upper right")
 
     plt.tight_layout()
     plt.savefig(path, dpi=160)
