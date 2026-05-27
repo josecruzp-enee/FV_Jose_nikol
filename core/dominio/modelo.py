@@ -38,19 +38,7 @@ class Datosproyecto:
     tarifa_energia: float
     cargos_fijos: float
 
-    # =====================================================
-    # PERFIL HORARIO TÉCNICO DE CONSUMO
-    # =====================================================
-
-    # perfil ingresado por usuario (kW promedio por hora)
-    perfil_kw_24h: Dict[int, float] = field(default_factory=dict)
-
-    # energía equivalente horaria (kWh)
-    # para integración con motor FV 8760
-    consumo_horario_24h_kwh: Dict[int, float] = field(default_factory=dict)
-
-    # métricas de consistencia del perfil
-    resumen_perfil_consumo: Dict[str, float] = field(default_factory=dict)
+    
 
     # -------------------------------
     # Producción FV
@@ -83,6 +71,21 @@ class Datosproyecto:
     # -------------------------------
     om_anual_pct: float = 0.0
 
+
+    # =====================================================
+    # PERFIL HORARIO TÉCNICO DE CONSUMO
+    # =====================================================
+
+    # perfil ingresado por usuario (kW promedio por hora)
+    perfil_kw_24h: Dict[int, float] = field(default_factory=dict)
+
+    # energía equivalente horaria (kWh)
+    # para integración con motor FV 8760
+    consumo_horario_24h_kwh: Dict[int, float] = field(default_factory=dict)
+
+    # métricas de consistencia del perfil
+    resumen_perfil_consumo: Dict[str, float] = field(default_factory=dict)
+    
     # =====================================================
     # CAMPOS DEL PIPELINE (DICT CONTROLADO)
     # =====================================================
