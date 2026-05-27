@@ -280,4 +280,5 @@ def calcular_corrientes(inp: CorrientesInput) -> ResultadoCorrientes:
         ac=ac,
         mppt_detalle=mppt_detalle,
         strings_detalle=strings,
+        inversores_detalle=inversores_detalle,
     )
