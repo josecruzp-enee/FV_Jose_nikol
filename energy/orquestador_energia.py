@@ -301,9 +301,95 @@ def ejecutar_motor_energia(inp: EnergiaInput) -> EnergiaResultado:
         return _resultado_error(inp, [str(e)])
 
 
+
+# ==========================================================
+# SUMA DE RESULTADOS POR INVERSOR
+# ==========================================================
+
+def _sumar_resultados_energia(
+    resultados: List[EnergiaResultado],
+) -> EnergiaResultado:
+
+    if not resultados:
+        return EnergiaResultado.error("Sin resultados de energía para sumar")
+
+    base = resultados[0]
+
+    def sumar_vector_12m(campo: str) -> List[float]:
+
+        return [
+            sum(getattr(r, campo)[i] for r in resultados)
+            for i in range(12)
+        ]
+
+    energia_horaria = [
+        sum(r.energia_horaria_kwh[i] for r in resultados)
+        for i in range(len(base.energia_horaria_kwh))
+    ]
+
+    pdc_total = sum(r.pdc_instalada_kw for r in resultados)
+    pac_total = sum(r.pac_nominal_kw for r in resultados)
+
+    energia_bruta_anual = sum(r.energia_bruta_anual for r in resultados)
+    energia_perdidas_anual = sum(r.energia_perdidas_anual for r in resultados)
+    energia_despues_perdidas_anual = sum(
+        r.energia_despues_perdidas_anual for r in resultados
+    )
+    energia_clipping_anual = sum(r.energia_clipping_anual for r in resultados)
+    energia_util_anual = sum(r.energia_util_anual for r in resultados)
+
+    produccion_especifica = (
+        energia_util_anual / pdc_total
+        if pdc_total > 0 else 0.0
+    )
+
+    performance_ratio = (
+        sum(r.performance_ratio * r.pdc_instalada_kw for r in resultados)
+        / pdc_total
+        if pdc_total > 0 else 0.0
+    )
+
+    return EnergiaResultado(
+        ok=True,
+        errores=[],
+
+        pdc_instalada_kw=pdc_total,
+        pac_nominal_kw=pac_total,
+        dc_ac_ratio=(
+            pdc_total / pac_total
+            if pac_total > 0 else 0.0
+        ),
+
+        energia_bruta_12m=sumar_vector_12m("energia_bruta_12m"),
+        energia_perdidas_12m=sumar_vector_12m("energia_perdidas_12m"),
+        energia_despues_perdidas_12m=sumar_vector_12m(
+            "energia_despues_perdidas_12m"
+        ),
+        energia_clipping_12m=sumar_vector_12m("energia_clipping_12m"),
+        energia_util_12m=sumar_vector_12m("energia_util_12m"),
+
+        energia_bruta_anual=energia_bruta_anual,
+        energia_perdidas_anual=energia_perdidas_anual,
+        energia_despues_perdidas_anual=energia_despues_perdidas_anual,
+        energia_clipping_anual=energia_clipping_anual,
+        energia_util_anual=energia_util_anual,
+
+        energia_horaria_kwh=energia_horaria,
+
+        produccion_especifica_kwh_kwp=produccion_especifica,
+        performance_ratio=performance_ratio,
+
+        meta={
+            "modelo": "8760_por_inversor",
+            "pipeline": "clima→solar→dc_por_inversor→ac_total",
+            "n_inversores_calculados": len(resultados),
+        },
+    )
+
 # ==========================================================
 # ADAPTER
 # ==========================================================
+
 def ejecutar_energia(datos, sizing, paneles) -> EnergiaResultado:
 
     if datos is None:
@@ -324,7 +410,10 @@ def ejecutar_energia(datos, sizing, paneles) -> EnergiaResultado:
     from energy.clima.lector_pvgis import descargar_clima_pvgis, EntradaClimaPVGIS
 
     clima_base = descargar_clima_pvgis(
-        EntradaClimaPVGIS(lat=lat, lon=lon)
+        EntradaClimaPVGIS(
+            lat=lat,
+            lon=lon,
+        )
     )
 
     if clima_base is None:
@@ -338,7 +427,7 @@ def ejecutar_energia(datos, sizing, paneles) -> EnergiaResultado:
     clima_8760 = simular_clima_8760(
         clima_base,
         tilt=tilt,
-        azimuth=azimuth
+        azimuth=azimuth,
     )
 
     from electrical.catalogos.catalogos import get_panel
@@ -354,25 +443,76 @@ def ejecutar_energia(datos, sizing, paneles) -> EnergiaResultado:
     panel_spec = get_panel(panel_id)
 
     if panel_spec is None:
-        return EnergiaResultado.error(f"Panel no encontrado: {panel_id}")
+        return EnergiaResultado.error(
+            f"Panel no encontrado: {panel_id}"
+        )
 
-    n_series = paneles.recomendacion.n_series
-    n_strings = paneles.array.n_strings_total
-    pdc_kw = paneles.array.potencia_dc_w / 1000
+    strings = getattr(paneles, "strings", []) or []
 
-    entrada = EnergiaInput(
-        n_series=n_series,
-        n_strings=n_strings,
-        pdc_kw=pdc_kw,
-        panel=panel_spec,
-        pac_nominal_kw=sizing.kw_ac,
-        clima=clima_8760,
-        tilt_deg=tilt,
-        azimut_deg=azimuth,
-        perdidas_dc_frac=getattr(datos, "perdidas_dc_frac", 0.05),
-        sombras_frac=getattr(datos, "sombras_frac", 0.02),
-        eficiencia_inversor=getattr(datos, "eficiencia_inversor", 0.97),
-        perdidas_ac_frac=getattr(datos, "perdidas_ac_frac", 0.02),
+    if not strings:
+        return EnergiaResultado.error("paneles.strings vacío")
+
+    n_inversores = int(
+        getattr(sizing, "n_inversores", 1) or 1
     )
 
-    return ejecutar_motor_energia(entrada)
+    resultados: List[EnergiaResultado] = []
+
+    for inv_idx in range(1, n_inversores + 1):
+
+        strings_inv = [
+            s for s in strings
+            if int(getattr(s, "inversor", 0) or 0) == inv_idx
+        ]
+
+        if not strings_inv:
+            continue
+
+        n_series = int(
+            getattr(strings_inv[0], "n_series", 0) or 0
+        )
+
+        n_strings = len(strings_inv)
+
+        if n_series <= 0 or n_strings <= 0:
+            continue
+
+        pdc_kw_inv = (
+            n_series
+            * n_strings
+            * float(panel_spec.pmax_w)
+            / 1000.0
+        )
+
+        entrada = EnergiaInput(
+            n_series=n_series,
+            n_strings=n_strings,
+            pdc_kw=pdc_kw_inv,
+            panel=panel_spec,
+
+            # Potencia física de UNA unidad inversora
+            pac_nominal_kw=float(getattr(sizing, "kw_ac", 0) or 0),
+
+            clima=clima_8760,
+            tilt_deg=tilt,
+            azimut_deg=azimuth,
+
+            perdidas_dc_frac=getattr(datos, "perdidas_dc_frac", 0.05),
+            sombras_frac=getattr(datos, "sombras_frac", 0.02),
+            eficiencia_inversor=getattr(datos, "eficiencia_inversor", 0.97),
+            perdidas_ac_frac=getattr(datos, "perdidas_ac_frac", 0.02),
+        )
+
+        res = ejecutar_motor_energia(entrada)
+
+        if not res.ok:
+            return res
+
+        resultados.append(res)
+
+    if not resultados:
+        return EnergiaResultado.error(
+            "No se pudo calcular energía por inversor"
+        )
+
+    return _sumar_resultados_energia(resultados)
