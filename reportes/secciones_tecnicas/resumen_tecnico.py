@@ -375,17 +375,16 @@ def build_resumen_tecnico(resultado, pal, styles, content_w):
     )
 
     # ======================================================
-    # STRINGS DESDE paneles (CORRECTO)
+    # STRINGS DESDE paneles
     # ======================================================
 
     strings = obtener_strings(paneles)
 
     # ======================================================
-    # ARRAY (FUENTE REAL)
+    # ARRAY
     # ======================================================
 
     array = obtener_array(paneles)
-
     n_strings = leer(array, "n_strings_total", len(strings))
 
     # ======================================================
@@ -395,7 +394,7 @@ def build_resumen_tecnico(resultado, pal, styles, content_w):
     n_series, vmp, voc, imp, isc = obtener_datos_string(strings)
 
     # ======================================================
-    # CORRIENTES (SEGÚN MODELO)
+    # CORRIENTES
     # ======================================================
 
     string_i = leer(leer(corr, "string", {}), "i_operacion_a", imp)
@@ -438,7 +437,7 @@ def build_resumen_tecnico(resultado, pal, styles, content_w):
     story.append(Spacer(1, 16))
 
     # ======================================================
-    # TABLA GENERADOR FV
+    # GENERADOR FV
     # ======================================================
 
     agregar_tabla(
@@ -476,29 +475,6 @@ def build_resumen_tecnico(resultado, pal, styles, content_w):
     )
 
     # ======================================================
-    # COMPARATIVA DE INVERSORES
-    # ======================================================
-
-    comparativa_inversores = leer(
-        sizing,
-        "comparativa_inversores",
-        leer(resultado, "comparativa_inversores", [])
-    )
-
-    story.extend(
-        construir_tabla_comparativa_inversores_pdf(
-            comparativa_inversores,
-            styles,
-        )
-    )
-    
-    # ======================================================
-    # FICHA TÉCNICA DEL INVERSOR
-    # ======================================================
-
-    inversor = leer(sizing, "inversor", None)
-
-        # ======================================================
     # FICHA TÉCNICA DEL INVERSOR
     # ======================================================
 
@@ -528,7 +504,6 @@ def build_resumen_tecnico(resultado, pal, styles, content_w):
         leer(resultado, "comparativa_inversores", [])
     )
 
-    # DEBUG TEMPORAL
     print(
         "[DEBUG PDF] comparativa_inversores:",
         len(comparativa_inversores)
@@ -543,7 +518,6 @@ def build_resumen_tecnico(resultado, pal, styles, content_w):
     )
 
     return story
-
 # ==========================================================
 # RESUMEN DE MANTENIMIENTO
 # ==========================================================
