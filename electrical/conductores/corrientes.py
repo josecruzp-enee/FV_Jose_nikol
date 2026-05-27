@@ -104,33 +104,20 @@ def _agrupar_por_mppt(strings):
 
     grupos = defaultdict(list)
 
-    print("\n==============================")
-    print("🔴 DEBUG AGRUPACIÓN MPPT")
-    print("==============================")
+    for s in strings:
 
-    for i, s in enumerate(strings):
-
+        inv = getattr(s, "inversor", None)
         mppt = getattr(s, "mppt", None)
 
-        print(f"String {i}:")
-        print("  mppt:", mppt)
-        print("  imp:", getattr(s, "imp_string_a", None))
-        print("  isc:", getattr(s, "isc_string_a", None))
+        if inv is None:
+            raise ValueError("String sin inversor")
 
         if mppt is None:
-            raise ValueError("❌ String sin MPPT (se perdió en el flujo)")
+            raise ValueError("String sin MPPT")
 
-        grupos[mppt].append(s)
-
-    print("\n📊 RESULTADO AGRUPACIÓN:")
-    for k, v in grupos.items():
-        print(f"MPPT {k} → {len(v)} strings")
-
-    print("MPPT detectados:", list(grupos.keys()))
-    print("==============================\n")
+        grupos[(inv, mppt)].append(s)
 
     return grupos
-
 
 # ==========================================================
 # MOTOR PRINCIPAL
@@ -196,11 +183,11 @@ def calcular_corrientes(inp: CorrientesInput) -> ResultadoCorrientes:
 
     print("\n🔹 CÁLCULO MPPT")
 
-    for mppt_id, grupo in grupos.items():
+    for (inv_id, mppt_id), grupo in grupos.items():
         i_operacion = sum(s.imp_string_a for s in grupo)
         i_diseno = sum(s.isc_string_a for s in grupo) * FACTOR_DC
 
-        print(f"MPPT {mppt_id}:")
+        print(f"INV {inv_id} / MPPT {mppt_id}:")
         print("  strings:", len(grupo))
         print("  I operación:", i_operacion)
         print("  I diseño:", i_diseno)
@@ -212,7 +199,10 @@ def calcular_corrientes(inp: CorrientesInput) -> ResultadoCorrientes:
     # ------------------------------------------------------
     # MPPT (compatibilidad)
     # ------------------------------------------------------
-    mppt = mppt_detalle[0] if mppt_detalle else NivelCorriente(0.0, 0.0)
+    mppt = (
+        max(mppt_detalle, key=lambda x: x.i_diseno_a)
+        if mppt_detalle else NivelCorriente(0.0, 0.0)
+    )
 
     # ------------------------------------------------------
     # DC TOTAL
