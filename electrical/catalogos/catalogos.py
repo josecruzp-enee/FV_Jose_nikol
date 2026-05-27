@@ -58,7 +58,7 @@ from .catalogos_yaml import (
 # Catálogo base (fallback)
 # ==========================================================
 
-_PANELES: Dict[str, Panel] = {
+_PANELES: Dict[str, Panel] = {}
 
     "panel_550w": Panel(
         id="panel_550w",
@@ -80,7 +80,7 @@ _PANELES: Dict[str, Panel] = {
 }
 
 
-_INVERSORES: Dict[str, Inversor] = {
+_INVERSORES: Dict[str, Inversor] = {}
 
     "inv_5kw_2mppt": Inversor(
         id="inv_5kw_2mppt",
