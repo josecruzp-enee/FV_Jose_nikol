@@ -63,14 +63,23 @@ class ResultadoProtecciones:
     errores: List[str]
     warnings: List[str]
 
+    # Compatibilidad histórica:
+    # representa la protección AC principal / total.
     ocpd_ac: OCPDResultado
+
+    # Nuevo modelo AC separado:
+    # - uno por salida de inversor
+    # - uno principal del sistema
+    ocpd_ac_inversores: List[OCPDResultado]
+    ocpd_ac_principal: OCPDResultado
+
     ocpd_dc_array: OCPDResultado
     fusible_string: FusibleStringResultado
 
-    # 🔥 PROTECCIONES POR MPPT
+    # Protecciones por MPPT
     mppt: List[OCPDResultado]
 
-    # 🔥 NUEVO — FUSIBLES POR MPPT (NO rompe nada)
+    # Fusibles por MPPT
     fusible_mppt: Optional[List[FusibleStringResultado]] = None
 
     # =====================================================
@@ -78,15 +87,21 @@ class ResultadoProtecciones:
     # =====================================================
     @staticmethod
     def error(msg: str) -> "ResultadoProtecciones":
+        cero_ocpd = OCPDResultado(0.0, 0, "")
+
         return ResultadoProtecciones(
             ok=False,
             errores=[msg],
             warnings=[],
-            ocpd_ac=OCPDResultado(0.0, 0, ""),
-            ocpd_dc_array=OCPDResultado(0.0, 0, ""),
+
+            ocpd_ac=cero_ocpd,
+            ocpd_ac_inversores=[],
+            ocpd_ac_principal=cero_ocpd,
+
+            ocpd_dc_array=cero_ocpd,
             fusible_string=FusibleStringResultado(
                 False, None, None, None, "error"
             ),
             mppt=[],
-            fusible_mppt=[]  # 🔥 clave
+            fusible_mppt=[],
         )
