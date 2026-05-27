@@ -314,23 +314,40 @@ def crear_tabla_caida_voltaje(resultado, pal, content_w):
         [
             "Circuito",
             "Conductor",
-            "Longitud",
-            "Corriente diseño",
+            "Long.",
+            "I diseño",
             "VD",
             "Límite",
             "Estado",
         ]
     ]
 
+    def nombre_legible(nombre: str) -> str:
+
+        if nombre.startswith("DC_MPPT_"):
+            idx = nombre.split("_")[-1]
+            return f"DC MPPT {idx}"
+
+        if nombre.startswith("AC_INV_"):
+            partes = nombre.split("_")
+            idx = partes[2] if len(partes) > 2 else ""
+            return f"AC INV {idx}".strip()
+
+        if nombre == "AC_TABLERO_A_INTERCONEXION":
+            return "AC principal"
+
+        return nombre.replace("_", " ")
+
     def agregar_fila(tramo):
 
         calibre = getattr(tramo, "calibre", "—")
         material = getattr(tramo, "material", "")
 
+        nombre = getattr(tramo, "nombre", "—")
         cumple_vd = getattr(tramo, "cumple_vd", False)
 
         rows.append([
-            getattr(tramo, "nombre", "—"),
+            nombre_legible(nombre),
             f"{calibre} {material}".strip(),
             f'{getattr(tramo, "l_m", 0):.1f} m',
             f'{getattr(tramo, "i_diseno_a", 0):.2f} A',
@@ -349,13 +366,13 @@ def crear_tabla_caida_voltaje(resultado, pal, content_w):
         agregar_fila(ac_principal)
 
     colw = [
-        content_w * 0.22,
+        content_w * 0.19,
         content_w * 0.14,
-        content_w * 0.13,
+        content_w * 0.12,
         content_w * 0.16,
         content_w * 0.10,
-        content_w * 0.10,
-        content_w * 0.15,
+        content_w * 0.12,
+        content_w * 0.17,
     ]
 
     tbl = Table(rows, colWidths=colw, repeatRows=1)
@@ -367,6 +384,7 @@ def crear_tabla_caida_voltaje(resultado, pal, content_w):
         ("ALIGN", (2, 1), (-1, -1), "RIGHT"),
         ("GRID", (0, 0), (-1, -1), 0.3, pal["BORDER"]),
         ("FONTSIZE", (0, 0), (-1, -1), 8),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
     ]))
 
     return tbl
