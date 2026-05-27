@@ -17,7 +17,9 @@ def construir_datos_proyecto(ctx):
     consumo_12m = getattr(ctx, "consumo_12m", [0]*12)
     tarifa_energia = getattr(ctx, "tarifa_energia", 0)
     cargos_fijos = getattr(ctx, "cargos_fijos", 0)
-
+    perfil_kw_24h=getattr(ctx, "perfil_kw_24h", {}) or {},
+    consumo_horario_24h_kwh=getattr(ctx, "consumo_horario_24h_kwh", {}) or {},
+    resumen_perfil_consumo=getattr(ctx, "resumen_perfil_consumo", {}) or {},
     # ======================================================
     # BASE
     # ======================================================
