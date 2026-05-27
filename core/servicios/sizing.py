@@ -414,7 +414,6 @@ def _dimensionar_por_zonas(panel, zonas):
 # ==========================================================
 # INVERSOR
 # ==========================================================
-
 def _seleccionar_inversor(pdc, dc_ac_obj, eq):
 
     resultado = ejecutar_inversor_desde_sizing(
@@ -437,7 +436,7 @@ def _seleccionar_inversor(pdc, dc_ac_obj, eq):
     n_inv = int(resultado.get("n_inversores", 1))
     pac_total = float(resultado.get("kw_ac_total", kw_ac * n_inv))
 
-    return inv, kw_ac, n_inv, pac_total
+    return inv, kw_ac, n_inv, pac_total, resultado
 
 
 # ==========================================================
@@ -486,7 +485,7 @@ def calcular_sizing_unificado(p: Datosproyecto) -> ResultadoSizing:
     # ======================================================
     # INVERSOR
     # ======================================================
-    inv, kw_ac, n_inv, pac_total = _seleccionar_inversor(
+    inv, kw_ac, n_inv, pac_total, resultado_inversor = _seleccionar_inversor(
         pdc,
         dc_ac_obj,
         eq,
@@ -518,4 +517,7 @@ def calcular_sizing_unificado(p: Datosproyecto) -> ResultadoSizing:
         dc_ac_ratio=round(dc_ac_ratio, 3),
 
         energia_12m=energia_12m,
+        comparativa_inversores=resultado_inversor.get("comparativa_inversores", []),
+        advertencia_inversor=resultado_inversor.get("advertencia"),
+        alternativa_recomendada=resultado_inversor.get("alternativa_recomendada"),
     )
