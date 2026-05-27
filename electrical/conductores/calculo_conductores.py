@@ -143,9 +143,9 @@ def tramo_conductor(
 @dataclass(frozen=True)
 class TramosFV:
 
-    dc_mppt: List[ResultadoConductor]  # 🔥 cada MPPT su cable
-    ac: ResultadoConductor
-
+    dc_mppt: List[ResultadoConductor]
+    ac_inversores: List[ResultadoConductor]
+    ac_principal: ResultadoConductor
 
 # ==========================================================
 # ORQUESTADOR FV (CORRECTO)
@@ -166,7 +166,7 @@ def dimensionar_tramos_fv(
 ) -> TramosFV:
 
     # ==================================================
-    # DC POR MPPT (🔥 CORRECTO)
+    # DC POR MPPT
     # ==================================================
     tramos_mppt = []
 
@@ -185,12 +185,31 @@ def dimensionar_tramos_fv(
         tramos_mppt.append(tramo)
 
     # ==================================================
-    # AC
+    # AC POR INVERSOR
     # ==================================================
     n_hilos_ac = 3 if fases == 3 else 2
 
-    tramo_ac = tramo_conductor(
-        nombre="AC_INV_A_TABLERO",
+    tramos_ac_inversores = []
+
+    for i, inv_corr in enumerate(getattr(corrientes, "inversores_detalle", [])):
+
+        tramo = tramo_conductor(
+            nombre=f"AC_INV_{i+1}_A_TABLERO",
+            i_diseno_a=inv_corr.i_diseno_a,
+            v_base_v=vac if vac > 0 else 1.0,
+            l_m=dist_ac_m,
+            vd_obj_pct=vd_obj_ac_pct,
+            material=material_ac,
+            n_hilos=n_hilos_ac,
+        )
+
+        tramos_ac_inversores.append(tramo)
+
+    # ==================================================
+    # AC PRINCIPAL / TOTAL DEL SISTEMA
+    # ==================================================
+    tramo_ac_principal = tramo_conductor(
+        nombre="AC_TABLERO_A_INTERCONEXION",
         i_diseno_a=corrientes.ac.i_diseno_a,
         v_base_v=vac if vac > 0 else 1.0,
         l_m=dist_ac_m,
@@ -204,5 +223,6 @@ def dimensionar_tramos_fv(
     # ==================================================
     return TramosFV(
         dc_mppt=tramos_mppt,
-        ac=tramo_ac,
+        ac_inversores=tramos_ac_inversores,
+        ac_principal=tramo_ac_principal,
     )
