@@ -32,7 +32,7 @@ class ResultadoCorrientes:
 
     mppt_detalle: List[NivelCorriente]
     strings_detalle: List[NivelCorriente]
-
+    inversores_detalle: List[NivelCorriente]
     errores: List[str]
     warnings: List[str]
 
