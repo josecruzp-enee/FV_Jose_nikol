@@ -9,7 +9,16 @@ from ..secciones_tecnicas.tabla_nec import (
 from ..secciones_tecnicas.layout_paneles import insertar_layout_paneles
 from ..secciones_tecnicas.tabla_distribucion_strings import crear_tabla_distribucion_inversores
 from pathlib import Path
-from reportlab.platypus import Paragraph, Spacer, PageBreak, Image
+from reportlab.platypus import (
+    Paragraph,
+    Spacer,
+    PageBreak,
+    Image,
+    Table,
+    TableStyle,
+)
+
+from reportlab.lib import colors
 # =========================================================
 # LECTURA SEGURA
 # =========================================================
@@ -154,7 +163,196 @@ def _section_indicadores(story, resultado, pal, styles, content_w):
 
     story.append(Spacer(1, 12))
 
+def _section_optimizacion_economica(
+    story,
+    resultado,
+    pal,
+    styles,
+    content_w
+):
 
+    energia = leer(
+        resultado,
+        "energia",
+        None
+    )
+
+    opt = None
+
+    if energia is not None:
+        opt = leer(
+            energia,
+            "optimizacion_economica",
+            None
+        )
+
+    if not opt:
+        return
+
+    tabla = opt.get(
+        "tabla_evaluacion",
+        []
+    )
+
+    if not tabla:
+        return
+
+    pdc_optimo = float(
+        opt.get("pdc_kw", 0.0) or 0.0
+    )
+
+    filas_filtradas = []
+
+    for r in tabla:
+
+        pdc = float(
+            r.get("pdc_kw", 0.0) or 0.0
+        )
+
+        incluir = False
+
+        # ±25 kWp alrededor del óptimo
+        if abs(pdc - pdc_optimo) <= 25:
+            incluir = True
+
+        # cada 10 kWp
+        if int(round(pdc)) % 10 == 0:
+            incluir = True
+
+        # óptimo exacto
+        if abs(pdc - pdc_optimo) < 0.5:
+            incluir = True
+
+        if incluir:
+            filas_filtradas.append(r)
+
+    if not filas_filtradas:
+        return
+
+    story.append(
+        Paragraph(
+            "Optimización económica del sistema FV",
+            styles["Heading2"]
+        )
+    )
+
+    story.append(Spacer(1, 6))
+
+    data = [[
+        "kWp",
+        "Gen. anual",
+        "Autocons.",
+        "Exced.",
+        "Cobertura",
+        "Benef. bruto",
+        "CAPEX",
+        "Benef. neto",
+    ]]
+
+    for r in filas_filtradas:
+
+        pdc = float(
+            r.get("pdc_kw", 0.0) or 0.0
+        )
+
+        marca = (
+            "★ "
+            if abs(pdc - pdc_optimo) < 0.5
+            else ""
+        )
+
+        data.append([
+            f"{marca}{pdc:,.1f}",
+            f"{float(r.get('generacion_kwh_anual', 0.0)):,.0f}",
+            f"{float(r.get('autoconsumo_kwh_anual', 0.0)):,.0f}",
+            f"{float(r.get('excedente_kwh_anual', 0.0)):,.0f}",
+            f"{float(r.get('cobertura_directa_pct', 0.0)):,.1f}%",
+            f"L {float(r.get('beneficio_bruto_l_anual', 0.0)):,.0f}",
+            f"L {float(r.get('capex_estimado_l', 0.0)):,.0f}",
+            f"L {float(r.get('beneficio_neto_l_anual', 0.0)):,.0f}",
+        ])
+
+    tabla_pdf = Table(
+        data,
+        colWidths=[
+            content_w * 0.08,
+            content_w * 0.12,
+            content_w * 0.12,
+            content_w * 0.11,
+            content_w * 0.10,
+            content_w * 0.14,
+            content_w * 0.14,
+            content_w * 0.14,
+        ],
+        repeatRows=1,
+    )
+
+    tabla_pdf.setStyle(TableStyle([
+
+        (
+            "BACKGROUND",
+            (0, 0),
+            (-1, 0),
+            colors.HexColor("#0B3551")
+        ),
+
+        (
+            "TEXTCOLOR",
+            (0, 0),
+            (-1, 0),
+            colors.white
+        ),
+
+        (
+            "FONTNAME",
+            (0, 0),
+            (-1, 0),
+            "Helvetica-Bold"
+        ),
+
+        (
+            "FONTSIZE",
+            (0, 0),
+            (-1, -1),
+            6
+        ),
+
+        (
+            "ALIGN",
+            (0, 0),
+            (-1, -1),
+            "RIGHT"
+        ),
+
+        (
+            "ALIGN",
+            (0, 0),
+            (0, -1),
+            "CENTER"
+        ),
+
+        (
+            "GRID",
+            (0, 0),
+            (-1, -1),
+            0.25,
+            colors.lightgrey
+        ),
+    ]))
+
+    story.append(tabla_pdf)
+    story.append(Spacer(1, 8))
+
+    story.append(
+        Paragraph(
+            "La fila marcada con ★ corresponde "
+            "al tamaño seleccionado por el "
+            "optimizador económico.",
+            styles["BodyText"]
+        )
+    )
+
+    story.append(Spacer(1, 12))
 # =========================================================
 # GRÁFICOS FV
 # =========================================================
@@ -269,6 +467,7 @@ def build_ingenieria_electrica(resultado, datos, paths, pal, styles, content_w, 
     _section_energia_horaria(story, paths, styles, content_w)
     _section_demanda_vs_fv_horaria(story, paths, styles, content_w)
     _section_energia_mensual(story, paths, styles, content_w)
+    _section_optimizacion_economica(story, resultado, pal, styles, content_w)
 
     insertar_layout_paneles(story, paths, styles, content_w, safe_image)
 
