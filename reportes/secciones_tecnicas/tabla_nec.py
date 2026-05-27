@@ -159,7 +159,8 @@ def crear_tabla_indicadores(resultado, pal, content_w):
     strings = getattr(paneles, "strings", []) if paneles else []
 
     n_paneles = getattr(sizing, "n_paneles", 0) if sizing else 0
-    kw_ac = getattr(sizing, "kw_ac", 0) if sizing else 0
+    kw_ac_unitario = getattr(sizing, "kw_ac", 0) if sizing else 0
+    kw_ac_total = getattr(sizing, "kw_ac_total", kw_ac_unitario) if sizing else 0
     kwp_dc = getattr(sizing, "kwp_dc", 0) if sizing else 0
 
     # ======================================================
@@ -197,7 +198,7 @@ def crear_tabla_indicadores(resultado, pal, content_w):
     # DC / AC
     # ======================================================
 
-    relacion = kwp_dc / kw_ac if kw_ac else 0
+    relacion = kwp_dc / kw_ac_total if kw_ac_total else 0
     carga_inv = kwp_dc / n_inv if n_inv else 0
 
     rows = [
