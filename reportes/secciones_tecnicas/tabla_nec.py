@@ -27,6 +27,7 @@ def crear_tabla_parametros_electricos(resultado, pal, content_w):
 
     panel_nom, panel_dis = leer("panel")
     string_nom, string_dis = leer("string")
+    mppt_nom, mppt_dis = leer("mppt")
     dc_nom, dc_dis = leer("dc_total")
     ac_nom, ac_dis = leer("ac")
 
@@ -34,8 +35,9 @@ def crear_tabla_parametros_electricos(resultado, pal, content_w):
         ["Nivel", "Corriente operación (A)", "Corriente diseño (A)"],
         ["Panel", panel_nom, panel_dis],
         ["String", string_nom, string_dis],
-        ["Entrada inversor DC", dc_nom, dc_dis],
-        ["Salida inversor AC", ac_nom, ac_dis],
+        ["MPPT crítico", mppt_nom, mppt_dis],
+        ["DC total del Arreglo", dc_nom, dc_dis],
+        ["AC total del Sistema", ac_nom, ac_dis],
     ]
 
     colw = [content_w * 0.4, content_w * 0.3, content_w * 0.3]
@@ -100,8 +102,8 @@ def crear_tabla_dimensionamiento_nec(resultado, pal, content_w):
     niveles = [
         ("panel", "Panel", None, None),
         ("string", "String", fusible, cond_dc),
-        ("dc_total", "DC Inversor", ocpd_dc, cond_dc),
-        ("ac", "AC Inversor", ocpd_ac, cond_ac),
+        ("mppt", "MPPT crítico", ocpd_dc, cond_dc),
+        ("ac", "AC total del sistema", ocpd_ac, cond_ac),
     ]
 
     for key, nombre, p, c in niveles:
