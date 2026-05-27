@@ -34,6 +34,9 @@ def construir_datos_proyecto(ctx):
 
         tarifa_energia=float(tarifa_energia),
         cargos_fijos=float(cargos_fijos),
+        perfil_kw_24h=perfil_kw_24h,
+        consumo_horario_24h_kwh=consumo_horario_24h_kwh,
+        resumen_perfil_consumo=resumen_perfil_consumo,
 
         prod_base_kwh_kwp_mes=getattr(ctx, "prod_base_kwh_kwp_mes", None),
         factores_fv_12m=getattr(ctx, "factores_fv_12m", None),
