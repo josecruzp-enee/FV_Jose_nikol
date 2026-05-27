@@ -190,25 +190,6 @@ def evaluar_economia_sistema(
 
     return resultado
 
-def calcular_factor_recuperacion_capital(
-    *,
-    tasa_descuento_anual: float,
-    vida_util_anios: int,
-) -> float:
-
-    if vida_util_anios <= 0:
-        raise ValueError("vida_util_anios inválida")
-
-    i = float(tasa_descuento_anual)
-
-    if i <= 0:
-        return 1.0 / vida_util_anios
-
-    return (
-        i * (1.0 + i) ** vida_util_anios
-    ) / (
-        (1.0 + i) ** vida_util_anios - 1.0
-    )
 
 def optimizar_kwp_maximo_ahorro(
     *,
@@ -219,7 +200,7 @@ def optimizar_kwp_maximo_ahorro(
     tarifa_compra_l_kwh: float,
     precio_inyeccion_l_kwh: float = 2.20,
 
-    costo_l_kwp: float = 26000.0,
+    costo_l_kwp: float = 31932.0,
     tasa_descuento_anual: float = 0.10,
     vida_util_anios: int = 20,
 
@@ -293,6 +274,29 @@ def optimizar_kwp_maximo_ahorro(
         ):
             mejor = dict(r)
 
+                # ==========================================
+        # PARADA ECONÓMICA
+        # ==========================================
+        if mejor is not None:
+
+            beneficio_actual = (
+                r["beneficio_neto_l_anual"]
+            )
+
+            beneficio_mejor = (
+                mejor["beneficio_neto_l_anual"]
+            )
+
+            delta = (
+                beneficio_actual -
+                beneficio_mejor
+            )
+
+            # si ya estamos empeorando mucho,
+            # no tiene sentido seguir creciendo
+            if delta < -50000:
+                break
+                
         kwp += paso_kwp
 
     if mejor is None:
