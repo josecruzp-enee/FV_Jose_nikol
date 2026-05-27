@@ -113,14 +113,18 @@ def calcular_cantidad_inversores(
 # API PRINCIPAL
 # ======================================================
 
-from typing import Optional, Dict, Any
+# ======================================================
+# VALIDACIONES
+# ======================================================
 
-def ejecutar_inversor_desde_sizing(
+def validar_entradas_inversor(
     *,
     pdc_kw: float,
     dc_ac_obj: float,
-    inversor_id_forzado: Optional[str] = None,
-) -> Dict[str, Any]:
+) -> None:
+    """
+    Valida entradas principales del prediseño de inversores.
+    """
 
     if pdc_kw <= 0:
         raise ValueError("pdc_kw inválido")
@@ -128,34 +132,67 @@ def ejecutar_inversor_desde_sizing(
     if dc_ac_obj <= 0:
         raise ValueError("dc_ac_obj inválido")
 
-    # --------------------------------------------------
-    # INVERSOR FORZADO (modo manual con fallback)
-    # --------------------------------------------------
-    if inversor_id_forzado:
 
-        inv = get_inversor(inversor_id_forzado)
+# ======================================================
+# INVERSOR FORZADO
+# ======================================================
 
-        if inv is not None:
-            pac = float(inv.kw_ac)
+def resolver_inversor_forzado(
+    *,
+    pdc_kw: float,
+    dc_ac_obj: float,
+    inversor_id_forzado: str,
+) -> Optional[Dict[str, Any]]:
+    """
+    Resuelve el caso en que el usuario o el flujo envía un inversor específico.
 
-            calc = calcular_cantidad_inversores(
-                pdc_kw=pdc_kw,
-                pac_inversor_kw=pac,
-                dc_ac_obj=dc_ac_obj,
-            )
+    Mantiene la lógica actual:
+    - Si el inversor existe, calcula cantidad por DC/AC objetivo.
+    - Si no existe, devuelve None para permitir fallback automático.
+    """
 
-            return {
-                "inversor_id": inversor_id_forzado,
-                **calc,
-                "sugerencias": []
-            }
+    inv = get_inversor(inversor_id_forzado)
 
-        # 🔥 FALLBACK AUTOMÁTICO
-        print(f"[WARN] Inversor '{inversor_id_forzado}' no encontrado. Usando selección automática.")
+    if inv is None:
+        print(
+            f"[WARN] Inversor '{inversor_id_forzado}' no encontrado. "
+            "Usando selección automática."
+        )
+        return None
 
-    # --------------------------------------------------
-    # SELECCIÓN AUTOMÁTICA
-    # --------------------------------------------------
+    pac = float(inv.kw_ac)
+
+    calc = calcular_cantidad_inversores(
+        pdc_kw=pdc_kw,
+        pac_inversor_kw=pac,
+        dc_ac_obj=dc_ac_obj,
+    )
+
+    return {
+        "inversor_id": inversor_id_forzado,
+        **calc,
+        "sugerencias": [],
+    }
+
+
+# ======================================================
+# SELECCIÓN AUTOMÁTICA ACTUAL
+# ======================================================
+
+def resolver_inversor_automatico_actual(
+    *,
+    pdc_kw: float,
+    dc_ac_obj: float,
+) -> Optional[Dict[str, Any]]:
+    """
+    Ejecuta la selección automática actual.
+
+    Mantiene la lógica existente:
+    - Recorre el catálogo.
+    - Calcula cantidad por DC/AC objetivo.
+    - Selecciona la alternativa con menor potencia AC total.
+    """
+
     mejor_total = None
     mejor_resultado = None
     mejor_id = None
@@ -185,10 +222,82 @@ def ejecutar_inversor_desde_sizing(
             mejor_resultado = calc
             mejor_id = iid
 
-    # --------------------------------------------------
-    # SI NO HAY NINGÚN INVERSOR VÁLIDO
-    # --------------------------------------------------
     if mejor_resultado is None:
+        return None
+
+    return {
+        "inversor_id": mejor_id,
+        **mejor_resultado,
+    }
+
+
+# ======================================================
+# SUGERENCIAS FORMATEADAS
+# ======================================================
+
+def construir_sugerencias_inversor(
+    *,
+    pdc_kw: float,
+    dc_ac_obj: float,
+) -> list[Dict[str, Any]]:
+    """
+    Genera sugerencias de configuración para UI.
+    """
+
+    sugerencias = sugerir_configuraciones_inversor(
+        pdc_kw,
+        dc_ac_obj,
+    )
+
+    return [
+        {
+            "descripcion": formatear_configuracion(s["config"]),
+            "pac_total": s["pac_total"],
+            "dc_ac": s["dc_ac"],
+        }
+        for s in sugerencias
+    ]
+
+
+# ======================================================
+# API PRINCIPAL
+# ======================================================
+
+def ejecutar_inversor_desde_sizing(
+    *,
+    pdc_kw: float,
+    dc_ac_obj: float,
+    inversor_id_forzado: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Orquesta el prediseño de inversores desde sizing.
+
+    Mantiene el comportamiento actual.
+    No optimiza todavía por ventana DC/AC.
+    """
+
+    validar_entradas_inversor(
+        pdc_kw=pdc_kw,
+        dc_ac_obj=dc_ac_obj,
+    )
+
+    if inversor_id_forzado:
+
+        resultado_forzado = resolver_inversor_forzado(
+            pdc_kw=pdc_kw,
+            dc_ac_obj=dc_ac_obj,
+            inversor_id_forzado=inversor_id_forzado,
+        )
+
+        if resultado_forzado is not None:
+            return resultado_forzado
+
+    resultado_automatico = resolver_inversor_automatico_actual(
+        pdc_kw=pdc_kw,
+        dc_ac_obj=dc_ac_obj,
+    )
+
+    if resultado_automatico is None:
         print("[WARN] No se encontró ningún inversor válido")
 
         return {
@@ -196,28 +305,15 @@ def ejecutar_inversor_desde_sizing(
             "kw_ac_total": 0,
             "n_inversores": 0,
             "dc_ac": 0,
-            "sugerencias": []
+            "sugerencias": [],
         }
 
-    # --------------------------------------------------
-    # GENERAR SUGERENCIAS
-    # --------------------------------------------------
-    sugerencias = sugerir_configuraciones_inversor(pdc_kw, dc_ac_obj)
+    sugerencias_fmt = construir_sugerencias_inversor(
+        pdc_kw=pdc_kw,
+        dc_ac_obj=dc_ac_obj,
+    )
 
-    sugerencias_fmt = [
-        {
-            "descripcion": formatear_configuracion(s["config"]),
-            "pac_total": s["pac_total"],
-            "dc_ac": s["dc_ac"]
-        }
-        for s in sugerencias
-    ]
-
-    # --------------------------------------------------
-    # RESULTADO FINAL
-    # --------------------------------------------------
     return {
-        "inversor_id": mejor_id,
-        **mejor_resultado,
-        "sugerencias": sugerencias_fmt
+        **resultado_automatico,
+        "sugerencias": sugerencias_fmt,
     }
