@@ -4,6 +4,7 @@ from ..secciones_tecnicas.tabla_nec import (
     crear_tabla_parametros_electricos,
     crear_tabla_dimensionamiento_nec,
     crear_tabla_indicadores,
+    crear_tabla_caida_voltaje,
 )
 from ..secciones_tecnicas.layout_paneles import insertar_layout_paneles
 from ..secciones_tecnicas.tabla_distribucion_strings import crear_tabla_distribucion_inversores
@@ -110,7 +111,35 @@ def _section_nec(story, resultado, pal, styles, content_w):
 
     story.append(Spacer(1, 12))
 
+def _section_caida_voltaje(story, resultado, pal, styles, content_w):
 
+    story.append(
+        Paragraph(
+            "Análisis de caída de voltaje",
+            styles["Heading2"]
+        )
+    )
+
+    story.append(Spacer(1, 6))
+
+    tabla = crear_tabla_caida_voltaje(
+        resultado,
+        pal,
+        content_w,
+    )
+
+    if tabla:
+        story.append(tabla)
+    else:
+        story.append(
+            Paragraph(
+                "No hay análisis de caída de voltaje disponible.",
+                styles["BodyText"]
+            )
+        )
+
+    story.append(Spacer(1, 12))
+    
 def _section_indicadores(story, resultado, pal, styles, content_w):
 
     story.append(Paragraph("Indicadores técnicos del sistema", styles["Heading2"]))
@@ -217,6 +246,7 @@ def build_ingenieria_electrica(resultado, datos, paths, pal, styles, content_w, 
     _section_parametros_electricos(story, resultado, pal, styles, content_w)
     _section_nec(story, resultado, pal, styles, content_w)
     _section_indicadores(story, resultado, pal, styles, content_w)
+    _section_caida_voltaje(story, resultado, pal, styles, content_w)
 
     _section_potencia_horaria(story, paths, styles, content_w)
     _section_energia_horaria(story, paths, styles, content_w)
