@@ -17,9 +17,9 @@ def construir_datos_proyecto(ctx):
     consumo_12m = getattr(ctx, "consumo_12m", [0]*12)
     tarifa_energia = getattr(ctx, "tarifa_energia", 0)
     cargos_fijos = getattr(ctx, "cargos_fijos", 0)
-    perfil_kw_24h=getattr(ctx, "perfil_kw_24h", {}) or {},
-    consumo_horario_24h_kwh=getattr(ctx, "consumo_horario_24h_kwh", {}) or {},
-    resumen_perfil_consumo=getattr(ctx, "resumen_perfil_consumo", {}) or {},
+    perfil_kw_24h=getattr(ctx, "perfil_kw_24h", {}) or {}
+    consumo_horario_24h_kwh=getattr(ctx, "consumo_horario_24h_kwh", {}) or {}
+    resumen_perfil_consumo=getattr(ctx, "resumen_perfil_consumo", {}) or {}
     # ======================================================
     # BASE
     # ======================================================
@@ -58,7 +58,7 @@ def construir_datos_proyecto(ctx):
             p.consumo_12m = [10000.0] * 12
 
         if not p.prod_base_kwh_kwp_mes:
-            p.prod_base_kwh_kwp_mes = [120.0] * 12
+            p.prod_base_kwh_kwp_mes = 120.0
 
         if not p.factores_fv_12m:
             p.factores_fv_12m = [1.0] * 12
@@ -67,7 +67,12 @@ def construir_datos_proyecto(ctx):
     # NORMALIZACIÓN
     # ======================================================
     p.consumo_12m = [float(x or 0) for x in p.consumo_12m]
-    p.prod_base_kwh_kwp_mes = [float(x or 0) for x in p.prod_base_kwh_kwp_mes]
+    if isinstance(p.prod_base_kwh_kwp_mes, list):
+        p.prod_base_kwh_kwp_mes = float(
+            sum(p.prod_base_kwh_kwp_mes) / len(p.prod_base_kwh_kwp_mes)
+        )
+    else:
+        p.prod_base_kwh_kwp_mes = float(p.prod_base_kwh_kwp_mes or 0)
     p.factores_fv_12m = [float(x or 1) for x in p.factores_fv_12m]
 
     # ======================================================
