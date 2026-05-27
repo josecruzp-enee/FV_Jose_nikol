@@ -275,7 +275,7 @@ def _chart_anual(energia_anual: float, path: Path):
 def generar_charts(
     res,
     out_dir=None,
-    vista_resultados=None
+    vista_resultados=None,
     proyecto=datos_proyecto,
 ):
 
