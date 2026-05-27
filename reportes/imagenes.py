@@ -84,6 +84,7 @@ def generar_artefactos(
     *,
     res: Dict[str, Any],
     out_dir: str | Path,
+    proyecto=None,
     vista_resultados: Optional[Dict[str, Any]] = None,
     dos_aguas: bool = True,
     max_cols: int = 7,
@@ -102,7 +103,7 @@ def generar_artefactos(
         res,
         paths["charts_dir"],
         vista_resultados=vista_resultados or {},
-        proyecto=p,
+        proyecto=proyecto,
     )
 
     if charts:
