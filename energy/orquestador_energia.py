@@ -477,12 +477,18 @@ def ejecutar_energia(datos, sizing, paneles) -> EnergiaResultado:
         if n_series <= 0 or n_strings <= 0:
             continue
 
-        pdc_kw_inv = (
-            n_series
-            * n_strings
-            * float(panel_spec.pmax_w)
-            / 1000.0
-        )
+        pdc_kw_inv = 0.0
+
+        for s in strings_inv:
+            n_series_s = int(
+                getattr(s, "n_series", 0) or 0
+            )
+
+            pdc_kw_inv += (
+                n_series_s
+                * float(panel_spec.pmax_w)
+                / 1000.0
+            )
 
         entrada = EnergiaInput(
             n_series=n_series,
