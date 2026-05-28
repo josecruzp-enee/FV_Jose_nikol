@@ -200,22 +200,24 @@ def _section_optimizacion_economica(
     ben_con = float(con.get("beneficio_neto_l_anual", 0.0) or 0.0)
 
     texto_conclusion = (
-        "Se evaluaron dos escenarios: uno conservador sin reconocimiento económico "
-        "de excedentes y otro con inyección remunerada a la red. "
-        "Para el diseño base se recomienda usar el escenario sin inyección, porque "
-        "evita depender de ingresos por energía excedente y prioriza el autoconsumo. "
+        f"<b>Resultado de optimización:</b> el escenario sin inyección recomienda "
+        f"<b>{pdc_sin:,.1f} kWp</b>, con beneficio neto anual estimado de "
+        f"<b>L {ben_sin:,.0f}</b> y excedente de <b>{exc_sin:,.1f}%</b>. "
     )
 
-    if pdc_con > pdc_sin:
+    if con:
         texto_conclusion += (
-            "El escenario con inyección permite instalar una potencia mayor, "
-            "pero también incrementa el excedente energético."
+            f"El escenario con inyección aumenta el tamaño recomendado a "
+            f"<b>{pdc_con:,.1f} kWp</b>, con beneficio neto anual de "
+            f"<b>L {ben_con:,.0f}</b>, pero eleva el excedente a "
+            f"<b>{exc_con:,.1f}%</b>. "
         )
-    else:
-        texto_conclusion += (
-            "Ambos escenarios resultan en potencias similares, por lo que la venta "
-            "de excedentes no cambia significativamente el tamaño recomendado."
-        )
+
+    texto_conclusion += (
+        "Para diseño base se recomienda el escenario sin inyección. "
+        "El escenario con inyección debe evaluarse únicamente si existe contrato "
+        "formal o reconocimiento real de excedentes."
+    )
 
     story.append(Paragraph(texto_conclusion, styles["BodyText"]))
     story.append(Spacer(1, 8))
@@ -288,8 +290,7 @@ def _section_optimizacion_economica(
         Paragraph(
             "<b>Decisión recomendada:</b> usar el escenario sin inyección "
             "como diseño base. El escenario con inyección debe presentarse como "
-            "alternativa comercial si existe reconocimiento real de excedentes "
-            "a L 2.20/kWh.",
+            "alternativa comercial condicionada a contrato formal de compra de excedentes.",
             styles["BodyText"]
         )
     )
@@ -302,24 +303,38 @@ def _section_optimizacion_economica(
         return
 
     pdc_optimo = pdc_sin
+
+    puntos_interes = {
+        20,
+        40,
+        50,
+        60,
+        int(round(pdc_optimo)),
+        70,
+        80,
+        100,
+        120,
+    }
+
     filas_filtradas = []
 
     for r in tabla:
-        pdc = float(r.get("pdc_kw", 0.0) or 0.0)
+        pdc_float = float(r.get("pdc_kw", 0.0) or 0.0)
+        pdc_int = int(round(pdc_float))
 
-        incluir = False
-
-        if abs(pdc - pdc_optimo) <= 15:
-            incluir = True
-
-        if int(round(pdc)) % 20 == 0:
-            incluir = True
-
-        if abs(pdc - pdc_optimo) < 0.5:
-            incluir = True
-
-        if incluir:
+        if pdc_int in puntos_interes or abs(pdc_float - pdc_optimo) < 0.5:
             filas_filtradas.append(r)
+
+    filas_unicas = {}
+
+    for r in filas_filtradas:
+        pdc_float = float(r.get("pdc_kw", 0.0) or 0.0)
+        filas_unicas[pdc_float] = r
+
+    filas_filtradas = sorted(
+        filas_unicas.values(),
+        key=lambda x: float(x.get("pdc_kw", 0.0) or 0.0)
+    )
 
     if not filas_filtradas:
         return
@@ -387,7 +402,8 @@ def _section_optimizacion_economica(
     story.append(
         Paragraph(
             "La fila marcada con ★ corresponde al tamaño usado como diseño base "
-            "del sistema fotovoltaico.",
+            "del sistema fotovoltaico. Los demás puntos se muestran solo como "
+            "referencia comparativa.",
             styles["BodyText"]
         )
     )
