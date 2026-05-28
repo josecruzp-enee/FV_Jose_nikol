@@ -190,7 +190,96 @@ def evaluar_economia_sistema(
 
     return resultado
 
+def optimizar_kwp_maximo_ahorro(
+    *,
+    demanda_24h: Dict[int, float],
+    energia_horaria_base_kwh: List[float],
+    pdc_kw_base: float,
+    panel_w: float,
+    tarifa_compra_l_kwh: float,
+    precio_inyeccion_l_kwh: float = 0.0,
+    costo_l_kwp: float = 31932.0,
+    tasa_descuento_anual: float = 0.10,
+    vida_util_anios: int = 20,
+    kwp_min: float = 1.0,
+    kwp_max: float = 500.0,
+    paso_kwp: float = 1.0,
+) -> dict:
+    """
+    Optimiza el tamaño FV maximizando beneficio neto anual.
+    Ejecuta un solo escenario económico.
+    """
 
+    demanda_8760 = construir_demanda_8760_desde_24h(
+        demanda_24h,
+        len(energia_horaria_base_kwh)
+    )
+
+    fv_unitario = construir_perfil_unitario_fv_8760(
+        energia_horaria_base_kwh,
+        pdc_kw_base
+    )
+
+    tabla_evaluacion = []
+
+    mejor_resultado = None
+    mejor_beneficio = float("-inf")
+
+    kwp = kwp_min
+
+    while kwp <= kwp_max:
+
+        balance = evaluar_balance_8760(
+            demanda_8760_kwh=demanda_8760,
+            fv_unitario_8760_kwh_kwp=fv_unitario,
+            kwp=kwp,
+            tarifa_compra_l_kwh=tarifa_compra_l_kwh,
+            precio_inyeccion_l_kwh=precio_inyeccion_l_kwh,
+        )
+
+        economia = evaluar_economia_sistema(
+            resultado_balance=balance,
+            pdc_kw_real=kwp,
+            costo_l_kwp=costo_l_kwp,
+            tasa_descuento_anual=tasa_descuento_anual,
+            vida_util_anios=vida_util_anios,
+        )
+
+        n_paneles = ceil(
+            kwp * 1000.0 / panel_w
+        )
+
+        economia.update({
+            "pdc_kw": kwp,
+            "n_paneles": n_paneles,
+        })
+
+        tabla_evaluacion.append(economia)
+
+        beneficio = float(
+            economia.get(
+                "beneficio_neto_l_anual",
+                0.0
+            ) or 0.0
+        )
+
+        if beneficio > mejor_beneficio:
+            mejor_beneficio = beneficio
+            mejor_resultado = economia
+
+        kwp += paso_kwp
+
+    if mejor_resultado is None:
+        raise ValueError(
+            "No se encontró solución óptima."
+        )
+
+    resultado = dict(mejor_resultado)
+
+    resultado["tabla_evaluacion"] = tabla_evaluacion
+
+    return resultado
+    
 def optimizar_kwp_doble_escenario(
     *,
     demanda_24h: Dict[int, float],
