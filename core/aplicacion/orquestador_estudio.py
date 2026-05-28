@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from core.dominio.modelo import Datosproyecto
 from core.dominio.contrato import ResultadoProyecto
-from core.servicios.optimizacion_fv import optimizar_kwp_maximo_ahorro
+from core.servicios.optimizacion_fv import optimizar_kwp_doble_escenario
 from core.aplicacion.dependencias import DependenciasEstudio
 from core.servicios.layout import construir_layout_preliminar_fv
 
@@ -139,7 +139,7 @@ def ejecutar_estudio(
                     "Potencia de panel inválida para optimización."
                 )
 
-            optimizacion_economica = optimizar_kwp_maximo_ahorro(
+            optimizacion_economica = optimizar_kwp_doble_escenario(
                 demanda_24h=demanda_24h,
                 energia_horaria_base_kwh=energia_horaria,
                 pdc_kw_base=float(sizing.pdc_kw),
@@ -163,7 +163,8 @@ def ejecutar_estudio(
 
             datos.sistema_fv["modo_original"] = "optimizacion_economica"
             datos.sistema_fv["modo"] = "kw_objetivo"
-            datos.sistema_fv["valor"] = float(optimizacion_economica["pdc_kw"])
+            escenario_base = optimizacion_economica["sin_inyeccion"]
+            datos.sistema_fv["valor"] = float(escenario_base["pdc_kw"])
             datos.sistema_fv["optimizacion_economica"] = optimizacion_economica
 
             # ==================================================
