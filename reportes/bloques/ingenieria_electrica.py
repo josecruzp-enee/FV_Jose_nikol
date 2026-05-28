@@ -17,7 +17,7 @@ from reportlab.platypus import (
     Table,
     TableStyle,
 )
-from exportadores.conclusiones import agregar_pagina_conclusiones_ejecutivas
+from reportes.secciones_tecnicas.conclusiones import agregar_pagina_conclusiones_ejecutivas
 from reportlab.lib import colors
 # =========================================================
 # LECTURA SEGURA
