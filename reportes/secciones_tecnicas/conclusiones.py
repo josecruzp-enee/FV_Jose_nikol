@@ -64,191 +64,248 @@ def _fmt_pct(valor: Any) -> str:
 # ======================================================
 # EXTRACCIÓN DE MÉTRICAS PRINCIPALES
 # ======================================================
-
 def extraer_metricas_conclusion(resultado: Any) -> dict:
     """
     Extrae métricas principales del resultado consolidado.
-    No calcula ingeniería nueva. Solo interpreta datos existentes.
+    Usa rutas reales observadas en el PDF actual y fallback desde optimización.
     """
+
+    energia = _get(resultado, "energia", default=None)
+    paneles = _get(resultado, "paneles", default=None)
+    financiero = _get(resultado, "financiero", "finanzas", default=None)
+    layout_preliminar = _get(resultado, "layout_preliminar", default=None)
+    opt = _get(resultado, "optimizacion_economica", default=None)
+
+    if not opt and energia is not None:
+        opt = _get(energia, "optimizacion_economica", default=None)
+
+    sin = {}
+    con = {}
+
+    if isinstance(opt, dict):
+        sin = opt.get("sin_inyeccion", {}) or {}
+        con = opt.get("con_inyeccion", {}) or {}
+
+    # ==============================
+    # ENERGÍA
+    # ==============================
 
     consumo_anual = _get(
         resultado,
+        "consumo_anual",
         "datos.consumo_anual",
+        "datos.consumo_anual_kwh",
         "proyecto.consumo_anual",
         "energia.consumo_anual",
         "energia.consumo_anual_kwh",
-        "consumo_anual",
         default=0,
     )
 
     produccion_anual = _get(
         resultado,
+        "produccion_anual",
+        "produccion_anual_kwh",
         "energia.produccion_anual",
         "energia.generacion_anual",
         "energia.produccion_anual_kwh",
+        "energia.generacion_anual_kwh",
         "sizing.produccion_anual",
-        "produccion_anual",
+        "sizing.produccion_anual_kwh",
         default=0,
     )
 
     cobertura_real = _get(
         resultado,
-        "energia.cobertura_real_pct",
-        "sizing.cobertura_real_pct",
-        "financiero.cobertura_real_pct",
+        "cobertura_real",
         "cobertura_real_pct",
+        "energia.cobertura_real",
+        "energia.cobertura_real_pct",
+        "sizing.cobertura_real",
+        "sizing.cobertura_real_pct",
         default=0,
     )
 
+    # Fallback desde optimización sin inyección
+    if not produccion_anual:
+        produccion_anual = sin.get("generacion_kwh_anual", 0.0)
+
+    if not cobertura_real:
+        cobertura_real = sin.get("cobertura_directa_pct", 0.0)
+
+    if not consumo_anual and _num(produccion_anual) > 0 and _num(cobertura_real) > 0:
+        consumo_anual = _num(produccion_anual) / (_num(cobertura_real) / 100.0)
+
     if not cobertura_real and _num(consumo_anual) > 0:
-        cobertura_real = (_num(produccion_anual) / _num(consumo_anual)) * 100
+        cobertura_real = (_num(produccion_anual) / _num(consumo_anual)) * 100.0
+
+    # ==============================
+    # SISTEMA FV
+    # ==============================
 
     kwp = _get(
         resultado,
+        "kwp",
+        "pdc_kw",
+        "potencia_dc_kwp",
         "sizing.kwp",
+        "sizing.pdc_kw",
         "sizing.potencia_kwp",
+        "sizing.potencia_dc_kwp",
+        "paneles.kwp",
+        "paneles.pdc_kw",
         "paneles.potencia_dc_kwp",
         "paneles.kwp_total",
-        "potencia_dc_kwp",
         default=0,
     )
+
+    if not kwp:
+        kwp = sin.get("pdc_kw", sin.get("kwp", 0.0))
 
     capex = _get(
         resultado,
-        "financiero.capex",
-        "finanzas.capex",
         "capex",
+        "capex_total",
+        "financiero.capex",
+        "financiero.capex_total",
+        "finanzas.capex",
+        "finanzas.capex_total",
         default=0,
     )
 
-    dscr = _get(
-        resultado,
-        "financiero.dscr",
-        "finanzas.dscr",
-        "dscr",
-        default=0,
-    )
-
-    ahorro_mensual = _get(
-        resultado,
-        "financiero.ahorro_neto_mensual",
-        "finanzas.ahorro_neto_mensual",
-        "financiero.ahorro_mensual",
-        "ahorro_neto_mensual",
-        default=0,
-    )
-
-    ahorro_anual = _get(
-        resultado,
-        "financiero.ahorro_neto_anual",
-        "finanzas.ahorro_neto_anual",
-        "financiero.beneficio_neto_anual",
-        "beneficio_neto_anual",
-        default=0,
-    )
-
-    if not ahorro_anual and ahorro_mensual:
-        ahorro_anual = _num(ahorro_mensual) * 12
-
-    pago_actual = _get(
-        resultado,
-        "financiero.pago_actual_mensual",
-        "finanzas.pago_actual_mensual",
-        "pago_actual_mensual",
-        default=0,
-    )
-
-    pago_total_fv = _get(
-        resultado,
-        "financiero.pago_total_con_fv",
-        "finanzas.pago_total_con_fv",
-        "pago_total_con_fv",
-        default=0,
-    )
-
-    cuota = _get(
-        resultado,
-        "financiero.cuota_mensual",
-        "finanzas.cuota_mensual",
-        "cuota_mensual",
-        default=0,
-    )
-
-    peor_mes = _get(
-        resultado,
-        "financiero.peor_mes",
-        "finanzas.peor_mes",
-        "peor_mes",
-        default=0,
-    )
+    if not capex:
+        capex = sin.get("capex_estimado_l", 0.0)
 
     n_paneles = _get(
         resultado,
+        "n_paneles",
+        "numero_paneles",
         "paneles.n_paneles",
         "paneles.numero_paneles",
         "sizing.n_paneles",
-        "n_paneles",
+        "sizing.numero_paneles",
         default=0,
     )
+
+    if not n_paneles:
+        n_paneles = sin.get("n_paneles", 0)
 
     potencia_panel_wp = _get(
         resultado,
-        "paneles.potencia_panel_wp",
-        "sizing.potencia_panel_wp",
         "potencia_panel_wp",
+        "paneles.potencia_panel_wp",
+        "paneles.potencia_wp",
+        "paneles.modulo_wp",
+        "sizing.potencia_panel_wp",
         default=0,
     )
 
-    inversores = _get(
-        resultado,
-        "paneles.inversores",
-        "sizing.inversores",
-        "inversores",
-        default=None,
-    )
+    if not potencia_panel_wp and _num(kwp) > 0 and _num(n_paneles) > 0:
+        potencia_panel_wp = (_num(kwp) * 1000.0) / _num(n_paneles)
 
     cantidad_inversores = _get(
         resultado,
+        "cantidad_inversores",
         "electrical.cantidad_inversores",
         "paneles.cantidad_inversores",
         "sizing.cantidad_inversores",
-        "cantidad_inversores",
         default=0,
     )
 
     kw_ac_total = _get(
         resultado,
+        "kw_ac_total",
+        "potencia_ac_kw",
         "electrical.kw_ac_total",
         "paneles.kw_ac_total",
         "sizing.kw_ac_total",
-        "potencia_ac_kw",
         default=0,
     )
 
-    area_layout = _get(
+    # ==============================
+    # FINANZAS
+    # ==============================
+
+    dscr = _get(
         resultado,
-        "layout.area_rectangular_m2",
-        "layout.area_necesaria_m2",
-        "sizing.area_necesaria_m2",
-        "area_necesaria_m2",
+        "dscr",
+        "financiero.dscr",
+        "finanzas.dscr",
         default=0,
     )
 
-    escenario_base = _get(
+    ahorro_mensual = _get(
         resultado,
-        "optimizacion.sin_inyeccion",
-        "optimizacion.resultado_sin_inyeccion",
-        "sin_inyeccion",
-        default=None,
+        "ahorro_neto_mensual",
+        "financiero.ahorro_neto_mensual",
+        "finanzas.ahorro_neto_mensual",
+        "financiero.ahorro_mensual",
+        default=0,
     )
 
-    escenario_inyeccion = _get(
+    ahorro_anual = _get(
         resultado,
-        "optimizacion.con_inyeccion",
-        "optimizacion.resultado_con_inyeccion",
-        "con_inyeccion",
-        default=None,
+        "ahorro_neto_anual",
+        "beneficio_neto_anual",
+        "financiero.ahorro_neto_anual",
+        "finanzas.ahorro_neto_anual",
+        "financiero.beneficio_neto_anual",
+        default=0,
     )
+
+    if not ahorro_anual:
+        ahorro_anual = sin.get("beneficio_neto_l_anual", 0.0)
+
+    if not ahorro_mensual and _num(ahorro_anual) > 0:
+        ahorro_mensual = _num(ahorro_anual) / 12.0
+
+    pago_actual = _get(
+        resultado,
+        "pago_actual_mensual",
+        "financiero.pago_actual_mensual",
+        "finanzas.pago_actual_mensual",
+        default=0,
+    )
+
+    pago_total_fv = _get(
+        resultado,
+        "pago_total_con_fv",
+        "financiero.pago_total_con_fv",
+        "finanzas.pago_total_con_fv",
+        default=0,
+    )
+
+    cuota = _get(
+        resultado,
+        "cuota_mensual",
+        "financiero.cuota_mensual",
+        "finanzas.cuota_mensual",
+        default=0,
+    )
+
+    peor_mes = _get(
+        resultado,
+        "peor_mes",
+        "financiero.peor_mes",
+        "finanzas.peor_mes",
+        default=0,
+    )
+
+    # ==============================
+    # LAYOUT
+    # ==============================
+
+    layout = layout_preliminar
+
+    if isinstance(layout, dict):
+        layout = layout.get("layout") or layout
+
+    area_layout = 0.0
+
+    if layout is not None:
+        if isinstance(layout, dict):
+            area_layout = layout.get("area_rectangular_m2", 0.0) or layout.get("area_necesaria_m2", 0.0) or 0.0
+        else:
+            area_layout = getattr(layout, "area_rectangular_m2", 0.0) or getattr(layout, "area_necesaria_m2", 0.0) or 0.0
 
     return {
         "consumo_anual": _num(consumo_anual),
@@ -268,11 +325,9 @@ def extraer_metricas_conclusion(resultado: Any) -> dict:
         "cantidad_inversores": int(_num(cantidad_inversores)),
         "kw_ac_total": _num(kw_ac_total),
         "area_layout": _num(area_layout),
-        "escenario_base": escenario_base,
-        "escenario_inyeccion": escenario_inyeccion,
+        "escenario_base": sin,
+        "escenario_inyeccion": con,
     }
-
-
 # ======================================================
 # CLASIFICACIÓN EJECUTIVA
 # ======================================================
