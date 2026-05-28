@@ -67,13 +67,29 @@ def _fmt_pct(valor: Any) -> str:
 def extraer_metricas_conclusion(resultado: Any) -> dict:
     """
     Extrae métricas principales del resultado consolidado.
-    Usa rutas reales observadas en el PDF actual y fallback desde optimización.
+
+    Lee datos reales desde:
+    - resultado.finanzas / resultado.financiero
+    - finanzas["evaluacion"]
+    - resultado.energia
+    - resultado.paneles
+    - resultado.layout_preliminar
+    - resultado.optimizacion_economica
+
+    No modifica cálculos existentes.
     """
 
     energia = _get(resultado, "energia", default=None)
     paneles = _get(resultado, "paneles", default=None)
-    financiero = _get(resultado, "financiero", "finanzas", default=None)
+    financiero = _get(
+        resultado,
+        "finanzas",
+        "financiero",
+        "resultado_financiero",
+        default=None,
+    )
     layout_preliminar = _get(resultado, "layout_preliminar", default=None)
+
     opt = _get(resultado, "optimizacion_economica", default=None)
 
     if not opt and energia is not None:
@@ -86,13 +102,14 @@ def extraer_metricas_conclusion(resultado: Any) -> dict:
         sin = opt.get("sin_inyeccion", {}) or {}
         con = opt.get("con_inyeccion", {}) or {}
 
-    # ==============================
+    # ======================================================
     # ENERGÍA
-    # ==============================
+    # ======================================================
 
     consumo_anual = _get(
         resultado,
         "consumo_anual",
+        "consumo_anual_kwh",
         "datos.consumo_anual",
         "datos.consumo_anual_kwh",
         "proyecto.consumo_anual",
@@ -109,6 +126,7 @@ def extraer_metricas_conclusion(resultado: Any) -> dict:
         "energia.generacion_anual",
         "energia.produccion_anual_kwh",
         "energia.generacion_anual_kwh",
+        "energia.energia_anual_kwh",
         "sizing.produccion_anual",
         "sizing.produccion_anual_kwh",
         default=0,
@@ -125,22 +143,18 @@ def extraer_metricas_conclusion(resultado: Any) -> dict:
         default=0,
     )
 
-    # Fallback desde optimización sin inyección
     if not produccion_anual:
         produccion_anual = sin.get("generacion_kwh_anual", 0.0)
 
     if not cobertura_real:
         cobertura_real = sin.get("cobertura_directa_pct", 0.0)
 
-    if not consumo_anual and _num(produccion_anual) > 0 and _num(cobertura_real) > 0:
-        consumo_anual = _num(produccion_anual) / (_num(cobertura_real) / 100.0)
+    # No inferir consumo desde cobertura de optimización.
+    # Si no existe consumo en resultado, queda 0 para evitar dato falso.
 
-    if not cobertura_real and _num(consumo_anual) > 0:
-        cobertura_real = (_num(produccion_anual) / _num(consumo_anual)) * 100.0
-
-    # ==============================
+    # ======================================================
     # SISTEMA FV
-    # ==============================
+    # ======================================================
 
     kwp = _get(
         resultado,
@@ -164,11 +178,15 @@ def extraer_metricas_conclusion(resultado: Any) -> dict:
     capex = _get(
         resultado,
         "capex",
+        "capex_L",
         "capex_total",
         "financiero.capex",
+        "financiero.capex_L",
         "financiero.capex_total",
         "finanzas.capex",
+        "finanzas.capex_L",
         "finanzas.capex_total",
+        "resultado_financiero.capex_L",
         default=0,
     )
 
@@ -221,24 +239,42 @@ def extraer_metricas_conclusion(resultado: Any) -> dict:
         default=0,
     )
 
-    # ==============================
+    # ======================================================
     # FINANZAS
-    # ==============================
+    # ======================================================
 
     dscr = _get(
         resultado,
         "dscr",
-        "financiero.dscr",
-        "finanzas.dscr",
+        "indicadores.dscr",
+        "resumen.dscr",
+        "financiero.evaluacion.dscr",
+        "finanzas.evaluacion.dscr",
+        "resultado_financiero.evaluacion.dscr",
         default=0,
     )
+
+    if not dscr and financiero:
+        try:
+            if isinstance(financiero, dict):
+                dscr = financiero.get("evaluacion", {}).get("dscr", 0.0)
+            else:
+                evaluacion = getattr(financiero, "evaluacion", None)
+
+                if isinstance(evaluacion, dict):
+                    dscr = evaluacion.get("dscr", 0.0)
+                else:
+                    dscr = getattr(evaluacion, "dscr", 0.0)
+        except Exception:
+            dscr = 0.0
 
     ahorro_mensual = _get(
         resultado,
         "ahorro_neto_mensual",
         "financiero.ahorro_neto_mensual",
         "finanzas.ahorro_neto_mensual",
-        "financiero.ahorro_mensual",
+        "financiero.evaluacion.neto_prom",
+        "finanzas.evaluacion.neto_prom",
         default=0,
     )
 
@@ -247,8 +283,9 @@ def extraer_metricas_conclusion(resultado: Any) -> dict:
         "ahorro_neto_anual",
         "beneficio_neto_anual",
         "financiero.ahorro_neto_anual",
+        "financiero.ahorro_anual_L",
         "finanzas.ahorro_neto_anual",
-        "financiero.beneficio_neto_anual",
+        "finanzas.ahorro_anual_L",
         default=0,
     )
 
@@ -260,8 +297,11 @@ def extraer_metricas_conclusion(resultado: Any) -> dict:
 
     pago_actual = _get(
         resultado,
+        "pago_actual",
         "pago_actual_mensual",
+        "financiero.pago_actual",
         "financiero.pago_actual_mensual",
+        "finanzas.pago_actual",
         "finanzas.pago_actual_mensual",
         default=0,
     )
@@ -269,6 +309,7 @@ def extraer_metricas_conclusion(resultado: Any) -> dict:
     pago_total_fv = _get(
         resultado,
         "pago_total_con_fv",
+        "total_pago_con_fv",
         "financiero.pago_total_con_fv",
         "finanzas.pago_total_con_fv",
         default=0,
@@ -279,20 +320,84 @@ def extraer_metricas_conclusion(resultado: Any) -> dict:
         "cuota_mensual",
         "financiero.cuota_mensual",
         "finanzas.cuota_mensual",
+        "resultado_financiero.cuota_mensual",
         default=0,
     )
 
     peor_mes = _get(
         resultado,
         "peor_mes",
-        "financiero.peor_mes",
-        "finanzas.peor_mes",
+        "financiero.evaluacion.peor_mes",
+        "finanzas.evaluacion.peor_mes",
+        "resultado_financiero.evaluacion.peor_mes",
         default=0,
     )
 
-    # ==============================
+    if not peor_mes and financiero:
+        try:
+            if isinstance(financiero, dict):
+                peor_mes = financiero.get("evaluacion", {}).get("peor_mes", 0.0)
+            else:
+                evaluacion = getattr(financiero, "evaluacion", None)
+
+                if isinstance(evaluacion, dict):
+                    peor_mes = evaluacion.get("peor_mes", 0.0)
+                else:
+                    peor_mes = getattr(evaluacion, "peor_mes", 0.0)
+        except Exception:
+            peor_mes = 0.0
+
+    # ======================================================
+    # FALLBACK DESDE TABLA 12 MESES
+    # ======================================================
+
+    tabla_12m = None
+
+    if financiero:
+        if isinstance(financiero, dict):
+            tabla_12m = financiero.get("tabla_12m")
+        else:
+            tabla_12m = getattr(financiero, "tabla_12m", None)
+
+    if isinstance(tabla_12m, list) and tabla_12m:
+
+        if not pago_actual:
+            pago_actual = sum(
+                float(x.get("factura_base_L", 0.0) or 0.0)
+                for x in tabla_12m
+            ) / len(tabla_12m)
+
+        if not pago_total_fv:
+            pago_total_fv = sum(
+                (
+                    float(x.get("pago_enee_L", 0.0) or 0.0)
+                    + float(x.get("cuota_L", 0.0) or 0.0)
+                    + float(x.get("om_L", 0.0) or 0.0)
+                )
+                for x in tabla_12m
+            ) / len(tabla_12m)
+
+        if not cuota:
+            cuota = sum(
+                float(x.get("cuota_L", 0.0) or 0.0)
+                for x in tabla_12m
+            ) / len(tabla_12m)
+
+        if not ahorro_mensual:
+            ahorro_mensual = sum(
+                float(x.get("neto_L", 0.0) or 0.0)
+                for x in tabla_12m
+            ) / len(tabla_12m)
+
+        if not peor_mes:
+            peor_mes = min(
+                float(x.get("neto_L", 0.0) or 0.0)
+                for x in tabla_12m
+            )
+
+    # ======================================================
     # LAYOUT
-    # ==============================
+    # ======================================================
 
     layout = layout_preliminar
 
@@ -303,9 +408,17 @@ def extraer_metricas_conclusion(resultado: Any) -> dict:
 
     if layout is not None:
         if isinstance(layout, dict):
-            area_layout = layout.get("area_rectangular_m2", 0.0) or layout.get("area_necesaria_m2", 0.0) or 0.0
+            area_layout = (
+                layout.get("area_rectangular_m2", 0.0)
+                or layout.get("area_necesaria_m2", 0.0)
+                or 0.0
+            )
         else:
-            area_layout = getattr(layout, "area_rectangular_m2", 0.0) or getattr(layout, "area_necesaria_m2", 0.0) or 0.0
+            area_layout = (
+                getattr(layout, "area_rectangular_m2", 0.0)
+                or getattr(layout, "area_necesaria_m2", 0.0)
+                or 0.0
+            )
 
     return {
         "consumo_anual": _num(consumo_anual),
