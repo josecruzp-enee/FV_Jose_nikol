@@ -171,61 +171,148 @@ def _section_optimizacion_economica(
     content_w
 ):
 
-    # ======================================================
-    # Leer optimización económica
-    # Nuevo contrato: resultado.optimizacion_economica
-    # Fallback: resultado.energia.optimizacion_economica
-    # ======================================================
-    opt = leer(
-        resultado,
-        "optimizacion_economica",
-        None
-    )
+    opt = leer(resultado, "optimizacion_economica", None)
 
     if not opt:
-
-        energia = leer(
-            resultado,
-            "energia",
-            None
-        )
-
+        energia = leer(resultado, "energia", None)
         if energia is not None:
-            opt = leer(
-                energia,
-                "optimizacion_economica",
-                None
-            )
+            opt = leer(energia, "optimizacion_economica", None)
 
-    if not opt:
+    if not opt or not isinstance(opt, dict):
         return
 
-    tabla = opt.get(
-        "tabla_evaluacion",
-        []
+    sin = opt.get("sin_inyeccion", {}) or {}
+    con = opt.get("con_inyeccion", {}) or {}
+
+    if not sin and not con:
+        return
+
+    story.append(Paragraph("Optimización económica del sistema FV", styles["Heading2"]))
+    story.append(Spacer(1, 6))
+
+    pdc_sin = float(sin.get("pdc_kw", sin.get("kwp", 0.0)) or 0.0)
+    pdc_con = float(con.get("pdc_kw", con.get("kwp", 0.0)) or 0.0)
+
+    exc_sin = float(sin.get("excedente_pct_generacion", 0.0) or 0.0)
+    exc_con = float(con.get("excedente_pct_generacion", 0.0) or 0.0)
+
+    ben_sin = float(sin.get("beneficio_neto_l_anual", 0.0) or 0.0)
+    ben_con = float(con.get("beneficio_neto_l_anual", 0.0) or 0.0)
+
+    texto_conclusion = (
+        "Se evaluaron dos escenarios: uno conservador sin reconocimiento económico "
+        "de excedentes y otro con inyección remunerada a la red. "
+        "Para el diseño base se recomienda usar el escenario sin inyección, porque "
+        "evita depender de ingresos por energía excedente y prioriza el autoconsumo. "
     )
+
+    if pdc_con > pdc_sin:
+        texto_conclusion += (
+            "El escenario con inyección permite instalar una potencia mayor, "
+            "pero también incrementa el excedente energético."
+        )
+    else:
+        texto_conclusion += (
+            "Ambos escenarios resultan en potencias similares, por lo que la venta "
+            "de excedentes no cambia significativamente el tamaño recomendado."
+        )
+
+    story.append(Paragraph(texto_conclusion, styles["BodyText"]))
+    story.append(Spacer(1, 8))
+
+    data = [[
+        "Escenario",
+        "kWp recomendado",
+        "Paneles",
+        "Gen. anual",
+        "Autocons.",
+        "Excedente",
+        "Cobertura",
+        "Benef. neto",
+    ]]
+
+    if sin:
+        data.append([
+            "Sin inyección",
+            f"{pdc_sin:,.1f}",
+            f"{int(sin.get('n_paneles', 0) or 0):,}",
+            f"{float(sin.get('generacion_kwh_anual', 0.0) or 0.0):,.0f}",
+            f"{float(sin.get('autoconsumo_kwh_anual', 0.0) or 0.0):,.0f}",
+            f"{exc_sin:,.1f}%",
+            f"{float(sin.get('cobertura_directa_pct', 0.0) or 0.0):,.1f}%",
+            f"L {ben_sin:,.0f}",
+        ])
+
+    if con:
+        data.append([
+            "Con inyección",
+            f"{pdc_con:,.1f}",
+            f"{int(con.get('n_paneles', 0) or 0):,}",
+            f"{float(con.get('generacion_kwh_anual', 0.0) or 0.0):,.0f}",
+            f"{float(con.get('autoconsumo_kwh_anual', 0.0) or 0.0):,.0f}",
+            f"{exc_con:,.1f}%",
+            f"{float(con.get('cobertura_directa_pct', 0.0) or 0.0):,.1f}%",
+            f"L {ben_con:,.0f}",
+        ])
+
+    tabla_pdf = Table(
+        data,
+        colWidths=[
+            content_w * 0.15,
+            content_w * 0.12,
+            content_w * 0.09,
+            content_w * 0.13,
+            content_w * 0.13,
+            content_w * 0.11,
+            content_w * 0.11,
+            content_w * 0.16,
+        ],
+        repeatRows=1,
+    )
+
+    tabla_pdf.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0B3551")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 6),
+        ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
+        ("ALIGN", (0, 0), (-1, 0), "CENTER"),
+        ("GRID", (0, 0), (-1, -1), 0.25, colors.lightgrey),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+    ]))
+
+    story.append(tabla_pdf)
+    story.append(Spacer(1, 8))
+
+    story.append(
+        Paragraph(
+            "<b>Decisión recomendada:</b> usar el escenario sin inyección "
+            "como diseño base. El escenario con inyección debe presentarse como "
+            "alternativa comercial si existe reconocimiento real de excedentes "
+            "a L 2.20/kWh.",
+            styles["BodyText"]
+        )
+    )
+
+    story.append(Spacer(1, 12))
+
+    tabla = sin.get("tabla_evaluacion", [])
 
     if not tabla:
         return
 
-    pdc_optimo = float(
-        opt.get("pdc_kw", 0.0) or 0.0
-    )
-
+    pdc_optimo = pdc_sin
     filas_filtradas = []
 
     for r in tabla:
-
-        pdc = float(
-            r.get("pdc_kw", 0.0) or 0.0
-        )
+        pdc = float(r.get("pdc_kw", 0.0) or 0.0)
 
         incluir = False
 
-        if abs(pdc - pdc_optimo) <= 25:
+        if abs(pdc - pdc_optimo) <= 15:
             incluir = True
 
-        if int(round(pdc)) % 10 == 0:
+        if int(round(pdc)) % 20 == 0:
             incluir = True
 
         if abs(pdc - pdc_optimo) < 0.5:
@@ -239,64 +326,52 @@ def _section_optimizacion_economica(
 
     story.append(
         Paragraph(
-            "Optimización económica del sistema FV",
-            styles["Heading2"]
+            "Evaluación resumida del escenario base sin inyección",
+            styles["Heading3"]
         )
     )
-
     story.append(Spacer(1, 6))
 
-    data = [[
+    data_eval = [[
         "kWp",
-        "Gen. anual",
+        "Gen.",
         "Autocons.",
         "Exced.",
         "Cobertura",
-        "Benef. bruto",
         "CAPEX",
         "Benef. neto",
     ]]
 
     for r in filas_filtradas:
+        pdc = float(r.get("pdc_kw", 0.0) or 0.0)
 
-        pdc = float(
-            r.get("pdc_kw", 0.0) or 0.0
-        )
+        marca = "★ " if abs(pdc - pdc_optimo) < 0.5 else ""
 
-        marca = (
-            "★ "
-            if abs(pdc - pdc_optimo) < 0.5
-            else ""
-        )
-
-        data.append([
+        data_eval.append([
             f"{marca}{pdc:,.1f}",
-            f"{float(r.get('generacion_kwh_anual', 0.0)):,.0f}",
-            f"{float(r.get('autoconsumo_kwh_anual', 0.0)):,.0f}",
-            f"{float(r.get('excedente_kwh_anual', 0.0)):,.0f}",
-            f"{float(r.get('cobertura_directa_pct', 0.0)):,.1f}%",
-            f"L {float(r.get('beneficio_bruto_l_anual', 0.0)):,.0f}",
-            f"L {float(r.get('capex_estimado_l', 0.0)):,.0f}",
-            f"L {float(r.get('beneficio_neto_l_anual', 0.0)):,.0f}",
+            f"{float(r.get('generacion_kwh_anual', 0.0) or 0.0):,.0f}",
+            f"{float(r.get('autoconsumo_kwh_anual', 0.0) or 0.0):,.0f}",
+            f"{float(r.get('excedente_pct_generacion', 0.0) or 0.0):,.1f}%",
+            f"{float(r.get('cobertura_directa_pct', 0.0) or 0.0):,.1f}%",
+            f"L {float(r.get('capex_estimado_l', 0.0) or 0.0):,.0f}",
+            f"L {float(r.get('beneficio_neto_l_anual', 0.0) or 0.0):,.0f}",
         ])
 
-    tabla_pdf = Table(
-        data,
+    tabla_eval_pdf = Table(
+        data_eval,
         colWidths=[
-            content_w * 0.08,
-            content_w * 0.12,
-            content_w * 0.12,
-            content_w * 0.11,
             content_w * 0.10,
             content_w * 0.14,
             content_w * 0.14,
-            content_w * 0.14,
+            content_w * 0.12,
+            content_w * 0.12,
+            content_w * 0.18,
+            content_w * 0.20,
         ],
         repeatRows=1,
     )
 
-    tabla_pdf.setStyle(TableStyle([
-
+    tabla_eval_pdf.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0B3551")),
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
         ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
@@ -304,17 +379,15 @@ def _section_optimizacion_economica(
         ("ALIGN", (0, 0), (-1, -1), "RIGHT"),
         ("ALIGN", (0, 0), (0, -1), "CENTER"),
         ("GRID", (0, 0), (-1, -1), 0.25, colors.lightgrey),
-
     ]))
 
-    story.append(tabla_pdf)
+    story.append(tabla_eval_pdf)
     story.append(Spacer(1, 8))
 
     story.append(
         Paragraph(
-            "La fila marcada con ★ corresponde "
-            "al tamaño seleccionado por el "
-            "optimizador económico.",
+            "La fila marcada con ★ corresponde al tamaño usado como diseño base "
+            "del sistema fotovoltaico.",
             styles["BodyText"]
         )
     )
