@@ -191,13 +191,14 @@ def evaluar_economia_sistema(
     return resultado
 
 
-def optimizar_kwp_maximo_ahorro(
+def optimizar_kwp_doble_escenario(
     *,
     demanda_24h: Dict[int, float],
     energia_horaria_base_kwh: List[float],
     pdc_kw_base: float,
     panel_w: float,
     tarifa_compra_l_kwh: float,
+
     precio_inyeccion_l_kwh: float = 2.20,
 
     costo_l_kwp: float = 31932.0,
@@ -208,105 +209,70 @@ def optimizar_kwp_maximo_ahorro(
     kwp_max: float = 500.0,
     paso_kwp: float = 1.0,
 ) -> dict:
+    """
+    Ejecuta la optimización FV en dos escenarios:
 
-    beneficio_minimo_pct = 0.95
+    1. Sin inyección:
+       - El excedente no tiene valor económico.
+       - precio_inyeccion_l_kwh = 0.0
 
-    demanda_8760 = construir_demanda_8760_desde_24h(
+    2. Con inyección:
+       - El excedente se remunera.
+       - precio_inyeccion_l_kwh configurable, por defecto L 2.20/kWh.
+
+    No duplica lógica.
+    Reutiliza optimizar_kwp_maximo_ahorro().
+    """
+
+    resultado_sin_inyeccion = optimizar_kwp_maximo_ahorro(
         demanda_24h=demanda_24h,
-        n_horas=len(energia_horaria_base_kwh),
-    )
-
-    fv_unitario = construir_perfil_unitario_fv_8760(
-        energia_horaria_kwh=energia_horaria_base_kwh,
+        energia_horaria_base_kwh=energia_horaria_base_kwh,
         pdc_kw_base=pdc_kw_base,
-    )
+        panel_w=panel_w,
+        tarifa_compra_l_kwh=tarifa_compra_l_kwh,
+        precio_inyeccion_l_kwh=0.0,
 
-    crf = calcular_factor_recuperacion_capital(
+        costo_l_kwp=costo_l_kwp,
         tasa_descuento_anual=tasa_descuento_anual,
         vida_util_anios=vida_util_anios,
+
+        kwp_min=kwp_min,
+        kwp_max=kwp_max,
+        paso_kwp=paso_kwp,
     )
 
-    tabla_evaluacion = []
-    kwp = float(kwp_min)
+    resultado_con_inyeccion = optimizar_kwp_maximo_ahorro(
+        demanda_24h=demanda_24h,
+        energia_horaria_base_kwh=energia_horaria_base_kwh,
+        pdc_kw_base=pdc_kw_base,
+        panel_w=panel_w,
+        tarifa_compra_l_kwh=tarifa_compra_l_kwh,
+        precio_inyeccion_l_kwh=precio_inyeccion_l_kwh,
 
-    while kwp <= kwp_max:
+        costo_l_kwp=costo_l_kwp,
+        tasa_descuento_anual=tasa_descuento_anual,
+        vida_util_anios=vida_util_anios,
 
-        n_paneles = int(ceil((kwp * 1000.0) / panel_w))
-        pdc_kw_real = n_paneles * panel_w / 1000.0
-
-        r = evaluar_balance_8760(
-            demanda_8760_kwh=demanda_8760,
-            fv_unitario_8760_kwh_kwp=fv_unitario,
-            kwp=pdc_kw_real,
-            tarifa_compra_l_kwh=tarifa_compra_l_kwh,
-            precio_inyeccion_l_kwh=precio_inyeccion_l_kwh,
-        )
-
-        capex_estimado_l = pdc_kw_real * costo_l_kwp
-        costo_anualizado_l = capex_estimado_l * crf
-
-        beneficio_bruto_l_anual = float(
-            r.get("beneficio_l_anual", 0.0) or 0.0
-        )
-
-        beneficio_neto_l_anual = (
-            beneficio_bruto_l_anual - costo_anualizado_l
-        )
-
-        dscr = (
-            beneficio_bruto_l_anual / costo_anualizado_l
-            if costo_anualizado_l > 0
-            else 0.0
-        )
-
-        r["n_paneles"] = n_paneles
-        r["pdc_kw"] = pdc_kw_real
-        r["kwp"] = pdc_kw_real
-        r["costo_l_kwp"] = costo_l_kwp
-        r["capex_estimado_l"] = capex_estimado_l
-        r["factor_recuperacion_capital"] = crf
-        r["costo_anualizado_l"] = costo_anualizado_l
-        r["beneficio_bruto_l_anual"] = beneficio_bruto_l_anual
-        r["beneficio_neto_l_anual"] = beneficio_neto_l_anual
-        r["dscr"] = dscr
-
-        tabla_evaluacion.append(dict(r))
-
-        kwp += paso_kwp
-
-    if not tabla_evaluacion:
-        raise ValueError("No se pudo optimizar el sistema FV")
-
-    beneficio_max = max(
-        float(r.get("beneficio_neto_l_anual", 0.0) or 0.0)
-        for r in tabla_evaluacion
+        kwp_min=kwp_min,
+        kwp_max=kwp_max,
+        paso_kwp=paso_kwp,
     )
 
-    beneficio_minimo = beneficio_max * beneficio_minimo_pct
-
-    candidatos = [
-        r for r in tabla_evaluacion
-        if float(r.get("beneficio_neto_l_anual", 0.0) or 0.0) >= beneficio_minimo
-    ]
-
-    if candidatos:
-        mejor = min(
-            candidatos,
-            key=lambda r: float(r.get("capex_estimado_l", 0.0) or 0.0)
-        )
-    else:
-        mejor = max(
-            tabla_evaluacion,
-            key=lambda r: float(r.get("beneficio_neto_l_anual", 0.0) or 0.0)
-        )
-
-    mejor = dict(mejor)
-    mejor["criterio_optimizacion"] = (
-        "Menor CAPEX que alcanza al menos "
-        f"{beneficio_minimo_pct * 100:.0f}% del beneficio neto máximo"
+    resultado_sin_inyeccion["escenario"] = "sin_inyeccion"
+    resultado_sin_inyeccion["precio_inyeccion_l_kwh"] = 0.0
+    resultado_sin_inyeccion["descripcion_escenario"] = (
+        "Optimización sin reconocimiento económico de excedentes."
     )
-    mejor["beneficio_maximo_l_anual"] = beneficio_max
-    mejor["beneficio_minimo_aceptable_l_anual"] = beneficio_minimo
-    mejor["tabla_evaluacion"] = tabla_evaluacion
 
-    return mejor
+    resultado_con_inyeccion["escenario"] = "con_inyeccion"
+    resultado_con_inyeccion["precio_inyeccion_l_kwh"] = precio_inyeccion_l_kwh
+    resultado_con_inyeccion["descripcion_escenario"] = (
+        f"Optimización con reconocimiento de excedentes a "
+        f"L {precio_inyeccion_l_kwh:.2f}/kWh."
+    )
+
+    return {
+        "sin_inyeccion": resultado_sin_inyeccion,
+        "con_inyeccion": resultado_con_inyeccion,
+        "precio_inyeccion_l_kwh": precio_inyeccion_l_kwh,
+    }
