@@ -306,6 +306,18 @@ def extraer_metricas_conclusion(resultado: Any, datos: Any = None) -> dict:
     if not ahorro_mensual and _num(ahorro_anual) > 0:
         ahorro_mensual = _num(ahorro_anual) / 12.0
 
+    # ======================================================
+    # BENEFICIOS BRUTO Y NETO
+    # ======================================================
+
+    beneficio_bruto_anual = _num(ahorro_anual)
+
+    beneficio_neto_anual = 0.0
+
+    if _num(ahorro_mensual) > 0:
+        beneficio_neto_anual = _num(ahorro_mensual) * 12.0
+
+    
     pago_actual = _get(
         resultado,
         "pago_actual",
@@ -440,6 +452,8 @@ def extraer_metricas_conclusion(resultado: Any, datos: Any = None) -> dict:
         "dscr": _num(dscr),
         "ahorro_mensual": _num(ahorro_mensual),
         "ahorro_anual": _num(ahorro_anual),
+        "beneficio_bruto_anual": _num(beneficio_bruto_anual),
+        "beneficio_neto_anual": _num(beneficio_neto_anual),
         "pago_actual": _num(pago_actual),
         "pago_total_fv": _num(pago_total_fv),
         "cuota": _num(cuota),
@@ -518,13 +532,17 @@ def generar_conclusiones_ejecutivas(resultado: Any, datos: Any = None) -> dict:
     })
 
     conclusiones.append({
-        "titulo": "3. Resultado financiero para el cliente",
+        "titulo": "3. Impacto financiero esperado",
         "texto": (
             f"El pago energético mensual actual se estima en {_fmt_lps(m['pago_actual'])}. "
             f"Con el sistema FV y el financiamiento considerado, el pago total mensual proyectado "
             f"se reduce a aproximadamente {_fmt_lps(m['pago_total_fv'])}, incluyendo una cuota "
             f"de financiamiento de {_fmt_lps(m['cuota'])}. "
-            f"Esto representa un ahorro anual estimado de {_fmt_lps(m['ahorro_anual'])}."
+            f"El beneficio económico anual generado por la energía fotovoltaica "
+            f"se estima en {_fmt_lps(m['beneficio_bruto_anual'])}. "
+            f"Después de considerar el financiamiento del proyecto, "
+            f"el ahorro neto anual esperado para el cliente es de "
+            f"{_fmt_lps(m['beneficio_neto_anual'])}."
         ),
     })
 
