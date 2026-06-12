@@ -15,6 +15,8 @@ def _defaults_sistema_fv() -> Dict[str, Any]:
         "longitud": -87.2,
         "modo_diseno": "auto",
         "usar_zonas": False,
+        "tipo_montaje": "Terraza / cubierta plana",
+        "orientacion_panel": "Vertical (Portrait)",
         "sizing_input": {
             "modo": "cobertura",
             "valor": 80.0
@@ -197,6 +199,45 @@ def _render_dimensionamiento(sf):
                     "azimut": 180.0,
                     "inclinacion": 15.0,
                 }]
+
+
+
+# ==========================================================
+# CONDICIONES DE INSTALACIÓN
+# ==========================================================
+def _render_condiciones_instalacion(sf):
+
+    st.markdown("### Condiciones de instalación")
+
+    sf["tipo_montaje"] = st.selectbox(
+        "Tipo de montaje",
+        [
+            "Terraza / cubierta plana",
+            "Techo a dos aguas",
+            "Suelo",
+        ],
+        index=[
+            "Terraza / cubierta plana",
+            "Techo a dos aguas",
+            "Suelo",
+        ].index(sf.get("tipo_montaje", "Terraza / cubierta plana")),
+        key="tipo_montaje",
+    )
+
+    sf["orientacion_panel"] = st.selectbox(
+        "Orientación de panel",
+        [
+            "Vertical (Portrait)",
+            "Horizontal (Landscape)",
+        ],
+        index=[
+            "Vertical (Portrait)",
+            "Horizontal (Landscape)",
+        ].index(sf.get("orientacion_panel", "Vertical (Portrait)")),
+        key="orientacion_panel",
+    )
+
+
 # ==========================================================
 # ZONAS
 # ==========================================================
@@ -286,6 +327,7 @@ def render(ctx):
     sf = _get_sf(ctx)
 
     _render_dimensionamiento(sf)
+    _render_condiciones_instalacion(sf)
 
     if sf.get("usar_zonas"):
         _render_zonas(sf)
