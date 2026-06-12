@@ -586,7 +586,7 @@ def build_ingenieria_electrica(resultado, datos, paths, pal, styles, content_w, 
     _section_optimizacion_economica(story, resultado, pal, styles, content_w)
     agregar_pagina_conclusiones_ejecutivas(story, styles, resultado, datos)
     _section_layout_preliminar(story, resultado, pal, styles, content_w)
-    insertar_layout_paneles(story, paths, styles, content_w, safe_image)
+    insertar_layout_paneles(story, paths, styles, content_w, safe_image, datos.get("sistema_fv", {}) if datos else {},)
 
     story.append(PageBreak())
 
