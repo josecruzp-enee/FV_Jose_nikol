@@ -572,7 +572,9 @@ def ejecutar_inversor_desde_sizing(
     return {
         **resultado_automatico,
         "sugerencias": sugerencias_fmt,
-        "comparativa_inversores": tabla_comparativa,
+        "comparativa_inversores": [],
+        "comparacion_inversores": {},
+        "configuracion_mixta": False,
     }
 
 
