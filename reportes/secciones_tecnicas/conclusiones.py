@@ -109,8 +109,13 @@ def extraer_metricas_conclusion(resultado: Any, datos: Any = None) -> dict:
     consumo_anual = 0.0
 
     if datos is not None:
-        consumo_12m = leer(datos, "consumo_12m", []) or []
-        consumo_anual = sum(_num(x) for x in consumo_12m)
+        consumo_12m = _get(
+            datos,
+            "consumo_12m",
+            default=[]
+        ) or []
+
+    consumo_anual = sum(_num(x) for x in consumo_12m)
 
     if not consumo_anual:
         consumo_anual = _get(
