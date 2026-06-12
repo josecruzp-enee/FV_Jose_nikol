@@ -127,6 +127,7 @@ def extraer_metricas_conclusion(resultado: Any) -> dict:
         "energia.produccion_anual_kwh",
         "energia.generacion_anual_kwh",
         "energia.energia_anual_kwh",
+        "energia.energia_util_anual",
         "sizing.produccion_anual",
         "sizing.produccion_anual_kwh",
         default=0,
