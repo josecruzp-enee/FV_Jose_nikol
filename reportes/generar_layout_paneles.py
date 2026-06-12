@@ -11,114 +11,60 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 
 
-# =========================================================
-# CONFIGURACIÓN VISUAL
-# =========================================================
-
 COLOR_PANEL = "#1F3A5F"
 COLOR_BORDE = "#0B2E4A"
 COLOR_FONDO = "#FFFFFF"
 COLOR_CUMBRERA = "#DDDDDD"
+COLOR_CAJA = "#F7F7F7"
+COLOR_LINEA = "#222222"
 
 
-# =========================================================
-# UTILIDADES
-# =========================================================
-
-def _normalizar_modo(modo_sistema) -> str:
-    if modo_sistema is None:
-        return ""
-
-    return str(modo_sistema).strip().lower()
-
-
-def _es_modo_por_zonas(modo_sistema=None, zonas=None) -> bool:
-    modo = _normalizar_modo(modo_sistema)
-    zonas = zonas or []
-
-    return (
-        modo in ["multizona", "por_zonas", "zonas", "por zonas"]
-        or len(zonas) > 0
-    )
-
-
-def _validar_entrada(
-    n_paneles: int,
-    max_cols: int,
-    panel_w: float,
-    panel_h: float,
-    gap: float,
-    gap_cumbrera_m: float,
-) -> None:
-
+def _validar_entrada(n_paneles, max_cols, panel_w, panel_h, gap, gap_cumbrera_m):
     if n_paneles <= 0:
         raise ValueError("n_paneles debe ser mayor que cero.")
-
     if max_cols <= 0:
         raise ValueError("max_cols debe ser mayor que cero.")
-
     if panel_w <= 0:
         raise ValueError("panel_w debe ser mayor que cero.")
-
     if panel_h <= 0:
         raise ValueError("panel_h debe ser mayor que cero.")
-
     if gap < 0:
         raise ValueError("gap no puede ser negativo.")
-
     if gap_cumbrera_m < 0:
         raise ValueError("gap_cumbrera_m no puede ser negativo.")
 
 
-# =========================================================
-# GRID DE PANELES
-# =========================================================
-
-def _dibujar_grid(
-    n,
-    cols,
-    rows,
-    x0,
-    y0,
-    w,
-    h,
-    gap,
-    start_num=1,
-):
-
+def _dibujar_grid(n, cols, rows, x0, y0, w, h, gap, start_num=1):
     patches = []
     labels = []
-
     num = start_num
 
     for r in range(rows):
         for c in range(cols):
-
             if num >= start_num + n:
                 break
 
             x = x0 + c * (w + gap)
             y = y0 + r * (h + gap)
 
-            rect = Rectangle(
-                (x, y),
-                w,
-                h,
-                facecolor=COLOR_PANEL,
-                edgecolor=COLOR_BORDE,
-                linewidth=0.8,
+            patches.append(
+                Rectangle(
+                    (x, y),
+                    w,
+                    h,
+                    facecolor=COLOR_PANEL,
+                    edgecolor=COLOR_BORDE,
+                    linewidth=0.7,
+                )
             )
 
-            patches.append(rect)
             labels.append((x + w / 2, y + h / 2, str(num)))
-
             num += 1
 
     return patches, labels, num
 
 
 def _agregar_paneles(ax, patches, labels):
-
     for p in patches:
         ax.add_patch(p)
 
@@ -130,23 +76,11 @@ def _agregar_paneles(ax, patches, labels):
             color="white",
             ha="center",
             va="center",
-            fontsize=6,
+            fontsize=5.2,
         )
 
 
-# =========================================================
-# LAYOUT UNA AGUA / RECTANGULAR
-# =========================================================
-
-def _generar_layout_rectangular(
-    ax,
-    n_paneles: int,
-    max_cols: int,
-    panel_w: float,
-    panel_h: float,
-    gap: float,
-):
-
+def _generar_layout_rectangular(ax, n_paneles, max_cols, panel_w, panel_h, gap):
     cols = min(max_cols, n_paneles)
     rows = math.ceil(n_paneles / cols)
 
@@ -167,30 +101,25 @@ def _generar_layout_rectangular(
     ancho_total = cols * panel_w + max(cols - 1, 0) * gap
     alto_total = rows * panel_h + max(rows - 1, 0) * gap
 
-    return ancho_total, alto_total
+    return ancho_total, alto_total, cols, rows
 
-
-# =========================================================
-# LAYOUT DOS AGUAS
-# =========================================================
 
 def _generar_layout_dos_aguas(
     ax,
-    n_paneles: int,
-    max_cols: int,
-    panel_w: float,
-    panel_h: float,
-    gap: float,
-    gap_cumbrera_m: float,
+    n_paneles,
+    max_cols,
+    panel_w,
+    panel_h,
+    gap,
+    gap_cumbrera_m,
 ):
-
-    n_arriba = (n_paneles + 1) // 2
     n_abajo = n_paneles // 2
+    n_arriba = n_paneles - n_abajo
 
     cols = min(max_cols, max(n_arriba, n_abajo))
 
-    rows_arriba = math.ceil(n_arriba / cols)
     rows_abajo = math.ceil(n_abajo / cols)
+    rows_arriba = math.ceil(n_arriba / cols)
 
     ancho_total = cols * panel_w + max(cols - 1, 0) * gap
 
@@ -198,10 +127,6 @@ def _generar_layout_dos_aguas(
     alto_arriba = rows_arriba * panel_h + max(rows_arriba - 1, 0) * gap
 
     alto_total = alto_abajo + gap_cumbrera_m + alto_arriba
-
-    # =====================================================
-    # ABAJO
-    # =====================================================
 
     patches_abajo, labels_abajo, next_num = _dibujar_grid(
         n=n_abajo,
@@ -214,10 +139,6 @@ def _generar_layout_dos_aguas(
         gap=gap,
         start_num=1,
     )
-
-    # =====================================================
-    # ARRIBA
-    # =====================================================
 
     y_arriba = alto_abajo + gap_cumbrera_m
 
@@ -239,10 +160,6 @@ def _generar_layout_dos_aguas(
         labels_abajo + labels_arriba,
     )
 
-    # =====================================================
-    # CUMBRERA
-    # =====================================================
-
     ax.add_patch(
         Rectangle(
             (0, alto_abajo),
@@ -253,44 +170,50 @@ def _generar_layout_dos_aguas(
         )
     )
 
-    return ancho_total, alto_total
+    ax.text(
+        ancho_total / 2,
+        alto_abajo + gap_cumbrera_m / 2,
+        "Cumbrera",
+        ha="center",
+        va="center",
+        fontsize=7,
+        color="#555555",
+    )
+
+    return ancho_total, alto_total, cols, rows_abajo + rows_arriba
 
 
-# =========================================================
-# FUNCIÓN PRINCIPAL
-# =========================================================
-def _agregar_cotas(ax, ancho_total, alto_total, gap):
-    margen = 0.45
+def _agregar_cotas(ax, ancho_total, alto_total):
+    margen_x = 0.80
+    margen_y = 0.85
 
-    # Cota horizontal inferior
-    y_cota = -margen
+    y_cota = -margen_y
     ax.annotate(
         "",
         xy=(0, y_cota),
         xytext=(ancho_total, y_cota),
-        arrowprops=dict(arrowstyle="<->", linewidth=1.0),
+        arrowprops=dict(arrowstyle="<->", linewidth=1.0, color=COLOR_LINEA),
     )
 
     ax.text(
         ancho_total / 2,
-        y_cota - 0.18,
+        y_cota - 0.22,
         f"Ancho estimado: {ancho_total:.2f} m",
         ha="center",
         va="top",
         fontsize=8,
     )
 
-    # Cota vertical izquierda
-    x_cota = -margen
+    x_cota = -margen_x
     ax.annotate(
         "",
         xy=(x_cota, 0),
         xytext=(x_cota, alto_total),
-        arrowprops=dict(arrowstyle="<->", linewidth=1.0),
+        arrowprops=dict(arrowstyle="<->", linewidth=1.0, color=COLOR_LINEA),
     )
 
     ax.text(
-        x_cota - 0.15,
+        x_cota - 0.18,
         alto_total / 2,
         f"Largo estimado: {alto_total:.2f} m",
         ha="right",
@@ -299,37 +222,107 @@ def _agregar_cotas(ax, ancho_total, alto_total, gap):
         fontsize=8,
     )
 
-    # Nota separación
-    ax.text(
-        ancho_total,
-        alto_total + 0.20,
-        f"Separación entre paneles: {gap:.2f} m",
-        ha="right",
-        va="bottom",
-        fontsize=7,
+
+def _agregar_norte(ax, ancho_total, y_base):
+    x = ancho_total + 0.75
+    y = y_base + 0.55
+
+    ax.annotate(
+        "",
+        xy=(x, y + 0.85),
+        xytext=(x, y),
+        arrowprops=dict(arrowstyle="->", linewidth=1.4, color=COLOR_LINEA),
     )
+
+    ax.text(
+        x,
+        y + 1.00,
+        "N",
+        ha="center",
+        va="bottom",
+        fontsize=11,
+        weight="bold",
+    )
+
+
+def _agregar_caja_tecnica(
+    ax,
+    ancho_total,
+    y_caja,
+    n_paneles,
+    cols,
+    rows,
+    ancho_total_m,
+    largo_total_m,
+    panel_w,
+    panel_h,
+    gap,
+    dos_aguas,
+    orientacion_panel,
+):
+    alto_caja = 1.95
+    ancho_caja = max(ancho_total, 9.0)
+
+    ax.add_patch(
+        Rectangle(
+            (0, y_caja),
+            ancho_caja,
+            alto_caja,
+            facecolor=COLOR_CAJA,
+            edgecolor="#BBBBBB",
+            linewidth=0.8,
+        )
+    )
+
+    tipo = "Cubierta a dos aguas" if dos_aguas else "Terraza / cubierta plana"
+
+    texto = (
+        "Dimensiones estimadas:\n"
+        f"Ancho: {ancho_total_m:.2f} m\n"
+        f"Largo: {largo_total_m:.2f} m\n\n"
+        f"Panel: {panel_h:.2f} m (alto) × {panel_w:.2f} m (ancho)\n"
+        f"Separación entre paneles: {gap:.2f} m\n\n"
+        f"Tipo: {tipo}\n"
+        f"Orientación: {orientacion_panel}\n"
+        f"Total de paneles: {n_paneles}\n"
+        f"Distribución: {cols} columnas × {rows} filas"
+    )
+
+    ax.text(
+        0.30,
+        y_caja + alto_caja - 0.25,
+        texto,
+        ha="left",
+        va="top",
+        fontsize=7.5,
+        linespacing=1.25,
+    )
+
 
 def generar_layout_paneles(
     n_paneles: int,
     out_path: str | Path,
-    max_cols: int = 7,
+    max_cols: int | None = None,
     panel_w: float = 1.1,
     panel_h: float = 2.2,
     gap: float = 0.08,
-    dos_aguas: bool = True,
+    dos_aguas: bool = False,
     gap_cumbrera_m: float = 0.35,
     modo_sistema: str | None = None,
     zonas: list | None = None,
+    orientacion_panel: str = "Vertical (Portrait)",
 ):
-
     """
     Genera una imagen PNG del layout de paneles FV.
 
-    Criterio:
-    - Si el sistema NO está en modo por zonas, fuerza layout rectangular.
-    - Si el sistema está en modo por zonas/multizona, permite layout dos aguas.
+    Nota:
+    - dos_aguas viene desde tipo_montaje.
+    - zonas es independiente del tipo de montaje.
     - No modifica cálculos eléctricos, strings ni optimización.
     """
+
+    if max_cols is None:
+        max_cols = math.ceil(math.sqrt(n_paneles))
 
     _validar_entrada(
         n_paneles=n_paneles,
@@ -343,19 +336,11 @@ def generar_layout_paneles(
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
-    es_por_zonas = _es_modo_por_zonas(
-        modo_sistema=modo_sistema,
-        zonas=zonas,
-    )
-
-    if not es_por_zonas:
-        dos_aguas = False
-
-    fig, ax = plt.subplots(figsize=(10, 4))
+    fig, ax = plt.subplots(figsize=(10, 7))
     ax.set_facecolor(COLOR_FONDO)
 
     if dos_aguas:
-        ancho_total, alto_total = _generar_layout_dos_aguas(
+        ancho_total, alto_total, cols, rows = _generar_layout_dos_aguas(
             ax=ax,
             n_paneles=n_paneles,
             max_cols=max_cols,
@@ -365,7 +350,7 @@ def generar_layout_paneles(
             gap_cumbrera_m=gap_cumbrera_m,
         )
     else:
-        ancho_total, alto_total = _generar_layout_rectangular(
+        ancho_total, alto_total, cols, rows = _generar_layout_rectangular(
             ax=ax,
             n_paneles=n_paneles,
             max_cols=max_cols,
@@ -374,10 +359,41 @@ def generar_layout_paneles(
             gap=gap,
         )
 
-    _agregar_cotas(ax, ancho_total, alto_total, gap)
+    _agregar_cotas(ax, ancho_total, alto_total)
 
-    ax.set_xlim(-0.8, ancho_total + 0.4)
-    ax.set_ylim(-0.9, alto_total + 0.6)
+    ax.text(
+        ancho_total,
+        alto_total + 0.28,
+        f"Separación entre paneles: {gap:.2f} m",
+        ha="right",
+        va="bottom",
+        fontsize=7,
+    )
+
+    y_caja = -3.35
+
+    _agregar_caja_tecnica(
+        ax=ax,
+        ancho_total=ancho_total,
+        y_caja=y_caja,
+        n_paneles=n_paneles,
+        cols=cols,
+        rows=rows,
+        ancho_total_m=ancho_total,
+        largo_total_m=alto_total,
+        panel_w=panel_w,
+        panel_h=panel_h,
+        gap=gap,
+        dos_aguas=dos_aguas,
+        orientacion_panel=orientacion_panel,
+    )
+
+    _agregar_norte(ax, ancho_total, y_caja)
+
+    ax.set_aspect("equal")
+
+    ax.set_xlim(-1.25, max(ancho_total + 1.45, 10.8))
+    ax.set_ylim(y_caja - 0.20, alto_total + 0.75)
 
     ax.axis("off")
 
