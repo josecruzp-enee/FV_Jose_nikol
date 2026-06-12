@@ -226,9 +226,9 @@ def generar_tabla_comparativa_inversores(
                 "motivo": motivo,
                 "score": (
                     penalizacion_rango,
-                    desviacion,
                     n,
                     kw_ac_total,
+                    desviacion,
                 ),
             })
 
@@ -321,9 +321,9 @@ def sugerir_configuraciones_inversor(
 
     soluciones.sort(
         key=lambda x: (
-            abs(x["dc_ac"] - dc_ac_obj),
             x["n_inversores"],
             x["pac_total"],
+            abs(x["dc_ac"] - dc_ac_obj),
             x["error"],
         )
     )
