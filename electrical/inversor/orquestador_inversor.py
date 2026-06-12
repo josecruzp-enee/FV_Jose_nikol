@@ -142,9 +142,9 @@ def evaluar_opcion_inversor(
 
     score = (
         penalizacion_rango,
-        desviacion,
         n_inversores,
         kw_ac_total,
+        desviacion,
     )
 
     return {
