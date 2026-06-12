@@ -259,6 +259,7 @@ def _agregar_caja_tecnica(
     gap,
     dos_aguas,
     orientacion_panel,
+    tipo_montaje,
 ):
     alto_caja = 1.95
     ancho_caja = max(ancho_total, 9.0)
@@ -274,7 +275,7 @@ def _agregar_caja_tecnica(
         )
     )
 
-    tipo = "Cubierta a dos aguas" if dos_aguas else "Terraza / cubierta plana"
+    tipo = tipo_montaje
 
     texto = (
         "Dimensiones estimadas:\n"
@@ -311,6 +312,7 @@ def generar_layout_paneles(
     modo_sistema: str | None = None,
     zonas: list | None = None,
     orientacion_panel: str = "Vertical (Portrait)",
+    tipo_montaje: str = "Terraza / cubierta plana",
 ):
     """
     Genera una imagen PNG del layout de paneles FV.
@@ -386,6 +388,7 @@ def generar_layout_paneles(
         gap=gap,
         dos_aguas=dos_aguas,
         orientacion_panel=orientacion_panel,
+        tipo_montaje=tipo_montaje,
     )
 
     _agregar_norte(ax, ancho_total, y_caja)
