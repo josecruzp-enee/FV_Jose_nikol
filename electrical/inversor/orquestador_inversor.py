@@ -175,36 +175,91 @@ def generar_tabla_comparativa_inversores(
 ) -> list[Dict[str, Any]]:
 
     catalogo = obtener_catalogo_inversores()
-
     tabla = []
 
-    for inv in catalogo:
-        fila = evaluar_opcion_inversor(
-            pdc_kw=pdc_kw,
-            dc_ac_obj=dc_ac_obj,
-            inversor_id=inv["id"],
-            pac_inversor_kw=inv["kw"],
-            tolerancia_dc_ac=tolerancia_dc_ac,
-        )
+    dc_ac_min = max(0.01, dc_ac_obj - tolerancia_dc_ac)
+    dc_ac_max = dc_ac_obj + tolerancia_dc_ac
 
-        tabla.append(fila)
+    for inv in catalogo:
+
+        pac = float(inv["kw"])
+        n_base = ceil((pdc_kw / dc_ac_obj) / pac)
+
+        candidatos_n = sorted(set([
+            max(1, n_base - 1),
+            n_base,
+            n_base + 1,
+        ]))
+
+        for n in candidatos_n:
+
+            kw_ac_total = n * pac
+            ratio_real = pdc_kw / kw_ac_total if kw_ac_total > 0 else 0
+            desviacion = abs(ratio_real - dc_ac_obj)
+
+            dentro_rango = dc_ac_min <= ratio_real <= dc_ac_max
+
+            if dentro_rango:
+                estado = "ACEPTABLE"
+                motivo = "DC/AC dentro del rango permitido."
+                penalizacion_rango = 0
+            elif ratio_real > dc_ac_max:
+                estado = "NO RECOMENDADO"
+                motivo = "DC/AC alto; posible clipping."
+                penalizacion_rango = 1
+            else:
+                estado = "NO RECOMENDADO"
+                motivo = "DC/AC bajo; inversor sobredimensionado respecto al arreglo."
+                penalizacion_rango = 1
+
+            tabla.append({
+                "inversor_id": inv["id"],
+                "configuracion": f"{n}×{pac:.1f} kW",
+                "n_inversores": n,
+                "kw_ac": pac,
+                "kw_ac_total": kw_ac_total,
+                "dc_ac_real": ratio_real,
+                "ratio_real": ratio_real,
+                "kw_ac_obj": pdc_kw / dc_ac_obj,
+                "desviacion_dc_ac": desviacion,
+                "estado": estado,
+                "motivo": motivo,
+                "score": (
+                    penalizacion_rango,
+                    desviacion,
+                    n,
+                    kw_ac_total,
+                ),
+            })
 
     tabla.sort(key=lambda x: x["score"])
 
-    for i, fila in enumerate(tabla, 1):
+    # eliminar duplicados
+    unicos = []
+    vistos = set()
+
+    for fila in tabla:
+        key = (fila["inversor_id"], fila["n_inversores"], fila["kw_ac_total"])
+
+        if key in vistos:
+            continue
+
+        vistos.add(key)
+        unicos.append(fila)
+
+    for i, fila in enumerate(unicos, 1):
         fila["opcion"] = i
 
         if i == 1 and fila["estado"] == "ACEPTABLE":
             fila["estado"] = "ÓPTIMO"
             fila["motivo"] = (
-                "Mejor opción: DC/AC cercano al objetivo, "
-                "menor cantidad de inversores y potencia AC adecuada."
+                "Mejor opción evaluada: DC/AC dentro del rango permitido "
+                "y configuración técnicamente razonable."
             )
 
         fila.pop("score", None)
 
-    return tabla
-
+    return unicos[:10]
 
 def obtener_opcion_optima(
     *,
