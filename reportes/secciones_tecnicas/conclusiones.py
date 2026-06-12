@@ -513,7 +513,7 @@ def generar_conclusiones_ejecutivas(resultado: Any, datos: Any = None) -> dict:
             f"El sistema fotovoltaico propuesto tiene una potencia instalada de {_fmt_kwp(m['kwp'])} "
             f"y una producción anual estimada de {_fmt_kwh(m['produccion_anual'])}. "
             f"Esta generación cubre aproximadamente {_fmt_pct(m['cobertura_real'])} "
-            f"del consumo anual del cliente, equivalente a {_fmt_kwh(m['consumo_anual'])}."
+            f"del consumo anual del cliente, cuyo consumo total es de {_fmt_kwh(m['consumo_anual'])}."
         ),
     })
 
