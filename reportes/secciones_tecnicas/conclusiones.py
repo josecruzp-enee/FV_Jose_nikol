@@ -106,17 +106,19 @@ def extraer_metricas_conclusion(resultado: Any, datos: Any = None) -> dict:
     # ENERGÍA
     # ======================================================
 
-    consumo_anual = _get(
-        resultado,
-        "consumo_anual",
-        "consumo_anual_kwh",
-        "datos.consumo_anual",
-        "datos.consumo_anual_kwh",
-        "proyecto.consumo_anual",
-        "energia.consumo_anual",
-        "energia.consumo_anual_kwh",
-        default=0,
-    )
+    consumo_anual = 0.0
+
+    if datos is not None:
+        consumo_12m = leer(datos, "consumo_12m", []) or []
+        consumo_anual = sum(_num(x) for x in consumo_12m)
+
+    if not consumo_anual:
+        consumo_anual = _get(
+            resultado,
+            "consumo_anual",
+            "consumo_anual_kwh",
+            default=0,
+        )
 
     produccion_anual = _get(
         resultado,
@@ -150,6 +152,9 @@ def extraer_metricas_conclusion(resultado: Any, datos: Any = None) -> dict:
     if not cobertura_real:
         cobertura_real = sin.get("cobertura_directa_pct", 0.0)
 
+    if _num(consumo_anual) > 0 and _num(produccion_anual) > 0:
+        cobertura_real = (_num(produccion_anual) / _num(consumo_anual)) * 100.0
+    
     # No inferir consumo desde cobertura de optimización.
     # Si no existe consumo en resultado, queda 0 para evitar dato falso.
 
