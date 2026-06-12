@@ -259,6 +259,55 @@ def _generar_layout_dos_aguas(
 # =========================================================
 # FUNCIÓN PRINCIPAL
 # =========================================================
+def _agregar_cotas(ax, ancho_total, alto_total, gap):
+    margen = 0.45
+
+    # Cota horizontal inferior
+    y_cota = -margen
+    ax.annotate(
+        "",
+        xy=(0, y_cota),
+        xytext=(ancho_total, y_cota),
+        arrowprops=dict(arrowstyle="<->", linewidth=1.0),
+    )
+
+    ax.text(
+        ancho_total / 2,
+        y_cota - 0.18,
+        f"Ancho estimado: {ancho_total:.2f} m",
+        ha="center",
+        va="top",
+        fontsize=8,
+    )
+
+    # Cota vertical izquierda
+    x_cota = -margen
+    ax.annotate(
+        "",
+        xy=(x_cota, 0),
+        xytext=(x_cota, alto_total),
+        arrowprops=dict(arrowstyle="<->", linewidth=1.0),
+    )
+
+    ax.text(
+        x_cota - 0.15,
+        alto_total / 2,
+        f"Largo estimado: {alto_total:.2f} m",
+        ha="right",
+        va="center",
+        rotation=90,
+        fontsize=8,
+    )
+
+    # Nota separación
+    ax.text(
+        ancho_total,
+        alto_total + 0.20,
+        f"Separación entre paneles: {gap:.2f} m",
+        ha="right",
+        va="bottom",
+        fontsize=7,
+    )
 
 def generar_layout_paneles(
     n_paneles: int,
@@ -325,8 +374,10 @@ def generar_layout_paneles(
             gap=gap,
         )
 
-    ax.set_xlim(-0.2, ancho_total + 0.2)
-    ax.set_ylim(-0.2, alto_total + 0.2)
+    _agregar_cotas(ax, ancho_total, alto_total, gap)
+
+    ax.set_xlim(-0.8, ancho_total + 0.4)
+    ax.set_ylim(-0.9, alto_total + 0.6)
 
     ax.axis("off")
 
