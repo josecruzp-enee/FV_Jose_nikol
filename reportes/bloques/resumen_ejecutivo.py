@@ -163,27 +163,46 @@ def p1_conclusion(financiero, sizing, datos, pal, content_w):
     ds_val = evaluacion.get("dscr", None)
     ds_txt = "—" if ds_val is None else f"{ds_val:.2f}"
 
-    estado = str(evaluacion.get("estado", "")).upper()
-
-    impacto = float(leer(financiero, "ahorro_mensual", 0.0))
     peor = float(evaluacion.get("peor_mes", 0.0))
 
     kwp = float(leer(sizing, "kwp_dc", 0.0))
 
-    # 🔥 CALCULAR COBERTURA REAL TAMBIÉN AQUÍ
-    consumo_12m = get_field(datos, "consumo_12m", [])
-    consumo_anual = sum(consumo_12m) if isinstance(consumo_12m, list) else 0
+    # =====================================================
+    # IMPACTO FINANCIERO REAL
+    # Se calcula desde tabla_12m para evitar depender
+    # de una llave que puede no existir en financiero.
+    # =====================================================
 
     tabla = leer(financiero, "tabla_12m", [])
-    energia_real = sum([x.get("fv_kwh", 0) for x in tabla]) if tabla else 0
 
-    cobertura_real = energia_real / consumo_anual if consumo_anual > 0 else 0
+    if tabla:
+        pago_actual = sum(float(x.get("factura_base_L", 0.0)) for x in tabla) / 12.0
+        pago_residual = sum(float(x.get("pago_enee_L", 0.0)) for x in tabla) / 12.0
+    else:
+        pago_actual = 0.0
+        pago_residual = 0.0
+
+    cuota = float(leer(financiero, "cuota_mensual", 0.0))
+
+    pago_total = pago_residual + cuota
+    impacto = pago_actual - pago_total
+
+    # =====================================================
+    # COBERTURA REAL
+    # =====================================================
+
+    consumo_12m = get_field(datos, "consumo_12m", [])
+    consumo_anual = sum(consumo_12m) if isinstance(consumo_12m, list) else 0.0
+
+    energia_real = sum(float(x.get("fv_kwh", 0.0)) for x in tabla) if tabla else 0.0
+
+    cobertura_real = energia_real / consumo_anual if consumo_anual > 0 else 0.0
 
     cobertura_obj = float(get_field(datos, "cobertura_objetivo", 0.0))
 
     concl = f"""
     <b>Conclusión ejecutiva</b><br/><br/>
-    • Impacto financiero: {money_L(impacto)}/mes<br/>
+    • Impacto financiero: <b>{money_L(impacto)}/mes</b><br/>
     • DSCR: <b>{ds_txt}</b><br/>
     • Peor mes: <b>{money_L(peor)}</b><br/>
     • Sistema: {kwp:.2f} kWp<br/>
