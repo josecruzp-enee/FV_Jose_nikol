@@ -64,7 +64,7 @@ def _fmt_pct(valor: Any) -> str:
 # ======================================================
 # EXTRACCIÓN DE MÉTRICAS PRINCIPALES
 # ======================================================
-def extraer_metricas_conclusion(resultado: Any) -> dict:
+def extraer_metricas_conclusion(resultado: Any, datos: Any = None) -> dict:
     """
     Extrae métricas principales del resultado consolidado.
 
@@ -477,12 +477,12 @@ def clasificar_viabilidad(m: dict) -> tuple[str, str]:
 # TEXTO AUTOMÁTICO DE CONCLUSIONES
 # ======================================================
 
-def generar_conclusiones_ejecutivas(resultado: Any) -> dict:
+def generar_conclusiones_ejecutivas(resultado: Any, datos: Any = None) -> dict:
     """
     Genera contenido estructurado para la página de conclusiones.
     """
 
-    m = extraer_metricas_conclusion(resultado)
+    m = extraer_metricas_conclusion(resultado, datos)
     estado, criterio_estado = clasificar_viabilidad(m)
 
     conclusiones = []
@@ -575,7 +575,7 @@ def agregar_pagina_conclusiones_ejecutivas(story, styles, resultado, datos=None)
     from reportlab.lib import colors
     from reportlab.lib.units import cm
 
-    data = generar_conclusiones_ejecutivas(resultado)
+    data = generar_conclusiones_ejecutivas(resultado, datos)
     m = data["metricas"]
     estado = data["estado"]
 
