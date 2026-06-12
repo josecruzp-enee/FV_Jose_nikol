@@ -297,7 +297,46 @@ def construir_sugerencias_inversor(
         for s in sugerencias
     ]
 
+def comparar_opciones_economica_conservadora(
+    *,
+    pdc_kw: float,
+) -> Dict[str, Any]:
 
+    economicas = sugerir_configuraciones_inversor(
+        pdc_kw=pdc_kw,
+        dc_ac_obj=1.30,
+        max_inv=10,
+        tolerancia_dc_ac=0.02,
+    )
+
+    conservadoras = sugerir_configuraciones_inversor(
+        pdc_kw=pdc_kw,
+        dc_ac_obj=1.15,
+        max_inv=10,
+        tolerancia_dc_ac=0.08,
+    )
+
+    economica = economicas[0] if economicas else None
+    conservadora = conservadoras[0] if conservadoras else None
+
+    return {
+        "economica": {
+            "descripcion": formatear_configuracion(economica["config"]),
+            "kw_ac_total": economica["pac_total"],
+            "dc_ac": economica["dc_ac"],
+            "n_inversores": economica["n_inversores"],
+            "criterio": "Menor CAPEX; acepta mayor clipping.",
+        } if economica else None,
+
+        "conservadora": {
+            "descripcion": formatear_configuracion(conservadora["config"]),
+            "kw_ac_total": conservadora["pac_total"],
+            "dc_ac": conservadora["dc_ac"],
+            "n_inversores": conservadora["n_inversores"],
+            "criterio": "Mayor CAPEX; menor clipping.",
+        } if conservadora else None,
+    }
+    
 # ======================================================
 # SELECCIÓN AUTOMÁTICA
 # ======================================================
@@ -307,6 +346,28 @@ def resolver_inversor_automatico_actual(
     pdc_kw: float,
     dc_ac_obj: float,
 ) -> Optional[Dict[str, Any]]:
+
+    comparacion = comparar_opciones_economica_conservadora(
+        pdc_kw=pdc_kw,
+    )
+
+    economica = comparacion.get("economica")
+
+    if economica is not None:
+        return {
+            "inversor_id": None,
+            "configuracion": economica["descripcion"],
+            "n_inversores": economica["n_inversores"],
+            "kw_ac": 0.0,
+            "kw_ac_total": economica["kw_ac_total"],
+            "ratio_real": economica["dc_ac"],
+            "kw_ac_obj": pdc_kw / dc_ac_obj,
+            "seleccion_forzada": False,
+            "advertencia": None,
+            "alternativa_recomendada": comparacion.get("conservadora"),
+            "comparacion_inversores": comparacion,
+            "configuracion_mixta": True,
+        }
 
     optimo = obtener_opcion_optima(
         pdc_kw=pdc_kw,
@@ -318,6 +379,7 @@ def resolver_inversor_automatico_actual(
 
     return {
         "inversor_id": optimo["inversor_id"],
+        "configuracion": optimo["configuracion"],
         "n_inversores": optimo["n_inversores"],
         "kw_ac": optimo["kw_ac"],
         "kw_ac_total": optimo["kw_ac_total"],
@@ -326,8 +388,9 @@ def resolver_inversor_automatico_actual(
         "seleccion_forzada": False,
         "advertencia": None,
         "alternativa_recomendada": None,
+        "comparacion_inversores": comparacion,
+        "configuracion_mixta": False,
     }
-
 
 # ======================================================
 # ADVERTENCIA PARA INVERSOR FORZADO
