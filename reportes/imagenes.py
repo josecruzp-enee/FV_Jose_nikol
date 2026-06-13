@@ -93,6 +93,13 @@ def inferir_n_paneles(res: Any) -> int:
 def inferir_strings(res: Any):
     """
     Busca strings en las rutas conocidas sin romper compatibilidad.
+
+    Rutas soportadas:
+    - res["strings"]
+    - res.strings
+    - res["paneles"]["strings"]
+    - res.paneles.strings
+    - res["paneles"].strings
     """
 
     strings = _leer(res, "strings", None)
@@ -107,8 +114,16 @@ def inferir_strings(res: Any):
         if strings:
             return strings
 
-    return []
+    # fallback adicional: algunos resultados guardan paneles como dict anidado
+    if isinstance(res, dict):
+        paneles_dict = res.get("paneles", None)
 
+        if isinstance(paneles_dict, dict):
+            strings = paneles_dict.get("strings", None)
+            if strings:
+                return strings
+
+    return []
 
 def inferir_layout_strings(strings) -> tuple[bool, int | None, int | None]:
     """
