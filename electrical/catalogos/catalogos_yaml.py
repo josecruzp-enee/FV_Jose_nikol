@@ -171,6 +171,11 @@ def _paneles() -> Dict[str, PanelSpec]:
             coef_vmp_pct_c=coef_vmp,
             coef_potencia_pct_c=coef_pmax,
             noct_c=noct_c,
+            largo_mm=float(mecanico.get("largo_mm", 2200.0)),
+            ancho_mm=float(mecanico.get("ancho_mm", 1100.0)),
+            espesor_mm=float(mecanico.get("espesor_mm", 35.0)),
+            peso_kg=float(mecanico.get("peso_kg", 0.0)),
+            area_m2=float(mecanico.get("area_m2", 0.0)),
         )
 
     return out
