@@ -567,7 +567,7 @@ def generar_layout_paneles(
     if layout_por_strings:
         ax.text(
             ancho_total / 2,
-            -1.18,
+            -1.55,
             (
                 f"Separación entre paneles: {gap:.2f} m   |   "
                 f"Separación entre filas por sombra: {separacion_sombra_m:.2f} m"
