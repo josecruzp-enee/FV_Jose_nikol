@@ -66,72 +66,68 @@ def p1_tabla_cliente(datos, sizing, fecha, pal, content_w):
 
 def p1_tabla_solucion_unica(datos, sizing, energia, financiero, pal, content_w, paneles=None):
 
-    kwp = float(leer(sizing, "kwp_dc", leer(sizing, "pdc_kw", 0.0)))
     capex = float(leer(financiero, "capex_L", 0.0))
-    # Homologar módulos reales conectados desde strings
-    strings = leer(paneles, "strings", []) if paneles else []
 
-    panel_wp_real = 0.0
+    # =====================================================
+    # SISTEMA FV REAL CONECTADO
+    # Prioridad: strings reales > sizing preliminar
+    # =====================================================
+    strings = leer(paneles, "strings", []) if paneles else []
     panel_obj = leer(paneles, "panel", None) if paneles else None
 
-    if panel_obj:
-        panel_wp_real = float(leer(panel_obj, "pmax_w", 0.0))
+    panel_wp = float(leer(panel_obj, "pmax_w", 0.0)) if panel_obj else 0.0
 
-    paneles_conectados = 0
+    n_paneles = sum(
+        int(leer(s, "n_series", 0) or 0)
+        for s in strings
+    )
 
-    for s in strings:
-        paneles_conectados += int(leer(s, "n_series", 0) or 0)
-
-    if paneles_conectados > 0 and panel_wp_real > 0:
-        n_paneles = paneles_conectados
-        panel_wp = int(panel_wp_real)
-        kwp = paneles_conectados * panel_wp_real / 1000.0
+    if n_paneles > 0 and panel_wp > 0:
+        kwp = n_paneles * panel_wp / 1000.0
     else:
+        kwp = float(leer(sizing, "kwp_dc", leer(sizing, "pdc_kw", 0.0)))
         n_paneles = int(leer(sizing, "n_paneles", 0))
         panel_wp = int((kwp * 1000) / n_paneles) if n_paneles > 0 else 0
 
-    # 🔥 ENERGÍA CORRECTA
+    # =====================================================
+    # ENERGÍA
+    # =====================================================
     energia_12m = leer(energia, "energia_util_12m", [])
     prod_anual = sum(energia_12m) if isinstance(energia_12m, list) else 0.0
 
-    # 🔥 CONSUMO Y COBERTURA REAL
     consumo_12m = get_field(datos, "consumo_12m", [])
-    consumo_anual = sum(consumo_12m) if isinstance(consumo_12m, list) else 0
+    consumo_anual = sum(consumo_12m) if isinstance(consumo_12m, list) else 0.0
 
-    cobertura_real = prod_anual / consumo_anual if consumo_anual > 0 else 0
-
-
-    tasa = float(get_field(datos, "tasa_anual", 0.0))
-    plazo = int(get_field(datos, "plazo_anios", 0))
-    pct = float(get_field(datos, "porcentaje_financiado", 0.0))
+    cobertura_real = prod_anual / consumo_anual if consumo_anual > 0 else 0.0
 
     evaluacion = leer(financiero, "evaluacion", {}) or {}
-
     estado_txt = str(evaluacion.get("estado", "")).upper().strip()
 
-    # 🔥 DSCR
     ds_val = evaluacion.get("dscr", None)
     ds_txt = "—" if ds_val is None else f"{ds_val:.2f}"
 
     data = [
         ["Dato", "Valor", "Dato", "Valor"],
 
-        # 🔥 MOSTRAR OBJETIVO Y REAL
         ["Cobertura objetivo", f"{get_field(datos, 'cobertura_objetivo', 0)*100:.0f}%",
          "Cobertura real", f"{cobertura_real*100:.1f}%"],
 
-        ["Sistema", f"{num(kwp,2)} kWp", "CAPEX", money_L(capex)],
+        ["Sistema", f"{num(kwp, 2)} kWp", "CAPEX", money_L(capex)],
 
         ["Producción anual", f"{prod_anual:,.0f} kWh/año", "DSCR", ds_txt],
 
-        ["Módulos FV", f"{n_paneles} × {panel_wp} Wp", "Estado", estado_txt],
+        ["Módulos FV", f"{int(n_paneles)} × {int(panel_wp)} Wp", "Estado", estado_txt],
     ]
 
     t = make_table(data, content_w, ratios=[1.25, 2.15, 1.25, 2.15], repeatRows=1)
     t.setStyle(table_style_uniform(pal, font_header=9, font_body=9))
 
-    return [section_bar("Solución propuesta e indicadores clave", pal, content_w),
-            Spacer(1, 6), t, Spacer(1, 12)]
+    return [
+        section_bar("Solución propuesta e indicadores clave", pal, content_w),
+        Spacer(1, 6),
+        t,
+        Spacer(1, 12),
+    ]
 # =========================================================
 # DECISIÓN
 # =========================================================
