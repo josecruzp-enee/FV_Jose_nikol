@@ -42,21 +42,25 @@ def generar_string_fv(strings, out_path, *_, **__):
         ),
     )
 
-    # Agrupar por inversor
     grupos_inv = {}
+
     for idx, s in enumerate(strings_ordenados, start=1):
         inv = int(getattr(s, "inversor", 1) or 1)
         mppt = int(getattr(s, "mppt", 1) or 1)
         n_series = int(getattr(s, "n_series", 0) or 0)
 
-        grupos_inv.setdefault(inv, []).append({
-            "idx": idx,
-            "mppt": mppt,
-            "n_series": n_series,
-        })
+        grupos_inv.setdefault(inv, []).append(
+            {
+                "idx": idx,
+                "mppt": mppt,
+                "n_series": n_series,
+            }
+        )
 
-    # Configuración visual
-    X_LABEL = -0.75
+    # =====================================================
+    # CONFIG VISUAL
+    # =====================================================
+    X_LABEL = -0.85
     X_PANEL = 0.0
     X_INV = 11.4
 
@@ -64,39 +68,48 @@ def generar_string_fv(strings, out_path, *_, **__):
     panel_h = 0.66
     gap = 0.09
 
-    inv_w = 2.55
-    mppt_w = 1.10
-    mppt_h = 0.42
+    inv_w = 2.75
+    mppt_w = 1.45
+    mppt_h = 0.50
 
-    y_step = 0.95
-    y_gap_inv = 0.70
+    y_step = 0.98
+    y_gap_inv = 0.78
 
     total_strings = len(strings_ordenados)
-    fig_h = max(5.8, total_strings * 0.62)
+    fig_h = max(6.0, total_strings * 0.66)
 
-    fig, ax = plt.subplots(figsize=(14, fig_h))
+    fig, ax = plt.subplots(figsize=(14.5, fig_h))
 
     y_actual = 0.0
     conexiones = []
 
-    # Resumen superior
     n_inversores = len(grupos_inv)
-    n_mppt = len(set((inv, item["mppt"]) for inv, items in grupos_inv.items() for item in items))
+    n_mppt = len(
+        set(
+            (inv, item["mppt"])
+            for inv, items in grupos_inv.items()
+            for item in items
+        )
+    )
 
+    # =====================================================
+    # RESUMEN SUPERIOR
+    # =====================================================
     ax.text(
         X_PANEL,
-        1.10,
-        f"{total_strings} strings FV  |  {n_inversores} inversores  |  {n_mppt} MPPT utilizados",
+        1.18,
+        f"{total_strings} strings FV   |   {n_inversores} inversores   |   {n_mppt} MPPT utilizados",
         ha="left",
         va="bottom",
-        fontsize=8.5,
+        fontsize=10,
         weight="bold",
     )
 
-    # Dibujar por inversor
+    # =====================================================
+    # DIBUJAR STRINGS Y AGRUPAR CONEXIONES
+    # =====================================================
     for inv, items in sorted(grupos_inv.items()):
 
-        y_inicio_inv = y_actual
         y_centros = []
 
         for item in items:
@@ -121,11 +134,22 @@ def generar_string_fv(strings, out_path, *_, **__):
                 f"STR-{idx:02d}",
                 ha="right",
                 va="center",
-                fontsize=7,
+                fontsize=8.5,
                 weight="bold",
             )
 
-            # Paneles
+            # Texto de serie
+            ax.text(
+                X_PANEL,
+                y - 0.10,
+                f"{n}S",
+                ha="left",
+                va="top",
+                fontsize=7.5,
+                color="#444444",
+            )
+
+            # Paneles en serie
             for i in range(n):
                 x = X_PANEL + i * (panel_w + gap)
 
@@ -136,7 +160,7 @@ def generar_string_fv(strings, out_path, *_, **__):
                         panel_h,
                         edgecolor=COLOR_BORDE_PANEL,
                         facecolor=COLOR_PANEL,
-                        linewidth=0.75,
+                        linewidth=0.80,
                     )
                 )
 
@@ -145,30 +169,32 @@ def generar_string_fv(strings, out_path, *_, **__):
                         [x + panel_w, x + panel_w + gap],
                         [y_mid, y_mid],
                         color="black",
-                        lw=0.7,
+                        lw=0.75,
                     )
 
             x_end = X_PANEL + n * (panel_w + gap)
 
-            conexiones.append({
-                "inv": inv,
-                "mppt": mppt,
-                "x_end": x_end,
-                "y_pos": y_pos,
-                "y_neg": y_neg,
-                "y_mid": y_mid,
-            })
+            conexiones.append(
+                {
+                    "inv": inv,
+                    "mppt": mppt,
+                    "x_end": x_end,
+                    "y_pos": y_pos,
+                    "y_neg": y_neg,
+                    "y_mid": y_mid,
+                }
+            )
 
             y_actual -= y_step
 
         if not y_centros:
             continue
 
-        y_top = max(y_centros) + 0.55
-        y_bottom = min(y_centros) - 0.55
+        y_top = max(y_centros) + 0.62
+        y_bottom = min(y_centros) - 0.62
         inv_h = y_top - y_bottom
 
-        # Caja inversor principal
+        # Caja inversor
         ax.add_patch(
             Rectangle(
                 (X_INV, y_bottom),
@@ -176,19 +202,20 @@ def generar_string_fv(strings, out_path, *_, **__):
                 inv_h,
                 edgecolor=COLOR_BORDE,
                 facecolor=COLOR_INV,
-                linewidth=1.0,
+                linewidth=1.05,
             )
         )
 
+        # Título inversor horizontal
         ax.text(
-            X_INV + inv_w - 0.35,
+            X_INV + inv_w - 0.45,
             (y_top + y_bottom) / 2,
             f"INV {inv}",
             ha="center",
             va="center",
-            fontsize=8,
+            fontsize=9,
             weight="bold",
-            rotation=90 if inv_h > 1.2 else 0,
+            rotation=0,
         )
 
         # MPPT dentro del inversor
@@ -205,7 +232,7 @@ def generar_string_fv(strings, out_path, *_, **__):
                     mppt_h,
                     edgecolor="#555555",
                     facecolor=COLOR_MPPT,
-                    linewidth=0.75,
+                    linewidth=0.85,
                 )
             )
 
@@ -215,33 +242,36 @@ def generar_string_fv(strings, out_path, *_, **__):
                 f"MPPT {c['mppt']}",
                 ha="center",
                 va="center",
-                fontsize=6.6,
+                fontsize=8,
+                weight="bold",
             )
 
-            # Conductores hasta el MPPT
+            # Conductores al MPPT
             ax.plot(
                 [c["x_end"], mppt_x],
                 [c["y_pos"], c["y_pos"]],
                 color="red",
-                lw=1.7,
+                lw=1.85,
             )
+
             ax.plot(
                 [c["x_end"], mppt_x],
                 [c["y_neg"], c["y_neg"]],
                 color="black",
-                lw=1.7,
+                lw=1.85,
             )
 
-            # Bornes en MPPT
-            ax.plot(mppt_x, c["y_pos"], "o", color="red", markersize=3.5)
-            ax.plot(mppt_x, c["y_neg"], "o", color="black", markersize=3.5)
+            # Bornes
+            ax.plot(mppt_x, c["y_pos"], "o", color="red", markersize=4)
+            ax.plot(mppt_x, c["y_neg"], "o", color="black", markersize=4)
 
-        # Separación entre inversores
         y_actual -= y_gap_inv
 
-    # Leyenda
+    # =====================================================
+    # LEYENDA
+    # =====================================================
     if conexiones:
-        y_min = min(c["y_neg"] for c in conexiones) - 0.75
+        y_min = min(c["y_neg"] for c in conexiones) - 0.85
     else:
         y_min = -1.0
 
@@ -251,11 +281,14 @@ def generar_string_fv(strings, out_path, *_, **__):
         "Rojo: conductor positivo (+)     Negro: conductor negativo (-)",
         ha="left",
         va="top",
-        fontsize=7.5,
+        fontsize=8.5,
     )
 
-    ax.set_xlim(-1.2, X_INV + inv_w + 0.35)
-    ax.set_ylim(y_min - 0.35, 1.45)
+    # =====================================================
+    # FINAL
+    # =====================================================
+    ax.set_xlim(-1.35, X_INV + inv_w + 0.35)
+    ax.set_ylim(y_min - 0.40, 1.55)
     ax.axis("off")
 
     plt.tight_layout()
