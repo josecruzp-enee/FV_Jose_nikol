@@ -109,18 +109,45 @@ def _seleccionar_fijo(n_min, n_max):
 # =========================================================
 
 def _distribuir(n_strings, n_inv, n_mppt):
+    """
+    Distribuye strings en modo round-robin por inversor.
+
+    Criterio:
+    - Primero asigna un string a cada inversor en MPPT 1.
+    - Si sobran strings, vuelve al inversor 1 y asigna MPPT 2.
+    - Así evita dejar inversores sin strings cuando hay suficientes strings.
+
+    Ejemplo:
+    10 strings, 7 inversores, 2 MPPT:
+    S1  -> INV1 MPPT1
+    S2  -> INV2 MPPT1
+    S3  -> INV3 MPPT1
+    S4  -> INV4 MPPT1
+    S5  -> INV5 MPPT1
+    S6  -> INV6 MPPT1
+    S7  -> INV7 MPPT1
+    S8  -> INV1 MPPT2
+    S9  -> INV2 MPPT2
+    S10 -> INV3 MPPT2
+    """
 
     posiciones = []
-    carga = [(i, m, 0) for i in range(1, n_inv+1) for m in range(1, n_mppt+1)]
 
-    for _ in range(n_strings):
-        carga.sort(key=lambda x: x[2])
-        i, m, c = carga[0]
-        posiciones.append((i, m))
-        carga[0] = (i, m, c + 1)
+    capacidad_total = n_inv * n_mppt
+
+    if n_strings > capacidad_total:
+        raise ValueError(
+            f"No hay MPPT suficientes para distribuir strings: "
+            f"{n_strings} strings > {n_inv} inversores × {n_mppt} MPPT "
+            f"= {capacidad_total} entradas MPPT."
+        )
+
+    for idx in range(n_strings):
+        inversor = (idx % n_inv) + 1
+        mppt = (idx // n_inv) + 1
+        posiciones.append((inversor, mppt))
 
     return posiciones
-
 
 # =========================================================
 # FUNCIÓN PRINCIPAL
