@@ -275,9 +275,9 @@ def ejecutar_estudio(
             largo_mm = getattr(panel, "largo_mm", None)
             ancho_mm = getattr(panel, "ancho_mm", None)
 
-        if largo_mm and ancho_mm:
-            largo_panel_m = float(largo_mm) / 1000.0
-            ancho_panel_m = float(ancho_mm) / 1000.0
+            if largo_mm and ancho_mm:
+                largo_panel_m = float(largo_mm) / 1000.0
+                ancho_panel_m = float(ancho_mm) / 1000.0
 
         layout_preliminar = construir_layout_preliminar_fv(
             n_paneles=int(getattr(sizing, "n_paneles", 0) or 0),
