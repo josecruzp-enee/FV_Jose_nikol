@@ -58,6 +58,13 @@ class PanelSpec:
     coef_potencia_pct_c: float
     noct_c: float
 
+    # dimensiones mecánicas
+    largo_mm: float = 2200.0
+    ancho_mm: float = 1100.0
+    espesor_mm: float = 35.0
+    peso_kg: float = 0.0
+    area_m2: float = 0.0
+
 # ==========================================================
 # PARÁMETROS DE CABLEADO
 # ==========================================================
