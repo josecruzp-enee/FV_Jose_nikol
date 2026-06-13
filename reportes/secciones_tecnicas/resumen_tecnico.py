@@ -171,21 +171,17 @@ def data_resumen_sistema(
 ):
 
     return [
-
         ["Parámetro", "Valor"],
 
         ["Potencia DC instalada", f"{kwp_dc:.2f} kWp"],
         ["Potencia AC instalada", f"{kw_ac_total:.2f} kW"],
         ["Relación DC/AC", f"{relacion_dc_ac:.2f}"],
 
-        ["Módulos dimensionados", f"{n_paneles} × {panel_wp:.0f} Wp"],
-        ["Módulos conectados", paneles_usados],
-       
+        ["Número de módulos", f"{paneles_usados} × {panel_wp:.0f} Wp"],
 
         ["Número de inversores",
          f"{n_inversores} × {potencia_inversor:.1f} kW"],
     ]
-
 
 def data_generador_fv(
     *,
@@ -413,21 +409,31 @@ def build_resumen_tecnico(resultado, pal, styles, content_w):
     # DERIVADOS
     # ======================================================
 
-    potencia_inversor, relacion_dc_ac, paneles_usados, paneles_sobrantes, panel_wp = (
-        obtener_derivados(
-            kwp_dc,
-            kw_ac_total,
-            kw_ac_unitario,
-            n_paneles,
-        )
+    panel = leer(paneles, "panel", None) if paneles else None
+
+    panel_pmax_w = (
+        float(leer(panel, "pmax_w", 0))
+        if panel
+        else 0
     )
 
-    # Homologación con la configuración eléctrica real
-    # Ejemplo: 14S × 10 strings = 140 módulos conectados
-    if n_strings > 0 and n_series > 0:
-        paneles_conectados = n_strings * n_series
-        paneles_usados = paneles_conectados
-        paneles_sobrantes = max(0, n_paneles - paneles_conectados)
+    (
+        potencia_inversor,
+        relacion_dc_ac,
+        paneles_usados,
+        paneles_sobrantes,
+        panel_wp,
+        kwp_dc,
+    ) = obtener_derivados(
+        kwp_dc,
+        kw_ac_total,
+        kw_ac_unitario,
+        n_paneles,
+        n_series=n_series,
+        n_strings=n_strings,
+        panel_pmax_w=panel_pmax_w,
+    )
+    
     # ======================================================
     # TABLA SISTEMA
     # ======================================================
