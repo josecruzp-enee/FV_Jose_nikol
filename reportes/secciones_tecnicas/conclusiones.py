@@ -68,19 +68,12 @@ def extraer_metricas_conclusion(resultado: Any, datos: Any = None) -> dict:
     """
     Extrae métricas principales del resultado consolidado.
 
-    Lee datos reales desde:
-    - resultado.finanzas / resultado.financiero
-    - finanzas["evaluacion"]
-    - resultado.energia
-    - resultado.paneles
-    - resultado.layout_preliminar
-    - resultado.optimizacion_economica
-
-    No modifica cálculos existentes.
+    Prioridad:
+    1. Sistema FV real conectado desde resultado.paneles.strings.
+    2. Fallback desde sizing / optimización económica.
     """
 
     energia = _get(resultado, "energia", default=None)
-    paneles = _get(resultado, "paneles", default=None)
     financiero = _get(
         resultado,
         "finanzas",
@@ -107,13 +100,10 @@ def extraer_metricas_conclusion(resultado: Any, datos: Any = None) -> dict:
     # ======================================================
 
     consumo_anual = 0.0
+    consumo_12m = []
 
     if datos is not None:
-        consumo_12m = _get(
-            datos,
-            "consumo_12m",
-            default=[]
-        ) or []
+        consumo_12m = _get(datos, "consumo_12m", default=[]) or []
 
     consumo_anual = sum(_num(x) for x in consumo_12m)
 
@@ -140,6 +130,9 @@ def extraer_metricas_conclusion(resultado: Any, datos: Any = None) -> dict:
         default=0,
     )
 
+    if not produccion_anual:
+        produccion_anual = sin.get("generacion_kwh_anual", 0.0)
+
     cobertura_real = _get(
         resultado,
         "cobertura_real",
@@ -151,40 +144,108 @@ def extraer_metricas_conclusion(resultado: Any, datos: Any = None) -> dict:
         default=0,
     )
 
-    if not produccion_anual:
-        produccion_anual = sin.get("generacion_kwh_anual", 0.0)
-
     if not cobertura_real:
         cobertura_real = sin.get("cobertura_directa_pct", 0.0)
 
     if _num(consumo_anual) > 0 and _num(produccion_anual) > 0:
         cobertura_real = (_num(produccion_anual) / _num(consumo_anual)) * 100.0
-    
-    # No inferir consumo desde cobertura de optimización.
-    # Si no existe consumo en resultado, queda 0 para evitar dato falso.
 
     # ======================================================
-    # SISTEMA FV
+    # SISTEMA FV REAL CONECTADO
     # ======================================================
 
-    kwp = _get(
+    strings = _get(resultado, "paneles.strings", default=[]) or []
+    panel = _get(resultado, "paneles.panel", default=None)
+
+    panel_wp_real = _num(
+        _get(
+            panel,
+            "pmax_w",
+            "potencia_wp",
+            default=0,
+        )
+    )
+
+    n_paneles_reales = sum(
+        int(_get(s, "n_series", default=0) or 0)
+        for s in strings
+    )
+
+    if n_paneles_reales > 0 and panel_wp_real > 0:
+        n_paneles = n_paneles_reales
+        potencia_panel_wp = panel_wp_real
+        kwp = n_paneles * potencia_panel_wp / 1000.0
+
+    else:
+        kwp = _get(
+            resultado,
+            "kwp",
+            "pdc_kw",
+            "potencia_dc_kwp",
+            "sizing.kwp",
+            "sizing.pdc_kw",
+            "sizing.potencia_kwp",
+            "sizing.potencia_dc_kwp",
+            "paneles.kwp",
+            "paneles.pdc_kw",
+            "paneles.potencia_dc_kwp",
+            "paneles.kwp_total",
+            default=0,
+        )
+
+        if not kwp:
+            kwp = sin.get("pdc_kw", sin.get("kwp", 0.0))
+
+        n_paneles = _get(
+            resultado,
+            "n_paneles",
+            "numero_paneles",
+            "paneles.n_paneles",
+            "paneles.numero_paneles",
+            "sizing.n_paneles",
+            "sizing.numero_paneles",
+            default=0,
+        )
+
+        if not n_paneles:
+            n_paneles = sin.get("n_paneles", 0)
+
+        potencia_panel_wp = _get(
+            resultado,
+            "potencia_panel_wp",
+            "paneles.potencia_panel_wp",
+            "paneles.potencia_wp",
+            "paneles.modulo_wp",
+            "sizing.potencia_panel_wp",
+            default=0,
+        )
+
+        if not potencia_panel_wp and _num(kwp) > 0 and _num(n_paneles) > 0:
+            potencia_panel_wp = (_num(kwp) * 1000.0) / _num(n_paneles)
+
+    cantidad_inversores = _get(
         resultado,
-        "kwp",
-        "pdc_kw",
-        "potencia_dc_kwp",
-        "sizing.kwp",
-        "sizing.pdc_kw",
-        "sizing.potencia_kwp",
-        "sizing.potencia_dc_kwp",
-        "paneles.kwp",
-        "paneles.pdc_kw",
-        "paneles.potencia_dc_kwp",
-        "paneles.kwp_total",
+        "cantidad_inversores",
+        "electrical.cantidad_inversores",
+        "paneles.cantidad_inversores",
+        "sizing.cantidad_inversores",
+        "sizing.n_inversores",
         default=0,
     )
 
-    if not kwp:
-        kwp = sin.get("pdc_kw", sin.get("kwp", 0.0))
+    kw_ac_total = _get(
+        resultado,
+        "kw_ac_total",
+        "potencia_ac_kw",
+        "electrical.kw_ac_total",
+        "paneles.kw_ac_total",
+        "sizing.kw_ac_total",
+        default=0,
+    )
+
+    # ======================================================
+    # FINANZAS
+    # ======================================================
 
     capex = _get(
         resultado,
@@ -203,56 +264,6 @@ def extraer_metricas_conclusion(resultado: Any, datos: Any = None) -> dict:
 
     if not capex:
         capex = sin.get("capex_estimado_l", 0.0)
-
-    n_paneles = _get(
-        resultado,
-        "n_paneles",
-        "numero_paneles",
-        "paneles.n_paneles",
-        "paneles.numero_paneles",
-        "sizing.n_paneles",
-        "sizing.numero_paneles",
-        default=0,
-    )
-
-    if not n_paneles:
-        n_paneles = sin.get("n_paneles", 0)
-
-    potencia_panel_wp = _get(
-        resultado,
-        "potencia_panel_wp",
-        "paneles.potencia_panel_wp",
-        "paneles.potencia_wp",
-        "paneles.modulo_wp",
-        "sizing.potencia_panel_wp",
-        default=0,
-    )
-
-    if not potencia_panel_wp and _num(kwp) > 0 and _num(n_paneles) > 0:
-        potencia_panel_wp = (_num(kwp) * 1000.0) / _num(n_paneles)
-
-    cantidad_inversores = _get(
-        resultado,
-        "cantidad_inversores",
-        "electrical.cantidad_inversores",
-        "paneles.cantidad_inversores",
-        "sizing.cantidad_inversores",
-        default=0,
-    )
-
-    kw_ac_total = _get(
-        resultado,
-        "kw_ac_total",
-        "potencia_ac_kw",
-        "electrical.kw_ac_total",
-        "paneles.kw_ac_total",
-        "sizing.kw_ac_total",
-        default=0,
-    )
-
-    # ======================================================
-    # FINANZAS
-    # ======================================================
 
     dscr = _get(
         resultado,
@@ -306,10 +317,6 @@ def extraer_metricas_conclusion(resultado: Any, datos: Any = None) -> dict:
     if not ahorro_mensual and _num(ahorro_anual) > 0:
         ahorro_mensual = _num(ahorro_anual) / 12.0
 
-    # ======================================================
-    # BENEFICIOS BRUTO Y NETO
-    # ======================================================
-
     beneficio_bruto_anual = _num(ahorro_anual)
 
     beneficio_neto_anual = 0.0
@@ -317,7 +324,6 @@ def extraer_metricas_conclusion(resultado: Any, datos: Any = None) -> dict:
     if _num(ahorro_mensual) > 0:
         beneficio_neto_anual = _num(ahorro_mensual) * 12.0
 
-    
     pago_actual = _get(
         resultado,
         "pago_actual",
