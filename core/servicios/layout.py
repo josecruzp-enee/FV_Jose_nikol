@@ -127,7 +127,6 @@ def generar_layout_cuadricula_fv(
         separacion_y_m=round(separacion_y_m, 3),
     )
 
-
 def construir_layout_preliminar_fv(
     *,
     n_paneles: int,
@@ -140,14 +139,11 @@ def construir_layout_preliminar_fv(
 ) -> dict:
     """
     Devuelve el paquete informativo completo de área + layout preliminar.
-    """
 
-    area = calcular_area_sistema_fv(
-        n_paneles=n_paneles,
-        largo_panel_m=largo_panel_m,
-        ancho_panel_m=ancho_panel_m,
-        factor_ocupacion=factor_ocupacion,
-    )
+    Regla actual:
+    - El área principal debe venir del layout geométrico real.
+    - El cálculo por factor de ocupación queda solo como referencia/fallback.
+    """
 
     layout = generar_layout_cuadricula_fv(
         n_paneles=n_paneles,
@@ -158,11 +154,31 @@ def construir_layout_preliminar_fv(
         max_columnas=max_columnas,
     )
 
+    area_fallback = calcular_area_sistema_fv(
+        n_paneles=n_paneles,
+        largo_panel_m=largo_panel_m,
+        ancho_panel_m=ancho_panel_m,
+        factor_ocupacion=factor_ocupacion,
+    )
+
+    area_real_m2 = float(getattr(layout, "area_rectangular_m2", 0.0) or 0.0)
+
     return {
-        "area": area,
+        "area": area_fallback,
         "layout": layout,
+
+        # Campo nuevo principal
+        "area_real_m2": round(area_real_m2, 2),
+        "area_layout_real_m2": round(area_real_m2, 2),
+        "area_necesaria_m2": round(area_real_m2, 2),
+
+        # Campo viejo queda como referencia
+        "area_fallback_m2": float(getattr(area_fallback, "area_necesaria_m2", 0.0) or 0.0),
+        "factor_ocupacion_fallback": float(getattr(area_fallback, "factor_ocupacion", 0.0) or 0.0),
+
         "nota": (
-            "Layout preliminar informativo. No considera obstáculos, sombras, "
-            "orientación real ni verificación estructural."
+            "Layout preliminar informativo. El área reportada corresponde al "
+            "rectángulo geométrico generado por filas, columnas y separaciones. "
+            "No considera obstáculos, sombras reales, orientación final ni verificación estructural."
         ),
     }
