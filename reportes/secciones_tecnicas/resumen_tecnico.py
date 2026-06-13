@@ -129,19 +129,30 @@ def obtener_datos_string(strings):
     return n_series, vmp, voc, imp, isc
 
 
-def obtener_derivados(kwp_dc, kw_ac_total, kw_ac_unitario, n_paneles):
+def obtener_derivados(
+    kwp_dc,
+    kw_ac_total,
+    kw_ac_unitario,
+    n_paneles,
+    n_series=0,
+    n_strings=0,
+    panel_pmax_w=0,
+):
+    paneles_reales = int(n_series or 0) * int(n_strings or 0)
+
+    if paneles_reales > 0 and panel_pmax_w > 0:
+        n_paneles = paneles_reales
+        kwp_dc = n_paneles * float(panel_pmax_w) / 1000.0
 
     potencia_inversor = kw_ac_unitario
     relacion_dc_ac = kwp_dc / kw_ac_total if kw_ac_total else 0
 
-    paneles_usados = n_paneles
-    paneles_sobrantes = 0
+    panel_wp = float(panel_pmax_w or 0)
 
-    panel_wp = (kwp_dc * 1000 / n_paneles) if n_paneles > 0 else 0
+    if panel_wp <= 0 and n_paneles > 0:
+        panel_wp = (kwp_dc * 1000 / n_paneles)
 
-    return potencia_inversor, relacion_dc_ac, paneles_usados, paneles_sobrantes, panel_wp
-
-
+    return potencia_inversor, relacion_dc_ac, n_paneles, 0, panel_wp, kwp_dc
 # ==========================================================
 # TABLAS
 # ==========================================================
