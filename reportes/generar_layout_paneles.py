@@ -8,28 +8,17 @@ import matplotlib
 matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
-from matplotlib.patches import Rectangle, FancyBboxPatch
+from matplotlib.patches import Rectangle
 
 
-# =========================================================
-# COLORES PROFESIONALES
-# =========================================================
-COLOR_PANEL = "#163A5F"
-COLOR_PANEL_2 = "#1F4E79"
+COLOR_PANEL = "#1F3A5F"
 COLOR_BORDE = "#0B2E4A"
-COLOR_TEXTO = "#1F1F1F"
-COLOR_AZUL = "#0B5394"
-COLOR_GRIS = "#666666"
-COLOR_GRIS_CLARO = "#E6E6E6"
-COLOR_CAJA = "#F8FAFC"
 COLOR_FONDO = "#FFFFFF"
-COLOR_SOMBRA = "#D9EAF7"
 COLOR_CUMBRERA = "#DDDDDD"
+COLOR_CAJA = "#F7F7F7"
+COLOR_LINEA = "#222222"
 
 
-# =========================================================
-# VALIDACIONES
-# =========================================================
 def _validar_entrada(n_paneles, max_cols, panel_w, panel_h, gap, gap_cumbrera_m):
     if n_paneles <= 0:
         raise ValueError("n_paneles debe ser mayor que cero.")
@@ -45,98 +34,9 @@ def _validar_entrada(n_paneles, max_cols, panel_w, panel_h, gap, gap_cumbrera_m)
         raise ValueError("gap_cumbrera_m no puede ser negativo.")
 
 
-def _normalizar_tipo_montaje(tipo_montaje: str | None) -> str:
-    return str(tipo_montaje or "").strip().lower()
-
-
-# =========================================================
-# CÁLCULO DE SOMBRA
-# =========================================================
-def calcular_separacion_sombra_m(
-    latitud: float = 15.0,
-    inclinacion_grados: float = 15.0,
-    panel_h: float = 2.2,
-    altura_solar_min_grados: float = 30.0,
-):
-    """
-    Separación preliminar entre filas por sombra.
-
-    Criterio:
-    separación = altura trasera del panel / tan(altura solar mínima)
-
-    altura trasera = largo_panel * sin(inclinación)
-
-    Nota:
-    Este cálculo es preliminar. Para ingeniería final debe revisarse
-    con azimut, fecha/hora crítica, obstáculos y modelo solar.
-    """
-
-    latitud = abs(float(latitud or 15.0))
-    inclinacion_grados = float(inclinacion_grados or 0.0)
-    panel_h = float(panel_h or 2.2)
-
-    if not altura_solar_min_grados:
-        altura_solar_min_grados = max(25.0, 90.0 - latitud - 23.45)
-
-    beta = math.radians(inclinacion_grados)
-    alfa = math.radians(float(altura_solar_min_grados))
-
-    altura_trasera = panel_h * math.sin(beta)
-
-    if altura_trasera <= 0 or alfa <= 0:
-        return 0.0
-
-    separacion = altura_trasera / math.tan(alfa)
-    return round(max(separacion, 0.0), 2)
-
-
-# =========================================================
-# DIBUJO BASE
-# =========================================================
-def _dibujar_panel(ax, x, y, w, h, numero=None, fontsize=6.2):
-    panel = Rectangle(
-        (x, y),
-        w,
-        h,
-        facecolor=COLOR_PANEL,
-        edgecolor=COLOR_BORDE,
-        linewidth=0.65,
-    )
-    ax.add_patch(panel)
-
-    # Líneas internas sutiles tipo módulo FV
-    for i in range(1, 3):
-        ax.plot(
-            [x + i * w / 3, x + i * w / 3],
-            [y + 0.03, y + h - 0.03],
-            color="#2F5F8F",
-            linewidth=0.25,
-            alpha=0.65,
-        )
-
-    for j in range(1, 4):
-        ax.plot(
-            [x + 0.03, x + w - 0.03],
-            [y + j * h / 4, y + j * h / 4],
-            color="#2F5F8F",
-            linewidth=0.25,
-            alpha=0.65,
-        )
-
-    if numero is not None:
-        ax.text(
-            x + w / 2,
-            y + h / 2,
-            str(numero),
-            color="white",
-            ha="center",
-            va="center",
-            fontsize=fontsize,
-            weight="bold",
-        )
-
-
 def _dibujar_grid(n, cols, rows, x0, y0, w, h, gap, start_num=1):
+    patches = []
+    labels = []
     num = start_num
 
     for r in range(rows):
@@ -147,29 +47,57 @@ def _dibujar_grid(n, cols, rows, x0, y0, w, h, gap, start_num=1):
             x = x0 + c * (w + gap)
             y = y0 + r * (h + gap)
 
-            _dibujar_panel(ax=plt.gca(), x=x, y=y, w=w, h=h, numero=num)
+            patches.append(
+                Rectangle(
+                    (x, y),
+                    w,
+                    h,
+                    facecolor=COLOR_PANEL,
+                    edgecolor=COLOR_BORDE,
+                    linewidth=0.7,
+                )
+            )
+
+            labels.append((x + w / 2, y + h / 2, str(num)))
             num += 1
 
-    return num
+    return patches, labels, num
 
 
-# =========================================================
-# LAYOUT RECTANGULAR
-# =========================================================
+
+def _agregar_paneles(ax, patches, labels):
+    for p in patches:
+        ax.add_patch(p)
+
+    for x, y, txt in labels:
+        ax.text(
+            x,
+            y,
+            txt,
+            color="white",
+            ha="center",
+            va="center",
+            fontsize=6.4,
+        )
+
+
 def _generar_layout_rectangular(ax, n_paneles, max_cols, panel_w, panel_h, gap):
     cols = min(max_cols, n_paneles)
     rows = math.ceil(n_paneles / cols)
 
-    num = 1
-    for r in range(rows):
-        for c in range(cols):
-            if num > n_paneles:
-                break
+    patches, labels, _ = _dibujar_grid(
+        n=n_paneles,
+        cols=cols,
+        rows=rows,
+        x0=0,
+        y0=0,
+        w=panel_w,
+        h=panel_h,
+        gap=gap,
+        start_num=1,
+    )
 
-            x = c * (panel_w + gap)
-            y = (rows - 1 - r) * (panel_h + gap)
-            _dibujar_panel(ax, x, y, panel_w, panel_h, num)
-            num += 1
+    _agregar_paneles(ax, patches, labels)
 
     ancho_total = cols * panel_w + max(cols - 1, 0) * gap
     alto_total = rows * panel_h + max(rows - 1, 0) * gap
@@ -177,9 +105,6 @@ def _generar_layout_rectangular(ax, n_paneles, max_cols, panel_w, panel_h, gap):
     return ancho_total, alto_total, cols, rows
 
 
-# =========================================================
-# LAYOUT POR STRINGS — VERSIÓN PROFESIONAL
-# =========================================================
 def _generar_layout_por_strings(
     ax,
     n_paneles,
@@ -191,14 +116,10 @@ def _generar_layout_por_strings(
     separacion_sombra_m=0.0,
 ):
     """
-    Layout físico agrupado por strings.
+    Genera layout físico orientativo agrupado por strings.
 
-    Mejoras:
-    - Menos ruido visual.
-    - Sombra como banda suave.
-    - Una sola cota general de separación.
-    - Títulos separados del dibujo.
-    - Etiquetas limpias por string.
+    Si separacion_sombra_m > gap, usa esa distancia como separación
+    vertical entre filas/strings para representar separación por sombra.
     """
 
     n_strings = int(n_strings or 0)
@@ -212,26 +133,27 @@ def _generar_layout_por_strings(
     rows = n_strings
     total_dibujado = min(n_paneles, n_strings * paneles_por_string)
 
-    gap_col = float(gap)
-    gap_fila = max(float(gap), separacion_sombra_m)
+    gap_col = gap
+    gap_fila = max(gap, separacion_sombra_m)
 
-    ancho_total = cols * panel_w + max(cols - 1, 0) * gap_col
-    alto_total = rows * panel_h + max(rows - 1, 0) * gap_fila
+    ancho_total_preview = cols * panel_w + max(cols - 1, 0) * gap_col
 
+    patches = []
+    labels = []
     num = 1
 
     for r in range(rows):
         y = (rows - 1 - r) * (panel_h + gap_fila)
 
         ax.text(
-            -0.55,
+            -0.35,
             y + panel_h / 2,
             f"STR-{r + 1:02d}",
             ha="right",
             va="center",
-            fontsize=7.2,
+            fontsize=7,
             weight="bold",
-            color=COLOR_TEXTO,
+            color=COLOR_LINEA,
         )
 
         for c in range(cols):
@@ -239,75 +161,87 @@ def _generar_layout_por_strings(
                 break
 
             x = c * (panel_w + gap_col)
-            _dibujar_panel(
-                ax=ax,
-                x=x,
-                y=y,
-                w=panel_w,
-                h=panel_h,
-                numero=num,
-                fontsize=5.8 if total_dibujado > 120 else 6.4,
-            )
-            num += 1
 
-        # Banda de separación/sombra entre filas
-        if separacion_sombra_m > gap and r < rows - 1:
-            y_banda = y - gap_fila
-            ax.add_patch(
+            patches.append(
                 Rectangle(
-                    (0, y_banda),
-                    ancho_total,
-                    gap_fila,
-                    facecolor=COLOR_SOMBRA,
-                    edgecolor="none",
-                    alpha=0.32,
-                    zorder=-1,
+                    (x, y),
+                    panel_w,
+                    panel_h,
+                    facecolor=COLOR_PANEL,
+                    edgecolor=COLOR_BORDE,
+                    linewidth=0.7,
                 )
             )
 
+            labels.append((x + panel_w / 2, y + panel_h / 2, str(num)))
+            num += 1
+
+        # Cota visual de separación por sombra entre esta fila y la siguiente
+        if separacion_sombra_m > gap and r < rows - 1:
+            y_sup = y - gap_fila
+            y_inf = y
+
+            y_mid = (y_sup + y_inf) / 2
+            x_cota_sombra = ancho_total_preview + 0.55
+
             ax.plot(
-                [0, ancho_total],
-                [y_banda + gap_fila / 2, y_banda + gap_fila / 2],
+                [0, ancho_total_preview],
+                [y_mid, y_mid],
                 linestyle="--",
                 linewidth=0.45,
-                color="#8AA6BF",
-                alpha=0.9,
+                color="#888888",
             )
 
-    # Cota única de separación entre filas
-    if separacion_sombra_m > gap and rows > 1:
-        x_cota = ancho_total + 0.55
-        y1 = alto_total - panel_h
-        y2 = alto_total - panel_h - gap_fila
+            ax.annotate(
+                "",
+                xy=(x_cota_sombra, y_sup),
+                xytext=(x_cota_sombra, y_inf),
+                arrowprops=dict(
+                    arrowstyle="<->",
+                    linewidth=0.8,
+                    color="#555555",
+                ),
+            )
 
-        ax.annotate(
-            "",
-            xy=(x_cota, y1),
-            xytext=(x_cota, y2),
-            arrowprops=dict(
-                arrowstyle="<->",
-                linewidth=1.0,
-                color=COLOR_AZUL,
-            ),
-        )
+            ax.text(
+                x_cota_sombra + 0.15,
+                y_mid,
+                f"Sombra: {separacion_sombra_m:.2f} m",
+                fontsize=6,
+                va="center",
+                ha="left",
+                color="#555555",
+            )
 
+    _agregar_paneles(ax, patches, labels)
+
+    ancho_total = cols * panel_w + max(cols - 1, 0) * gap_col
+    alto_total = rows * panel_h + max(rows - 1, 0) * gap_fila
+
+    ax.text(
+        ancho_total / 2,
+        alto_total + 1.15,
+        f"Distribución física por strings: {n_strings} strings × {paneles_por_string} módulos",
+        ha="center",
+        va="bottom",
+        fontsize=9,
+        weight="bold",
+        color=COLOR_LINEA,
+    )
+
+    if separacion_sombra_m > gap:
         ax.text(
-            x_cota + 0.18,
-            (y1 + y2) / 2,
-            f"{separacion_sombra_m:.2f} m\nseparación\nentre filas",
-            ha="left",
-            va="center",
-            fontsize=6.8,
-            color=COLOR_AZUL,
-            linespacing=1.15,
+            ancho_total / 2,
+            alto_total + 0.75,
+            f"Separación entre filas por sombra: {separacion_sombra_m:.2f} m",
+            ha="center",
+            va="bottom",
+            fontsize=7,
+            color=COLOR_LINEA,
         )
 
     return ancho_total, alto_total, cols, rows
 
-
-# =========================================================
-# LAYOUT DOS AGUAS
-# =========================================================
 def _generar_layout_dos_aguas(
     ax,
     n_paneles,
@@ -332,27 +266,37 @@ def _generar_layout_dos_aguas(
 
     alto_total = alto_abajo + gap_cumbrera_m + alto_arriba
 
-    num = 1
-
-    for r in range(rows_abajo):
-        for c in range(cols):
-            if num > n_abajo:
-                break
-            x = c * (panel_w + gap)
-            y = r * (panel_h + gap)
-            _dibujar_panel(ax, x, y, panel_w, panel_h, num)
-            num += 1
+    patches_abajo, labels_abajo, next_num = _dibujar_grid(
+        n=n_abajo,
+        cols=cols,
+        rows=rows_abajo,
+        x0=0,
+        y0=0,
+        w=panel_w,
+        h=panel_h,
+        gap=gap,
+        start_num=1,
+    )
 
     y_arriba = alto_abajo + gap_cumbrera_m
 
-    for r in range(rows_arriba):
-        for c in range(cols):
-            if num > n_paneles:
-                break
-            x = c * (panel_w + gap)
-            y = y_arriba + r * (panel_h + gap)
-            _dibujar_panel(ax, x, y, panel_w, panel_h, num)
-            num += 1
+    patches_arriba, labels_arriba, _ = _dibujar_grid(
+        n=n_arriba,
+        cols=cols,
+        rows=rows_arriba,
+        x0=0,
+        y0=y_arriba,
+        w=panel_w,
+        h=panel_h,
+        gap=gap,
+        start_num=next_num,
+    )
+
+    _agregar_paneles(
+        ax,
+        patches_abajo + patches_arriba,
+        labels_abajo + labels_arriba,
+    )
 
     ax.add_patch(
         Rectangle(
@@ -371,18 +315,15 @@ def _generar_layout_dos_aguas(
         ha="center",
         va="center",
         fontsize=7,
-        color=COLOR_GRIS,
+        color="#555555",
     )
 
     return ancho_total, alto_total, cols, rows_abajo + rows_arriba
 
 
-# =========================================================
-# COTAS Y ELEMENTOS GRÁFICOS
-# =========================================================
 def _agregar_cotas(ax, ancho_total, alto_total):
-    margen_x = 1.10
-    margen_y = 0.75
+    margen_x = 3.50
+    margen_y = 0.85
 
     y_cota = -margen_y
 
@@ -390,7 +331,7 @@ def _agregar_cotas(ax, ancho_total, alto_total):
         "",
         xy=(0, y_cota),
         xytext=(ancho_total, y_cota),
-        arrowprops=dict(arrowstyle="<->", linewidth=1.0, color=COLOR_TEXTO),
+        arrowprops=dict(arrowstyle="<->", linewidth=1.0, color=COLOR_LINEA),
     )
 
     ax.text(
@@ -399,8 +340,7 @@ def _agregar_cotas(ax, ancho_total, alto_total):
         f"Ancho estimado: {ancho_total:.2f} m",
         ha="center",
         va="top",
-        fontsize=7.6,
-        color=COLOR_TEXTO,
+        fontsize=8,
     )
 
     x_cota = -margen_x
@@ -409,193 +349,138 @@ def _agregar_cotas(ax, ancho_total, alto_total):
         "",
         xy=(x_cota, 0),
         xytext=(x_cota, alto_total),
-        arrowprops=dict(arrowstyle="<->", linewidth=1.0, color=COLOR_TEXTO),
+        arrowprops=dict(arrowstyle="<->", linewidth=1.0, color=COLOR_LINEA),
     )
 
     ax.text(
-        x_cota - 0.16,
+        x_cota - 0.18,
         alto_total / 2,
         f"Largo estimado: {alto_total:.2f} m",
         ha="right",
         va="center",
         rotation=90,
-        fontsize=7.6,
-        color=COLOR_TEXTO,
+        fontsize=8,
     )
 
 
-def _agregar_norte(ax, ancho_total, alto_total):
-    x = ancho_total + 0.90
-    y = max(0.35, alto_total - 1.30)
+def _agregar_norte(ax, ancho_total, y_base):
+    x = ancho_total + 0.75
+    y = y_base + 0.55
 
     ax.annotate(
         "",
         xy=(x, y + 0.85),
         xytext=(x, y),
-        arrowprops=dict(arrowstyle="->", linewidth=1.35, color=COLOR_TEXTO),
+        arrowprops=dict(arrowstyle="->", linewidth=1.4, color=COLOR_LINEA),
     )
 
     ax.text(
         x,
-        y + 0.98,
+        y + 1.00,
         "N",
         ha="center",
         va="bottom",
-        fontsize=10,
+        fontsize=11,
         weight="bold",
-        color=COLOR_TEXTO,
     )
 
 
-def _agregar_encabezado(
+def _agregar_caja_tecnica(
     ax,
     ancho_total,
-    alto_total,
+    y_caja,
     n_paneles,
     cols,
     rows,
+    ancho_total_m,
+    largo_total_m,
+    panel_w,
+    panel_h,
     gap,
-    separacion_sombra_m,
+    dos_aguas,
     orientacion_panel,
     tipo_montaje,
-    layout_por_strings,
-    n_strings,
-    paneles_por_string,
-    inclinacion_panel_grados,
 ):
-    y0 = alto_total + 2.45
+    """
+    Caja técnica reservada para uso futuro.
 
-    titulo = "LAYOUT PRELIMINAR DEL GENERADOR FOTOVOLTAICO"
+    Por ahora no se llama para evitar duplicar información
+    con la tabla del PDF.
+    """
 
-    ax.text(
-        0,
-        y0,
-        titulo,
-        ha="left",
-        va="bottom",
-        fontsize=12.5,
-        weight="bold",
-        color=COLOR_TEXTO,
-    )
+    alto_caja = 1.95
+    ancho_caja = max(ancho_total, 9.0)
 
-    ax.plot([0, min(ancho_total, 5.0)], [y0 - 0.16, y0 - 0.16], color=COLOR_AZUL, linewidth=2.0)
-
-    if layout_por_strings and n_strings and paneles_por_string:
-        subtitulo = f"{int(n_strings)} strings × {int(paneles_por_string)} módulos/string · {int(n_paneles)} módulos totales"
-    else:
-        subtitulo = f"{int(n_paneles)} módulos · {cols} columnas × {rows} filas"
-
-    ax.text(
-        0,
-        y0 - 0.55,
-        subtitulo,
-        ha="left",
-        va="top",
-        fontsize=8.6,
-        color=COLOR_TEXTO,
-    )
-
-    ax.text(
-        0,
-        y0 - 0.92,
-        f"Montaje: {tipo_montaje} · Orientación: {orientacion_panel} · Inclinación: {inclinacion_panel_grados:.1f}°",
-        ha="left",
-        va="top",
-        fontsize=7.6,
-        color=COLOR_GRIS,
-    )
-
-
-def _agregar_resumen_inferior(
-    ax,
-    ancho_total,
-    y,
-    n_paneles,
-    gap,
-    separacion_sombra_m,
-    orientacion_panel,
-    inclinacion_panel_grados,
-):
-    ancho_caja = max(ancho_total, 11.0)
-    alto_caja = 1.05
-
-    caja = FancyBboxPatch(
-        (0, y),
-        ancho_caja,
-        alto_caja,
-        boxstyle="round,pad=0.10,rounding_size=0.10",
-        linewidth=0.8,
-        edgecolor="#B8C7D9",
-        facecolor=COLOR_CAJA,
-    )
-
-    ax.add_patch(caja)
-
-    items = [
-        ("Módulos", f"{int(n_paneles)}"),
-        ("Panel-panel", f"{gap:.2f} m"),
-        ("Fila-fila", f"{separacion_sombra_m:.2f} m" if separacion_sombra_m > 0 else "N/A"),
-        ("Orientación", orientacion_panel),
-        ("Inclinación", f"{inclinacion_panel_grados:.1f}°"),
-    ]
-
-    x = 0.35
-    paso = ancho_caja / len(items)
-
-    for i, (k, v) in enumerate(items):
-        xi = x + i * paso
-
-        ax.text(
-            xi,
-            y + 0.68,
-            k,
-            ha="left",
-            va="center",
-            fontsize=6.8,
-            color=COLOR_GRIS,
+    ax.add_patch(
+        Rectangle(
+            (0, y_caja),
+            ancho_caja,
+            alto_caja,
+            facecolor=COLOR_CAJA,
+            edgecolor="#BBBBBB",
+            linewidth=0.8,
         )
+    )
 
-        ax.text(
-            xi,
-            y + 0.35,
-            v,
-            ha="left",
-            va="center",
-            fontsize=8.0,
-            weight="bold",
-            color=COLOR_AZUL,
-        )
-
-        if i > 0:
-            ax.plot(
-                [xi - 0.25, xi - 0.25],
-                [y + 0.18, y + alto_caja - 0.18],
-                color="#D0D7DE",
-                linewidth=0.7,
-            )
-
-
-def _agregar_nota_tecnica(ax, ancho_total, y):
     texto = (
-        "Nota: Layout preliminar referencial. La separación entre filas debe validarse "
-        "en ingeniería final considerando azimut, obstáculos, estructura y condición solar crítica."
+        "Dimensiones estimadas:\n"
+        f"Ancho: {ancho_total_m:.2f} m\n"
+        f"Largo: {largo_total_m:.2f} m\n\n"
+        f"Panel: {panel_h:.2f} m (alto) × {panel_w:.2f} m (ancho)\n"
+        f"Separación entre paneles: {gap:.2f} m\n\n"
+        f"Tipo: {tipo_montaje}\n"
+        f"Orientación: {orientacion_panel}\n"
+        f"Total de paneles: {n_paneles}\n"
+        f"Distribución: {cols} columnas × {rows} filas"
     )
 
     ax.text(
-        0,
-        y,
+        0.30,
+        y_caja + alto_caja - 0.25,
         texto,
         ha="left",
         va="top",
-        fontsize=6.3,
-        color=COLOR_GRIS,
-        wrap=True,
+        fontsize=7.5,
+        linespacing=1.25,
     )
 
+def calcular_separacion_sombra_m(
+    latitud: float = 15.0,
+    inclinacion_grados: float = 15.0,
+    panel_h: float = 2.2,
+    altura_solar_min_grados: float = 30.0,
+):
+    """
+    Calcula separación aproximada entre filas por sombra.
 
-# =========================================================
-# FUNCIÓN PRINCIPAL
-# =========================================================
+    Criterio conservador:
+    separación = altura trasera del panel / tan(altura solar mínima)
+
+    altura trasera = largo_panel * sin(inclinación)
+    """
+
+    latitud = abs(float(latitud or 15.0))
+    inclinacion_grados = float(inclinacion_grados or 0.0)
+    panel_h = float(panel_h or 2.2)
+
+    # Si no mandan altura solar, se estima conservadora para Honduras.
+    # Honduras aprox. 13°N a 16°N.
+    if not altura_solar_min_grados:
+        altura_solar_min_grados = max(25.0, 90.0 - latitud - 23.45)
+
+    beta = math.radians(inclinacion_grados)
+    alfa = math.radians(float(altura_solar_min_grados))
+
+    altura_trasera = panel_h * math.sin(beta)
+
+    if altura_trasera <= 0 or alfa <= 0:
+        return 0.0
+
+    separacion = altura_trasera / math.tan(alfa)
+
+    return round(max(separacion, 0.0), 2)
+
+
 def generar_layout_paneles(
     n_paneles: int,
     out_path: str | Path,
@@ -618,13 +503,14 @@ def generar_layout_paneles(
     paneles_por_string: int | None = None,
 ):
     """
-    Genera una imagen PNG profesional del layout preliminar de paneles FV.
+    Genera una imagen PNG del layout de paneles FV.
 
-    Compatible con:
-    - Layout rectangular.
+    Modos:
+    - Rectangular tradicional.
     - Techo a dos aguas.
     - Layout físico por strings.
-    - Separación por sombra para montaje en terraza/cubierta plana o suelo.
+
+    No modifica cálculos eléctricos, strings ni optimización.
     """
 
     if max_cols is None:
@@ -645,20 +531,16 @@ def generar_layout_paneles(
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
-    tipo_norm = _normalizar_tipo_montaje(tipo_montaje)
+    fig, ax = plt.subplots(figsize=(11.5, 7.2))
+    ax.set_facecolor(COLOR_FONDO)
 
-    if separacion_sombra_m <= 0 and any(t in tipo_norm for t in ["terraza", "cubierta", "plana", "suelo"]):
+    if separacion_sombra_m <= 0 and tipo_montaje in ["Terraza / cubierta plana", "Suelo"]:
         separacion_sombra_m = calcular_separacion_sombra_m(
             latitud=latitud,
             inclinacion_grados=inclinacion_panel_grados,
             panel_h=panel_h,
             altura_solar_min_grados=altura_solar_min_grados,
-        )
-
-    # Figura más ancha y limpia
-    fig, ax = plt.subplots(figsize=(12.4, 7.4))
-    fig.patch.set_facecolor(COLOR_FONDO)
-    ax.set_facecolor(COLOR_FONDO)
+    )
 
     if layout_por_strings and n_strings and paneles_por_string:
         ancho_total, alto_total, cols, rows = _generar_layout_por_strings(
@@ -694,63 +576,34 @@ def generar_layout_paneles(
         )
 
     _agregar_cotas(ax, ancho_total, alto_total)
-    _agregar_norte(ax, ancho_total, alto_total)
 
-    _agregar_encabezado(
-        ax=ax,
-        ancho_total=ancho_total,
-        alto_total=alto_total,
-        n_paneles=n_paneles,
-        cols=cols,
-        rows=rows,
-        gap=gap,
-        separacion_sombra_m=separacion_sombra_m,
-        orientacion_panel=orientacion_panel,
-        tipo_montaje=tipo_montaje,
-        layout_por_strings=layout_por_strings,
-        n_strings=n_strings,
-        paneles_por_string=paneles_por_string,
-        inclinacion_panel_grados=float(inclinacion_panel_grados or 0.0),
+    y_sep = alto_total + (0.42 if layout_por_strings else 0.28)
+
+    ax.text(
+        ancho_total,
+        y_sep,
+        f"Separación entre paneles: {gap:.2f} m",
+        ha="right",
+        va="bottom",
+        fontsize=7,
     )
 
-    y_resumen = -2.15
-
-    _agregar_resumen_inferior(
-        ax=ax,
-        ancho_total=ancho_total,
-        y=y_resumen,
-        n_paneles=n_paneles,
-        gap=gap,
-        separacion_sombra_m=separacion_sombra_m,
-        orientacion_panel=orientacion_panel,
-        inclinacion_panel_grados=float(inclinacion_panel_grados or 0.0),
-    )
-
-    _agregar_nota_tecnica(
-        ax=ax,
-        ancho_total=ancho_total,
-        y=y_resumen - 0.35,
-    )
+    _agregar_norte(ax, ancho_total, 0)
 
     ax.set_aspect("equal")
 
-    margen_izq = -1.85
-    margen_der = 2.25
-    margen_inf = -2.75
-    margen_sup = 3.10
-
-    ax.set_xlim(margen_izq, max(ancho_total + margen_der, 11.8))
-    ax.set_ylim(margen_inf, alto_total + margen_sup)
+    ax.set_xlim(-4.0, max(ancho_total + 1.45, 10.8))
+    ax.set_ylim(-1.35, alto_total + 1.55)
 
     ax.axis("off")
 
     plt.savefig(
         out_path,
-        dpi=240,
+        dpi=220,
         bbox_inches="tight",
-        pad_inches=0.12,
+        pad_inches=0.08,
     )
 
-    plt.close(fig)
+    plt.close()
 
     return str(out_path)
