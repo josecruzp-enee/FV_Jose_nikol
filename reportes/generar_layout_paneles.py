@@ -104,6 +104,91 @@ def _generar_layout_rectangular(ax, n_paneles, max_cols, panel_w, panel_h, gap):
     return ancho_total, alto_total, cols, rows
 
 
+def _generar_layout_por_strings(
+    ax,
+    n_paneles,
+    n_strings,
+    paneles_por_string,
+    panel_w,
+    panel_h,
+    gap,
+):
+    """
+    Genera layout físico orientativo agrupado por strings.
+
+    Ejemplo:
+    10 strings × 12 paneles = 10 filas × 12 columnas.
+    """
+
+    n_strings = int(n_strings or 0)
+    paneles_por_string = int(paneles_por_string or 0)
+
+    if n_strings <= 0 or paneles_por_string <= 0:
+        raise ValueError("n_strings y paneles_por_string deben ser mayores que cero.")
+
+    cols = paneles_por_string
+    rows = n_strings
+
+    total_dibujado = min(n_paneles, n_strings * paneles_por_string)
+
+    patches = []
+    labels = []
+    num = 1
+
+    for r in range(rows):
+        y = (rows - 1 - r) * (panel_h + gap)
+
+        # etiqueta string a la izquierda
+        ax.text(
+            -0.35,
+            y + panel_h / 2,
+            f"STR-{r + 1:02d}",
+            ha="right",
+            va="center",
+            fontsize=7,
+            weight="bold",
+            color=COLOR_LINEA,
+        )
+
+        for c in range(cols):
+            if num > total_dibujado:
+                break
+
+            x = c * (panel_w + gap)
+
+            patches.append(
+                Rectangle(
+                    (x, y),
+                    panel_w,
+                    panel_h,
+                    facecolor=COLOR_PANEL,
+                    edgecolor=COLOR_BORDE,
+                    linewidth=0.7,
+                )
+            )
+
+            labels.append((x + panel_w / 2, y + panel_h / 2, str(num)))
+            num += 1
+
+    _agregar_paneles(ax, patches, labels)
+
+    ancho_total = cols * panel_w + max(cols - 1, 0) * gap
+    alto_total = rows * panel_h + max(rows - 1, 0) * gap
+
+    ax.text(
+        ancho_total / 2,
+        alto_total + 0.38,
+        f"Distribución física por strings: {n_strings} strings × {paneles_por_string} módulos",
+        ha="center",
+        va="bottom",
+        fontsize=8,
+        weight="bold",
+        color=COLOR_LINEA,
+    )
+
+    return ancho_total, alto_total, cols, rows
+
+
 def _generar_layout_dos_aguas(
     ax,
     n_paneles,
@@ -188,6 +273,7 @@ def _agregar_cotas(ax, ancho_total, alto_total):
     margen_y = 0.85
 
     y_cota = -margen_y
+
     ax.annotate(
         "",
         xy=(0, y_cota),
@@ -205,6 +291,7 @@ def _agregar_cotas(ax, ancho_total, alto_total):
     )
 
     x_cota = -margen_x
+
     ax.annotate(
         "",
         xy=(x_cota, 0),
@@ -261,6 +348,13 @@ def _agregar_caja_tecnica(
     orientacion_panel,
     tipo_montaje,
 ):
+    """
+    Caja técnica reservada para uso futuro.
+
+    Por ahora no se llama para evitar duplicar información
+    con la tabla del PDF.
+    """
+
     alto_caja = 1.95
     ancho_caja = max(ancho_total, 9.0)
 
@@ -275,15 +369,13 @@ def _agregar_caja_tecnica(
         )
     )
 
-    tipo = tipo_montaje
-
     texto = (
         "Dimensiones estimadas:\n"
         f"Ancho: {ancho_total_m:.2f} m\n"
         f"Largo: {largo_total_m:.2f} m\n\n"
         f"Panel: {panel_h:.2f} m (alto) × {panel_w:.2f} m (ancho)\n"
         f"Separación entre paneles: {gap:.2f} m\n\n"
-        f"Tipo: {tipo}\n"
+        f"Tipo: {tipo_montaje}\n"
         f"Orientación: {orientacion_panel}\n"
         f"Total de paneles: {n_paneles}\n"
         f"Distribución: {cols} columnas × {rows} filas"
@@ -313,18 +405,26 @@ def generar_layout_paneles(
     zonas: list | None = None,
     orientacion_panel: str = "Vertical (Portrait)",
     tipo_montaje: str = "Terraza / cubierta plana",
+    layout_por_strings: bool = False,
+    n_strings: int | None = None,
+    paneles_por_string: int | None = None,
 ):
     """
     Genera una imagen PNG del layout de paneles FV.
 
-    Nota:
-    - dos_aguas viene desde tipo_montaje.
-    - zonas es independiente del tipo de montaje.
-    - No modifica cálculos eléctricos, strings ni optimización.
+    Modos:
+    - Rectangular tradicional.
+    - Techo a dos aguas.
+    - Layout físico por strings.
+
+    No modifica cálculos eléctricos, strings ni optimización.
     """
 
     if max_cols is None:
-        max_cols = math.ceil(math.sqrt(n_paneles))
+        if layout_por_strings and paneles_por_string:
+            max_cols = int(paneles_por_string)
+        else:
+            max_cols = math.ceil(math.sqrt(n_paneles))
 
     _validar_entrada(
         n_paneles=n_paneles,
@@ -341,7 +441,18 @@ def generar_layout_paneles(
     fig, ax = plt.subplots(figsize=(11.5, 7.2))
     ax.set_facecolor(COLOR_FONDO)
 
-    if dos_aguas:
+    if layout_por_strings and n_strings and paneles_por_string:
+        ancho_total, alto_total, cols, rows = _generar_layout_por_strings(
+            ax=ax,
+            n_paneles=n_paneles,
+            n_strings=n_strings,
+            paneles_por_string=paneles_por_string,
+            panel_w=panel_w,
+            panel_h=panel_h,
+            gap=gap,
+        )
+
+    elif dos_aguas:
         ancho_total, alto_total, cols, rows = _generar_layout_dos_aguas(
             ax=ax,
             n_paneles=n_paneles,
@@ -351,6 +462,7 @@ def generar_layout_paneles(
             gap=gap,
             gap_cumbrera_m=gap_cumbrera_m,
         )
+
     else:
         ancho_total, alto_total, cols, rows = _generar_layout_rectangular(
             ax=ax,
@@ -372,15 +484,12 @@ def generar_layout_paneles(
         fontsize=7,
     )
 
-
-    
-
     _agregar_norte(ax, ancho_total, 0)
 
     ax.set_aspect("equal")
 
-    ax.set_xlim(-1.25, max(ancho_total + 1.45, 10.8))
-    ax.set_ylim(-1.35, alto_total + 0.75)
+    ax.set_xlim(-1.65, max(ancho_total + 1.45, 10.8))
+    ax.set_ylim(-1.35, alto_total + 0.95)
 
     ax.axis("off")
 
@@ -390,6 +499,7 @@ def generar_layout_paneles(
         bbox_inches="tight",
         pad_inches=0.08,
     )
+
     plt.close()
 
     return str(out_path)
