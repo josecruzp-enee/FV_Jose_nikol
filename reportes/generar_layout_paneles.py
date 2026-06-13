@@ -500,11 +500,11 @@ def generar_layout_paneles(
     ax.set_facecolor(COLOR_FONDO)
 
     if separacion_sombra_m <= 0 and tipo_montaje in ["Terraza / cubierta plana", "Suelo"]:
-    separacion_sombra_m = calcular_separacion_sombra_m(
-        latitud=latitud,
-        inclinacion_grados=inclinacion_panel_grados,
-        panel_h=panel_h,
-        altura_solar_min_grados=altura_solar_min_grados,
+        separacion_sombra_m = calcular_separacion_sombra_m(
+            latitud=latitud,
+            inclinacion_grados=inclinacion_panel_grados,
+            panel_h=panel_h,
+            altura_solar_min_grados=altura_solar_min_grados,
     )
 
     if layout_por_strings and n_strings and paneles_por_string:
