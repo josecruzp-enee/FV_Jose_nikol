@@ -89,13 +89,15 @@ def extraer_metricas_conclusion(resultado: Any, datos: Any = None) -> dict:
     # LAYOUT
     # ======================================================
 
-    layout_preliminar = _get(resultado, "layout_preliminar", default={})
+    layout_preliminar = _get(resultado, "layout_preliminar", default=None)
 
     area_layout = _num(
-        layout_preliminar.get("area_layout_real_m2", 0.0)
-        or layout_preliminar.get("area_real_m2", 0.0)
-        or layout_preliminar.get("area_necesaria_m2", 0.0)
-        or getattr(layout_preliminar.get("layout", None), "area_rectangular_m2", 0.0)
+        _get(
+            layout_preliminar,
+            "area_rectangular_m2",
+            "area_necesaria_m2",
+            default=0.0,
+        )
     )
     
     opt = _get(resultado, "optimizacion_economica", default=None)
