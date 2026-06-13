@@ -608,7 +608,18 @@ def agregar_pagina_conclusiones_ejecutivas(story, styles, resultado, datos=None)
     from reportlab.platypus import Paragraph, Spacer, PageBreak, Table, TableStyle
     from reportlab.lib import colors
     from reportlab.lib.units import cm
+    from reportlab.lib.enums import TA_JUSTIFY
+    from reportlab.lib.styles import ParagraphStyle
 
+    if "BodyJustify" not in styles:
+    styles.add(
+        ParagraphStyle(
+            name="BodyJustify",
+            parent=styles["BodyText"],
+            alignment=TA_JUSTIFY,
+        )
+    )
+    
     data = generar_conclusiones_ejecutivas(resultado, datos)
     m = data["metricas"]
     estado = data["estado"]
@@ -651,7 +662,7 @@ def agregar_pagina_conclusiones_ejecutivas(story, styles, resultado, datos=None)
     for bloque in data["conclusiones"]:
         story.append(Paragraph(bloque["titulo"], styles["Heading2"]))
         story.append(Spacer(1, 0.10 * cm))
-        story.append(Paragraph(bloque["texto"], styles["BodyText"]))
+        story.append(Paragraph(bloque["texto"], styles["BodyJustify"]))
         story.append(Spacer(1, 0.25 * cm))
 
     story.append(Spacer(1, 0.25 * cm))
