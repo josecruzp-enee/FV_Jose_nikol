@@ -85,7 +85,7 @@ def extraer_metricas_conclusion(resultado: Any, datos: Any = None) -> dict:
     # ======================================================
     # LAYOUT
     # ======================================================
-
+    layout_preliminar = _get(resultado, "layout_preliminar", default=None)
     layout = layout_preliminar
 
     if isinstance(layout, dict):
