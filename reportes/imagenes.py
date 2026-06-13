@@ -297,4 +297,11 @@ def generar_artefactos(
             ),
         )
 
-    return paths
+    return {
+        "path": str(out_path),
+        "ancho_total_m": float(ancho_total),
+        "largo_total_m": float(alto_total),
+        "area_rectangular_m2": float(ancho_total * alto_total),
+        "columnas": int(cols),
+        "filas": int(rows),
+    }
