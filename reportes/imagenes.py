@@ -173,6 +173,7 @@ def generar_artefactos(
 
     from reportes.generar_charts import generar_charts
     from reportes.generar_layout_paneles import generar_layout_paneles
+    from electrical.catalogos import catalogo_paneles
 
     paths = construir_paths_salida(out_dir)
 
@@ -206,11 +207,17 @@ def generar_artefactos(
     n_paneles = inferir_n_paneles(res)
 
     sf = {}
+    equipos = {}
 
     try:
         sf = getattr(proyecto, "sistema_fv", {}) or {}
     except Exception:
         sf = {}
+
+    try:
+        equipos = getattr(proyecto, "equipos", {}) or {}
+    except Exception:
+        equipos = {}
 
     modo_sistema = sf.get("modo")
     zonas = sf.get("zonas") or []
@@ -232,11 +239,49 @@ def generar_artefactos(
     paths["tipo_montaje"] = tipo_montaje
     paths["orientacion_panel"] = orientacion_panel
 
+    # =====================================================
+    # DIMENSIONES REALES DEL PANEL
+    # =====================================================
+    panel_w = 1.10
+    panel_h = 2.20
+
+    try:
+        panel_id = equipos.get("panel_id")
+
+        paneles_catalogo = {
+            p["id"]: p for p in catalogo_paneles()
+        }
+
+        panel = paneles_catalogo.get(panel_id, {}) or {}
+        mecanico = panel.get("mecanico", {}) or {}
+
+        largo_mm = float(mecanico.get("largo_mm", 2200))
+        ancho_mm = float(mecanico.get("ancho_mm", 1100))
+
+        largo_m = largo_mm / 1000.0
+        ancho_m = ancho_mm / 1000.0
+
+        if orientacion_panel == "Horizontal (Landscape)":
+            panel_w = largo_m
+            panel_h = ancho_m
+        else:
+            panel_w = ancho_m
+            panel_h = largo_m
+
+    except Exception:
+        panel_w = 1.10
+        panel_h = 2.20
+
+    paths["panel_w_m"] = panel_w
+    paths["panel_h_m"] = panel_h
+
     if n_paneles > 0:
         generar_layout_paneles(
             n_paneles=n_paneles,
             out_path=paths["layout_paneles"],
             max_cols=None,
+            panel_w=panel_w,
+            panel_h=panel_h,
             dos_aguas=dos_aguas_layout,
             gap_cumbrera_m=float(gap_cumbrera_m),
             modo_sistema=modo_sistema,
@@ -247,7 +292,9 @@ def generar_artefactos(
             n_strings=n_strings,
             paneles_por_string=paneles_por_string,
             latitud=float(_leer(proyecto, "lat", 15.0) or 15.0),
-            inclinacion_panel_grados=float(sf.get("inclinacion_panel_grados", 15.0) or 15.0),
+            inclinacion_panel_grados=float(
+                sf.get("inclinacion_panel_grados", 15.0) or 15.0
+            ),
         )
 
     return paths
