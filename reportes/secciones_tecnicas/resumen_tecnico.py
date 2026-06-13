@@ -167,10 +167,9 @@ def data_resumen_sistema(
         ["Potencia AC instalada", f"{kw_ac_total:.2f} kW"],
         ["Relación DC/AC", f"{relacion_dc_ac:.2f}"],
 
-        ["Número de módulos", f"{n_paneles} × {panel_wp:.0f} Wp"],
-
-        ["Paneles utilizados", paneles_usados],
-        ["Paneles sobrantes", paneles_sobrantes],
+        ["Módulos dimensionados", f"{n_paneles} × {panel_wp:.0f} Wp"],
+        ["Módulos conectados", paneles_usados],
+        ["Módulos sobrantes", paneles_sobrantes],
 
         ["Número de inversores",
          f"{n_inversores} × {potencia_inversor:.1f} kW"],
@@ -412,6 +411,12 @@ def build_resumen_tecnico(resultado, pal, styles, content_w):
         )
     )
 
+    # Homologación con la configuración eléctrica real
+    # Ejemplo: 14S × 10 strings = 140 módulos conectados
+    if n_strings > 0 and n_series > 0:
+        paneles_conectados = n_strings * n_series
+        paneles_usados = paneles_conectados
+        paneles_sobrantes = max(0, n_paneles - paneles_conectados)
     # ======================================================
     # TABLA SISTEMA
     # ======================================================
