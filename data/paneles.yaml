@@ -19,6 +19,13 @@ paneles:
     termico:
       noct_c: 45
 
+    mecanico:
+      largo_mm: 1956
+      ancho_mm: 992
+      espesor_mm: 40
+      peso_kg: 22.5
+      area_m2: 1.94
+
 ########################################################################
 
   ja_550:
@@ -38,6 +45,16 @@ paneles:
       vmp: -0.35
       pmax: -0.34
 
+    termico:
+      noct_c: 45
+
+    mecanico:
+      largo_mm: 2279
+      ancho_mm: 1134
+      espesor_mm: 35
+      peso_kg: 28.6
+      area_m2: 2.585
+
 ########################################################################
 
   canadian_450:
@@ -55,6 +72,16 @@ paneles:
     coeficientes_pct_c:
       voc: -0.29
       pmax: -0.37
+
+    termico:
+      noct_c: 45
+
+    mecanico:
+      largo_mm: 2108
+      ancho_mm: 1048
+      espesor_mm: 40
+      peso_kg: 24.9
+      area_m2: 2.21
 
 ########################################################################
 
