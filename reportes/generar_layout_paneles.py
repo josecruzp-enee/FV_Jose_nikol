@@ -564,16 +564,38 @@ def generar_layout_paneles(
 
     _agregar_cotas(ax, ancho_total, alto_total)
 
-    y_sep = alto_total + (0.42 if layout_por_strings else 0.28)
+    if layout_por_strings:
+        ax.text(
+            ancho_total / 2,
+            -1.18,
+            (
+                f"Separación entre paneles: {gap:.2f} m   |   "
+                f"Separación entre filas por sombra: {separacion_sombra_m:.2f} m"
+            ),
+            ha="center",
+            va="top",
+            fontsize=7,
+            color=COLOR_LINEA,
+        )
+    else:
+        ax.text(
+            ancho_total,
+            alto_total + 0.28,
+            f"Separación entre paneles: {gap:.2f} m",
+            ha="right",
+            va="bottom",
+            fontsize=7,
+            color=COLOR_LINEA,
+        )
 
-    ax.text(
-        ancho_total,
-        y_sep,
-        f"Separación entre paneles: {gap:.2f} m",
-        ha="right",
-        va="bottom",
-        fontsize=7,
-    )
+        ax.text(
+            ancho_total,
+            y_sep,
+            f"Separación entre paneles: {gap:.2f} m",
+            ha="right",
+            va="bottom",
+            fontsize=7,
+        )
 
     _agregar_norte(ax, ancho_total, 0)
 
