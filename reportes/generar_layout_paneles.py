@@ -338,7 +338,7 @@ def generar_layout_paneles(
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
-    fig, ax = plt.subplots(figsize=(10, 6))
+    fig, ax = plt.subplots(figsize=(11.5, 7.2))
     ax.set_facecolor(COLOR_FONDO)
 
     if dos_aguas:
@@ -372,7 +372,6 @@ def generar_layout_paneles(
         fontsize=7,
     )
 
-    y_caja = -3.35
 
     
 
