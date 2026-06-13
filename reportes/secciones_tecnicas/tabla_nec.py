@@ -219,37 +219,76 @@ def crear_tabla_indicadores(resultado, pal, content_w):
 
     strings = getattr(paneles, "strings", []) if paneles else []
 
-    n_paneles = getattr(sizing, "n_paneles", 0) if sizing else 0
-    kw_ac_unitario = getattr(sizing, "kw_ac", 0) if sizing else 0
-    kw_ac_total = getattr(sizing, "kw_ac_total", kw_ac_unitario) if sizing else 0
-    kwp_dc = getattr(sizing, "kwp_dc", 0) if sizing else 0
-
     # ======================================================
-    # PANEL UTILIZADOS
+    # DATOS BASE
     # ======================================================
 
-    paneles_en_strings = sum(getattr(s, "n_series", 0) for s in strings)
+    n_paneles_sizing = int(getattr(sizing, "n_paneles", 0) or 0) if sizing else 0
+
+    kw_ac_unitario = float(getattr(sizing, "kw_ac", 0) or 0) if sizing else 0
+    kw_ac_total = float(
+        getattr(sizing, "kw_ac_total", kw_ac_unitario) or kw_ac_unitario
+    ) if sizing else 0
+
+    n_inv = int(getattr(sizing, "n_inversores", 1) or 1) if sizing else 1
+
+    # ======================================================
+    # PANEL REAL
+    # ======================================================
+
+    panel = getattr(paneles, "panel", None) if paneles else None
+
+    if panel is None and sizing is not None:
+        panel = getattr(sizing, "panel", None)
+
+    panel_wp = float(getattr(panel, "pmax_w", 0) or 0) if panel else 0
+
+    # ======================================================
+    # PANELES REALMENTE CONECTADOS
+    # ======================================================
+
+    paneles_en_strings = sum(
+        int(getattr(s, "n_series", 0) or 0) * int(getattr(s, "n_paralelo", 1) or 1)
+        for s in strings
+    )
+
+    if paneles_en_strings <= 0:
+        paneles_en_strings = n_paneles_sizing
+
+    # ======================================================
+    # POTENCIA DC REAL
+    # Fuente prioritaria: strings reales + panel real
+    # ======================================================
+
+    if paneles_en_strings > 0 and panel_wp > 0:
+        kwp_dc_real = paneles_en_strings * panel_wp / 1000.0
+    else:
+        kwp_dc_real = float(
+            getattr(sizing, "kwp_dc", getattr(sizing, "pdc_kw", 0)) or 0
+        ) if sizing else 0
+
+    # ======================================================
+    # UTILIZACIÓN DE PANELES
+    # ======================================================
 
     utiliz_panel = (
-        paneles_en_strings / n_paneles * 100
-        if n_paneles else 0
+        paneles_en_strings / n_paneles_sizing * 100
+        if n_paneles_sizing else 0
     )
 
     # ======================================================
     # MPPT
     # ======================================================
 
-    n_inv = getattr(sizing, "n_inversores", 1) if sizing else 1
-
-    inversor = getattr(sizing, "inversor", None)
-    mppt_por_inv = getattr(inversor, "n_mppt", 2) if inversor else 2
+    inversor = getattr(sizing, "inversor", None) if sizing else None
+    mppt_por_inv = int(getattr(inversor, "n_mppt", 2) or 2) if inversor else 2
 
     n_mppt_total = n_inv * mppt_por_inv
 
     array = getattr(paneles, "array", None) if paneles else None
 
     strings_por_mppt = (
-        getattr(array, "strings_por_mppt", 1)
+        int(getattr(array, "strings_por_mppt", 1) or 1)
         if array else 1
     )
 
@@ -264,11 +303,11 @@ def crear_tabla_indicadores(resultado, pal, content_w):
     # DC / AC
     # ======================================================
 
-    relacion = kwp_dc / kw_ac_total if kw_ac_total else 0
-    carga_inv = kwp_dc / n_inv if n_inv else 0
+    relacion = kwp_dc_real / kw_ac_total if kw_ac_total else 0
+    carga_inv = kwp_dc_real / n_inv if n_inv else 0
 
     rows = [
-        ["Indicador","Valor"],
+        ["Indicador", "Valor"],
         ["Utilización de paneles", f"{utiliz_panel:.1f} %"],
         ["Utilización de MPPT", f"{utiliz_mppt:.1f} %"],
         ["Relación DC/AC", f"{relacion:.2f}"],
@@ -283,12 +322,12 @@ def crear_tabla_indicadores(resultado, pal, content_w):
     tbl = Table(rows, colWidths=colw)
 
     tbl.setStyle(TableStyle([
-        ("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),
-        ("BACKGROUND",(0,0),(-1,0),pal["SOFT"]),
-        ("TEXTCOLOR",(0,0),(-1,0),pal["PRIMARY"]),
-        ("ALIGN",(1,1),(1,-1),"RIGHT"),
-        ("GRID",(0,0),(-1,-1),0.3,pal["BORDER"]),
-        ("FONTSIZE",(0,0),(-1,-1),10),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("BACKGROUND", (0, 0), (-1, 0), pal["SOFT"]),
+        ("TEXTCOLOR", (0, 0), (-1, 0), pal["PRIMARY"]),
+        ("ALIGN", (1, 1), (1, -1), "RIGHT"),
+        ("GRID", (0, 0), (-1, -1), 0.3, pal["BORDER"]),
+        ("FONTSIZE", (0, 0), (-1, -1), 10),
     ]))
 
     return tbl
