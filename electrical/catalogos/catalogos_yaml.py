@@ -149,6 +149,7 @@ def _paneles() -> Dict[str, PanelSpec]:
         stc = p["stc"]
         co = p.get("coeficientes_pct_c", {})
         termico = p.get("termico", {})
+        mecanico = p.get("mecanico", {}) or {}
 
         # Normalización segura
         coef_voc = float(co.get("voc", 0.0))
