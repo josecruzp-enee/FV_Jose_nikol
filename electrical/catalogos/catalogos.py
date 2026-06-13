@@ -177,6 +177,8 @@ def catalogo_paneles() -> list[dict]:
                 "espesor_mm": float(p.espesor_mm),
                 "peso_kg": float(p.peso_kg),
                 "area_m2": float(p.area_m2),
+            }
+                
         })
 
     return out
