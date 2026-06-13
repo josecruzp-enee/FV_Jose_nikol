@@ -276,41 +276,39 @@ def generar_artefactos(
     paths["panel_h_m"] = panel_h
 
     if n_paneles > 0:
-        generar_layout_paneles(
-            n_paneles=n_paneles,
-            out_path=paths["layout_paneles"],
-            max_cols=None,
-            panel_w=panel_w,
-            panel_h=panel_h,
-            dos_aguas=dos_aguas_layout,
-            gap_cumbrera_m=float(gap_cumbrera_m),
-            modo_sistema=modo_sistema,
-            zonas=zonas,
-            orientacion_panel=orientacion_panel,
-            tipo_montaje=tipo_montaje,
-            layout_por_strings=layout_por_strings,
-            n_strings=n_strings,
-            paneles_por_string=paneles_por_string,
-            latitud=float(_leer(proyecto, "lat", 15.0) or 15.0),
-            inclinacion_panel_grados=float(
-                sf.get("inclinacion_panel_grados", 15.0) or 15.0
-            ),
+
+    layout_info = generar_layout_paneles(
+        n_paneles=n_paneles,
+        out_path=paths["layout_paneles"],
+        max_cols=None,
+        panel_w=panel_w,
+        panel_h=panel_h,
+        dos_aguas=dos_aguas_layout,
+        gap_cumbrera_m=float(gap_cumbrera_m),
+        modo_sistema=modo_sistema,
+        zonas=zonas,
+        orientacion_panel=orientacion_panel,
+        tipo_montaje=tipo_montaje,
+        layout_por_strings=layout_por_strings,
+        n_strings=n_strings,
+        paneles_por_string=paneles_por_string,
+        latitud=float(_leer(proyecto, "lat", 15.0) or 15.0),
+        inclinacion_panel_grados=float(
+            sf.get("inclinacion_panel_grados", 15.0) or 15.0
+        ),
+    )
+
+    if isinstance(layout_info, dict):
+        paths["layout_paneles"] = layout_info.get(
+            "path",
+            paths["layout_paneles"],
         )
 
-        if isinstance(layout_info, dict):
-            paths["layout_paneles"] = layout_info.get("path", paths["layout_paneles"])
-            paths["layout_paneles_info"] = layout_info
-            paths["layout_ancho_total_m"] = layout_info.get("ancho_total_m")
-            paths["layout_largo_total_m"] = layout_info.get("largo_total_m")
-            paths["layout_area_rectangular_m2"] = layout_info.get("area_rectangular_m2")
-            paths["layout_columnas"] = layout_info.get("columnas")
-            paths["layout_filas"] = layout_info.get("filas")
+        paths["layout_paneles_info"] = layout_info
+        paths["layout_ancho_total_m"] = layout_info.get("ancho_total_m")
+        paths["layout_largo_total_m"] = layout_info.get("largo_total_m")
+        paths["layout_area_rectangular_m2"] = layout_info.get("area_rectangular_m2")
+        paths["layout_columnas"] = layout_info.get("columnas")
+        paths["layout_filas"] = layout_info.get("filas")
 
-    return {
-        "path": str(out_path),
-        "ancho_total_m": float(ancho_total),
-        "largo_total_m": float(alto_total),
-        "area_rectangular_m2": float(ancho_total * alto_total),
-        "columnas": int(cols),
-        "filas": int(rows),
-    }
+return paths
