@@ -19,10 +19,7 @@ paneles:
     termico:
       noct_c: 45
 
-
-
-
-
+########################################################################
 
   ja_550:
     marca: JA Solar
@@ -41,7 +38,7 @@ paneles:
       vmp: -0.35
       pmax: -0.34
 
-
+#######################################################################
   canadian_450:
     marca: Canadian Solar
     nombre: HiKu CS3W-450
@@ -57,3 +54,59 @@ paneles:
     coeficientes_pct_c:
       voc: -0.29
       pmax: -0.37   # tu loader usará esto como fallback para Vmp
+
+
+
+########################################################################
+
+ja_650:
+  marca: JA Solar
+  nombre: JAM72S42 LR 650W
+  codigo: JAM72S42-650/LR
+
+  stc:
+    pmax_w: 650
+    vmp_v: 44.67
+    voc_v: 53.27
+    imp_a: 14.55
+    isc_a: 15.41
+
+  coeficientes_pct_c:
+    isc: 0.045
+    voc: -0.25
+    pmax: -0.29
+
+  termico:
+    noct_c: 45
+
+  eficiencia:
+    modulo_pct: 23.3
+    celda_pct: 26.0
+
+  mecanico:
+    largo_mm: 2465
+    ancho_mm: 1134
+    espesor_mm: 30
+    peso_kg: 29.6
+    area_m2: 2.795
+
+  construccion:
+    tecnologia: "N-Type Mono"
+    celdas: 144
+    configuracion_celdas: "6x24"
+    half_cell: true
+    bifacial: false
+
+  electrico:
+    voltaje_sistema_max_v: 1500
+    fusible_max_a: 25
+    caja_conexion: "IP68"
+    diodos: 3
+
+  temperatura:
+    operacion_min_c: -40
+    operacion_max_c: 85
+
+  garantia:
+    producto_anios: 12
+    potencia_anios: 25
