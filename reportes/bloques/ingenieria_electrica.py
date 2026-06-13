@@ -607,7 +607,7 @@ def build_ingenieria_electrica(resultado, datos, paths, pal, styles, content_w, 
     _section_demanda_vs_fv_horaria(story, paths, styles, content_w)
     _section_energia_mensual(story, paths, styles, content_w)
     _section_optimizacion_economica(story, resultado, pal, styles, content_w)
-    agregar_pagina_conclusiones_ejecutivas(story, styles, resultado, datos)
+    agregar_pagina_conclusiones_ejecutivas(story, styles, resultado, datos, paths=paths)
     _section_layout_preliminar(story, resultado, pal, styles, content_w, paths=paths)
     insertar_layout_paneles(story, paths, styles, content_w, safe_image, datos.get("sistema_fv", {}) if datos else {},)
 
