@@ -472,30 +472,7 @@ def extraer_metricas_conclusion(resultado: Any, datos: Any = None) -> dict:
                 for x in tabla_12m
             )
 
-    # ======================================================
-    # LAYOUT
-    # ======================================================
-
-    layout = layout_preliminar
-
-    if isinstance(layout, dict):
-        layout = layout.get("layout") or layout
-
-    area_layout = 0.0
-
-    if layout is not None:
-        if isinstance(layout, dict):
-            area_layout = (
-                layout.get("area_rectangular_m2", 0.0)
-                or layout.get("area_necesaria_m2", 0.0)
-                or 0.0
-            )
-        else:
-            area_layout = (
-                getattr(layout, "area_rectangular_m2", 0.0)
-                or getattr(layout, "area_necesaria_m2", 0.0)
-                or 0.0
-            )
+    
 
     return {
         "consumo_anual": _num(consumo_anual),
