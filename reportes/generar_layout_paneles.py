@@ -117,9 +117,6 @@ def _generar_layout_por_strings(
 ):
     """
     Genera layout físico orientativo agrupado por strings.
-
-    Si separacion_sombra_m > gap, usa esa distancia como separación
-    vertical entre filas/strings para representar separación por sombra.
     """
 
     n_strings = int(n_strings or 0)
@@ -218,6 +215,7 @@ def _generar_layout_por_strings(
     ancho_total = cols * panel_w + max(cols - 1, 0) * gap_col
     alto_total = rows * panel_h + max(rows - 1, 0) * gap_fila
 
+    # Solo título arriba. Las separaciones se pondrán abajo en generar_layout_paneles().
     ax.text(
         ancho_total / 2,
         alto_total + 1.15,
@@ -229,19 +227,8 @@ def _generar_layout_por_strings(
         color=COLOR_LINEA,
     )
 
-    if separacion_sombra_m > gap:
-        ax.text(
-            ancho_total / 2,
-            alto_total + 0.75,
-            f"Separación entre filas por sombra: {separacion_sombra_m:.2f} m",
-            ha="center",
-            va="bottom",
-            fontsize=7,
-            color=COLOR_LINEA,
-        )
-
     return ancho_total, alto_total, cols, rows
-
+    
 def _generar_layout_dos_aguas(
     ax,
     n_paneles,
