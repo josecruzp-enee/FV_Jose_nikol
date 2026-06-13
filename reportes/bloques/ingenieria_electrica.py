@@ -486,7 +486,7 @@ def _section_energia_mensual(story, paths, styles, content_w):
         "No se pudo generar la gráfica de generación mensual."
     )
 
-def _section_layout_preliminar(story, resultado, pal, styles, content_w):
+def _section_layout_preliminar(story, resultado, pal, styles, content_w, paths=None):
 
     layout = leer(resultado, "layout_preliminar", None)
 
@@ -496,32 +496,61 @@ def _section_layout_preliminar(story, resultado, pal, styles, content_w):
     if isinstance(layout, dict):
         layout = layout.get("layout") or layout
 
+    paths = paths or {}
+
     def val(campo, default=None):
         if isinstance(layout, dict):
             return layout.get(campo, default)
         return getattr(layout, campo, default)
 
+    layout_por_strings = bool(paths.get("layout_por_strings", False))
+    n_strings = paths.get("n_strings_layout")
+    paneles_por_string = paths.get("paneles_por_string_layout")
+
     story.append(Paragraph("Layout preliminar del sistema FV", styles["Heading2"]))
     story.append(Spacer(1, 6))
 
-    data = [
-        ["Concepto", "Valor"],
-        ["Cantidad de paneles", f"{int(val('n_paneles', 0)):,}"],
-        ["Filas", f"{int(val('filas', 0)):,}"],
-        ["Columnas", f"{int(val('columnas', 0)):,}"],
-        ["Paneles colocados", f"{int(val('paneles_colocados', 0)):,}"],
-        ["Espacios sobrantes", f"{int(val('paneles_sobrantes', 0)):,}"],
-        ["Ancho total estimado", f"{float(val('ancho_total_m', 0.0)):,.2f} m"],
-        ["Largo total estimado", f"{float(val('largo_total_m', 0.0)):,.2f} m"],
-        ["Área rectangular estimada", f"{float(val('area_rectangular_m2', 0.0)):,.2f} m²"],
-    ]
+    if layout_por_strings and n_strings and paneles_por_string:
+        total_representado = int(n_strings) * int(paneles_por_string)
+
+        data = [
+            ["Concepto", "Valor"],
+            ["Tipo de layout", "Distribución física por strings"],
+            ["Strings representados", f"{int(n_strings):,}"],
+            ["Módulos por string", f"{int(paneles_por_string):,}"],
+            ["Módulos representados", f"{total_representado:,}"],
+            ["Cantidad de paneles del sistema", f"{int(val('n_paneles', total_representado)):,}"],
+            ["Ancho estimado según imagen", "Ver cota en layout gráfico"],
+            ["Largo estimado según imagen", "Ver cota en layout gráfico"],
+        ]
+
+        nota = (
+            "Layout preliminar basado en la configuración eléctrica de strings. "
+            "La separación entre filas por sombra se representa en el layout gráfico. "
+            "No considera obstáculos, orientación real de cubierta ni verificación estructural."
+        )
+
+    else:
+        data = [
+            ["Concepto", "Valor"],
+            ["Cantidad de paneles", f"{int(val('n_paneles', 0)):,}"],
+            ["Filas", f"{int(val('filas', 0)):,}"],
+            ["Columnas", f"{int(val('columnas', 0)):,}"],
+            ["Paneles colocados", f"{int(val('paneles_colocados', 0)):,}"],
+            ["Espacios sobrantes", f"{int(val('paneles_sobrantes', 0)):,}"],
+            ["Ancho total estimado", f"{float(val('ancho_total_m', 0.0)):,.2f} m"],
+            ["Largo total estimado", f"{float(val('largo_total_m', 0.0)):,.2f} m"],
+            ["Área rectangular estimada", f"{float(val('area_rectangular_m2', 0.0)):,.2f} m²"],
+        ]
+
+        nota = (
+            "Layout preliminar informativo. No considera obstáculos, sombras, "
+            "orientación real ni verificación estructural."
+        )
 
     tabla = Table(
         data,
-        colWidths=[
-            content_w * 0.45,
-            content_w * 0.55,
-        ],
+        colWidths=[content_w * 0.45, content_w * 0.55],
         repeatRows=1,
     )
 
@@ -537,15 +566,7 @@ def _section_layout_preliminar(story, resultado, pal, styles, content_w):
 
     story.append(tabla)
     story.append(Spacer(1, 8))
-
-    story.append(
-        Paragraph(
-            "Layout preliminar informativo. No considera obstáculos, sombras, "
-            "orientación real ni verificación estructural.",
-            styles["BodyText"]
-        )
-    )
-
+    story.append(Paragraph(nota, styles["BodyText"]))
     story.append(Spacer(1, 12))
 # =========================================================
 # PAGE 5
@@ -585,7 +606,7 @@ def build_ingenieria_electrica(resultado, datos, paths, pal, styles, content_w, 
     _section_energia_mensual(story, paths, styles, content_w)
     _section_optimizacion_economica(story, resultado, pal, styles, content_w)
     agregar_pagina_conclusiones_ejecutivas(story, styles, resultado, datos)
-    _section_layout_preliminar(story, resultado, pal, styles, content_w)
+    _section_layout_preliminar(story, resultado, pal, styles, content_w, paths=paths)
     insertar_layout_paneles(story, paths, styles, content_w, safe_image, datos.get("sistema_fv", {}) if datos else {},)
 
     story.append(PageBreak())
