@@ -385,8 +385,12 @@ def generar_layout_paneles(
 
     ax.axis("off")
 
-    plt.tight_layout()
-    plt.savefig(out_path, dpi=200)
+    plt.savefig(
+        out_path,
+        dpi=220,
+        bbox_inches="tight",
+        pad_inches=0.08,
+    )
     plt.close()
 
     return str(out_path)
