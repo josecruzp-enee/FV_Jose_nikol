@@ -64,6 +64,7 @@ def _dibujar_grid(n, cols, rows, x0, y0, w, h, gap, start_num=1):
     return patches, labels, num
 
 
+
 def _agregar_paneles(ax, patches, labels):
     for p in patches:
         ax.add_patch(p)
@@ -408,6 +409,42 @@ def _agregar_caja_tecnica(
         linespacing=1.25,
     )
 
+def calcular_separacion_sombra_m(
+    latitud: float = 15.0,
+    inclinacion_grados: float = 15.0,
+    panel_h: float = 2.2,
+    altura_solar_min_grados: float = 30.0,
+):
+    """
+    Calcula separación aproximada entre filas por sombra.
+
+    Criterio conservador:
+    separación = altura trasera del panel / tan(altura solar mínima)
+
+    altura trasera = largo_panel * sin(inclinación)
+    """
+
+    latitud = abs(float(latitud or 15.0))
+    inclinacion_grados = float(inclinacion_grados or 0.0)
+    panel_h = float(panel_h or 2.2)
+
+    # Si no mandan altura solar, se estima conservadora para Honduras.
+    # Honduras aprox. 13°N a 16°N.
+    if not altura_solar_min_grados:
+        altura_solar_min_grados = max(25.0, 90.0 - latitud - 23.45)
+
+    beta = math.radians(inclinacion_grados)
+    alfa = math.radians(float(altura_solar_min_grados))
+
+    altura_trasera = panel_h * math.sin(beta)
+
+    if altura_trasera <= 0 or alfa <= 0:
+        return 0.0
+
+    separacion = altura_trasera / math.tan(alfa)
+
+    return round(max(separacion, 0.0), 2)
+
 
 def generar_layout_paneles(
     n_paneles: int,
@@ -419,6 +456,9 @@ def generar_layout_paneles(
     dos_aguas: bool = False,
     gap_cumbrera_m: float = 0.35,
     separacion_sombra_m: float = 0.0,
+    latitud: float = 15.0,
+    inclinacion_panel_grados: float = 15.0,
+    altura_solar_min_grados: float = 30.0,
     modo_sistema: str | None = None,
     zonas: list | None = None,
     orientacion_panel: str = "Vertical (Portrait)",
@@ -458,6 +498,14 @@ def generar_layout_paneles(
 
     fig, ax = plt.subplots(figsize=(11.5, 7.2))
     ax.set_facecolor(COLOR_FONDO)
+
+    if separacion_sombra_m <= 0 and tipo_montaje in ["Terraza / cubierta plana", "Suelo"]:
+    separacion_sombra_m = calcular_separacion_sombra_m(
+        latitud=latitud,
+        inclinacion_grados=inclinacion_panel_grados,
+        panel_h=panel_h,
+        altura_solar_min_grados=altura_solar_min_grados,
+    )
 
     if layout_por_strings and n_strings and paneles_por_string:
         ancho_total, alto_total, cols, rows = _generar_layout_por_strings(
