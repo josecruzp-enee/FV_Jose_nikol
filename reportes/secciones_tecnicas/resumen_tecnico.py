@@ -180,7 +180,7 @@ def data_resumen_sistema(
 
         ["Módulos dimensionados", f"{n_paneles} × {panel_wp:.0f} Wp"],
         ["Módulos conectados", paneles_usados],
-        ["Módulos sobrantes", paneles_sobrantes],
+       
 
         ["Número de inversores",
          f"{n_inversores} × {potencia_inversor:.1f} kW"],
