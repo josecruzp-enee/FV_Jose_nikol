@@ -85,63 +85,18 @@ def extraer_metricas_conclusion(resultado: Any, datos: Any = None) -> dict:
     # ======================================================
     # LAYOUT
     # ======================================================
-    layout_preliminar = _get(resultado, "layout_preliminar", default=None)
-    layout = layout_preliminar
+    # ======================================================
+    # LAYOUT
+    # ======================================================
 
-    if isinstance(layout, dict):
-        layout = layout.get("layout") or layout
+    layout_preliminar = _get(resultado, "layout_preliminar", default=None)
 
     area_layout = 0.0
-    ancho_layout_m = 0.0
-    largo_layout_m = 0.0
 
-    if layout is not None:
-        if isinstance(layout, dict):
-            ancho_layout_m = _num(
-                layout.get("ancho_total_m", 0.0)
-                or layout.get("ancho_layout_grafico_m", 0.0)
-            )
-
-            largo_layout_m = _num(
-                layout.get("largo_total_m", 0.0)
-                or layout.get("largo_layout_grafico_m", 0.0)
-            )
-
-            area_layout = _num(
-                layout.get("area_rectangular_m2", 0.0)
-                or layout.get("area_necesaria_m2", 0.0)
-            )
-
-        else:
-            ancho_layout_m = _num(
-                getattr(layout, "ancho_total_m", 0.0)
-                or getattr(layout, "ancho_layout_grafico_m", 0.0)
-            )
-
-            largo_layout_m = _num(
-                getattr(layout, "largo_total_m", 0.0)
-                or getattr(layout, "largo_layout_grafico_m", 0.0)
-            )
-
-            area_layout = _num(
-                getattr(layout, "area_rectangular_m2", 0.0)
-                or getattr(layout, "area_necesaria_m2", 0.0)
-            )
-
-    if ancho_layout_m > 0 and largo_layout_m > 0:
-        area_layout = ancho_layout_m * largo_layout_m
-
-    opt = _get(resultado, "optimizacion_economica", default=None)
-
-    if not opt and energia is not None:
-        opt = _get(energia, "optimizacion_economica", default=None)
-
-    sin = {}
-    con = {}
-
-    if isinstance(opt, dict):
-        sin = opt.get("sin_inyeccion", {}) or {}
-        con = opt.get("con_inyeccion", {}) or {}
+    if isinstance(layout_preliminar, dict):
+        area_layout = _num(
+            layout_preliminar.get("area_layout_real_m2", 0.0)
+        )
 
     # ======================================================
     # ENERGÍA
