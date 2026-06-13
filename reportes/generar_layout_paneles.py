@@ -269,7 +269,7 @@ def _generar_layout_dos_aguas(
 
 
 def _agregar_cotas(ax, ancho_total, alto_total):
-    margen_x = 2.20
+    margen_x = 2.80
     margen_y = 0.85
 
     y_cota = -margen_y
