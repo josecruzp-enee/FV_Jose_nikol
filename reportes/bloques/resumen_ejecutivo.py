@@ -64,10 +64,31 @@ def p1_tabla_cliente(datos, sizing, fecha, pal, content_w):
 # SOLUCIÓN
 # =========================================================
 
-def p1_tabla_solucion_unica(datos, sizing, energia, financiero, pal, content_w):
+def p1_tabla_solucion_unica(datos, sizing, energia, financiero, pal, content_w, paneles=None):
 
     kwp = float(leer(sizing, "kwp_dc", leer(sizing, "pdc_kw", 0.0)))
     capex = float(leer(financiero, "capex_L", 0.0))
+    # Homologar módulos reales conectados desde strings
+    strings = leer(paneles, "strings", []) if paneles else []
+
+    panel_wp_real = 0.0
+    panel_obj = leer(paneles, "panel", None) if paneles else None
+
+    if panel_obj:
+        panel_wp_real = float(leer(panel_obj, "pmax_w", 0.0))
+
+    paneles_conectados = 0
+
+    for s in strings:
+        paneles_conectados += int(leer(s, "n_series", 0) or 0)
+
+    if paneles_conectados > 0 and panel_wp_real > 0:
+        n_paneles = paneles_conectados
+        panel_wp = int(panel_wp_real)
+        kwp = paneles_conectados * panel_wp_real / 1000.0
+    else:
+        n_paneles = int(leer(sizing, "n_paneles", 0))
+        panel_wp = int((kwp * 1000) / n_paneles) if n_paneles > 0 else 0
 
     # 🔥 ENERGÍA CORRECTA
     energia_12m = leer(energia, "energia_util_12m", [])
@@ -79,8 +100,6 @@ def p1_tabla_solucion_unica(datos, sizing, energia, financiero, pal, content_w):
 
     cobertura_real = prod_anual / consumo_anual if consumo_anual > 0 else 0
 
-    n_paneles = int(leer(sizing, "n_paneles", 0))
-    panel_wp = int((kwp * 1000) / n_paneles) if n_paneles > 0 else 0
 
     tasa = float(get_field(datos, "tasa_anual", 0.0))
     plazo = int(get_field(datos, "plazo_anios", 0))
@@ -221,6 +240,7 @@ def build_resumen_ejecutivo(resultado, datos, paths, pal, styles, content_w):
     sizing = leer(resultado, "sizing", {})
     energia = leer(resultado, "energia", {})
     financiero = leer(resultado, "financiero", {})
+    paneles = leer(resultado, "paneles", None)
 
     fecha = datetime.now().strftime("%Y-%m-%d")
 
