@@ -159,6 +159,7 @@ def _chart_potencia_horaria(
     plt.savefig(path, dpi=160)
     plt.close()
 
+
 def _chart_demanda_vs_fv_horaria(
     consumo_horario_24h_kwh: dict,
     energia_horaria_kwh: List[float],
@@ -167,12 +168,15 @@ def _chart_demanda_vs_fv_horaria(
     """
     Grafica demanda original, generación FV y demanda neta desde red.
 
-    Variables:
-    - demanda: consumo original del cliente.
-    - fv_promedio: generación FV promedio horaria.
-    - demanda_neta_red: energía que todavía compra a la red.
-    - excedente: energía FV no autoconsumida.
+    Colores:
+    - Azul: demanda original.
+    - Verde: generación FV / reducción por FV.
+    - Rojo: demanda neta desde red.
+    - Naranja/beige: excedente FV.
     """
+
+    import numpy as np
+    import matplotlib.pyplot as plt
 
     if not energia_horaria_kwh:
         energia_horaria_kwh = [0.0] * 8760
@@ -230,63 +234,82 @@ def _chart_demanda_vs_fv_horaria(
         else 0.0
     )
 
+    horas_np = np.array(horas, dtype=float)
+    demanda_np = np.array(demanda, dtype=float)
+    fv_np = np.array(fv_promedio, dtype=float)
+    red_np = np.array(demanda_neta_red, dtype=float)
+
     plt.figure(figsize=(11, 5.5))
+    ax = plt.gca()
+
+    # ======================================================
+    # ÁREA DE REDUCCIÓN POR FV
+    # ======================================================
+    ax.fill_between(
+        horas_np,
+        red_np,
+        demanda_np,
+        where=demanda_np > red_np,
+        interpolate=True,
+        color="green",
+        alpha=0.16,
+        label="Demanda reducida por FV",
+        zorder=1,
+    )
+
+    # ======================================================
+    # ÁREA DE EXCEDENTE FV
+    # ======================================================
+    ax.fill_between(
+        horas_np,
+        demanda_np,
+        fv_np,
+        where=fv_np > demanda_np,
+        interpolate=True,
+        color="orange",
+        alpha=0.28,
+        label="Excedente FV",
+        zorder=2,
+    )
 
     # ======================================================
     # CURVA DEMANDA ORIGINAL
     # ======================================================
-    plt.plot(
-        horas,
-        demanda,
+    ax.plot(
+        horas_np,
+        demanda_np,
         marker="o",
         linewidth=2,
-        label="Demanda original"
+        color="blue",
+        label="Demanda original",
+        zorder=5,
     )
 
     # ======================================================
     # CURVA GENERACIÓN FV
     # ======================================================
-    plt.plot(
-        horas,
-        fv_promedio,
+    ax.plot(
+        horas_np,
+        fv_np,
         marker="o",
         linewidth=2,
-        label="Generación FV"
+        color="green",
+        label="Generación FV",
+        zorder=6,
     )
 
     # ======================================================
     # CURVA DEMANDA NETA DESDE RED
     # ======================================================
-    plt.plot(
-        horas,
-        demanda_neta_red,
+    ax.plot(
+        horas_np,
+        red_np,
         marker="o",
         linewidth=2,
         linestyle="--",
-        label="Demanda neta desde red"
-    )
-
-    # ======================================================
-    # ÁREA DE REDUCCIÓN POR FV
-    # ======================================================
-    plt.fill_between(
-        horas,
-        demanda,
-        demanda_neta_red,
-        alpha=0.18,
-        label="Demanda reducida por FV"
-    )
-
-    # ======================================================
-    # EXCEDENTE FV
-    # ======================================================
-    plt.fill_between(
-        horas,
-        fv_promedio,
-        demanda,
-        where=[fv_promedio[i] > demanda[i] for i in horas],
-        alpha=0.25,
-        label="Excedente FV"
+        color="red",
+        label="Demanda neta desde red",
+        zorder=7,
     )
 
     texto = (
@@ -299,26 +322,36 @@ def _chart_demanda_vs_fv_horaria(
         f"Reducción compra red: {reduccion_red:.1f}%"
     )
 
-    plt.text(
+    ax.text(
         0.02,
         0.97,
         texto,
-        transform=plt.gca().transAxes,
+        transform=ax.transAxes,
         fontsize=8,
         verticalalignment="top",
-        bbox=dict(boxstyle="round", alpha=0.15)
+        bbox=dict(
+            boxstyle="round",
+            facecolor="white",
+            edgecolor="gray",
+            alpha=0.80,
+        ),
+        zorder=10,
     )
 
-    plt.title("Reducción de demanda por generación fotovoltaica")
-    plt.xlabel("Hora del día")
-    plt.ylabel("Energía promedio horaria (kWh)")
-    plt.xticks(range(24))
-    plt.grid(True, alpha=0.35)
-    plt.legend(loc="upper right")
+    ax.set_title("Reducción de demanda por generación fotovoltaica")
+    ax.set_xlabel("Hora del día")
+    ax.set_ylabel("Energía promedio horaria (kWh)")
+    ax.set_xticks(range(24))
+    ax.grid(True, alpha=0.35)
+    ax.legend(loc="upper right")
 
     plt.tight_layout()
     plt.savefig(path, dpi=160)
     plt.close()
+
+
+
+
 def _chart_energia_horaria(
     energia_horaria_kwh: List[float],
     path: Path
