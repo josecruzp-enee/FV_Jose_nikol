@@ -130,21 +130,29 @@ def generar_artefactos(
     modo_sistema = sf.get("modo")
     zonas = sf.get("zonas", [])
 
-    # guardar para PDF
+    tipo_montaje = sf.get("tipo_montaje", "Terraza / cubierta plana")
+    orientacion_panel = sf.get("orientacion_panel", "Vertical (Portrait)")
+
+    dos_aguas_layout = tipo_montaje == "Techo a dos aguas"
+
+    # guardar para PDF / debug
     paths["modo_sistema"] = modo_sistema
     paths["zonas"] = zonas
+    paths["tipo_montaje"] = tipo_montaje
+    paths["orientacion_panel"] = orientacion_panel
 
     if n_paneles > 0:
         generar_layout_paneles(
             n_paneles=n_paneles,
             out_path=paths["layout_paneles"],
-            max_cols=max_cols,
-            dos_aguas=bool(dos_aguas),
+            max_cols=None,
+            dos_aguas=dos_aguas_layout,
             gap_cumbrera_m=float(gap_cumbrera_m),
             modo_sistema=modo_sistema,
             zonas=zonas,
+            orientacion_panel=orientacion_panel,
+            tipo_montaje=tipo_montaje,
         )
-
 
     
     # =====================================================
