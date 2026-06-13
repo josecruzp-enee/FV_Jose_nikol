@@ -511,21 +511,23 @@ def _section_layout_preliminar(story, resultado, pal, styles, content_w, paths=N
     story.append(Spacer(1, 6))
 
     if layout_por_strings and n_strings and paneles_por_string:
-        total_representado = int(n_strings) * int(paneles_por_string)
+        n_strings = int(n_strings)
+        paneles_por_string = int(paneles_por_string)
+        total_representado = n_strings * paneles_por_string
 
         data = [
             ["Concepto", "Valor"],
             ["Tipo de layout", "Distribución física por strings"],
-            ["Strings representados", f"{int(n_strings):,}"],
-            ["Módulos por string", f"{int(paneles_por_string):,}"],
-            ["Módulos representados", f"{total_representado:,}"],
-            ["Cantidad de paneles del sistema", f"{int(val('n_paneles', total_representado)):,}"],
-            ["Ancho estimado según imagen", "Ver cota en layout gráfico"],
-            ["Largo estimado según imagen", "Ver cota en layout gráfico"],
+            ["Strings representados", f"{n_strings:,}"],
+            ["Módulos por string", f"{paneles_por_string:,}"],
+            ["Módulos conectados representados", f"{total_representado:,}"],
+            ["Ancho estimado", "Ver cota en layout gráfico"],
+            ["Largo estimado", "Ver cota en layout gráfico"],
         ]
 
         nota = (
-            "Layout preliminar basado en la configuración eléctrica de strings. "
+            "Layout preliminar basado en la configuración eléctrica real de strings. "
+            "Los módulos representados corresponden a los módulos conectados del generador FV. "
             "La separación entre filas por sombra se representa en el layout gráfico. "
             "No considera obstáculos, orientación real de cubierta ni verificación estructural."
         )
