@@ -185,7 +185,7 @@ def _generar_layout_por_strings(
 
     ax.text(
         ancho_total / 2,
-        alto_total + 0.80,
+        alto_total + 1.15,
         f"Distribución física por strings: {n_strings} strings × {paneles_por_string} módulos",
         ha="center",
         va="bottom",
@@ -197,7 +197,7 @@ def _generar_layout_por_strings(
     if separacion_sombra_m > gap:
         ax.text(
             ancho_total / 2,
-            alto_total + 0.45,
+            alto_total + 0.75,
             f"Separación entre filas por sombra: {separacion_sombra_m:.2f} m",
             ha="center",
             va="bottom",
@@ -558,7 +558,7 @@ def generar_layout_paneles(
     ax.set_aspect("equal")
 
     ax.set_xlim(-4.0, max(ancho_total + 1.45, 10.8))
-    ax.set_ylim(-1.35, alto_total + 0.95)
+    ax.set_ylim(-1.35, alto_total + 1.55)
 
     ax.axis("off")
 
