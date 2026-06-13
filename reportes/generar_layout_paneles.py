@@ -590,7 +590,6 @@ def generar_layout_paneles(
 
         ax.text(
             ancho_total,
-            y_sep,
             f"Separación entre paneles: {gap:.2f} m",
             ha="right",
             va="bottom",
