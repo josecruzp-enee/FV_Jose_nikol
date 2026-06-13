@@ -76,7 +76,7 @@ def _agregar_paneles(ax, patches, labels):
             color="white",
             ha="center",
             va="center",
-            fontsize=5.2,
+            fontsize=6.4,
         )
 
 
@@ -177,11 +177,11 @@ def _generar_layout_por_strings(
 
     ax.text(
         ancho_total / 2,
-        alto_total + 0.38,
+        alto_total + 0.80,
         f"Distribución física por strings: {n_strings} strings × {paneles_por_string} módulos",
         ha="center",
         va="bottom",
-        fontsize=8,
+        fontsize=9,
         weight="bold",
         color=COLOR_LINEA,
     )
@@ -475,9 +475,11 @@ def generar_layout_paneles(
 
     _agregar_cotas(ax, ancho_total, alto_total)
 
+    y_sep = alto_total + (0.42 if layout_por_strings else 0.28)
+
     ax.text(
         ancho_total,
-        alto_total + 0.28,
+        y_sep,
         f"Separación entre paneles: {gap:.2f} m",
         ha="right",
         va="bottom",
