@@ -1,8 +1,8 @@
-# reportes/imagenes.py
+# -*- coding: utf-8 -*-
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, Optional
+import math
 
 import matplotlib
 matplotlib.use("Agg")
@@ -11,260 +11,390 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 
 
-# =========================================================
-# BASE PATHS
-# =========================================================
-
-def _ensure_dir(p: Path) -> Path:
-    p.mkdir(parents=True, exist_ok=True)
-    return p
-
-
-def construir_paths_salida(base_dir: str | Path) -> Dict[str, str]:
-    base = Path(base_dir)
-    _ensure_dir(base)
-
-    charts_dir = _ensure_dir(base / "charts")
-
-    return {
-        "out_dir": str(base),
-        "charts_dir": str(charts_dir),
-        "layout_paneles": str(base / "layout_paneles.png"),
-    }
+COLOR_PANEL = "#1F3A5F"
+COLOR_BORDE = "#0B2E4A"
+COLOR_FONDO = "#FFFFFF"
+COLOR_CUMBRERA = "#DDDDDD"
+COLOR_CAJA = "#F7F7F7"
+COLOR_LINEA = "#222222"
 
 
-# =========================================================
-# HELPERS NUMÉRICOS
-# =========================================================
-
-def _as_int(x: Any, default: int = 0) -> int:
-    try:
-        return int(float(x)) if x is not None else int(default)
-    except Exception:
-        return int(default)
-
-
-# =========================================================
-# INFERENCIA DE PANELES
-# =========================================================
-
-def inferir_n_paneles(res: Any) -> int:
-    sizing = res.get("sizing") if isinstance(res, dict) else getattr(res, "sizing", None)
-
-    if sizing and not isinstance(sizing, dict):
-        n = _as_int(getattr(sizing, "n_paneles", 0))
-        if n > 0:
-            return n
-
-        n = _as_int(getattr(sizing, "n_paneles_string", 0))
-        if n > 0:
-            return n
-
-    if isinstance(sizing, dict):
-        n = _as_int(sizing.get("n_paneles"), 0)
-        if n > 0:
-            return n
-
-        n = _as_int(sizing.get("n_paneles_string"), 0)
-        if n > 0:
-            return n
-
-    n = _as_int(res.get("n_paneles") if isinstance(res, dict) else getattr(res, "n_paneles", 0))
-    if n > 0:
-        return n
-
-    return 0
+def _validar_entrada(n_paneles, max_cols, panel_w, panel_h, gap, gap_cumbrera_m):
+    if n_paneles <= 0:
+        raise ValueError("n_paneles debe ser mayor que cero.")
+    if max_cols <= 0:
+        raise ValueError("max_cols debe ser mayor que cero.")
+    if panel_w <= 0:
+        raise ValueError("panel_w debe ser mayor que cero.")
+    if panel_h <= 0:
+        raise ValueError("panel_h debe ser mayor que cero.")
+    if gap < 0:
+        raise ValueError("gap no puede ser negativo.")
+    if gap_cumbrera_m < 0:
+        raise ValueError("gap_cumbrera_m no puede ser negativo.")
 
 
-# =========================================================
-# PIPELINE PRINCIPAL
-# =========================================================
+def _dibujar_grid(n, cols, rows, x0, y0, w, h, gap, start_num=1):
+    patches = []
+    labels = []
+    num = start_num
 
-def generar_artefactos(
-    *,
-    res: Dict[str, Any],
-    out_dir: str | Path,
-    proyecto=None,
-    vista_resultados: Optional[Dict[str, Any]] = None,
-    dos_aguas: bool = True,
-    max_cols: int = 7,
-    gap_cumbrera_m: float = 0.35,
-) -> Dict[str, str]:
+    for r in range(rows):
+        for c in range(cols):
+            if num >= start_num + n:
+                break
 
-    from reportes.generar_charts import generar_charts
-    from reportes.generar_layout_paneles import generar_layout_paneles
+            x = x0 + c * (w + gap)
+            y = y0 + r * (h + gap)
 
-    paths = construir_paths_salida(out_dir)
+            patches.append(
+                Rectangle(
+                    (x, y),
+                    w,
+                    h,
+                    facecolor=COLOR_PANEL,
+                    edgecolor=COLOR_BORDE,
+                    linewidth=0.7,
+                )
+            )
 
-    # =====================================================
-    # CHARTS
-    # =====================================================
-    charts = generar_charts(
-        res,
-        paths["charts_dir"],
-        vista_resultados=vista_resultados or {},
-        proyecto=proyecto,
-    )
+            labels.append((x + w / 2, y + h / 2, str(num)))
+            num += 1
 
-    if charts:
-        paths.update({k: str(v) for k, v in charts.items()})
+    return patches, labels, num
 
-    # =====================================================
-    # LAYOUT PANELES
-    # =====================================================
-        # =====================================================
-    # LAYOUT PANELES
-    # =====================================================
-    n_paneles = inferir_n_paneles(res)
 
-    # -----------------------------------------------------
-    # Detectar modo del sistema FV
-    # -----------------------------------------------------
-    sf = {}
+def _agregar_paneles(ax, patches, labels):
+    for p in patches:
+        ax.add_patch(p)
 
-    try:
-        sf = getattr(proyecto, "sistema_fv", {}) or {}
-    except Exception:
-        sf = {}
-
-    modo_sistema = sf.get("modo")
-    zonas = sf.get("zonas", [])
-
-    tipo_montaje = sf.get("tipo_montaje", "Terraza / cubierta plana")
-    orientacion_panel = sf.get("orientacion_panel", "Vertical (Portrait)")
-
-    dos_aguas_layout = tipo_montaje == "Techo a dos aguas"
-
-    # guardar para PDF / debug
-    paths["modo_sistema"] = modo_sistema
-    paths["zonas"] = zonas
-    paths["tipo_montaje"] = tipo_montaje
-    paths["orientacion_panel"] = orientacion_panel
-
-    if n_paneles > 0:
-        generar_layout_paneles(
-            n_paneles=n_paneles,
-            out_path=paths["layout_paneles"],
-            max_cols=None,
-            dos_aguas=dos_aguas_layout,
-            gap_cumbrera_m=float(gap_cumbrera_m),
-            modo_sistema=modo_sistema,
-            zonas=zonas,
-            orientacion_panel=orientacion_panel,
-            tipo_montaje=tipo_montaje,
+    for x, y, txt in labels:
+        ax.text(
+            x,
+            y,
+            txt,
+            color="white",
+            ha="center",
+            va="center",
+            fontsize=5.2,
         )
 
-    
-    # =====================================================
-    # STRING FV (ALINEADO)
-    # =====================================================
-    try:
-        strings = res.get("strings") if isinstance(res, dict) else getattr(res, "strings", None)
 
-        if not strings:
-            print("❌ No hay strings en res")
-        else:
-            print(f"✔ Strings detectados: {len(strings)}")
+def _generar_layout_rectangular(ax, n_paneles, max_cols, panel_w, panel_h, gap):
+    cols = min(max_cols, n_paneles)
+    rows = math.ceil(n_paneles / cols)
 
-            path_string = (Path(paths["out_dir"]) / "string_fv.png").resolve()
-            path_string.parent.mkdir(parents=True, exist_ok=True)
+    patches, labels, _ = _dibujar_grid(
+        n=n_paneles,
+        cols=cols,
+        rows=rows,
+        x0=0,
+        y0=0,
+        w=panel_w,
+        h=panel_h,
+        gap=gap,
+        start_num=1,
+    )
 
-            # ---------- AGRUPAR ----------
-            grupos = {}
-            for s in strings:
-                inv = getattr(s, "inversor", 1)
-                mppt = getattr(s, "mppt", 1)
-                grupos.setdefault((inv, mppt), []).append(s)
+    _agregar_paneles(ax, patches, labels)
 
-            # ---------- CONFIG ----------
-            panel_w = 0.5
-            panel_h = 1.0
-            gap = 0.15
+    ancho_total = cols * panel_w + max(cols - 1, 0) * gap
+    alto_total = rows * panel_h + max(rows - 1, 0) * gap
 
-            X_PANEL = 0
-            X_MPPT = 8
-            X_INV = 12
+    return ancho_total, alto_total, cols, rows
 
-            fig, ax = plt.subplots(figsize=(14, 6))
 
-            y_base = 0
-            conexiones = {}
+def _generar_layout_dos_aguas(
+    ax,
+    n_paneles,
+    max_cols,
+    panel_w,
+    panel_h,
+    gap,
+    gap_cumbrera_m,
+):
+    n_abajo = n_paneles // 2
+    n_arriba = n_paneles - n_abajo
 
-            # ---------- STRINGS ----------
-            for (inv, mppt), grupo in sorted(grupos.items()):
-                s = grupo[0]
-                n = int(getattr(s, "n_series", 0) or 0)
+    cols = min(max_cols, max(n_arriba, n_abajo))
 
-                y = y_base
+    rows_abajo = math.ceil(n_abajo / cols)
+    rows_arriba = math.ceil(n_arriba / cols)
 
-                for i in range(n):
-                    x = X_PANEL + i * (panel_w + gap)
+    ancho_total = cols * panel_w + max(cols - 1, 0) * gap
 
-                    ax.add_patch(Rectangle(
-                        (x, y),
-                        panel_w,
-                        panel_h,
-                        edgecolor="#0B2E4A",
-                        facecolor="#1F2A37"
-                    ))
+    alto_abajo = rows_abajo * panel_h + max(rows_abajo - 1, 0) * gap
+    alto_arriba = rows_arriba * panel_h + max(rows_arriba - 1, 0) * gap
 
-                    if i < n - 1:
-                        ax.plot(
-                            [x + panel_w, x + panel_w + gap],
-                            [y + panel_h/2, y + panel_h/2],
-                            color="black"
-                        )
+    alto_total = alto_abajo + gap_cumbrera_m + alto_arriba
 
-                x_end = X_PANEL + n * (panel_w + gap)
+    patches_abajo, labels_abajo, next_num = _dibujar_grid(
+        n=n_abajo,
+        cols=cols,
+        rows=rows_abajo,
+        x0=0,
+        y0=0,
+        w=panel_w,
+        h=panel_h,
+        gap=gap,
+        start_num=1,
+    )
 
-                y_pos = y + panel_h * 0.7
-                y_neg = y + panel_h * 0.3
+    y_arriba = alto_abajo + gap_cumbrera_m
 
-                ax.plot([x_end, X_MPPT], [y_pos, y_pos], "r", lw=2)
-                ax.plot([x_end, X_MPPT], [y_neg, y_neg], "k", lw=2)
+    patches_arriba, labels_arriba, _ = _dibujar_grid(
+        n=n_arriba,
+        cols=cols,
+        rows=rows_arriba,
+        x0=0,
+        y0=y_arriba,
+        w=panel_w,
+        h=panel_h,
+        gap=gap,
+        start_num=next_num,
+    )
 
-                ax.plot(X_MPPT, y_pos, "ro")
-                ax.plot(X_MPPT, y_neg, "ko")
+    _agregar_paneles(
+        ax,
+        patches_abajo + patches_arriba,
+        labels_abajo + labels_arriba,
+    )
 
-                ax.text(X_MPPT, y + panel_h + 0.3, f"MPPT {mppt}", ha="center")
+    ax.add_patch(
+        Rectangle(
+            (0, alto_abajo),
+            ancho_total,
+            gap_cumbrera_m,
+            linewidth=0.0,
+            facecolor=COLOR_CUMBRERA,
+        )
+    )
 
-                conexiones.setdefault(inv, []).append((y_pos, y_neg))
+    ax.text(
+        ancho_total / 2,
+        alto_abajo + gap_cumbrera_m / 2,
+        "Cumbrera",
+        ha="center",
+        va="center",
+        fontsize=7,
+        color="#555555",
+    )
 
-                y_base -= 2.5
+    return ancho_total, alto_total, cols, rows_abajo + rows_arriba
 
-            # ---------- INVERSOR ----------
-            for inv, pts in conexiones.items():
-                y_vals = [yy for (yp, yn) in pts for yy in (yp, yn)]
-                y_mid = sum(y_vals) / len(y_vals)
 
-                ax.add_patch(Rectangle(
-                    (X_INV, y_mid - 1),
-                    2,
-                    2,
-                    edgecolor="black",
-                    facecolor="#eeeeee"
-                ))
+def _agregar_cotas(ax, ancho_total, alto_total):
+    margen_x = 0.80
+    margen_y = 0.85
 
-                ax.text(X_INV + 1, y_mid, f"INV {inv}", ha="center")
+    y_cota = -margen_y
 
-                for (y_pos, y_neg) in pts:
-                    ax.plot([X_MPPT, X_INV], [y_pos, y_pos], "r", lw=2)
-                    ax.plot([X_MPPT, X_INV], [y_neg, y_neg], "k", lw=2)
+    ax.annotate(
+        "",
+        xy=(0, y_cota),
+        xytext=(ancho_total, y_cota),
+        arrowprops=dict(arrowstyle="<->", linewidth=1.0, color=COLOR_LINEA),
+    )
 
-                    ax.plot(X_INV, y_pos, "ro")
-                    ax.plot(X_INV, y_neg, "ko")
+    ax.text(
+        ancho_total / 2,
+        y_cota - 0.22,
+        f"Ancho estimado: {ancho_total:.2f} m",
+        ha="center",
+        va="top",
+        fontsize=8,
+    )
 
-            ax.axis("off")
-            plt.tight_layout()
-            plt.savefig(path_string, dpi=200, bbox_inches="tight")
-            plt.close()
+    x_cota = -margen_x
 
-            if path_string.exists():
-                paths["string_fv"] = str(path_string)
-            else:
-                print("❌ No se creó string_fv.png")
+    ax.annotate(
+        "",
+        xy=(x_cota, 0),
+        xytext=(x_cota, alto_total),
+        arrowprops=dict(arrowstyle="<->", linewidth=1.0, color=COLOR_LINEA),
+    )
 
-    except Exception as e:
-        print("❌ ERROR STRING FV:", e)
+    ax.text(
+        x_cota - 0.18,
+        alto_total / 2,
+        f"Largo estimado: {alto_total:.2f} m",
+        ha="right",
+        va="center",
+        rotation=90,
+        fontsize=8,
+    )
 
-    return paths
+
+def _agregar_norte(ax, ancho_total, y_base):
+    x = ancho_total + 0.75
+    y = y_base + 0.55
+
+    ax.annotate(
+        "",
+        xy=(x, y + 0.85),
+        xytext=(x, y),
+        arrowprops=dict(arrowstyle="->", linewidth=1.4, color=COLOR_LINEA),
+    )
+
+    ax.text(
+        x,
+        y + 1.00,
+        "N",
+        ha="center",
+        va="bottom",
+        fontsize=11,
+        weight="bold",
+    )
+
+
+def _agregar_caja_tecnica(
+    ax,
+    ancho_total,
+    y_caja,
+    n_paneles,
+    cols,
+    rows,
+    ancho_total_m,
+    largo_total_m,
+    panel_w,
+    panel_h,
+    gap,
+    dos_aguas,
+    orientacion_panel,
+    tipo_montaje,
+):
+    """
+    Caja técnica reservada para uso futuro.
+
+    Por ahora no se llama desde generar_layout_paneles()
+    para evitar duplicar información con la tabla del PDF.
+    """
+
+    alto_caja = 1.95
+    ancho_caja = max(ancho_total, 9.0)
+
+    ax.add_patch(
+        Rectangle(
+            (0, y_caja),
+            ancho_caja,
+            alto_caja,
+            facecolor=COLOR_CAJA,
+            edgecolor="#BBBBBB",
+            linewidth=0.8,
+        )
+    )
+
+    texto = (
+        "Dimensiones estimadas:\n"
+        f"Ancho: {ancho_total_m:.2f} m\n"
+        f"Largo: {largo_total_m:.2f} m\n\n"
+        f"Panel: {panel_h:.2f} m (alto) × {panel_w:.2f} m (ancho)\n"
+        f"Separación entre paneles: {gap:.2f} m\n\n"
+        f"Tipo: {tipo_montaje}\n"
+        f"Orientación: {orientacion_panel}\n"
+        f"Total de paneles: {n_paneles}\n"
+        f"Distribución: {cols} columnas × {rows} filas"
+    )
+
+    ax.text(
+        0.30,
+        y_caja + alto_caja - 0.25,
+        texto,
+        ha="left",
+        va="top",
+        fontsize=7.5,
+        linespacing=1.25,
+    )
+
+
+def generar_layout_paneles(
+    n_paneles: int,
+    out_path: str | Path,
+    max_cols: int | None = None,
+    panel_w: float = 1.1,
+    panel_h: float = 2.2,
+    gap: float = 0.08,
+    dos_aguas: bool = False,
+    gap_cumbrera_m: float = 0.35,
+    modo_sistema: str | None = None,
+    zonas: list | None = None,
+    orientacion_panel: str = "Vertical (Portrait)",
+    tipo_montaje: str = "Terraza / cubierta plana",
+):
+    """
+    Genera una imagen PNG del layout de paneles FV.
+
+    Nota:
+    - dos_aguas viene desde tipo_montaje.
+    - zonas es independiente del tipo de montaje.
+    - No modifica cálculos eléctricos, strings ni optimización.
+    """
+
+    if max_cols is None:
+        max_cols = math.ceil(math.sqrt(n_paneles))
+
+    _validar_entrada(
+        n_paneles=n_paneles,
+        max_cols=max_cols,
+        panel_w=panel_w,
+        panel_h=panel_h,
+        gap=gap,
+        gap_cumbrera_m=gap_cumbrera_m,
+    )
+
+    out_path = Path(out_path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    fig, ax = plt.subplots(figsize=(11.5, 7.2))
+    ax.set_facecolor(COLOR_FONDO)
+
+    if dos_aguas:
+        ancho_total, alto_total, cols, rows = _generar_layout_dos_aguas(
+            ax=ax,
+            n_paneles=n_paneles,
+            max_cols=max_cols,
+            panel_w=panel_w,
+            panel_h=panel_h,
+            gap=gap,
+            gap_cumbrera_m=gap_cumbrera_m,
+        )
+    else:
+        ancho_total, alto_total, cols, rows = _generar_layout_rectangular(
+            ax=ax,
+            n_paneles=n_paneles,
+            max_cols=max_cols,
+            panel_w=panel_w,
+            panel_h=panel_h,
+            gap=gap,
+        )
+
+    _agregar_cotas(ax, ancho_total, alto_total)
+
+    ax.text(
+        ancho_total,
+        alto_total + 0.28,
+        f"Separación entre paneles: {gap:.2f} m",
+        ha="right",
+        va="bottom",
+        fontsize=7,
+    )
+
+    _agregar_norte(ax, ancho_total, 0)
+
+    ax.set_aspect("equal")
+
+    ax.set_xlim(-1.25, max(ancho_total + 1.45, 10.8))
+    ax.set_ylim(-1.35, alto_total + 0.75)
+
+    ax.axis("off")
+
+    plt.savefig(
+        out_path,
+        dpi=220,
+        bbox_inches="tight",
+        pad_inches=0.08,
+    )
+
+    plt.close()
+
+    return str(out_path)
