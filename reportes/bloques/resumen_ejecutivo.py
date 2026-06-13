@@ -250,7 +250,7 @@ def build_resumen_ejecutivo(resultado, datos, paths, pal, styles, content_w):
     story.append(Spacer(1, 10))
 
     story += p1_tabla_cliente(datos, sizing, fecha, pal, content_w)
-    story += p1_tabla_solucion_unica(datos, sizing, energia, financiero, pal, content_w)
+    story += p1_tabla_solucion_unica(datos, sizing, energia, financiero, pal, content_w, paneles=paneles)
     story += p1_tabla_decision(financiero, pal, content_w)
     story += p1_conclusion(financiero, sizing, datos, pal, content_w)
 
