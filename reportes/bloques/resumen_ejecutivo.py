@@ -171,7 +171,7 @@ def p1_tabla_decision(financiero, pal, content_w):
 # CONCLUSIÓN
 # =========================================================
 
-def p1_conclusion(financiero, sizing, datos, pal, content_w):
+def p1_conclusion(financiero, sizing, datos, pal, content_w, paneles=None):
 
     evaluacion = leer(financiero, "evaluacion", {}) or {}
 
@@ -180,7 +180,20 @@ def p1_conclusion(financiero, sizing, datos, pal, content_w):
 
     peor = float(evaluacion.get("peor_mes", 0.0))
 
-    kwp = float(leer(sizing, "kwp_dc", 0.0))
+    strings = leer(paneles, "strings", []) if paneles else []
+    panel_obj = leer(paneles, "panel", None) if paneles else None
+
+    panel_wp = float(leer(panel_obj, "pmax_w", 0.0)) if panel_obj else 0.0
+
+    n_paneles = sum(
+        int(leer(s, "n_series", 0) or 0)
+        for s in strings
+    )
+
+    if n_paneles > 0 and panel_wp > 0:
+        kwp = n_paneles * panel_wp / 1000.0
+    else:
+        kwp = float(leer(sizing, "kwp_dc", 0.0))
 
     # =====================================================
     # IMPACTO FINANCIERO REAL
@@ -248,7 +261,7 @@ def build_resumen_ejecutivo(resultado, datos, paths, pal, styles, content_w):
     story += p1_tabla_cliente(datos, sizing, fecha, pal, content_w)
     story += p1_tabla_solucion_unica(datos, sizing, energia, financiero, pal, content_w, paneles=paneles)
     story += p1_tabla_decision(financiero, pal, content_w)
-    story += p1_conclusion(financiero, sizing, datos, pal, content_w)
+    story += p1_conclusion(financiero, sizing, datos, pal, content_w, paneles=paneles)
 
     story.append(PageBreak())
 
