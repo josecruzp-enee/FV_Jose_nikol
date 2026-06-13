@@ -103,7 +103,6 @@ def _generar_layout_rectangular(ax, n_paneles, max_cols, panel_w, panel_h, gap):
 
     return ancho_total, alto_total, cols, rows
 
-
 def _generar_layout_por_strings(
     ax,
     n_paneles,
@@ -112,16 +111,18 @@ def _generar_layout_por_strings(
     panel_w,
     panel_h,
     gap,
+    separacion_sombra_m=0.0,
 ):
     """
     Genera layout físico orientativo agrupado por strings.
 
-    Ejemplo:
-    10 strings × 12 paneles = 10 filas × 12 columnas.
+    Si separacion_sombra_m > gap, usa esa distancia como separación
+    vertical entre filas/strings para representar separación por sombra.
     """
 
     n_strings = int(n_strings or 0)
     paneles_por_string = int(paneles_por_string or 0)
+    separacion_sombra_m = float(separacion_sombra_m or 0.0)
 
     if n_strings <= 0 or paneles_por_string <= 0:
         raise ValueError("n_strings y paneles_por_string deben ser mayores que cero.")
@@ -131,14 +132,20 @@ def _generar_layout_por_strings(
 
     total_dibujado = min(n_paneles, n_strings * paneles_por_string)
 
+    # Separación horizontal normal entre paneles.
+    gap_col = gap
+
+    # Separación vertical entre filas.
+    # Aquí entra la separación por sombra.
+    gap_fila = max(gap, separacion_sombra_m)
+
     patches = []
     labels = []
     num = 1
 
     for r in range(rows):
-        y = (rows - 1 - r) * (panel_h + gap)
+        y = (rows - 1 - r) * (panel_h + gap_fila)
 
-        # etiqueta string a la izquierda
         ax.text(
             -0.35,
             y + panel_h / 2,
@@ -154,7 +161,7 @@ def _generar_layout_por_strings(
             if num > total_dibujado:
                 break
 
-            x = c * (panel_w + gap)
+            x = c * (panel_w + gap_col)
 
             patches.append(
                 Rectangle(
@@ -172,8 +179,8 @@ def _generar_layout_por_strings(
 
     _agregar_paneles(ax, patches, labels)
 
-    ancho_total = cols * panel_w + max(cols - 1, 0) * gap
-    alto_total = rows * panel_h + max(rows - 1, 0) * gap
+    ancho_total = cols * panel_w + max(cols - 1, 0) * gap_col
+    alto_total = rows * panel_h + max(rows - 1, 0) * gap_fila
 
     ax.text(
         ancho_total / 2,
@@ -186,8 +193,18 @@ def _generar_layout_por_strings(
         color=COLOR_LINEA,
     )
 
-    return ancho_total, alto_total, cols, rows
+    if separacion_sombra_m > gap:
+        ax.text(
+            ancho_total / 2,
+            alto_total + 0.45,
+            f"Separación entre filas por sombra: {separacion_sombra_m:.2f} m",
+            ha="center",
+            va="bottom",
+            fontsize=7,
+            color=COLOR_LINEA,
+        )
 
+    return ancho_total, alto_total, cols, rows
 
 def _generar_layout_dos_aguas(
     ax,
@@ -401,6 +418,7 @@ def generar_layout_paneles(
     gap: float = 0.08,
     dos_aguas: bool = False,
     gap_cumbrera_m: float = 0.35,
+    separacion_sombra_m: float = 0.0,
     modo_sistema: str | None = None,
     zonas: list | None = None,
     orientacion_panel: str = "Vertical (Portrait)",
@@ -450,6 +468,7 @@ def generar_layout_paneles(
             panel_w=panel_w,
             panel_h=panel_h,
             gap=gap,
+            separacion_sombra_m=separacion_sombra_m,
         )
 
     elif dos_aguas:
