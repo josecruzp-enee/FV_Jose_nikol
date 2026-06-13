@@ -338,7 +338,7 @@ def generar_layout_paneles(
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
-    fig, ax = plt.subplots(figsize=(10, 7))
+    fig, ax = plt.subplots(figsize=(10, 6))
     ax.set_facecolor(COLOR_FONDO)
 
     if dos_aguas:
@@ -374,29 +374,14 @@ def generar_layout_paneles(
 
     y_caja = -3.35
 
-    _agregar_caja_tecnica(
-        ax=ax,
-        ancho_total=ancho_total,
-        y_caja=y_caja,
-        n_paneles=n_paneles,
-        cols=cols,
-        rows=rows,
-        ancho_total_m=ancho_total,
-        largo_total_m=alto_total,
-        panel_w=panel_w,
-        panel_h=panel_h,
-        gap=gap,
-        dos_aguas=dos_aguas,
-        orientacion_panel=orientacion_panel,
-        tipo_montaje=tipo_montaje,
-    )
+    
 
-    _agregar_norte(ax, ancho_total, y_caja)
+    _agregar_norte(ax, ancho_total, 0)
 
     ax.set_aspect("equal")
 
     ax.set_xlim(-1.25, max(ancho_total + 1.45, 10.8))
-    ax.set_ylim(y_caja - 0.20, alto_total + 0.75)
+    ax.set_ylim(-1.35, alto_total + 0.75)
 
     ax.axis("off")
 
