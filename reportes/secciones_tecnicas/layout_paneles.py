@@ -59,14 +59,14 @@ def insertar_layout_paneles(
 
         try:
             if safe_image:
-                img = safe_image(str(layout), max_w=content_w, max_h=750)
+                img = safe_image(str(layout), max_w=content_w, max_h=500)
                 if not img:
                     img = Image(str(layout))
             else:
                 img = Image(str(layout))
 
             max_w = content_w
-            max_h = 750
+            max_h = 500
 
             w = img.imageWidth
             h = img.imageHeight
