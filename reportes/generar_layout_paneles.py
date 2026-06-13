@@ -269,7 +269,7 @@ def _generar_layout_dos_aguas(
 
 
 def _agregar_cotas(ax, ancho_total, alto_total):
-    margen_x = 2.80
+    margen_x = 3.50
     margen_y = 0.85
 
     y_cota = -margen_y
@@ -490,7 +490,7 @@ def generar_layout_paneles(
 
     ax.set_aspect("equal")
 
-    ax.set_xlim(-1.65, max(ancho_total + 1.45, 10.8))
+    ax.set_xlim(-4.0, max(ancho_total + 1.45, 10.8))
     ax.set_ylim(-1.35, alto_total + 0.95)
 
     ax.axis("off")
