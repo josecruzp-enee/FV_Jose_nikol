@@ -612,11 +612,11 @@ def agregar_pagina_conclusiones_ejecutivas(story, styles, resultado, datos=None)
     from reportlab.lib.styles import ParagraphStyle
 
     if "BodyJustify" not in styles:
-    styles.add(
-        ParagraphStyle(
-            name="BodyJustify",
-            parent=styles["BodyText"],
-            alignment=TA_JUSTIFY,
+        styles.add(
+            ParagraphStyle(
+                name="BodyJustify",
+                parent=styles["BodyText"],
+                alignment=TA_JUSTIFY,
         )
     )
     
