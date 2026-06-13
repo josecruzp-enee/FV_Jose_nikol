@@ -587,7 +587,7 @@ def generar_conclusiones_ejecutivas(resultado: Any, datos: Any = None) -> dict:
 # FUNCIÓN REPORTLAB PARA INSERTAR PÁGINA
 # ======================================================
 
-def agregar_pagina_conclusiones_ejecutivas(story, styles, resultado, datos=None):
+def agregar_pagina_conclusiones_ejecutivas(story, styles, resultado, datos=None, paths=None):
     """
     Agrega una página completa de conclusiones ejecutivas al PDF.
 
@@ -615,6 +615,10 @@ def agregar_pagina_conclusiones_ejecutivas(story, styles, resultado, datos=None)
     )
     
     data = generar_conclusiones_ejecutivas(resultado, datos)
+
+    paths = paths or {}
+    if paths.get("layout_area_rectangular_m2"):
+        data["metricas"]["area_layout"] = float(paths["layout_area_rectangular_m2"])
     m = data["metricas"]
     estado = data["estado"]
 
