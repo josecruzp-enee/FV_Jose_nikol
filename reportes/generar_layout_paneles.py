@@ -531,7 +531,7 @@ def generar_layout_paneles(
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
-    fig, ax = plt.subplots(figsize=(11.5, 7.2))
+    fig, ax = plt.subplots(figsize=(13.5, 10.5))
     ax.set_facecolor(COLOR_FONDO)
 
     if separacion_sombra_m <= 0 and tipo_montaje in ["Terraza / cubierta plana", "Suelo"]:
@@ -593,13 +593,13 @@ def generar_layout_paneles(
     ax.set_aspect("equal")
 
     ax.set_xlim(-4.0, max(ancho_total + 1.45, 10.8))
-    ax.set_ylim(-1.35, alto_total + 1.55)
+    ax.set_ylim(-1.35, alto_total + 2.25)
 
     ax.axis("off")
 
     plt.savefig(
         out_path,
-        dpi=220,
+        dpi=300,
         bbox_inches="tight",
         pad_inches=0.08,
     )
