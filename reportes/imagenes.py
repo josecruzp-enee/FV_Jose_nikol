@@ -297,6 +297,15 @@ def generar_artefactos(
             ),
         )
 
+        if isinstance(layout_info, dict):
+            paths["layout_paneles"] = layout_info.get("path", paths["layout_paneles"])
+            paths["layout_paneles_info"] = layout_info
+            paths["layout_ancho_total_m"] = layout_info.get("ancho_total_m")
+            paths["layout_largo_total_m"] = layout_info.get("largo_total_m")
+            paths["layout_area_rectangular_m2"] = layout_info.get("area_rectangular_m2")
+            paths["layout_columnas"] = layout_info.get("columnas")
+            paths["layout_filas"] = layout_info.get("filas")
+
     return {
         "path": str(out_path),
         "ancho_total_m": float(ancho_total),
