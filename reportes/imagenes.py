@@ -7,9 +7,6 @@ from typing import Any, Dict, Optional
 import matplotlib
 matplotlib.use("Agg")
 
-import matplotlib.pyplot as plt
-from matplotlib.patches import Rectangle
-
 
 # =========================================================
 # BASE PATHS
@@ -42,6 +39,20 @@ def _as_int(x: Any, default: int = 0) -> int:
         return int(float(x)) if x is not None else int(default)
     except Exception:
         return int(default)
+
+
+# =========================================================
+# LECTURA SEGURA
+# =========================================================
+
+def _leer(obj: Any, campo: str, default=None):
+    if obj is None:
+        return default
+
+    if isinstance(obj, dict):
+        return obj.get(campo, default)
+
+    return getattr(obj, campo, default)
 
 
 # =========================================================
@@ -79,6 +90,57 @@ def inferir_n_paneles(res: Any) -> int:
     return 0
 
 
+def inferir_strings(res: Any):
+    """
+    Busca strings en las rutas conocidas sin romper compatibilidad.
+    """
+
+    strings = _leer(res, "strings", None)
+
+    if strings:
+        return strings
+
+    paneles = _leer(res, "paneles", None)
+
+    if paneles is not None:
+        strings = _leer(paneles, "strings", None)
+        if strings:
+            return strings
+
+    return []
+
+
+def inferir_layout_strings(strings) -> tuple[bool, int | None, int | None]:
+    """
+    Devuelve:
+    - layout_por_strings
+    - n_strings
+    - paneles_por_string
+
+    Solo activa layout por strings si todos los strings tienen el mismo n_series.
+    """
+
+    if not strings:
+        return False, None, None
+
+    n_series_lista = []
+
+    for s in strings:
+        n = _as_int(_leer(s, "n_series", 0), 0)
+        if n > 0:
+            n_series_lista.append(n)
+
+    if not n_series_lista:
+        return False, None, None
+
+    valores = set(n_series_lista)
+
+    if len(valores) != 1:
+        return False, None, None
+
+    return True, len(n_series_lista), int(n_series_lista[0])
+
+
 # =========================================================
 # PIPELINE PRINCIPAL
 # =========================================================
@@ -111,6 +173,17 @@ def generar_artefactos(
 
     if charts:
         paths.update({k: str(v) for k, v in charts.items()})
+
+    # =====================================================
+    # STRINGS DISPONIBLES
+    # =====================================================
+    strings = inferir_strings(res)
+
+    layout_por_strings, n_strings, paneles_por_string = inferir_layout_strings(strings)
+
+    paths["layout_por_strings"] = layout_por_strings
+    paths["n_strings_layout"] = n_strings
+    paths["paneles_por_string_layout"] = paneles_por_string
 
     # =====================================================
     # LAYOUT PANELES
@@ -155,119 +228,9 @@ def generar_artefactos(
             zonas=zonas,
             orientacion_panel=orientacion_panel,
             tipo_montaje=tipo_montaje,
+            layout_por_strings=layout_por_strings,
+            n_strings=n_strings,
+            paneles_por_string=paneles_por_string,
         )
-
-    # =====================================================
-    # STRING FV
-    # =====================================================
-    try:
-        strings = res.get("strings") if isinstance(res, dict) else getattr(res, "strings", None)
-
-        if not strings:
-            print("❌ No hay strings en res")
-        else:
-            print(f"✔ Strings detectados: {len(strings)}")
-
-            path_string = (Path(paths["out_dir"]) / "string_fv.png").resolve()
-            path_string.parent.mkdir(parents=True, exist_ok=True)
-
-            grupos = {}
-
-            for s in strings:
-                inv = getattr(s, "inversor", 1)
-                mppt = getattr(s, "mppt", 1)
-                grupos.setdefault((inv, mppt), []).append(s)
-
-            panel_w = 0.5
-            panel_h = 1.0
-            gap = 0.15
-
-            X_PANEL = 0
-            X_MPPT = 8
-            X_INV = 12
-
-            fig, ax = plt.subplots(figsize=(14, 6))
-
-            y_base = 0
-            conexiones = {}
-
-            for (inv, mppt), grupo in sorted(grupos.items()):
-                s = grupo[0]
-                n = int(getattr(s, "n_series", 0) or 0)
-
-                y = y_base
-
-                for i in range(n):
-                    x = X_PANEL + i * (panel_w + gap)
-
-                    ax.add_patch(
-                        Rectangle(
-                            (x, y),
-                            panel_w,
-                            panel_h,
-                            edgecolor="#0B2E4A",
-                            facecolor="#1F2A37",
-                        )
-                    )
-
-                    if i < n - 1:
-                        ax.plot(
-                            [x + panel_w, x + panel_w + gap],
-                            [y + panel_h / 2, y + panel_h / 2],
-                            color="black",
-                        )
-
-                x_end = X_PANEL + n * (panel_w + gap)
-
-                y_pos = y + panel_h * 0.7
-                y_neg = y + panel_h * 0.3
-
-                ax.plot([x_end, X_MPPT], [y_pos, y_pos], "r", lw=2)
-                ax.plot([x_end, X_MPPT], [y_neg, y_neg], "k", lw=2)
-
-                ax.plot(X_MPPT, y_pos, "ro")
-                ax.plot(X_MPPT, y_neg, "ko")
-
-                ax.text(X_MPPT, y + panel_h + 0.3, f"MPPT {mppt}", ha="center")
-
-                conexiones.setdefault(inv, []).append((y_pos, y_neg))
-
-                y_base -= 2.5
-
-            for inv, pts in conexiones.items():
-                y_vals = [yy for (yp, yn) in pts for yy in (yp, yn)]
-                y_mid = sum(y_vals) / len(y_vals)
-
-                ax.add_patch(
-                    Rectangle(
-                        (X_INV, y_mid - 1),
-                        2,
-                        2,
-                        edgecolor="black",
-                        facecolor="#eeeeee",
-                    )
-                )
-
-                ax.text(X_INV + 1, y_mid, f"INV {inv}", ha="center")
-
-                for (y_pos, y_neg) in pts:
-                    ax.plot([X_MPPT, X_INV], [y_pos, y_pos], "r", lw=2)
-                    ax.plot([X_MPPT, X_INV], [y_neg, y_neg], "k", lw=2)
-
-                    ax.plot(X_INV, y_pos, "ro")
-                    ax.plot(X_INV, y_neg, "ko")
-
-            ax.axis("off")
-            plt.tight_layout()
-            plt.savefig(path_string, dpi=200, bbox_inches="tight")
-            plt.close()
-
-            if path_string.exists():
-                paths["string_fv"] = str(path_string)
-            else:
-                print("❌ No se creó string_fv.png")
-
-    except Exception as e:
-        print("❌ ERROR STRING FV:", e)
 
     return paths
