@@ -246,6 +246,8 @@ def generar_artefactos(
             layout_por_strings=layout_por_strings,
             n_strings=n_strings,
             paneles_por_string=paneles_por_string,
+            latitud=float(_leer(proyecto, "lat", 15.0) or 15.0),
+            inclinacion_panel_grados=float(sf.get("inclinacion_panel_grados", 15.0) or 15.0),
         )
 
     return paths
