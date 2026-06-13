@@ -463,8 +463,7 @@ def extraer_metricas_conclusion(resultado: Any, datos: Any = None) -> dict:
         "area_layout": _num(area_layout),
         "escenario_base": sin,
         "escenario_inyeccion": con,
-        "ancho_layout_m": _num(ancho_layout_m),
-        "largo_layout_m": _num(largo_layout_m),
+        
     }
 # ======================================================
 # CLASIFICACIÓN EJECUTIVA
