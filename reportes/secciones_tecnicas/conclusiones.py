@@ -81,7 +81,55 @@ def extraer_metricas_conclusion(resultado: Any, datos: Any = None) -> dict:
         "resultado_financiero",
         default=None,
     )
-    layout_preliminar = _get(resultado, "layout_preliminar", default=None)
+    
+    # ======================================================
+    # LAYOUT
+    # ======================================================
+
+    layout = layout_preliminar
+
+    if isinstance(layout, dict):
+        layout = layout.get("layout") or layout
+
+    area_layout = 0.0
+    ancho_layout_m = 0.0
+    largo_layout_m = 0.0
+
+    if layout is not None:
+        if isinstance(layout, dict):
+            ancho_layout_m = _num(
+                layout.get("ancho_total_m", 0.0)
+                or layout.get("ancho_layout_grafico_m", 0.0)
+            )
+
+            largo_layout_m = _num(
+                layout.get("largo_total_m", 0.0)
+                or layout.get("largo_layout_grafico_m", 0.0)
+            )
+
+            area_layout = _num(
+                layout.get("area_rectangular_m2", 0.0)
+                or layout.get("area_necesaria_m2", 0.0)
+            )
+
+        else:
+            ancho_layout_m = _num(
+                getattr(layout, "ancho_total_m", 0.0)
+                or getattr(layout, "ancho_layout_grafico_m", 0.0)
+            )
+
+            largo_layout_m = _num(
+                getattr(layout, "largo_total_m", 0.0)
+                or getattr(layout, "largo_layout_grafico_m", 0.0)
+            )
+
+            area_layout = _num(
+                getattr(layout, "area_rectangular_m2", 0.0)
+                or getattr(layout, "area_necesaria_m2", 0.0)
+            )
+
+    if ancho_layout_m > 0 and largo_layout_m > 0:
+        area_layout = ancho_layout_m * largo_layout_m
 
     opt = _get(resultado, "optimizacion_economica", default=None)
 
@@ -471,6 +519,8 @@ def extraer_metricas_conclusion(resultado: Any, datos: Any = None) -> dict:
         "area_layout": _num(area_layout),
         "escenario_base": sin,
         "escenario_inyeccion": con,
+        "ancho_layout_m": _num(ancho_layout_m),
+        "largo_layout_m": _num(largo_layout_m),
     }
 # ======================================================
 # CLASIFICACIÓN EJECUTIVA
