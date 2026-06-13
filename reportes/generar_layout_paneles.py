@@ -104,6 +104,7 @@ def _generar_layout_rectangular(ax, n_paneles, max_cols, panel_w, panel_h, gap):
 
     return ancho_total, alto_total, cols, rows
 
+
 def _generar_layout_por_strings(
     ax,
     n_paneles,
@@ -130,15 +131,12 @@ def _generar_layout_por_strings(
 
     cols = paneles_por_string
     rows = n_strings
-
     total_dibujado = min(n_paneles, n_strings * paneles_por_string)
 
-    # Separación horizontal normal entre paneles.
     gap_col = gap
-
-    # Separación vertical entre filas.
-    # Aquí entra la separación por sombra.
     gap_fila = max(gap, separacion_sombra_m)
+
+    ancho_total_preview = cols * panel_w + max(cols - 1, 0) * gap_col
 
     patches = []
     labels = []
@@ -177,6 +175,43 @@ def _generar_layout_por_strings(
 
             labels.append((x + panel_w / 2, y + panel_h / 2, str(num)))
             num += 1
+
+        # Cota visual de separación por sombra entre esta fila y la siguiente
+        if separacion_sombra_m > gap and r < rows - 1:
+            y_sup = y - gap_fila
+            y_inf = y
+
+            y_mid = (y_sup + y_inf) / 2
+            x_cota_sombra = ancho_total_preview + 0.55
+
+            ax.plot(
+                [0, ancho_total_preview],
+                [y_mid, y_mid],
+                linestyle="--",
+                linewidth=0.45,
+                color="#888888",
+            )
+
+            ax.annotate(
+                "",
+                xy=(x_cota_sombra, y_sup),
+                xytext=(x_cota_sombra, y_inf),
+                arrowprops=dict(
+                    arrowstyle="<->",
+                    linewidth=0.8,
+                    color="#555555",
+                ),
+            )
+
+            ax.text(
+                x_cota_sombra + 0.15,
+                y_mid,
+                f"Sombra: {separacion_sombra_m:.2f} m",
+                fontsize=6,
+                va="center",
+                ha="left",
+                color="#555555",
+            )
 
     _agregar_paneles(ax, patches, labels)
 
