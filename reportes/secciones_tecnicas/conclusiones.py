@@ -98,6 +98,18 @@ def extraer_metricas_conclusion(resultado: Any, datos: Any = None) -> dict:
             layout_preliminar.get("area_layout_real_m2", 0.0)
         )
 
+    
+    opt = _get(resultado, "optimizacion_economica", default=None)
+
+    if not opt and energia is not None:
+        opt = _get(energia, "optimizacion_economica", default=None)
+
+    sin = {}
+    con = {}
+
+    if isinstance(opt, dict):
+        sin = opt.get("sin_inyeccion", {}) or {}
+        con = opt.get("con_inyeccion", {}) or {}
     # ======================================================
     # ENERGÍA
     # ======================================================
