@@ -61,8 +61,8 @@ def insertar_layout_paneles(
         story.append(Spacer(1, 10))
 
         try:
-            max_w = content_w
-            max_h = 560
+            max_w = content_w*0.88
+            max_h = 500
 
             if safe_image:
                 img = safe_image(str(layout), max_w=max_w, max_h=max_h)
@@ -75,7 +75,7 @@ def insertar_layout_paneles(
                 w = img.imageWidth
                 h = img.imageHeight
 
-                scale = min(max_w / w, max_h / h)
+                scale = min(max_w / w, max_h / h, 1.0)
 
                 img.drawWidth = w * scale
                 img.drawHeight = h * scale
