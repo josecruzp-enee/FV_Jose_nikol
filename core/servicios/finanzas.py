@@ -217,12 +217,12 @@ def _tir(flujos, guess=0.1):
 # ==========================================================
 # 🔵 ENTRYPOINT FINANCIERO
 # ==========================================================
-
 def ejecutar_finanzas(
     *,
     datos: Datosproyecto,
     sizing: ResultadoSizing,
     energia: EnergiaResultado,
+    bateria=None,
 ) -> Dict[str, Any]:
 
     kwp_dc = float(sizing.pdc_kw)
@@ -241,11 +241,58 @@ def ejecutar_finanzas(
     if not energia_fv_12m or len(energia_fv_12m) != 12:
         raise ValueError("Energía mensual inválida.")
 
-    capex = calcular_capex_L(
+    # ======================================================
+    # CAPEX FV
+    # ======================================================
+    capex_fv = calcular_capex_L(
         pdc_kw=kwp_dc,
         costo_usd_kwp=datos.costo_usd_kwp,
         tcambio=datos.tcambio,
     )
+
+    # ======================================================
+    # CAPEX BATERÍA
+    # ======================================================
+    capex_bateria = 0.0
+    capacidad_bateria_kwh = 0.0
+    costo_bateria_usd_kwh = 0.0
+
+    if bateria is not None and getattr(bateria, "ok", False):
+
+        sistema_fv = getattr(datos, "sistema_fv", {}) or {}
+        bateria_cfg = sistema_fv.get("bateria", {}) or {}
+
+        costo_bateria_usd_kwh = float(
+            bateria_cfg.get("costo_usd_kwh", 450.0) or 450.0
+        )
+
+        capacidad_bateria_kwh = float(
+            getattr(bateria, "capacidad_util_kwh", 0.0) or 0.0
+        )
+
+        if capacidad_bateria_kwh <= 0:
+            capacidad_bateria_kwh = float(
+                bateria_cfg.get("capacidad_util_kwh", 0.0) or 0.0
+            )
+
+        if capacidad_bateria_kwh <= 0:
+            bateria_rec = getattr(energia, "bateria_recomendada", None)
+
+            if bateria_rec is not None:
+                capacidad_bateria_kwh = float(
+                    getattr(bateria_rec, "capacidad_util_kwh", 0.0) or 0.0
+                )
+
+        capex_bateria = (
+            capacidad_bateria_kwh
+            * costo_bateria_usd_kwh
+            * float(datos.tcambio)
+        )
+
+    # ======================================================
+    # CAPEX TOTAL
+    # ======================================================
+    capex = capex_fv + capex_bateria
 
     cuota = calcular_cuota_mensual(
         capex_L_=capex,
@@ -268,14 +315,14 @@ def ejecutar_finanzas(
     evaluacion = _evaluacion_mensual(tabla_12m, cuota)
     ahorro_anual = sum(x["ahorro_L"] for x in tabla_12m)
 
-    # ==========================================================
-    # 🔥 INDICADORES FINANCIEROS
-    # ==========================================================
-
+    # ======================================================
+    # INDICADORES FINANCIEROS
+    # ======================================================
     roi = (ahorro_anual / capex) * 100 if capex > 0 else 0.0
     payback = capex / ahorro_anual if ahorro_anual > 0 else 0.0
 
     flujos = [-capex]
+
     for _ in range(10):
         flujos.append(ahorro_anual)
 
@@ -283,6 +330,10 @@ def ejecutar_finanzas(
 
     return {
         "capex_L": capex,
+        "capex_fv_L": capex_fv,
+        "capex_bateria_L": capex_bateria,
+        "capacidad_bateria_kwh": capacidad_bateria_kwh,
+        "costo_bateria_usd_kwh": costo_bateria_usd_kwh,
         "cuota_mensual": cuota,
         "tabla_12m": tabla_12m,
         "evaluacion": evaluacion,
@@ -291,3 +342,4 @@ def ejecutar_finanzas(
         "payback_anios": payback,
         "tir_pct": tir,
     }
+
