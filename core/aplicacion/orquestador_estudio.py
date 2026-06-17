@@ -503,7 +503,7 @@ def ejecutar_estudio(
             paneles=paneles,
             strings=paneles.strings,
             energia=energia,
-            bateria=bateria,
+           
             electrical=electrical,
             financiero=finanzas,
             layout_preliminar=layout_preliminar,
@@ -523,7 +523,7 @@ def ejecutar_estudio(
             paneles=paneles,
             strings=paneles.strings if paneles else None,
             energia=energia,
-            bateria=bateria,
+            
             electrical=electrical,
             financiero=finanzas,
             layout_preliminar=layout_preliminar,
