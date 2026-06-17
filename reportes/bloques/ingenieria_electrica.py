@@ -19,6 +19,8 @@ from reportlab.platypus import (
 )
 from reportes.secciones_tecnicas.conclusiones import agregar_pagina_conclusiones_ejecutivas
 from reportlab.lib import colors
+from reportlab.platypus import Table, TableStyle, Paragraph, Spacer
+from reportlab.lib.colors import HexColor
 # =========================================================
 # LECTURA SEGURA
 # =========================================================
@@ -162,6 +164,10 @@ def _section_indicadores(story, resultado, pal, styles, content_w):
         story.append(Paragraph("No hay indicadores disponibles.", styles["BodyText"]))
 
     story.append(Spacer(1, 12))
+
+
+
+
 
 def _section_optimizacion_economica(
     story,
@@ -431,6 +437,56 @@ def _section_potencia_horaria(story, paths, styles, content_w):
         "No se pudo generar la gráfica de potencia horaria."
     )
 
+def _section_bateria(story, energia, styles):
+
+    bateria_rec = getattr(energia, "bateria_recomendada", None)
+    bateria = getattr(energia, "bateria", None)
+
+    if bateria_rec is None:
+        return
+
+    story.append(Paragraph("Batería recomendada", styles["Heading2"]))
+    story.append(Spacer(1, 6))
+
+    data = [
+        ["Concepto", "Valor"],
+        ["Capacidad útil recomendada", f"{bateria_rec.capacidad_util_kwh:.1f} kWh"],
+        ["Potencia recomendada", f"{bateria_rec.potencia_max_kw:.1f} kW"],
+        ["Excedente FV diario estimado", f"{bateria_rec.excedente_diario_kwh:.1f} kWh/día"],
+        ["Consumo nocturno estimado", f"{bateria_rec.consumo_nocturno_kwh:.1f} kWh/día"],
+        ["Energía objetivo recuperable", f"{bateria_rec.energia_objetivo_kwh:.1f} kWh/día"],
+    ]
+
+    if bateria is not None and getattr(bateria, "ok", False):
+        data.extend([
+            ["Compra red sin batería", f"{bateria.compra_red_sin_bateria_kwh:.1f} kWh/día"],
+            ["Compra red con batería", f"{bateria.compra_red_con_bateria_kwh:.1f} kWh/día"],
+            ["Excedente sin batería", f"{bateria.excedente_sin_bateria_kwh:.1f} kWh/día"],
+            ["Excedente con batería", f"{bateria.excedente_con_bateria_kwh:.1f} kWh/día"],
+            ["Cobertura sin batería", f"{bateria.cobertura_sin_bateria_pct:.1f} %"],
+            ["Cobertura con batería", f"{bateria.cobertura_con_bateria_pct:.1f} %"],
+        ])
+
+    t = Table(data, colWidths=[220, 220])
+    t.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), HexColor("#1F4E79")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), HexColor("#FFFFFF")),
+        ("GRID", (0, 0), (-1, -1), 0.25, HexColor("#CCCCCC")),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+    ]))
+
+    story.append(t)
+    story.append(Spacer(1, 8))
+
+    story.append(Paragraph(
+        "La batería recomendada se calcula con base en el excedente solar diario "
+        "y el consumo nocturno estimado del cliente. Esta sección es preliminar "
+        "y no sustituye el dimensionamiento constructivo del sistema de almacenamiento.",
+        styles["Normal"]
+    ))
+
+    story.append(Spacer(1, 12))
 
 def _section_energia_horaria(story, paths, styles, content_w):
 
@@ -605,6 +661,7 @@ def build_ingenieria_electrica(resultado, datos, paths, pal, styles, content_w, 
     _section_potencia_horaria(story, paths, styles, content_w)
     _section_energia_horaria(story, paths, styles, content_w)
     _section_demanda_vs_fv_horaria(story, paths, styles, content_w)
+    _section_bateria(story, energia, styles)
     _section_energia_mensual(story, paths, styles, content_w)
     _section_optimizacion_economica(story, resultado, pal, styles, content_w)
     agregar_pagina_conclusiones_ejecutivas(story, styles, resultado, datos, paths=paths)
