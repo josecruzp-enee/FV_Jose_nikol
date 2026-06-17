@@ -174,6 +174,7 @@ def construir_datos_proyecto(ctx):
         "modo": modo,
         "valor": valor,
         "zonas": zonas_limpias,
+        "bateria": sf.get("bateria", {}),
     }
 
     # ======================================================
