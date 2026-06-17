@@ -617,14 +617,17 @@ def generar_charts(
         ) or {}
 
     p6 = base / "demanda_vs_fv_horaria.png"
-
+bateria = (
+    res.get("bateria")
+    if isinstance(res, dict)
+    else getattr(res, "bateria", None)
+)
     _chart_demanda_vs_fv_horaria(
-        consumo_horario_24h_kwh,
-        energia_horaria,
-        p6,
-        bateria=getattr(energia, "bateria", None),
-    )
-
+    consumo_horario_24h_kwh,
+    energia_horaria,
+    p6,
+    bateria=bateria,
+)
     paths["chart_demanda_vs_fv_horaria"] = str(p6)
 
     # anual
