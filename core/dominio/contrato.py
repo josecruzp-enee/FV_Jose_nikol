@@ -115,6 +115,7 @@ class ResultadoProyecto:
     paneles: Any
     strings: Any
     energia: Any
+    bateria: Any = None 
     electrical: Any
     financiero: Optional[ResultadoFinanciero]
 
