@@ -7,8 +7,122 @@ from core.aplicacion.dependencias import DependenciasEstudio
 from core.servicios.layout import construir_layout_preliminar_fv
 
 # ==========================================================
-# ORQUESTADOR PRINCIPAL
+# BATERÍAS
 # ==========================================================
+from energy.baterias import ConfigBateria, ejecutar_bateria
+
+
+# ==========================================================
+# HELPERS BATERÍA
+# ==========================================================
+def _construir_config_bateria(datos: Datosproyecto) -> ConfigBateria:
+    sistema_fv = getattr(datos, "sistema_fv", {}) or {}
+
+    bateria_cfg = (
+        sistema_fv.get("bateria", {})
+        or sistema_fv.get("baterias", {})
+        or {}
+    )
+
+    usar_bateria = bool(
+        bateria_cfg.get("usar_bateria", False)
+        or bateria_cfg.get("activa", False)
+        or bateria_cfg.get("habilitada", False)
+    )
+
+    return ConfigBateria(
+        usar_bateria=usar_bateria,
+        capacidad_util_kwh=float(
+            bateria_cfg.get("capacidad_util_kwh", 0.0) or 0.0
+        ),
+        potencia_max_kw=float(
+            bateria_cfg.get("potencia_max_kw", 0.0) or 0.0
+        ),
+        soc_inicial_pct=float(
+            bateria_cfg.get("soc_inicial_pct", 20.0) or 20.0
+        ),
+        soc_min_pct=float(
+            bateria_cfg.get("soc_min_pct", 20.0) or 20.0
+        ),
+        soc_max_pct=float(
+            bateria_cfg.get("soc_max_pct", 100.0) or 100.0
+        ),
+        eficiencia_ida_vuelta=float(
+            bateria_cfg.get("eficiencia_ida_vuelta", 0.90) or 0.90
+        ),
+        costo_usd_kwh=float(
+            bateria_cfg.get("costo_usd_kwh", 250.0) or 250.0
+        ),
+        vida_util_anios=int(
+            bateria_cfg.get("vida_util_anios", 10) or 10
+        ),
+    )
+
+
+def _aplicar_bateria_si_corresponde(
+    datos: Datosproyecto,
+    sizing,
+    paneles,
+    energia,
+):
+    """
+    Aplica simulación de batería después del motor de energía FV.
+
+    No reemplaza energia.
+    Solo agrega:
+        energia.bateria
+        energia.balance_bateria
+    """
+
+    cfg_bateria = _construir_config_bateria(datos)
+
+    if not cfg_bateria.usar_bateria:
+        return None
+
+    demanda_24h = getattr(
+        datos,
+        "consumo_horario_24h_kwh",
+        {}
+    ) or {}
+
+    fv_24h = getattr(
+        energia,
+        "energia_horaria_kwh",
+        None
+    )
+
+    if not demanda_24h:
+        raise ValueError(
+            "La simulación con batería requiere perfil horario de consumo."
+        )
+
+    if not fv_24h:
+        raise ValueError(
+            "La simulación con batería requiere energia.energia_horaria_kwh."
+        )
+
+    bateria = ejecutar_bateria(
+        demanda_24h=demanda_24h,
+        fv_24h=fv_24h,
+        cfg_bateria=cfg_bateria,
+    )
+
+    if bateria is None:
+        raise ValueError("Batería devolvió None")
+
+    if not bateria.ok:
+        return bateria
+
+    # Guardar resultado sin romper dataclasses existentes
+    try:
+        setattr(energia, "bateria", bateria)
+        setattr(energia, "balance_bateria", bateria)
+    except Exception:
+        pass
+
+    return bateria
+
+
 # ==========================================================
 # ORQUESTADOR PRINCIPAL
 # ==========================================================
@@ -25,6 +139,7 @@ def ejecutar_estudio(
     sizing = None
     paneles = None
     energia = None
+    bateria = None
     electrical = None
     finanzas = None
     optimizacion_economica = None
@@ -98,6 +213,29 @@ def ejecutar_estudio(
                 optimizacion_economica=None,
                 ok=False,
                 errores=energia.errores or ["Error en energía"]
+            )
+
+        # ==================================================
+        # 3.0 BATERÍA BASE
+        # ==================================================
+        bateria = _aplicar_bateria_si_corresponde(
+            datos=datos,
+            sizing=sizing,
+            paneles=paneles,
+            energia=energia,
+        )
+
+        if bateria is not None and not bateria.ok:
+            return ResultadoProyecto(
+                sizing=sizing,
+                paneles=paneles,
+                strings=paneles.strings if paneles else None,
+                energia=energia,
+                electrical=None,
+                financiero=None,
+                optimizacion_economica=optimizacion_economica,
+                ok=False,
+                errores=bateria.errores or ["Error en batería"]
             )
 
         # ==================================================
@@ -201,6 +339,29 @@ def ejecutar_estudio(
                     f"Energía optimizada inválida: {energia.errores}"
                 )
 
+            # ==================================================
+            # BATERÍA SOBRE ENERGÍA OPTIMIZADA
+            # ==================================================
+            bateria = _aplicar_bateria_si_corresponde(
+                datos=datos,
+                sizing=sizing,
+                paneles=paneles,
+                energia=energia,
+            )
+
+            if bateria is not None and not bateria.ok:
+                return ResultadoProyecto(
+                    sizing=sizing,
+                    paneles=paneles,
+                    strings=paneles.strings if paneles else None,
+                    energia=energia,
+                    electrical=None,
+                    financiero=None,
+                    optimizacion_economica=optimizacion_economica,
+                    ok=False,
+                    errores=bateria.errores or ["Error en batería"]
+                )
+
         # ==================================================
         # 4. ELECTRICAL
         # ==================================================
@@ -288,7 +449,7 @@ def ejecutar_estudio(
             separacion_y_m=0.40,
             max_columnas=None,
         )
-        
+
         # ==================================================
         # RESULTADO FINAL
         # ==================================================
