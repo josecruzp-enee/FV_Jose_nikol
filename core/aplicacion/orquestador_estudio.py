@@ -444,10 +444,11 @@ def ejecutar_estudio(
         if deps.finanzas is not None:
 
             finanzas = deps.finanzas.ejecutar(
-                datos,
-                sizing,
-                energia
-            )
+                datos=datos,
+                sizing=sizing,
+                energia=energia,
+                bateria=bateria,
+        )
 
             if finanzas is None:
                 raise ValueError("Finanzas devolvió None")
