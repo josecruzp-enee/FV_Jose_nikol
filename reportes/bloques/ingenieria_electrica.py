@@ -437,7 +437,7 @@ def _section_potencia_horaria(story, paths, styles, content_w):
         "No se pudo generar la gráfica de potencia horaria."
     )
 
-def _section_bateria(story, energia, styles):
+def _section_bateria(story, resultado, energia, styles):
 
     if energia is None:
         return
@@ -665,7 +665,7 @@ def build_ingenieria_electrica(resultado, datos, paths, pal, styles, content_w, 
     _section_potencia_horaria(story, paths, styles, content_w)
     _section_energia_horaria(story, paths, styles, content_w)
     _section_demanda_vs_fv_horaria(story, paths, styles, content_w)
-    _section_bateria(story, energia, styles)
+    _section_bateria(story, resultado, energia, styles)
     _section_energia_mensual(story, paths, styles, content_w)
     _section_optimizacion_economica(story, resultado, pal, styles, content_w)
     agregar_pagina_conclusiones_ejecutivas(story, styles, resultado, datos, paths=paths)
