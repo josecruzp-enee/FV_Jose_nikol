@@ -237,7 +237,34 @@ def _render_condiciones_instalacion(sf):
         key="orientacion_panel",
     )
 
+# ==========================================================
+# BATERÍA
+# ==========================================================
+def _render_bateria(sf):
 
+    st.markdown("### Batería")
+
+    bateria = sf.get("bateria", {}) or {}
+
+    incluir = st.checkbox(
+        "Incluir batería recomendada automáticamente",
+        value=bool(
+            bateria.get("usar_bateria", False)
+        ),
+        key="usar_bateria"
+    )
+
+    bateria["usar_bateria"] = incluir
+    bateria["incluir_bateria"] = incluir
+
+    st.caption(
+        "FV Engine calculará automáticamente la capacidad "
+        "óptima de batería a partir del excedente solar "
+        "y del consumo nocturno."
+    )
+
+    sf["bateria"] = bateria
+    
 # ==========================================================
 # ZONAS
 # ==========================================================
@@ -328,6 +355,7 @@ def render(ctx):
 
     _render_dimensionamiento(sf)
     _render_condiciones_instalacion(sf)
+    _render_bateria(sf)
 
     if sf.get("usar_zonas"):
         _render_zonas(sf)
