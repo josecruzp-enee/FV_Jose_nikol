@@ -21,13 +21,13 @@ def obtener_perfil_kw_gasolinera_24h() -> Dict[int, float]:
     """
 
     return {
-        0: 0.80,
-        1: 0.75,
-        2: 0.6,
-        3: 0.6,
-        4: 0.7,
-        5: 0.8,
-        6: 1.2,
+        0: 2.80,
+        1: 2.75,
+        2: 2.6,
+        3: 2.6,
+        4: 2.7,
+        5: 2.8,
+        6: 3.2,
         7: 1.6,
         8: 1.4,
         9: 1.0,
@@ -40,11 +40,11 @@ def obtener_perfil_kw_gasolinera_24h() -> Dict[int, float]:
         16: 1.20,
         17: 1.5,
         18: 2.0,
-        19: 2.7,
-        20: 3.0,
-        21: 2.5,
-        22: 2.0,
-        23: 1.5,
+        19: 4.7,
+        20: 5.0,
+        21: 4.5,
+        22: 4.0,
+        23: 3.5,
     }
 # ======================================================
 # VALIDACIONES PERFIL HORARIO
@@ -273,7 +273,7 @@ def render(ctx) -> None:
     # ------------------------------------------------------
     # VALORES POR DEFECTO (SOLO PRIMERA VEZ)
     # ------------------------------------------------------
-    sf.setdefault("kwh_12m", [18000.0] * 12)
+    sf.setdefault("kwh_12m", [1600.0] * 12)
     sf.setdefault("cargos_fijos_L_mes", 200.0)
     sf.setdefault("tarifa_energia_L_kwh", 5.0)
 
