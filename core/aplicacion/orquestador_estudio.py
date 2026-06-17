@@ -9,7 +9,11 @@ from core.servicios.layout import construir_layout_preliminar_fv
 # ==========================================================
 # BATERÍAS
 # ==========================================================
-from energy.baterias import ConfigBateria, ejecutar_bateria
+from energy.baterias import (
+    ConfigBateria,
+    ejecutar_bateria,
+    calcular_bateria_recomendada,
+)
 
 
 # ==========================================================
