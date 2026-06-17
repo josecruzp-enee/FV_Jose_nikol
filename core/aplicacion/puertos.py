@@ -72,5 +72,6 @@ class PuertoFinanzas(Protocol):
         datos: Datosproyecto,
         sizing: ResultadoSizing,
         energia: EnergiaResultado,
+        bateria=None,
     ) -> ResultadoFinanciero:
         ...
