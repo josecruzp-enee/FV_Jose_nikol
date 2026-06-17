@@ -115,9 +115,9 @@ class ResultadoProyecto:
     paneles: Any
     strings: Any
     energia: Any
+    electrical: Any = None
+    financiero: Optional[ResultadoFinanciero] = None
     bateria: Any = None
-    electrical: Any
-    financiero: Optional[ResultadoFinanciero]
 
     layout_preliminar: Optional[ResultadoLayoutPreliminar] = None
     optimizacion_economica: Any = None
