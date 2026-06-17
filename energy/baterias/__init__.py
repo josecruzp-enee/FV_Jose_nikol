@@ -8,6 +8,7 @@ from energy.baterias.recomendador_bateria import (
     BateriaRecomendada,
     calcular_bateria_recomendada,
 )
+from energy.baterias.perfiles import promediar_energia_8760_a_24h
 
 __all__ = [
     "ConfigBateria",
@@ -16,4 +17,5 @@ __all__ = [
     "ejecutar_bateria",
     "BateriaRecomendada",
     "calcular_bateria_recomendada",
+    "promediar_energia_8760_a_24h",
 ]
