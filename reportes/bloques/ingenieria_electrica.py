@@ -439,6 +439,9 @@ def _section_potencia_horaria(story, paths, styles, content_w):
 
 def _section_bateria(story, energia, styles):
 
+    if energia is None:
+        return
+
     bateria_rec = getattr(energia, "bateria_recomendada", None)
     bateria = getattr(energia, "bateria", None)
 
@@ -650,6 +653,7 @@ def build_ingenieria_electrica(resultado, datos, paths, pal, styles, content_w, 
     # =========================================================
     # SECCIONES
     # =========================================================
+    energia = leer(resultado, "energia", None)
     _section_resumen(story, resultado, pal, styles, content_w)
     _section_distribucion_strings(story, strings, pal, styles, content_w)
     _section_config_strings(story, strings, pal, styles, content_w)
