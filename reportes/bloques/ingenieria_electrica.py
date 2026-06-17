@@ -448,6 +448,11 @@ def _section_bateria(story, resultado, energia, styles):
     if bateria_rec is None:
         return
 
+    financiero = leer(resultado, "financiero", {}) or {}
+
+    if not isinstance(financiero, dict):
+        financiero = {}
+
     story.append(Paragraph("Batería recomendada", styles["Heading2"]))
     story.append(Spacer(1, 6))
 
@@ -461,6 +466,7 @@ def _section_bateria(story, resultado, energia, styles):
     ]
 
     if bateria is not None and getattr(bateria, "ok", False):
+
         data.extend([
             ["Compra red sin batería", f"{bateria.compra_red_sin_bateria_kwh:.1f} kWh/día"],
             ["Compra red con batería", f"{bateria.compra_red_con_bateria_kwh:.1f} kWh/día"],
@@ -470,7 +476,35 @@ def _section_bateria(story, resultado, energia, styles):
             ["Cobertura con batería", f"{bateria.cobertura_con_bateria_pct:.1f} %"],
         ])
 
-    t = Table(data, colWidths=[220, 220])
+    # =====================================================
+    # COSTOS DE BATERÍA (FINANZAS)
+    # =====================================================
+
+    capacidad_bateria = float(
+        financiero.get("capacidad_bateria_kwh", 0.0) or 0.0
+    )
+
+    capex_bateria = float(
+        financiero.get("capex_bateria_L", 0.0) or 0.0
+    )
+
+    costo_unitario = float(
+        financiero.get("costo_bateria_usd_kwh", 0.0) or 0.0
+    )
+
+    if capacidad_bateria > 0:
+
+        data.extend([
+            ["Capacidad batería utilizada", f"{capacidad_bateria:.1f} kWh"],
+            ["Costo unitario batería", f"US$ {costo_unitario:,.0f}/kWh"],
+            ["Costo estimado batería", f"L {capex_bateria:,.0f}"],
+        ])
+
+    t = Table(
+        data,
+        colWidths=[220, 220]
+    )
+
     t.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), HexColor("#1F4E79")),
         ("TEXTCOLOR", (0, 0), (-1, 0), HexColor("#FFFFFF")),
@@ -482,12 +516,14 @@ def _section_bateria(story, resultado, energia, styles):
     story.append(t)
     story.append(Spacer(1, 8))
 
-    story.append(Paragraph(
-        "La batería recomendada se calcula con base en el excedente solar diario "
-        "y el consumo nocturno estimado del cliente. Esta sección es preliminar "
-        "y no sustituye el dimensionamiento constructivo del sistema de almacenamiento.",
-        styles["Normal"]
-    ))
+    story.append(
+        Paragraph(
+            "La batería recomendada se calcula con base en el excedente solar diario "
+            "y el consumo nocturno estimado del cliente. Esta sección es preliminar "
+            "y no sustituye el dimensionamiento constructivo del sistema de almacenamiento.",
+            styles["Normal"]
+        )
+    )
 
     story.append(Spacer(1, 12))
 
