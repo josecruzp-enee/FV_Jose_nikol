@@ -170,7 +170,7 @@ class EnergiaAdapter:
 
 class FinanzasAdapter:
 
-    def ejecutar(self, datos, sizing, energia):
+    def ejecutar(self, datos, sizing, energia, bateria=None):
 
         if datos is None:
             raise ValueError("datos es None en finanzas")
@@ -185,14 +185,13 @@ class FinanzasAdapter:
             datos=datos,
             sizing=sizing,
             energia=energia,
+            bateria=bateria,
         )
 
         if resultado is None:
             raise ValueError("Finanzas devolvió None")
 
         return resultado
-
-
 # ==========================================================
 # FACTORY
 # ==========================================================
