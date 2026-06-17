@@ -164,14 +164,17 @@ def _chart_demanda_vs_fv_horaria(
     consumo_horario_24h_kwh: dict,
     energia_horaria_kwh: List[float],
     path: Path,
+    bateria=None,
 ):
     """
-    Grafica demanda original, generación FV y demanda neta desde red.
+    Grafica demanda original, generación FV, demanda neta desde red
+    y, si existe batería, demanda neta desde red con batería.
 
     Colores:
     - Azul: demanda original.
     - Verde: generación FV / reducción por FV.
-    - Rojo: demanda neta desde red.
+    - Rojo: demanda neta desde red sin batería.
+    - Morado: demanda neta desde red con batería.
     - Naranja/beige: excedente FV.
     """
 
@@ -216,6 +219,50 @@ def _chart_demanda_vs_fv_horaria(
         for d, f in zip(demanda, fv_promedio)
     ]
 
+    # ======================================================
+    # BATERÍA, SI EXISTE
+    # ======================================================
+    red_con_bateria = None
+    descarga_bateria = None
+    carga_bateria = None
+    soc_bateria = None
+
+    if bateria is not None and getattr(bateria, "ok", False):
+        red_con_bateria = getattr(
+            bateria,
+            "compra_red_con_bateria_24h",
+            None
+        )
+
+        descarga_bateria = getattr(
+            bateria,
+            "descarga_bateria_24h",
+            None
+        )
+
+        carga_bateria = getattr(
+            bateria,
+            "carga_bateria_24h",
+            None
+        )
+
+        soc_bateria = getattr(
+            bateria,
+            "soc_24h_pct",
+            None
+        )
+
+        if red_con_bateria:
+            red_con_bateria = [
+                float(x or 0.0)
+                for x in list(red_con_bateria)[:24]
+            ]
+
+            if len(red_con_bateria) < 24:
+                red_con_bateria += [0.0] * (24 - len(red_con_bateria))
+        else:
+            red_con_bateria = None
+
     energia_demanda = sum(demanda)
     energia_fv = sum(fv_promedio)
     energia_autoconsumo = sum(autoconsumo)
@@ -233,6 +280,18 @@ def _chart_demanda_vs_fv_horaria(
         if energia_demanda > 0
         else 0.0
     )
+
+    energia_red_bateria = None
+    reduccion_red_bateria = None
+
+    if red_con_bateria is not None:
+        energia_red_bateria = sum(red_con_bateria)
+
+        reduccion_red_bateria = (
+            (1 - energia_red_bateria / energia_demanda) * 100
+            if energia_demanda > 0
+            else 0.0
+        )
 
     horas_np = np.array(horas, dtype=float)
     demanda_np = np.array(demanda, dtype=float)
@@ -273,6 +332,24 @@ def _chart_demanda_vs_fv_horaria(
     )
 
     # ======================================================
+    # ÁREA DE DESCARGA DE BATERÍA
+    # ======================================================
+    if red_con_bateria is not None:
+        red_bat_np = np.array(red_con_bateria, dtype=float)
+
+        ax.fill_between(
+            horas_np,
+            red_bat_np,
+            red_np,
+            where=red_np > red_bat_np,
+            interpolate=True,
+            color="purple",
+            alpha=0.18,
+            label="Reducción adicional por batería",
+            zorder=3,
+        )
+
+    # ======================================================
     # CURVA DEMANDA ORIGINAL
     # ======================================================
     ax.plot(
@@ -299,7 +376,7 @@ def _chart_demanda_vs_fv_horaria(
     )
 
     # ======================================================
-    # CURVA DEMANDA NETA DESDE RED
+    # CURVA DEMANDA NETA DESDE RED SIN BATERÍA
     # ======================================================
     ax.plot(
         horas_np,
@@ -312,6 +389,21 @@ def _chart_demanda_vs_fv_horaria(
         zorder=7,
     )
 
+    # ======================================================
+    # CURVA DEMANDA NETA DESDE RED CON BATERÍA
+    # ======================================================
+    if red_con_bateria is not None:
+        ax.plot(
+            horas_np,
+            red_bat_np,
+            marker="o",
+            linewidth=2,
+            linestyle="-.",
+            color="purple",
+            label="Demanda neta con batería",
+            zorder=8,
+        )
+
     texto = (
         f"Demanda diaria: {energia_demanda:.1f} kWh\n"
         f"Generación FV: {energia_fv:.1f} kWh\n"
@@ -321,6 +413,12 @@ def _chart_demanda_vs_fv_horaria(
         f"Cobertura directa: {cobertura_directa:.1f}%\n"
         f"Reducción compra red: {reduccion_red:.1f}%"
     )
+
+    if energia_red_bateria is not None:
+        texto += (
+            f"\nRed con batería: {energia_red_bateria:.1f} kWh"
+            f"\nReducción con batería: {reduccion_red_bateria:.1f}%"
+        )
 
     ax.text(
         0.02,
@@ -348,7 +446,6 @@ def _chart_demanda_vs_fv_horaria(
     plt.tight_layout()
     plt.savefig(path, dpi=160)
     plt.close()
-
 
 
 
