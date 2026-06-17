@@ -514,6 +514,7 @@ def _chart_anual(energia_anual: float, path: Path):
 # GENERADOR PRINCIPAL (LIMPIO)
 # ==========================================================
 
+
 def generar_charts(
     res,
     out_dir=None,
@@ -524,19 +525,22 @@ def generar_charts(
     base = _mkdir_charts(out_dir)
 
     # ======================================================
-    # DATOS ENERGÍA (NO SE CALCULA AQUÍ)
+    # DATOS ENERGÍA
     # ======================================================
-
     energia = (
         res.get("energia")
         if isinstance(res, dict)
         else getattr(res, "energia", None)
     )
 
+    bateria = (
+        res.get("bateria")
+        if isinstance(res, dict)
+        else getattr(res, "bateria", None)
+    )
+
     if energia:
-        energia_raw = list(
-            getattr(energia, "energia_util_12m", [])
-        )
+        energia_raw = list(getattr(energia, "energia_util_12m", []))
         energia_mensual = _extraer_energia(energia_raw)
     else:
         energia_mensual = [0] * 12
@@ -547,13 +551,11 @@ def generar_charts(
     ]
 
     energia_anual = sum(energia_mensual)
-
     paths = {}
 
     # ======================================================
-    # GRÁFICAS
+    # GRÁFICAS MENSUALES / DIARIAS
     # ======================================================
-
     p1 = base / "fv_energia_mensual.png"
     _chart_mensual(meses, energia_mensual, p1)
     paths["chart_energia_mensual"] = str(p1)
@@ -568,9 +570,8 @@ def generar_charts(
     paths["chart_energia_diaria"] = str(p2)
 
     # ======================================================
-    # SERIE HORARIA REAL 8760
+    # SERIE HORARIA 8760
     # ======================================================
-
     energia_horaria = []
 
     if energia:
@@ -583,23 +584,16 @@ def generar_charts(
         )
 
     p3 = base / "fv_potencia_horaria.png"
-    _chart_potencia_horaria(
-        energia_horaria,
-        p3
-    )
+    _chart_potencia_horaria(energia_horaria, p3)
     paths["chart_potencia_horaria"] = str(p3)
 
     p4 = base / "fv_energia_horaria.png"
-    _chart_energia_horaria(
-        energia_horaria,
-        p4
-    )
+    _chart_energia_horaria(energia_horaria, p4)
     paths["chart_energia_horaria"] = str(p4)
 
     # ======================================================
     # DEMANDA CLIENTE VS GENERACIÓN FV
     # ======================================================
-
     consumo_horario_24h_kwh = {}
 
     if proyecto is None:
@@ -610,19 +604,18 @@ def generar_charts(
         )
 
     if proyecto:
-        consumo_horario_24h_kwh = getattr(
-            proyecto,
-            "consumo_horario_24h_kwh",
-            {}
-        ) or {}
+        if isinstance(proyecto, dict):
+            consumo_horario_24h_kwh = (
+                proyecto.get("consumo_horario_24h_kwh", {})
+                or {}
+            )
+        else:
+            consumo_horario_24h_kwh = (
+                getattr(proyecto, "consumo_horario_24h_kwh", {})
+                or {}
+            )
 
-        p6 = base / "demanda_vs_fv_horaria.png"
-
-    bateria = (
-        res.get("bateria")
-        if isinstance(res, dict)
-        else getattr(res, "bateria", None)
-    )
+    p6 = base / "demanda_vs_fv_horaria.png"
 
     _chart_demanda_vs_fv_horaria(
         consumo_horario_24h_kwh,
@@ -632,3 +625,12 @@ def generar_charts(
     )
 
     paths["chart_demanda_vs_fv_horaria"] = str(p6)
+
+    # ======================================================
+    # GRÁFICA ANUAL
+    # ======================================================
+    p5 = base / "fv_energia_anual.png"
+    _chart_anual(energia_anual, p5)
+    paths["chart_anual"] = str(p5)
+
+    return paths
