@@ -468,6 +468,9 @@ def _section_bateria(story, resultado, energia, styles):
     if bateria is not None and getattr(bateria, "ok", False):
 
         data.extend([
+            ["Capacidad batería instalada", f"{bateria.capacidad_util_kwh:.1f} kWh"],
+            ["Potencia batería instalada", f"{bateria.potencia_max_kw:.1f} kW"],
+
             ["Compra red sin batería", f"{bateria.compra_red_sin_bateria_kwh:.1f} kWh/día"],
             ["Compra red con batería", f"{bateria.compra_red_con_bateria_kwh:.1f} kWh/día"],
             ["Excedente sin batería", f"{bateria.excedente_sin_bateria_kwh:.1f} kWh/día"],
@@ -475,7 +478,6 @@ def _section_bateria(story, resultado, energia, styles):
             ["Cobertura sin batería", f"{bateria.cobertura_sin_bateria_pct:.1f} %"],
             ["Cobertura con batería", f"{bateria.cobertura_con_bateria_pct:.1f} %"],
         ])
-
     # =====================================================
     # COSTOS DE BATERÍA (FINANZAS)
     # =====================================================
