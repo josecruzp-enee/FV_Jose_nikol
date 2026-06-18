@@ -17,8 +17,6 @@ from energy.baterias import generar_opciones_bateria
 
 def _aplicar_bateria_si_corresponde(
     datos: Datosproyecto,
-    sizing,
-    paneles,
     energia,
 ):
     """
@@ -47,12 +45,10 @@ def _aplicar_bateria_si_corresponde(
         factor_aprovechamiento=0.80,
     )
 
-    try:
-        setattr(energia, "opciones_bateria", opciones_bateria)
-    except Exception:
-        pass
+    setattr(energia, "opciones_bateria", opciones_bateria)
 
     return None
+    
 # ==========================================================
 # ORQUESTADOR PRINCIPAL
 # ==========================================================
@@ -274,8 +270,6 @@ def ejecutar_estudio(
             # ==================================================
             bateria = _aplicar_bateria_si_corresponde(
                 datos=datos,
-                sizing=sizing,
-                paneles=paneles,
                 energia=energia,
             )
 
