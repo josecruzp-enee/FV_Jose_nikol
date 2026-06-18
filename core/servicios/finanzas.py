@@ -5,7 +5,8 @@ from typing import Any, Dict, List
 from core.dominio.modelo import Datosproyecto
 from core.dominio.contrato import ResultadoSizing
 from energy.resultado_energia import EnergiaResultado
-from energy.baterias import ConfigBateria, ejecutar_bateria
+from energy.baterias.modelos import ConfigBateria
+from energy.baterias.orquestador_bateria import ejecutar_bateria
 
 
 def _normalizar_energia(energia):
