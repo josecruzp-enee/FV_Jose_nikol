@@ -75,9 +75,9 @@ def calcular_bateria_recomendada(
     if capacidad <= 5:
         potencia = 3.0
     elif capacidad <= 10:
-        potencia = 5.0
+        potencia = 4.0
     elif capacidad <= 20:
-        potencia = 8.0
+        potencia = 5.0
     else:
         potencia = 10.0
 
