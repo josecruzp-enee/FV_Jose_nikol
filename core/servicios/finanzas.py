@@ -259,28 +259,24 @@ def ejecutar_finanzas(
 
     if bateria is not None and getattr(bateria, "ok", False):
 
-        sistema_fv = getattr(datos, "sistema_fv", {}) or {}
-        bateria_cfg = sistema_fv.get("bateria", {}) or {}
-
-        costo_bateria_usd_kwh = float(
-            bateria_cfg.get("costo_usd_kwh", 450.0) or 450.0
-        )
-
         capacidad_bateria_kwh = float(
             getattr(bateria, "capacidad_util_kwh", 0.0) or 0.0
         )
 
-        if capacidad_bateria_kwh <= 0:
-            capacidad_bateria_kwh = float(
-                bateria_cfg.get("capacidad_util_kwh", 0.0) or 0.0
-            )
+        costo_bateria_usd_kwh = float(
+            getattr(bateria, "costo_usd_kwh", 0.0) or 0.0
+        )
 
         if capacidad_bateria_kwh <= 0:
             bateria_rec = getattr(energia, "bateria_recomendada", None)
 
             if bateria_rec is not None:
                 capacidad_bateria_kwh = float(
-                    getattr(bateria_rec, "capacidad_util_kwh", 0.0) or 0.0
+                    getattr(
+                        bateria_rec,
+                        "capacidad_util_kwh",
+                        0.0
+                    ) or 0.0
                 )
 
         capex_bateria = (
@@ -342,4 +338,3 @@ def ejecutar_finanzas(
         "payback_anios": payback,
         "tir_pct": tir,
     }
-
