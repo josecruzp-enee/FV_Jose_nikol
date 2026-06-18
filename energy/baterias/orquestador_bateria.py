@@ -4,7 +4,7 @@ from __future__ import annotations
 from energy.baterias.modelos import ConfigBateria
 from energy.baterias.balance_bateria import simular_balance_bateria_24h
 from energy.baterias.perfiles import promediar_energia_8760_a_24h
-from energy.baterias.recomendador import generar_opciones_bateria
+from energy.baterias.recomendador_bateria import generar_opciones_bateria
 
 
 def ejecutar_bateria(
