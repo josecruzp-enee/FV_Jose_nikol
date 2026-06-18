@@ -7,6 +7,7 @@ from core.dominio.contrato import ResultadoSizing
 from energy.resultado_energia import EnergiaResultado
 from energy.baterias import ConfigBateria, ejecutar_bateria
 
+
 def _normalizar_energia(energia):
 
     if not isinstance(energia, list):
@@ -16,12 +17,10 @@ def _normalizar_energia(energia):
 
     for x in energia:
 
-        # caso 1: número directo
         if isinstance(x, (int, float)):
             resultado.append(float(x))
             continue
 
-        # caso 2: dict
         if isinstance(x, dict):
 
             if "valor" in x:
@@ -32,13 +31,129 @@ def _normalizar_energia(energia):
                 resultado.append(float(x["energia"]))
                 continue
 
-            if "energia_kwh" in x:  # 🔥 ESTE ES TU CASO REAL
+            if "energia_kwh" in x:
                 resultado.append(float(x["energia_kwh"]))
                 continue
 
         raise ValueError(f"Formato inválido en energía: {x}")
 
     return resultado
+
+
+def _extraer_valor_bateria(resultado_bateria, nombres, default=0.0) -> float:
+    for nombre in nombres:
+        valor = getattr(resultado_bateria, nombre, None)
+
+        if valor is None and isinstance(resultado_bateria, dict):
+            valor = resultado_bateria.get(nombre)
+
+        if valor is not None:
+            try:
+                return float(valor or 0.0)
+            except Exception:
+                pass
+
+    return float(default)
+
+
+def _energia_descargada_bateria_diaria(resultado_bateria) -> float:
+    valor_directo = _extraer_valor_bateria(
+        resultado_bateria,
+        [
+            "energia_descargada_kwh",
+            "energia_entregada_kwh",
+            "energia_util_bateria_kwh",
+            "energia_bateria_kwh",
+            "descarga_total_kwh",
+            "descargada_kwh",
+        ],
+        0.0,
+    )
+
+    if valor_directo > 0:
+        return valor_directo
+
+    descarga_24h = getattr(resultado_bateria, "descarga_24h_kwh", None)
+
+    if descarga_24h is None and isinstance(resultado_bateria, dict):
+        descarga_24h = resultado_bateria.get("descarga_24h_kwh")
+
+    if isinstance(descarga_24h, list):
+        total = 0.0
+        for x in descarga_24h:
+            try:
+                total += float(x or 0.0)
+            except Exception:
+                pass
+        return total
+
+    tabla_24h = getattr(resultado_bateria, "tabla_24h", None)
+
+    if tabla_24h is None and isinstance(resultado_bateria, dict):
+        tabla_24h = resultado_bateria.get("tabla_24h")
+
+    if isinstance(tabla_24h, list):
+        total = 0.0
+
+        for fila in tabla_24h:
+            if not isinstance(fila, dict):
+                continue
+
+            for campo in [
+                "descarga_kwh",
+                "energia_descargada_kwh",
+                "energia_entregada_kwh",
+                "bateria_a_carga_kwh",
+            ]:
+                if campo in fila:
+                    try:
+                        total += float(fila.get(campo) or 0.0)
+                    except Exception:
+                        pass
+                    break
+
+        return total
+
+    return 0.0
+
+
+def _energia_fv_12m_con_bateria(
+    *,
+    consumo_12m: List[float],
+    energia_fv_12m: List[float],
+    energia_generada_12m: List[float],
+    resultado_bateria,
+) -> List[float]:
+
+    energia_fv_12m = _normalizar_energia(energia_fv_12m)
+
+    if energia_generada_12m:
+        energia_generada_12m = _normalizar_energia(energia_generada_12m)
+    else:
+        energia_generada_12m = energia_fv_12m[:]
+
+    dias_mes = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+
+    energia_bateria_dia = _energia_descargada_bateria_diaria(resultado_bateria)
+
+    resultado = []
+
+    for i in range(12):
+        consumo = float(consumo_12m[i])
+        fv_util = float(energia_fv_12m[i])
+        fv_generada = float(energia_generada_12m[i])
+
+        excedente_mes = max(fv_generada - fv_util, 0.0)
+        deficit_mes = max(consumo - fv_util, 0.0)
+        bateria_mes = max(energia_bateria_dia, 0.0) * dias_mes[i]
+
+        adicional = min(excedente_mes, deficit_mes, bateria_mes)
+
+        resultado.append(min(consumo, fv_util + adicional))
+
+    return resultado
+
+
 # ==========================================================
 # 🔵 CAPEX
 # ==========================================================
@@ -94,6 +209,7 @@ def simular_12_meses(
 ) -> List[Dict[str, float]]:
 
     energia_fv_12m = _normalizar_energia(energia_fv_12m)
+
     if len(consumo_12m) != 12:
         raise ValueError("consumo_12m debe tener 12 valores")
 
@@ -159,17 +275,11 @@ def _evaluacion_mensual(tabla: list, cuota: float) -> dict:
 
     deuda_mensual = cuota + om_prom
 
-    # ======================================================
-    # DSCR (CORREGIDO)
-    # ======================================================
     if deuda_mensual > 0:
         dscr = ahorro_prom / deuda_mensual
     else:
-        dscr = None  # 🔥 sistema sin financiamiento
+        dscr = None
 
-    # ======================================================
-    # ESTADO (ROBUSTO)
-    # ======================================================
     if dscr is None:
         estado = "SIN FINANCIAMIENTO"
         nota = "Sistema evaluado sin deuda (flujo directo)."
@@ -214,6 +324,7 @@ def _tir(flujos, guess=0.1):
         r -= vpn / deriv
     return r
 
+
 def evaluar_opciones_bateria_financieras(
     *,
     datos: Datosproyecto,
@@ -226,16 +337,6 @@ def evaluar_opciones_bateria_financieras(
     pct_fin: float,
     om_anual_pct: float,
 ) -> Dict[str, Any]:
-    """
-    Evalúa financieramente las opciones técnicas de batería generadas por energía.
-
-    No decide en el orquestador.
-    Aquí se comparan escenarios:
-        - sin batería
-        - FV + batería 5 kWh
-        - FV + batería 10 kWh
-        - etc.
-    """
 
     opciones = getattr(energia, "opciones_bateria", None) or []
 
@@ -250,9 +351,6 @@ def evaluar_opciones_bateria_financieras(
 
     escenarios = []
 
-    # ======================================================
-    # Escenario base: sin batería
-    # ======================================================
     capex_base = float(capex_fv_L)
 
     cuota_base = calcular_cuota_mensual(
@@ -292,14 +390,19 @@ def evaluar_opciones_bateria_financieras(
         "resultado_bateria": None,
     })
 
-    # ======================================================
-    # Escenarios con batería
-    # ======================================================
     if not demanda_24h or not fv_24h:
         return {
             "escenarios": escenarios,
             "mejor": escenarios[0],
         }
+
+    energia_generada_12m = (
+        getattr(energia, "energia_generada_12m", None)
+        or getattr(energia, "energia_bruta_12m", None)
+        or getattr(energia, "energia_fv_12m", None)
+        or getattr(energia, "produccion_12m", None)
+        or getattr(energia, "energia_util_12m", [])
+    )
 
     for opcion in opciones:
         capacidad_kwh = float(
@@ -346,11 +449,16 @@ def evaluar_opciones_bateria_financieras(
 
         om_val = om_mensual(capex_total, om_anual_pct)
 
-        # Por ahora se mantiene la misma energía FV mensual.
-        # La mejora fina por batería se hará cuando el balance entregue energía mensual ajustada.
-        tabla = simular_12_meses(
+        energia_fv_12m_bateria = _energia_fv_12m_con_bateria(
             consumo_12m=datos.consumo_12m,
             energia_fv_12m=getattr(energia, "energia_util_12m", []),
+            energia_generada_12m=energia_generada_12m,
+            resultado_bateria=resultado_bateria,
+        )
+
+        tabla = simular_12_meses(
+            consumo_12m=datos.consumo_12m,
+            energia_fv_12m=energia_fv_12m_bateria,
             tarifa_energia=tarifa_energia,
             cargos_fijos=cargos_fijos,
             cuota_mensual=cuota,
@@ -374,6 +482,7 @@ def evaluar_opciones_bateria_financieras(
             "evaluacion": evaluacion,
             "tabla_12m": tabla,
             "resultado_bateria": resultado_bateria,
+            "energia_fv_12m_bateria": energia_fv_12m_bateria,
         })
 
     escenarios_validos = [
@@ -393,10 +502,12 @@ def evaluar_opciones_bateria_financieras(
         "escenarios": escenarios,
         "mejor": mejor,
     }
-    
+
+
 # ==========================================================
 # 🔵 ENTRYPOINT FINANCIERO
 # ==========================================================
+
 def ejecutar_finanzas(
     *,
     datos: Datosproyecto,
@@ -421,18 +532,12 @@ def ejecutar_finanzas(
     if not energia_fv_12m or len(energia_fv_12m) != 12:
         raise ValueError("Energía mensual inválida.")
 
-    # ======================================================
-    # CAPEX FV
-    # ======================================================
     capex_fv = calcular_capex_L(
         pdc_kw=kwp_dc,
         costo_usd_kwp=datos.costo_usd_kwp,
         tcambio=datos.tcambio,
     )
 
-    # ======================================================
-    # CAPEX BATERÍA
-    # ======================================================
     capex_bateria = 0.0
     capacidad_bateria_kwh = 0.0
     costo_bateria_usd_kwh = 0.0
@@ -465,9 +570,6 @@ def ejecutar_finanzas(
             * float(datos.tcambio)
         )
 
-    # ======================================================
-    # CAPEX TOTAL
-    # ======================================================
     capex = capex_fv + capex_bateria
 
     cuota = calcular_cuota_mensual(
@@ -491,9 +593,6 @@ def ejecutar_finanzas(
     evaluacion = _evaluacion_mensual(tabla_12m, cuota)
     ahorro_anual = sum(x["ahorro_L"] for x in tabla_12m)
 
-    # ======================================================
-    # INDICADORES FINANCIEROS
-    # ======================================================
     roi = (ahorro_anual / capex) * 100 if capex > 0 else 0.0
     payback = capex / ahorro_anual if ahorro_anual > 0 else 0.0
 
@@ -502,7 +601,7 @@ def ejecutar_finanzas(
     for _ in range(10):
         flujos.append(ahorro_anual)
 
-        tir = _tir(flujos) * 100
+    tir = _tir(flujos) * 100
 
     optimizacion_bateria = evaluar_opciones_bateria_financieras(
         datos=datos,
