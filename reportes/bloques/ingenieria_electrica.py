@@ -442,10 +442,12 @@ def _section_bateria(story, resultado, energia, styles):
     if energia is None:
         return
 
-    bateria_rec = getattr(energia, "bateria_recomendada", None)
-    bateria = getattr(energia, "bateria", None)
+    # Compatible con objeto y dict
+    bateria_rec = leer(energia, "bateria_recomendada", None)
+    bateria = leer(energia, "bateria", None)
 
-    if bateria_rec is None:
+    # Si no existe recomendación ni resultado de batería, no imprime sección
+    if bateria_rec is None and bateria is None:
         return
 
     financiero = leer(resultado, "financiero", {}) or {}
@@ -458,30 +460,79 @@ def _section_bateria(story, resultado, energia, styles):
 
     data = [
         ["Concepto", "Valor"],
-        ["Capacidad útil recomendada", f"{bateria_rec.capacidad_util_kwh:.1f} kWh"],
-        ["Potencia recomendada", f"{bateria_rec.potencia_max_kw:.1f} kW"],
-        ["Excedente FV diario estimado", f"{bateria_rec.excedente_diario_kwh:.1f} kWh/día"],
-        ["Consumo nocturno estimado", f"{bateria_rec.consumo_nocturno_kwh:.1f} kWh/día"],
-        ["Energía objetivo recuperable", f"{bateria_rec.energia_objetivo_kwh:.1f} kWh/día"],
     ]
 
-    if bateria is not None and getattr(bateria, "ok", False):
-
+    # =====================================================
+    # BATERÍA RECOMENDADA
+    # =====================================================
+    if bateria_rec is not None:
         data.extend([
-            ["Capacidad batería instalada", f"{bateria.capacidad_util_kwh:.1f} kWh"],
-            ["Potencia batería instalada", f"{bateria.potencia_max_kw:.1f} kW"],
-
-            ["Compra red sin batería", f"{bateria.compra_red_sin_bateria_kwh:.1f} kWh/día"],
-            ["Compra red con batería", f"{bateria.compra_red_con_bateria_kwh:.1f} kWh/día"],
-            ["Excedente sin batería", f"{bateria.excedente_sin_bateria_kwh:.1f} kWh/día"],
-            ["Excedente con batería", f"{bateria.excedente_con_bateria_kwh:.1f} kWh/día"],
-            ["Cobertura sin batería", f"{bateria.cobertura_sin_bateria_pct:.1f} %"],
-            ["Cobertura con batería", f"{bateria.cobertura_con_bateria_pct:.1f} %"],
+            [
+                "Capacidad útil recomendada",
+                f"{float(leer(bateria_rec, 'capacidad_util_kwh', 0.0) or 0.0):.1f} kWh"
+            ],
+            [
+                "Potencia recomendada",
+                f"{float(leer(bateria_rec, 'potencia_max_kw', 0.0) or 0.0):.1f} kW"
+            ],
+            [
+                "Excedente FV diario estimado",
+                f"{float(leer(bateria_rec, 'excedente_diario_kwh', 0.0) or 0.0):.1f} kWh/día"
+            ],
+            [
+                "Consumo nocturno estimado",
+                f"{float(leer(bateria_rec, 'consumo_nocturno_kwh', 0.0) or 0.0):.1f} kWh/día"
+            ],
+            [
+                "Energía objetivo recuperable",
+                f"{float(leer(bateria_rec, 'energia_objetivo_kwh', 0.0) or 0.0):.1f} kWh/día"
+            ],
         ])
-    # =====================================================
-    # COSTOS DE BATERÍA (FINANZAS)
-    # =====================================================
 
+    # =====================================================
+    # BATERÍA INSTALADA / RESULTADO CON BATERÍA
+    # =====================================================
+    bateria_ok = bool(leer(bateria, "ok", False)) if bateria is not None else False
+
+    if bateria is not None and bateria_ok:
+        data.extend([
+            [
+                "Capacidad batería instalada",
+                f"{float(leer(bateria, 'capacidad_util_kwh', 0.0) or 0.0):.1f} kWh"
+            ],
+            [
+                "Potencia batería instalada",
+                f"{float(leer(bateria, 'potencia_max_kw', 0.0) or 0.0):.1f} kW"
+            ],
+            [
+                "Compra red sin batería",
+                f"{float(leer(bateria, 'compra_red_sin_bateria_kwh', 0.0) or 0.0):.1f} kWh/día"
+            ],
+            [
+                "Compra red con batería",
+                f"{float(leer(bateria, 'compra_red_con_bateria_kwh', 0.0) or 0.0):.1f} kWh/día"
+            ],
+            [
+                "Excedente sin batería",
+                f"{float(leer(bateria, 'excedente_sin_bateria_kwh', 0.0) or 0.0):.1f} kWh/día"
+            ],
+            [
+                "Excedente con batería",
+                f"{float(leer(bateria, 'excedente_con_bateria_kwh', 0.0) or 0.0):.1f} kWh/día"
+            ],
+            [
+                "Cobertura sin batería",
+                f"{float(leer(bateria, 'cobertura_sin_bateria_pct', 0.0) or 0.0):.1f} %"
+            ],
+            [
+                "Cobertura con batería",
+                f"{float(leer(bateria, 'cobertura_con_bateria_pct', 0.0) or 0.0):.1f} %"
+            ],
+        ])
+
+    # =====================================================
+    # COSTOS DE BATERÍA
+    # =====================================================
     capacidad_bateria = float(
         financiero.get("capacidad_bateria_kwh", 0.0) or 0.0
     )
@@ -495,11 +546,19 @@ def _section_bateria(story, resultado, energia, styles):
     )
 
     if capacidad_bateria > 0:
-
         data.extend([
-            ["Capacidad batería utilizada", f"{capacidad_bateria:.1f} kWh"],
-            ["Costo unitario batería", f"US$ {costo_unitario:,.0f}/kWh"],
-            ["Costo estimado batería", f"L {capex_bateria:,.0f}"],
+            [
+                "Capacidad batería utilizada",
+                f"{capacidad_bateria:.1f} kWh"
+            ],
+            [
+                "Costo unitario batería",
+                f"US$ {costo_unitario:,.0f}/kWh"
+            ],
+            [
+                "Costo estimado batería",
+                f"L {capex_bateria:,.0f}"
+            ],
         ])
 
     t = Table(
@@ -513,6 +572,7 @@ def _section_bateria(story, resultado, energia, styles):
         ("GRID", (0, 0), (-1, -1), 0.25, HexColor("#CCCCCC")),
         ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("ALIGN", (1, 1), (1, -1), "RIGHT"),
     ]))
 
     story.append(t)
@@ -523,7 +583,7 @@ def _section_bateria(story, resultado, energia, styles):
             "La batería recomendada se calcula con base en el excedente solar diario "
             "y el consumo nocturno estimado del cliente. Esta sección es preliminar "
             "y no sustituye el dimensionamiento constructivo del sistema de almacenamiento.",
-            styles["Normal"]
+            styles["BodyText"]
         )
     )
 
