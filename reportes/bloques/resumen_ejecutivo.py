@@ -29,6 +29,26 @@ def leer(obj, campo, default=None):
     return getattr(obj, campo, default)
 
 
+def _financiero_para_pdf(financiero):
+    """
+    Usa la batería óptima en el resumen ejecutivo si existe
+    y si no es el escenario 'Sin batería'.
+
+    Si no hay batería óptima válida, conserva el financiero base.
+    """
+
+    bateria_optima = leer(financiero, "bateria_optima", None)
+
+    if isinstance(bateria_optima, dict):
+        nombre = str(bateria_optima.get("nombre", "")).strip().lower()
+        tabla_bat = bateria_optima.get("tabla_12m", [])
+
+        if nombre and nombre != "sin batería" and tabla_bat:
+            return bateria_optima
+
+    return financiero
+
+
 # =========================================================
 # CLIENTE
 # =========================================================
@@ -56,8 +76,12 @@ def p1_tabla_cliente(datos, sizing, fecha, pal, content_w):
         font_body=9,
     )
 
-    return [section_bar("Datos del cliente y situación energética", pal, content_w),
-            Spacer(1, 6), t, Spacer(1, 12)]
+    return [
+        section_bar("Datos del cliente y situación energética", pal, content_w),
+        Spacer(1, 6),
+        t,
+        Spacer(1, 12),
+    ]
 
 
 # =========================================================
@@ -66,12 +90,21 @@ def p1_tabla_cliente(datos, sizing, fecha, pal, content_w):
 
 def p1_tabla_solucion_unica(datos, sizing, energia, financiero, pal, content_w, paneles=None):
 
-    capex = float(leer(financiero, "capex_L", 0.0))
+    financiero_pdf = _financiero_para_pdf(financiero)
+
+    capex = float(
+        leer(
+            financiero_pdf,
+            "capex_total_L",
+            leer(financiero_pdf, "capex_L", 0.0),
+        )
+    )
 
     # =====================================================
     # SISTEMA FV REAL CONECTADO
     # Prioridad: strings reales > sizing preliminar
     # =====================================================
+
     strings = leer(paneles, "strings", []) if paneles else []
     panel_obj = leer(paneles, "panel", None) if paneles else None
 
@@ -90,36 +123,90 @@ def p1_tabla_solucion_unica(datos, sizing, energia, financiero, pal, content_w, 
         panel_wp = int((kwp * 1000) / n_paneles) if n_paneles > 0 else 0
 
     # =====================================================
-    # ENERGÍA
+    # ENERGÍA REAL USADA EN EL PDF
+    # Si existe escenario óptimo con batería, usa su tabla.
     # =====================================================
-    energia_12m = leer(energia, "energia_util_12m", [])
-    prod_anual = sum(energia_12m) if isinstance(energia_12m, list) else 0.0
+
+    tabla_pdf = leer(financiero_pdf, "tabla_12m", [])
 
     consumo_12m = get_field(datos, "consumo_12m", [])
     consumo_anual = sum(consumo_12m) if isinstance(consumo_12m, list) else 0.0
 
+    if tabla_pdf:
+        prod_anual = sum(
+            float(x.get("fv_kwh", 0.0))
+            for x in tabla_pdf
+            if isinstance(x, dict)
+        )
+    else:
+        energia_12m = leer(energia, "energia_util_12m", [])
+        prod_anual = sum(energia_12m) if isinstance(energia_12m, list) else 0.0
+
     cobertura_real = prod_anual / consumo_anual if consumo_anual > 0 else 0.0
 
-    evaluacion = leer(financiero, "evaluacion", {}) or {}
+    evaluacion = leer(financiero_pdf, "evaluacion", {}) or {}
     estado_txt = str(evaluacion.get("estado", "")).upper().strip()
 
     ds_val = evaluacion.get("dscr", None)
     ds_txt = "—" if ds_val is None else f"{ds_val:.2f}"
 
+    bateria_nombre = str(leer(financiero_pdf, "nombre", "") or "")
+    capacidad_bateria = float(leer(financiero_pdf, "capacidad_bateria_kwh", 0.0) or 0.0)
+
+    sistema_txt = f"{num(kwp, 2)} kWp"
+
+    if capacidad_bateria > 0:
+        sistema_txt += f" + batería {capacidad_bateria:.0f} kWh"
+
     data = [
         ["Dato", "Valor", "Dato", "Valor"],
 
-        ["Cobertura objetivo", f"{get_field(datos, 'cobertura_objetivo', 0)*100:.0f}%",
-         "Cobertura real", f"{cobertura_real*100:.1f}%"],
+        [
+            "Cobertura objetivo",
+            f"{get_field(datos, 'cobertura_objetivo', 0) * 100:.0f}%",
+            "Cobertura real",
+            f"{cobertura_real * 100:.1f}%",
+        ],
 
-        ["Sistema", f"{num(kwp, 2)} kWp", "CAPEX", money_L(capex)],
+        [
+            "Sistema",
+            sistema_txt,
+            "CAPEX",
+            money_L(capex),
+        ],
 
-        ["Producción anual", f"{prod_anual:,.0f} kWh/año", "DSCR", ds_txt],
+        [
+            "Producción útil anual",
+            f"{prod_anual:,.0f} kWh/año",
+            "DSCR",
+            ds_txt,
+        ],
 
-        ["Módulos FV", f"{int(n_paneles)} × {int(panel_wp)} Wp", "Estado", estado_txt],
+        [
+            "Módulos FV",
+            f"{int(n_paneles)} × {int(panel_wp)} Wp",
+            "Estado",
+            estado_txt,
+        ],
     ]
 
-    t = make_table(data, content_w, ratios=[1.25, 2.15, 1.25, 2.15], repeatRows=1)
+    if capacidad_bateria > 0:
+        data.append(
+            [
+                "Batería evaluada",
+                bateria_nombre,
+                "Capacidad",
+                f"{capacidad_bateria:.1f} kWh",
+            ]
+        )
+
+    t = make_table(
+        data,
+        content_w,
+        ratios=[1.25, 2.15, 1.25, 2.15],
+        repeatRows=1,
+    )
+
     t.setStyle(table_style_uniform(pal, font_header=9, font_body=9))
 
     return [
@@ -128,29 +215,57 @@ def p1_tabla_solucion_unica(datos, sizing, energia, financiero, pal, content_w, 
         t,
         Spacer(1, 12),
     ]
+
+
 # =========================================================
 # DECISIÓN
 # =========================================================
 
 def p1_tabla_decision(financiero, pal, content_w):
 
-    tabla = leer(financiero, "tabla_12m", [])
+    financiero_pdf = _financiero_para_pdf(financiero)
+
+    tabla = leer(financiero_pdf, "tabla_12m", [])
 
     if tabla:
-        pago_actual = sum(x["factura_base_L"] for x in tabla) / 12
-        pago_residual = sum(x["pago_enee_L"] for x in tabla) / 12
-    else:
-        pago_actual = pago_residual = 0.0
+        pago_actual = sum(
+            float(x.get("factura_base_L", 0.0))
+            for x in tabla
+            if isinstance(x, dict)
+        ) / 12.0
 
-    cuota = float(leer(financiero, "cuota_mensual", 0.0))
+        pago_residual = sum(
+            float(x.get("pago_enee_L", 0.0))
+            for x in tabla
+            if isinstance(x, dict)
+        ) / 12.0
+    else:
+        pago_actual = 0.0
+        pago_residual = 0.0
+
+    cuota = float(
+        leer(
+            financiero_pdf,
+            "cuota_mensual_L",
+            leer(financiero_pdf, "cuota_mensual", 0.0),
+        )
+    )
 
     pago_total = pago_residual + cuota
     ahorro = pago_actual - pago_total
 
+    capacidad_bateria = float(leer(financiero_pdf, "capacidad_bateria_kwh", 0.0) or 0.0)
+
     rows = [
         ["Pago actual ENEE (sin FV)", money_L(pago_actual)],
-        ["Pago ENEE con FV (residual)", money_L(pago_residual)],
+        ["Pago ENEE con FV / batería", money_L(pago_residual)],
         ["Cuota de financiamiento", money_L(cuota)],
+    ]
+
+    if capacidad_bateria > 0:
+        rows.append(["Batería incluida", f"{capacidad_bateria:.1f} kWh"])
+
+    rows += [
         ["Pago total con FV", money_L(pago_total)],
         ["Ahorro neto mensual", money_L(ahorro)],
     ]
@@ -160,11 +275,15 @@ def p1_tabla_decision(financiero, pal, content_w):
         rows=rows,
         content_w=content_w,
         pal=pal,
-        highlight_row=4,
+        highlight_row=len(rows) - 1,
     )
 
-    return [section_bar("Decisión del cliente (mensual)", pal, content_w),
-            Spacer(1, 6), t, Spacer(1, 12)]
+    return [
+        section_bar("Decisión del cliente (mensual)", pal, content_w),
+        Spacer(1, 6),
+        t,
+        Spacer(1, 12),
+    ]
 
 
 # =========================================================
@@ -173,7 +292,9 @@ def p1_tabla_decision(financiero, pal, content_w):
 
 def p1_conclusion(financiero, sizing, datos, pal, content_w, paneles=None):
 
-    evaluacion = leer(financiero, "evaluacion", {}) or {}
+    financiero_pdf = _financiero_para_pdf(financiero)
+
+    evaluacion = leer(financiero_pdf, "evaluacion", {}) or {}
 
     ds_val = evaluacion.get("dscr", None)
     ds_txt = "—" if ds_val is None else f"{ds_val:.2f}"
@@ -197,20 +318,34 @@ def p1_conclusion(financiero, sizing, datos, pal, content_w, paneles=None):
 
     # =====================================================
     # IMPACTO FINANCIERO REAL
-    # Se calcula desde tabla_12m para evitar depender
-    # de una llave que puede no existir en financiero.
+    # Si hay batería óptima, usa tabla_12m de esa batería.
     # =====================================================
 
-    tabla = leer(financiero, "tabla_12m", [])
+    tabla = leer(financiero_pdf, "tabla_12m", [])
 
     if tabla:
-        pago_actual = sum(float(x.get("factura_base_L", 0.0)) for x in tabla) / 12.0
-        pago_residual = sum(float(x.get("pago_enee_L", 0.0)) for x in tabla) / 12.0
+        pago_actual = sum(
+            float(x.get("factura_base_L", 0.0))
+            for x in tabla
+            if isinstance(x, dict)
+        ) / 12.0
+
+        pago_residual = sum(
+            float(x.get("pago_enee_L", 0.0))
+            for x in tabla
+            if isinstance(x, dict)
+        ) / 12.0
     else:
         pago_actual = 0.0
         pago_residual = 0.0
 
-    cuota = float(leer(financiero, "cuota_mensual", 0.0))
+    cuota = float(
+        leer(
+            financiero_pdf,
+            "cuota_mensual_L",
+            leer(financiero_pdf, "cuota_mensual", 0.0),
+        )
+    )
 
     pago_total = pago_residual + cuota
     impacto = pago_actual - pago_total
@@ -222,11 +357,22 @@ def p1_conclusion(financiero, sizing, datos, pal, content_w, paneles=None):
     consumo_12m = get_field(datos, "consumo_12m", [])
     consumo_anual = sum(consumo_12m) if isinstance(consumo_12m, list) else 0.0
 
-    energia_real = sum(float(x.get("fv_kwh", 0.0)) for x in tabla) if tabla else 0.0
+    energia_real = sum(
+        float(x.get("fv_kwh", 0.0))
+        for x in tabla
+        if isinstance(x, dict)
+    ) if tabla else 0.0
 
     cobertura_real = energia_real / consumo_anual if consumo_anual > 0 else 0.0
 
     cobertura_obj = float(get_field(datos, "cobertura_objetivo", 0.0))
+
+    capacidad_bateria = float(leer(financiero_pdf, "capacidad_bateria_kwh", 0.0) or 0.0)
+
+    linea_bateria = ""
+
+    if capacidad_bateria > 0:
+        linea_bateria = f"• Batería evaluada: <b>{capacidad_bateria:.1f} kWh</b><br/>"
 
     concl = f"""
     <b>Conclusión ejecutiva</b><br/><br/>
@@ -234,11 +380,13 @@ def p1_conclusion(financiero, sizing, datos, pal, content_w, paneles=None):
     • DSCR: <b>{ds_txt}</b><br/>
     • Peor mes: <b>{money_L(peor)}</b><br/>
     • Sistema: {kwp:.2f} kWp<br/>
-    • Cobertura objetivo: {cobertura_obj*100:.0f}%<br/>
-    • Cobertura real: <b>{cobertura_real*100:.1f}%</b><br/>
+    {linea_bateria}
+    • Cobertura objetivo: {cobertura_obj * 100:.0f}%<br/>
+    • Cobertura real: <b>{cobertura_real * 100:.1f}%</b><br/>
     """
 
     return [box_paragraph(concl, pal, content_w)]
+
 
 # =========================================================
 # ORQUESTADOR
