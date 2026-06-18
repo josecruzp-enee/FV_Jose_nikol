@@ -14,49 +14,6 @@ from energy.baterias import generar_opciones_bateria
 # ==========================================================
 # HELPERS BATERÍA
 # ==========================================================
-def _construir_config_bateria(datos: Datosproyecto) -> ConfigBateria:
-    sistema_fv = getattr(datos, "sistema_fv", {}) or {}
-
-    bateria_cfg = (
-        sistema_fv.get("bateria", {})
-        or sistema_fv.get("baterias", {})
-        or {}
-    )
-
-    usar_bateria = bool(
-        bateria_cfg.get("usar_bateria", False)
-        or bateria_cfg.get("activa", False)
-        or bateria_cfg.get("habilitada", False)
-    )
-
-    return ConfigBateria(
-        usar_bateria=usar_bateria,
-        capacidad_util_kwh=float(
-            bateria_cfg.get("capacidad_util_kwh", 0.0) or 0.0
-        ),
-        potencia_max_kw=float(
-            bateria_cfg.get("potencia_max_kw", 0.0) or 0.0
-        ),
-        soc_inicial_pct=float(
-            bateria_cfg.get("soc_inicial_pct", 20.0) or 20.0
-        ),
-        soc_min_pct=float(
-            bateria_cfg.get("soc_min_pct", 20.0) or 20.0
-        ),
-        soc_max_pct=float(
-            bateria_cfg.get("soc_max_pct", 100.0) or 100.0
-        ),
-        eficiencia_ida_vuelta=float(
-            bateria_cfg.get("eficiencia_ida_vuelta", 0.90) or 0.90
-        ),
-        costo_usd_kwh=float(
-            bateria_cfg.get("costo_usd_kwh", 250.0) or 250.0
-        ),
-        vida_util_anios=int(
-            bateria_cfg.get("vida_util_anios", 10) or 10
-        ),
-    )
-
 
 def _aplicar_bateria_si_corresponde(
     datos: Datosproyecto,
