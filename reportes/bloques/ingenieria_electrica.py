@@ -442,18 +442,19 @@ def _section_bateria(story, resultado, energia, styles):
     if energia is None:
         return
 
-    # Compatible con objeto y dict
-    bateria_rec = leer(energia, "bateria_recomendada", None)
-    bateria = leer(energia, "bateria", None)
-
-    # Si no existe recomendación ni resultado de batería, no imprime sección
-    if bateria_rec is None and bateria is None:
-        return
-
     financiero = leer(resultado, "financiero", {}) or {}
 
     if not isinstance(financiero, dict):
         financiero = {}
+
+    bateria_optima = financiero.get("bateria_optima", {}) or {}
+    opciones_bateria = leer(energia, "opciones_bateria", []) or []
+
+    bateria_rec = opciones_bateria[0] if opciones_bateria else None
+    bateria = bateria_optima.get("resultado_bateria")
+
+    if bateria_rec is None and bateria is None:
+        return
 
     story.append(Paragraph("Batería recomendada", styles["Heading2"]))
     story.append(Spacer(1, 6))
@@ -490,19 +491,20 @@ def _section_bateria(story, resultado, energia, styles):
         ])
 
     # =====================================================
-    # BATERÍA INSTALADA / RESULTADO CON BATERÍA
+    # RESULTADO DE BATERÍA ÓPTIMA
     # =====================================================
     bateria_ok = bool(leer(bateria, "ok", False)) if bateria is not None else False
 
     if bateria is not None and bateria_ok:
+
         data.extend([
             [
                 "Capacidad batería instalada",
-                f"{float(leer(bateria, 'capacidad_util_kwh', 0.0) or 0.0):.1f} kWh"
+                f"{float(leer(bateria_optima, 'capacidad_bateria_kwh', 0.0) or 0.0):.1f} kWh"
             ],
             [
                 "Potencia batería instalada",
-                f"{float(leer(bateria, 'potencia_max_kw', 0.0) or 0.0):.1f} kW"
+                f"{float(leer(bateria_optima, 'potencia_bateria_kw', 0.0) or 0.0):.1f} kW"
             ],
             [
                 "Compra red sin batería",
@@ -522,11 +524,11 @@ def _section_bateria(story, resultado, energia, styles):
             ],
             [
                 "Cobertura sin batería",
-                f"{float(leer(bateria, 'cobertura_sin_bateria_pct', 0.0) or 0.0):.1f} %"
+                f"{float(leer(bateria, 'cobertura_sin_bateria_pct', 0.0) or 0.0):.1f}%"
             ],
             [
                 "Cobertura con batería",
-                f"{float(leer(bateria, 'cobertura_con_bateria_pct', 0.0) or 0.0):.1f} %"
+                f"{float(leer(bateria, 'cobertura_con_bateria_pct', 0.0) or 0.0):.1f}%"
             ],
         ])
 
@@ -534,30 +536,27 @@ def _section_bateria(story, resultado, energia, styles):
     # COSTOS DE BATERÍA
     # =====================================================
     capacidad_bateria = float(
-        financiero.get("capacidad_bateria_kwh", 0.0) or 0.0
+        bateria_optima.get("capacidad_bateria_kwh", 0.0) or 0.0
     )
 
     capex_bateria = float(
-        financiero.get("capex_bateria_L", 0.0) or 0.0
-    )
-
-    costo_unitario = float(
-        financiero.get("costo_bateria_usd_kwh", 0.0) or 0.0
+        bateria_optima.get("capex_bateria_L", 0.0) or 0.0
     )
 
     if capacidad_bateria > 0:
+
         data.extend([
             [
                 "Capacidad batería utilizada",
                 f"{capacidad_bateria:.1f} kWh"
             ],
             [
-                "Costo unitario batería",
-                f"US$ {costo_unitario:,.0f}/kWh"
-            ],
-            [
                 "Costo estimado batería",
                 f"L {capex_bateria:,.0f}"
+            ],
+            [
+                "Escenario seleccionado",
+                str(bateria_optima.get("nombre", ""))
             ],
         ])
 
@@ -580,9 +579,7 @@ def _section_bateria(story, resultado, energia, styles):
 
     story.append(
         Paragraph(
-            "La batería recomendada se calcula con base en el excedente solar diario "
-            "y el consumo nocturno estimado del cliente. Esta sección es preliminar "
-            "y no sustituye el dimensionamiento constructivo del sistema de almacenamiento.",
+            "La batería mostrada corresponde al escenario financiero óptimo evaluado por el motor de optimización.",
             styles["BodyText"]
         )
     )
