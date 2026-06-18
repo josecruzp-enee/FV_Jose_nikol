@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import List, Dict, Any
 
 
-@dataclass(frozen=True)
+@dataclass
 class EnergiaResultado:
     """
     Resultado final del cálculo energético del sistema FV (8760).
