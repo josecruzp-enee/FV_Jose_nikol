@@ -1,21 +1,12 @@
 # -*- coding: utf-8 -*-
+from __future__ import annotations
 
-from energy.baterias.modelos import ConfigBateria
-from energy.baterias.resultado_bateria import ResultadoBateria
-from energy.baterias.balance_bateria import simular_balance_bateria_24h
-from energy.baterias.orquestador_bateria import ejecutar_bateria
 from energy.baterias.recomendador_bateria import (
     BateriaRecomendada,
-    calcular_bateria_recomendada,
+    generar_opciones_bateria,
 )
-from energy.baterias.perfiles import promediar_energia_8760_a_24h
 
 __all__ = [
-    "ConfigBateria",
-    "ResultadoBateria",
-    "simular_balance_bateria_24h",
-    "ejecutar_bateria",
     "BateriaRecomendada",
-    "calcular_bateria_recomendada",
-    "promediar_energia_8760_a_24h",
+    "generar_opciones_bateria",
 ]
