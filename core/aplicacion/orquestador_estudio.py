@@ -23,17 +23,8 @@ def _aplicar_bateria_si_corresponde(
     Finanzas decidirá cuál opción conviene.
     """
 
-    demanda_24h = getattr(
-        datos,
-        "consumo_horario_24h_kwh",
-        {}
-    ) or {}
-
-    fv_24h = getattr(
-        energia,
-        "energia_horaria_kwh",
-        None
-    )
+    demanda_24h = getattr(datos, "consumo_horario_24h_kwh", {}) or {}
+    fv_24h = getattr(energia, "energia_horaria_kwh", None)
 
     if not demanda_24h or not fv_24h:
         return None
@@ -45,6 +36,9 @@ def _aplicar_bateria_si_corresponde(
     )
 
     setattr(energia, "opciones_bateria", opciones_bateria)
+
+    if opciones_bateria:
+        return opciones_bateria[0]
 
     return None
     
