@@ -14,7 +14,6 @@ from energy.baterias import generar_opciones_bateria
 # ==========================================================
 # HELPERS BATERÍA
 # ==========================================================
-
 def _aplicar_bateria_si_corresponde(
     datos: Datosproyecto,
     energia,
@@ -146,8 +145,6 @@ def ejecutar_estudio(
         # ==================================================
         bateria = _aplicar_bateria_si_corresponde(
             datos=datos,
-            sizing=sizing,
-            paneles=paneles,
             energia=energia,
         )
 
