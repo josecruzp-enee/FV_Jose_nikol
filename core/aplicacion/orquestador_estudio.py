@@ -37,9 +37,6 @@ def _aplicar_bateria_si_corresponde(
 
     setattr(energia, "opciones_bateria", opciones_bateria)
 
-    if opciones_bateria:
-        return opciones_bateria[0]
-
     return None
     
 # ==========================================================
