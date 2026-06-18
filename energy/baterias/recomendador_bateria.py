@@ -114,28 +114,3 @@ def generar_opciones_bateria(
 
     return opciones
 
-
-def calcular_bateria_recomendada(
-    demanda_24h,
-    fv_24h,
-    factor_aprovechamiento: float = 0.80,
-) -> BateriaRecomendada:
-    """
-    Compatibilidad con código existente.
-
-    Devuelve la opción técnica más grande disponible.
-    Finanzas debe decidir después si conviene o no.
-    """
-
-    opciones = generar_opciones_bateria(
-        demanda_24h=demanda_24h,
-        fv_24h=fv_24h,
-        factor_aprovechamiento=factor_aprovechamiento,
-    )
-
-    opciones_validas = [b for b in opciones if b.capacidad_util_kwh > 0]
-
-    if not opciones_validas:
-        return opciones[0]
-
-    return opciones_validas[-1]
