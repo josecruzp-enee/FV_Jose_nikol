@@ -9,12 +9,7 @@ from core.servicios.layout import construir_layout_preliminar_fv
 # ==========================================================
 # BATERÍAS
 # ==========================================================
-from energy.baterias import (
-    ConfigBateria,
-    ejecutar_bateria,
-    calcular_bateria_recomendada,
-)
-
+from energy.baterias import generar_opciones_bateria
 
 # ==========================================================
 # HELPERS BATERÍA
@@ -70,16 +65,9 @@ def _aplicar_bateria_si_corresponde(
     energia,
 ):
     """
-    Calcula siempre batería recomendada.
-    Si el usuario activó batería, también simula el balance energético.
+    Genera opciones técnicas de batería y las guarda en energia.
+    Finanzas decidirá cuál opción conviene.
     """
-
-    sistema_fv = getattr(datos, "sistema_fv", {}) or {}
-    bateria_cfg = (
-        sistema_fv.get("bateria", {})
-        or sistema_fv.get("baterias", {})
-        or {}
-    )
 
     demanda_24h = getattr(
         datos,
@@ -96,78 +84,18 @@ def _aplicar_bateria_si_corresponde(
     if not demanda_24h or not fv_24h:
         return None
 
-    # ======================================================
-    # 1. SIEMPRE CALCULAR BATERÍA RECOMENDADA
-    # ======================================================
-    bateria_recomendada = calcular_bateria_recomendada(
+    opciones_bateria = generar_opciones_bateria(
         demanda_24h=demanda_24h,
         fv_24h=fv_24h,
+        factor_aprovechamiento=0.80,
     )
 
     try:
-        setattr(energia, "bateria_recomendada", bateria_recomendada)
+        setattr(energia, "opciones_bateria", opciones_bateria)
     except Exception:
         pass
 
-    # ======================================================
-    # 2. SOLO SIMULAR SI EL USUARIO LA INCLUYE
-    # ======================================================
-    usar_bateria = bool(
-        bateria_cfg.get("usar_bateria", False)
-        or bateria_cfg.get("incluir_bateria", False)
-        or bateria_cfg.get("activa", False)
-        or bateria_cfg.get("habilitada", False)
-    )
-
-    if not usar_bateria:
-        return None
-
-    capacidad_util_kwh = float(
-        bateria_cfg.get(
-            "capacidad_util_kwh",
-            bateria_recomendada.capacidad_util_kwh
-        ) or bateria_recomendada.capacidad_util_kwh
-    )
-
-    potencia_max_kw = float(
-        bateria_cfg.get(
-            "potencia_max_kw",
-            bateria_recomendada.potencia_max_kw
-        ) or bateria_recomendada.potencia_max_kw
-    )
-
-    cfg_bateria = ConfigBateria(
-        usar_bateria=True,
-        capacidad_util_kwh=capacidad_util_kwh,
-        potencia_max_kw=potencia_max_kw,
-        soc_inicial_pct=float(bateria_cfg.get("soc_inicial_pct", 20.0) or 20.0),
-        soc_min_pct=float(bateria_cfg.get("soc_min_pct", 20.0) or 20.0),
-        soc_max_pct=float(bateria_cfg.get("soc_max_pct", 100.0) or 100.0),
-        eficiencia_ida_vuelta=float(
-            bateria_cfg.get("eficiencia_ida_vuelta", 0.90) or 0.90
-        ),
-        costo_usd_kwh=float(bateria_cfg.get("costo_usd_kwh", 250.0) or 250.0),
-        vida_util_anios=int(bateria_cfg.get("vida_util_anios", 10) or 10),
-    )
-
-    bateria = ejecutar_bateria(
-        demanda_24h=demanda_24h,
-        fv_24h=fv_24h,
-        cfg_bateria=cfg_bateria,
-    )
-
-    if bateria is None:
-        raise ValueError("Batería devolvió None")
-
-    if bateria.ok:
-        try:
-            setattr(energia, "bateria", bateria)
-            setattr(energia, "balance_bateria", bateria)
-        except Exception:
-            pass
-
-    return bateria
-
+    return None
 # ==========================================================
 # ORQUESTADOR PRINCIPAL
 # ==========================================================
