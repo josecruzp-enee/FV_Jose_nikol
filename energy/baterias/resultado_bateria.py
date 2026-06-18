@@ -11,14 +11,11 @@ class ResultadoBateria:
     errores: List[str] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
 
-    # ======================================================
-    # CONFIGURACIÓN / RESULTADO TÉCNICO DE BATERÍA
-    # ======================================================
+    # Datos técnicos / económicos de batería
     capacidad_util_kwh: float = 0.0
     potencia_max_kw: float = 0.0
     costo_usd_kwh: float = 0.0
     capex_bateria_usd: float = 0.0
-    capex_bateria_lps: float = 0.0
     vida_util_anios: int = 0
 
     demanda_24h_kwh: List[float] = field(default_factory=list)
