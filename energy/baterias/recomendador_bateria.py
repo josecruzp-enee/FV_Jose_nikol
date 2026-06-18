@@ -12,15 +12,6 @@ class BateriaRecomendada:
     excedente_diario_kwh: float
     consumo_nocturno_kwh: float
     energia_objetivo_kwh: float
-
-    # Evaluación económica
-    beneficio_kwh_hnl: float
-    ahorro_diario_hnl: float
-    ahorro_anual_hnl: float
-    capex_bateria_hnl: float
-    payback_anios: float | None
-    conviene: bool
-
     criterio: str
 
 
@@ -40,34 +31,24 @@ def _to_24h_lista(valores) -> List[float]:
     return [0.0] * 24
 
 
-def _redondear_bateria_comercial(kwh: float) -> float:
-    if kwh <= 0:
+def _potencia_bateria_kw(capacidad_kwh: float) -> float:
+    if capacidad_kwh <= 0:
         return 0.0
-    if kwh <= 5:
+    if capacidad_kwh <= 5:
+        return 3.0
+    if capacidad_kwh <= 10:
+        return 4.0
+    if capacidad_kwh <= 20:
         return 5.0
-    if kwh <= 10:
-        return 10.0
-    if kwh <= 15:
-        return 15.0
-    if kwh <= 20:
-        return 20.0
-    if kwh <= 30:
-        return 30.0
-    return 40.0
+    return 10.0
 
 
-def calcular_bateria_recomendada(
+def generar_opciones_bateria(
     demanda_24h,
     fv_24h,
     factor_aprovechamiento: float = 0.80,
-
-    # Económicos
-    costo_bateria_usd_kwh: float = 250.0,
-    precio_energia_red_hnl_kwh: float = 5.0,
-    precio_inyeccion_hnl_kwh: float = 2.20,
-    tipo_cambio_hnl_usd: float = 26.61,
-    payback_max_anios: float = 7.0,
-) -> BateriaRecomendada:
+    capacidades_comerciales_kwh: List[float] | None = None,
+) -> List[BateriaRecomendada]:
     demanda = _to_24h_lista(demanda_24h)
     fv = _to_24h_lista(fv_24h)
 
@@ -86,80 +67,75 @@ def calcular_bateria_recomendada(
     energia_objetivo = min(excedente_diario, consumo_nocturno)
     energia_objetivo *= float(factor_aprovechamiento or 0.80)
 
-    capacidad = _redondear_bateria_comercial(energia_objetivo)
+    if capacidades_comerciales_kwh is None:
+        capacidades_comerciales_kwh = [5.0, 10.0, 15.0, 20.0, 30.0, 40.0]
 
-    if capacidad <= 0:
-        potencia = 0.0
-    elif capacidad <= 5:
-        potencia = 3.0
-    elif capacidad <= 10:
-        potencia = 4.0
-    elif capacidad <= 20:
-        potencia = 5.0
-    else:
-        potencia = 10.0
+    opciones: List[BateriaRecomendada] = []
 
-    # =====================================================
-    # EVALUACIÓN ECONÓMICA SIMPLE
-    # =====================================================
-    beneficio_kwh = float(precio_energia_red_hnl_kwh or 0.0) - float(
-        precio_inyeccion_hnl_kwh or 0.0
-    )
+    for capacidad in capacidades_comerciales_kwh:
+        capacidad = float(capacidad or 0.0)
 
-    if beneficio_kwh < 0:
-        beneficio_kwh = 0.0
+        if capacidad <= 0:
+            continue
 
-    ahorro_diario = capacidad * beneficio_kwh
-    ahorro_anual = ahorro_diario * 365.0
+        if capacidad > energia_objetivo:
+            continue
 
-    capex_bateria_hnl = (
-        capacidad
-        * float(costo_bateria_usd_kwh or 0.0)
-        * float(tipo_cambio_hnl_usd or 0.0)
-    )
-
-    if ahorro_anual > 0:
-        payback = capex_bateria_hnl / ahorro_anual
-    else:
-        payback = None
-
-    conviene = (
-        capacidad > 0
-        and payback is not None
-        and payback <= float(payback_max_anios or 7.0)
-    )
-
-    if capacidad <= 0:
-        criterio = (
-            "No se recomienda batería porque no se identificó excedente FV "
-            "aprovechable o consumo nocturno suficiente."
-        )
-    elif not conviene:
-        criterio = (
-            "La batería es técnicamente posible, pero económicamente no se "
-            "recomienda bajo los parámetros actuales. El beneficio por kWh "
-            "almacenado se calcula como la diferencia entre el precio de energía "
-            "comprada a la red y el precio reconocido por inyección."
-        )
-    else:
-        criterio = (
-            "La capacidad recomendada se calcula tomando el menor valor entre "
-            "excedente FV diario y consumo nocturno, aplicando un factor de "
-            "aprovechamiento del 80%, redondeando a una capacidad comercial y "
-            "validando que el ahorro estimado genere un payback aceptable."
+        opciones.append(
+            BateriaRecomendada(
+                capacidad_util_kwh=capacidad,
+                potencia_max_kw=_potencia_bateria_kw(capacidad),
+                excedente_diario_kwh=excedente_diario,
+                consumo_nocturno_kwh=consumo_nocturno,
+                energia_objetivo_kwh=energia_objetivo,
+                criterio=(
+                    "Opción técnicamente válida. La capacidad se limita por el menor valor "
+                    "entre excedente FV diario y consumo nocturno, aplicando el factor de "
+                    "aprovechamiento definido. La selección económica debe realizarse en el "
+                    "módulo financiero."
+                ),
+            )
         )
 
-    return BateriaRecomendada(
-        capacidad_util_kwh=capacidad,
-        potencia_max_kw=potencia,
-        excedente_diario_kwh=excedente_diario,
-        consumo_nocturno_kwh=consumo_nocturno,
-        energia_objetivo_kwh=energia_objetivo,
-        beneficio_kwh_hnl=beneficio_kwh,
-        ahorro_diario_hnl=ahorro_diario,
-        ahorro_anual_hnl=ahorro_anual,
-        capex_bateria_hnl=capex_bateria_hnl,
-        payback_anios=payback,
-        conviene=conviene,
-        criterio=criterio,
+    if not opciones:
+        opciones.append(
+            BateriaRecomendada(
+                capacidad_util_kwh=0.0,
+                potencia_max_kw=0.0,
+                excedente_diario_kwh=excedente_diario,
+                consumo_nocturno_kwh=consumo_nocturno,
+                energia_objetivo_kwh=energia_objetivo,
+                criterio=(
+                    "No se generan opciones de batería porque no se identificó excedente FV "
+                    "aprovechable o consumo nocturno suficiente."
+                ),
+            )
+        )
+
+    return opciones
+
+
+def calcular_bateria_recomendada(
+    demanda_24h,
+    fv_24h,
+    factor_aprovechamiento: float = 0.80,
+) -> BateriaRecomendada:
+    """
+    Compatibilidad con código existente.
+
+    Devuelve la opción técnica más grande disponible.
+    Finanzas debe decidir después si conviene o no.
+    """
+
+    opciones = generar_opciones_bateria(
+        demanda_24h=demanda_24h,
+        fv_24h=fv_24h,
+        factor_aprovechamiento=factor_aprovechamiento,
     )
+
+    opciones_validas = [b for b in opciones if b.capacidad_util_kwh > 0]
+
+    if not opciones_validas:
+        return opciones[0]
+
+    return opciones_validas[-1]
