@@ -317,13 +317,47 @@ def _evaluacion_mensual(tabla: list, cuota: float) -> dict:
 
 def _tir(flujos, guess=0.1):
     r = guess
+
     for _ in range(100):
         vpn = sum(f / (1 + r) ** i for i, f in enumerate(flujos))
         deriv = sum(-i * f / (1 + r) ** (i + 1) for i, f in enumerate(flujos))
+
         if abs(deriv) < 1e-10:
             break
+
         r -= vpn / deriv
+
     return r
+
+
+# ==========================================================
+# 🔵 Optimización financiera de baterías
+# ==========================================================
+
+def _resumen_escenario_financiero(
+    *,
+    evaluacion: dict,
+    capex_total: float,
+    ahorro_anual: float,
+) -> dict:
+    """
+    Campos planos para facilitar PDF / tablas / selección.
+    No reemplaza la evaluación original; solo la expone más fácil.
+    """
+
+    ahorro_neto_mensual = float(evaluacion.get("neto_prom", 0.0) or 0.0)
+    dscr = evaluacion.get("dscr", None)
+    peor_mes = float(evaluacion.get("peor_mes", 0.0) or 0.0)
+    estado = evaluacion.get("estado", "SIN ESTADO")
+
+    return {
+        "ahorro_neto_mensual_L": ahorro_neto_mensual,
+        "dscr": dscr,
+        "peor_mes_L": peor_mes,
+        "estado": estado,
+        "payback_anios": capex_total / ahorro_anual if ahorro_anual > 0 else None,
+        "roi_pct": (ahorro_anual / capex_total) * 100 if capex_total > 0 else 0.0,
+    }
 
 
 def evaluar_opciones_bateria_financieras(
@@ -375,7 +409,13 @@ def evaluar_opciones_bateria_financieras(
     ahorro_anual_base = sum(x["ahorro_L"] for x in tabla_base)
     evaluacion_base = _evaluacion_mensual(tabla_base, cuota_base)
 
-    escenarios.append({
+    resumen_base = _resumen_escenario_financiero(
+        evaluacion=evaluacion_base,
+        capex_total=capex_base,
+        ahorro_anual=ahorro_anual_base,
+    )
+
+    escenario_base = {
         "nombre": "Sin batería",
         "capacidad_bateria_kwh": 0.0,
         "potencia_bateria_kw": 0.0,
@@ -384,12 +424,13 @@ def evaluar_opciones_bateria_financieras(
         "cuota_mensual_L": cuota_base,
         "om_mensual_L": om_base,
         "ahorro_anual_L": ahorro_anual_base,
-        "payback_anios": capex_base / ahorro_anual_base if ahorro_anual_base > 0 else None,
-        "roi_pct": (ahorro_anual_base / capex_base) * 100 if capex_base > 0 else 0.0,
         "evaluacion": evaluacion_base,
         "tabla_12m": tabla_base,
         "resultado_bateria": None,
-    })
+    }
+
+    escenario_base.update(resumen_base)
+    escenarios.append(escenario_base)
 
     if not demanda_24h or not fv_24h:
         return {
@@ -469,7 +510,13 @@ def evaluar_opciones_bateria_financieras(
         ahorro_anual = sum(x["ahorro_L"] for x in tabla)
         evaluacion = _evaluacion_mensual(tabla, cuota)
 
-        escenarios.append({
+        resumen = _resumen_escenario_financiero(
+            evaluacion=evaluacion,
+            capex_total=capex_total,
+            ahorro_anual=ahorro_anual,
+        )
+
+        escenario = {
             "nombre": f"Batería {capacidad_kwh:.0f} kWh",
             "capacidad_bateria_kwh": capacidad_kwh,
             "potencia_bateria_kw": potencia_kw,
@@ -478,23 +525,28 @@ def evaluar_opciones_bateria_financieras(
             "cuota_mensual_L": cuota,
             "om_mensual_L": om_val,
             "ahorro_anual_L": ahorro_anual,
-            "payback_anios": capex_total / ahorro_anual if ahorro_anual > 0 else None,
-            "roi_pct": (ahorro_anual / capex_total) * 100 if capex_total > 0 else 0.0,
             "evaluacion": evaluacion,
             "tabla_12m": tabla,
             "resultado_bateria": resultado_bateria,
             "energia_fv_12m_bateria": energia_fv_12m_bateria,
-        })
+        }
+
+        escenario.update(resumen)
+        escenarios.append(escenario)
 
     escenarios_validos = [
         e for e in escenarios
-        if e.get("payback_anios") is not None
+        if e.get("evaluacion") is not None
     ]
 
     if escenarios_validos:
-        mejor = min(
+        mejor = max(
             escenarios_validos,
-            key=lambda e: e["payback_anios"]
+            key=lambda e: (
+                float(e.get("ahorro_neto_mensual_L", -999999) or -999999),
+                float(e.get("dscr") or 0.0),
+                -float(e.get("capex_total_L", 0.0) or 0.0),
+            )
         )
     else:
         mejor = escenarios[0]
