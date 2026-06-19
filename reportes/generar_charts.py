@@ -655,6 +655,28 @@ def generar_charts(
     if bateria is None and energia is not None:
         bateria = getattr(energia, "bateria", None)
 
+    if bateria is None:
+        finanzas = (
+        res.get("finanzas")
+        if isinstance(res, dict)
+        else getattr(res, "finanzas", None)
+    )
+
+        if finanzas is not None:
+            bateria_optima = (
+                finanzas.get("bateria_optima")
+                if isinstance(finanzas, dict)
+                else getattr(finanzas, "bateria_optima", None)
+            )
+
+            if bateria_optima is not None:
+                bateria = (
+                    bateria_optima.get("resultado_bateria")
+                    if isinstance(bateria_optima, dict)
+                    else getattr(bateria_optima, "resultado_bateria", None)
+                    )
+        
+
     if energia:
         energia_raw = list(getattr(energia, "energia_util_12m", []))
         energia_mensual = _extraer_energia(energia_raw)
