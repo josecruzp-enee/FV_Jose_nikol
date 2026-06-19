@@ -656,10 +656,10 @@ def generar_charts(
         bateria = getattr(energia, "bateria", None)
 
     if bateria is None:
-        finanzas = (
-        res.get("finanzas")
+    finanzas = (
+        res.get("financiero")
         if isinstance(res, dict)
-        else getattr(res, "finanzas", None)
+        else getattr(res, "financiero", None)
     )
 
         if finanzas is not None:
