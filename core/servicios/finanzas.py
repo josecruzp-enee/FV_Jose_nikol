@@ -438,6 +438,12 @@ def evaluar_opciones_bateria_financieras(
             "mejor": escenarios[0],
         }
 
+    bateria_recomendada = getattr(energia, "bateria_recomendada", None)
+
+    energia_objetivo_kwh = float(
+        getattr(bateria_recomendada, "energia_objetivo_kwh", 0.0) or 0.0
+    )
+
     energia_generada_12m = (
         getattr(energia, "energia_generada_12m", None)
         or getattr(energia, "energia_bruta_12m", None)
@@ -478,6 +484,10 @@ def evaluar_opciones_bateria_financieras(
 
         if resultado_bateria is None or not getattr(resultado_bateria, "ok", False):
             continue
+
+        energia_descargada_dia = _energia_descargada_bateria_diaria(
+            resultado_bateria
+        )
 
         capex_bateria = capacidad_kwh * costo_bateria_usd_kwh * tcambio
         capex_total = capex_fv_L + capex_bateria
@@ -529,6 +539,8 @@ def evaluar_opciones_bateria_financieras(
             "tabla_12m": tabla,
             "resultado_bateria": resultado_bateria,
             "energia_fv_12m_bateria": energia_fv_12m_bateria,
+            "energia_descargada_dia_kwh": energia_descargada_dia,
+            "energia_objetivo_kwh": energia_objetivo_kwh,
         }
 
         escenario.update(resumen)
@@ -539,149 +551,53 @@ def evaluar_opciones_bateria_financieras(
         if e.get("evaluacion") is not None
     ]
 
-    if escenarios_validos:
+    escenarios_con_bateria = [
+        e for e in escenarios_validos
+        if float(e.get("capacidad_bateria_kwh", 0.0) or 0.0) > 0
+    ]
+
+    if escenarios_con_bateria and energia_objetivo_kwh > 0:
+
+        escenarios_que_cumplen = [
+            e for e in escenarios_con_bateria
+            if float(e.get("energia_descargada_dia_kwh", 0.0) or 0.0)
+            >= energia_objetivo_kwh * 0.95
+        ]
+
+        if escenarios_que_cumplen:
+            mejor = min(
+                escenarios_que_cumplen,
+                key=lambda e: (
+                    float(e.get("capacidad_bateria_kwh", 999999) or 999999),
+                    float(e.get("capex_total_L", 999999999) or 999999999),
+                )
+            )
+        else:
+            mejor = min(
+                escenarios_con_bateria,
+                key=lambda e: (
+                    abs(
+                        float(e.get("energia_descargada_dia_kwh", 0.0) or 0.0)
+                        - energia_objetivo_kwh
+                    ),
+                    float(e.get("capex_total_L", 999999999) or 999999999),
+                )
+            )
+
+    elif escenarios_con_bateria:
         mejor = max(
-            escenarios_validos,
+            escenarios_con_bateria,
             key=lambda e: (
+                float(e.get("energia_descargada_dia_kwh", 0.0) or 0.0),
                 float(e.get("ahorro_neto_mensual_L", -999999) or -999999),
-                float(e.get("dscr") or 0.0),
                 -float(e.get("capex_total_L", 0.0) or 0.0),
             )
         )
+
     else:
         mejor = escenarios[0]
 
     return {
         "escenarios": escenarios,
         "mejor": mejor,
-    }
-
-
-# ==========================================================
-# 🔵 ENTRYPOINT FINANCIERO
-# ==========================================================
-
-def ejecutar_finanzas(
-    *,
-    datos: Datosproyecto,
-    sizing: ResultadoSizing,
-    energia: EnergiaResultado,
-    bateria=None,
-) -> Dict[str, Any]:
-
-    kwp_dc = float(sizing.pdc_kw)
-
-    if kwp_dc <= 0:
-        raise ValueError("Sizing incompleto para finanzas.")
-
-    if energia is None:
-        raise ValueError("Resultado energético no definido.")
-
-    if not energia.ok:
-        raise ValueError(f"Energía inválida: {energia.errores}")
-
-    energia_fv_12m = getattr(energia, "energia_util_12m", None)
-
-    if not energia_fv_12m or len(energia_fv_12m) != 12:
-        raise ValueError("Energía mensual inválida.")
-
-    capex_fv = calcular_capex_L(
-        pdc_kw=kwp_dc,
-        costo_usd_kwp=datos.costo_usd_kwp,
-        tcambio=datos.tcambio,
-    )
-
-    capex_bateria = 0.0
-    capacidad_bateria_kwh = 0.0
-    costo_bateria_usd_kwh = 0.0
-
-    if bateria is not None and getattr(bateria, "ok", False):
-
-        capacidad_bateria_kwh = float(
-            getattr(bateria, "capacidad_util_kwh", 0.0) or 0.0
-        )
-
-        costo_bateria_usd_kwh = float(
-            getattr(bateria, "costo_usd_kwh", 0.0) or 0.0
-        )
-
-        if capacidad_bateria_kwh <= 0:
-            bateria_rec = getattr(energia, "bateria_recomendada", None)
-
-            if bateria_rec is not None:
-                capacidad_bateria_kwh = float(
-                    getattr(
-                        bateria_rec,
-                        "capacidad_util_kwh",
-                        0.0
-                    ) or 0.0
-                )
-
-        capex_bateria = (
-            capacidad_bateria_kwh
-            * costo_bateria_usd_kwh
-            * float(datos.tcambio)
-        )
-
-    capex = capex_fv + capex_bateria
-
-    cuota = calcular_cuota_mensual(
-        capex_L_=capex,
-        tasa_anual=datos.tasa_anual,
-        plazo_anios=datos.plazo_anios,
-        pct_fin=datos.porcentaje_financiado,
-    )
-
-    om_mensual_val = om_mensual(capex, datos.om_anual_pct)
-
-    tabla_12m = simular_12_meses(
-        consumo_12m=datos.consumo_12m,
-        energia_fv_12m=energia_fv_12m,
-        tarifa_energia=datos.tarifa_energia,
-        cargos_fijos=datos.cargos_fijos,
-        cuota_mensual=cuota,
-        om_mensual_val=om_mensual_val,
-    )
-
-    evaluacion = _evaluacion_mensual(tabla_12m, cuota)
-    ahorro_anual = sum(x["ahorro_L"] for x in tabla_12m)
-
-    roi = (ahorro_anual / capex) * 100 if capex > 0 else 0.0
-    payback = capex / ahorro_anual if ahorro_anual > 0 else 0.0
-
-    flujos = [-capex]
-
-    for _ in range(10):
-        flujos.append(ahorro_anual)
-
-    tir = _tir(flujos) * 100
-
-    optimizacion_bateria = evaluar_opciones_bateria_financieras(
-        datos=datos,
-        energia=energia,
-        capex_fv_L=capex_fv,
-        tarifa_energia=datos.tarifa_energia,
-        cargos_fijos=datos.cargos_fijos,
-        tasa_anual=datos.tasa_anual,
-        plazo_anios=datos.plazo_anios,
-        pct_fin=datos.porcentaje_financiado,
-        om_anual_pct=datos.om_anual_pct,
-    )
-
-    return {
-        "capex_L": capex,
-        "capex_fv_L": capex_fv,
-        "capex_bateria_L": capex_bateria,
-        "capacidad_bateria_kwh": capacidad_bateria_kwh,
-        "costo_bateria_usd_kwh": costo_bateria_usd_kwh,
-        "cuota_mensual": cuota,
-        "tabla_12m": tabla_12m,
-        "evaluacion": evaluacion,
-        "ahorro_anual_L": ahorro_anual,
-        "roi_pct": roi,
-        "payback_anios": payback,
-        "tir_pct": tir,
-        "optimizacion_bateria": optimizacion_bateria,
-        "escenarios_bateria": optimizacion_bateria["escenarios"],
-        "bateria_optima": optimizacion_bateria["mejor"],
     }
