@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List
+from typing import Any, Dict, List, Optional
 
 import matplotlib
 matplotlib.use("Agg")
@@ -9,16 +9,23 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 
-# ==========================================================
-# CONFIG
-# ==========================================================
-
 DIAS_MES = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
 
 
 # ==========================================================
-# CREAR CARPETA
+# HELPERS GENERALES
 # ==========================================================
+
+def _leer(obj: Any, campo: str, default=None):
+    if obj is None:
+        return default
+
+    if isinstance(obj, dict):
+        return obj.get(campo, default)
+
+    return getattr(obj, campo, default)
+
 
 def _mkdir_charts(out_dir: str | None) -> Path:
     base = Path(out_dir) if out_dir else Path("salidas") / "charts"
@@ -26,37 +33,35 @@ def _mkdir_charts(out_dir: str | None) -> Path:
     return base
 
 
-# ==========================================================
-# LEER POTENCIA DC
-# ==========================================================
+def _lista_float(valores, n: int, default: float = 0.0) -> List[float]:
+    salida = []
 
-def _leer_pdc_kw(res):
-    sizing = res.get("sizing") if isinstance(res, dict) else getattr(res, "sizing", None)
+    if valores is None:
+        return [default] * n
 
-    if not sizing:
-        return 0.0
+    if isinstance(valores, dict):
+        for i in range(n):
+            salida.append(float(valores.get(i, valores.get(str(i), default)) or default))
+        return salida
 
-    kwp = getattr(sizing, "kwp_dc", None)
-    if kwp:
-        return float(kwp)
+    if isinstance(valores, list):
+        for x in valores[:n]:
+            try:
+                salida.append(float(x or default))
+            except Exception:
+                salida.append(default)
 
-    if isinstance(sizing, dict):
-        kwp = sizing.get("kwp_recomendado")
-        if kwp:
-            return float(kwp)
+    while len(salida) < n:
+        salida.append(default)
 
-        pdc_w = sizing.get("potencia_dc_w")
-        if pdc_w:
-            return float(pdc_w) / 1000.0
-
-    return 0.0
+    return salida
 
 
 # ==========================================================
-# HELPERS ENERGÍA
+# ENERGÍA
 # ==========================================================
 
-def _extraer_energia(lista):
+def _extraer_energia_12m(lista) -> List[float]:
     if not lista:
         return [0.0] * 12
 
@@ -71,6 +76,25 @@ def _extraer_energia(lista):
     return [0.0] * 12
 
 
+def _extraer_energia_resultado(res):
+    return _leer(res, "energia", None)
+
+
+def _extraer_energia_mensual(energia) -> List[float]:
+    if energia is None:
+        return [0.0] * 12
+
+    energia_raw = list(_leer(energia, "energia_util_12m", []) or [])
+    return _extraer_energia_12m(energia_raw)
+
+
+def _extraer_energia_horaria(energia) -> List[float]:
+    if energia is None:
+        return []
+
+    return list(_leer(energia, "energia_horaria_kwh", []) or [])
+
+
 def _promedio_fv_24h(energia_horaria_kwh: List[float]) -> List[float]:
     if not energia_horaria_kwh:
         energia_horaria_kwh = [0.0] * 8760
@@ -83,445 +107,277 @@ def _promedio_fv_24h(energia_horaria_kwh: List[float]) -> List[float]:
         suma[hora] += float(valor or 0.0)
         conteo[hora] += 1
 
+    return [suma[h] / conteo[h] if conteo[h] else 0.0 for h in range(24)]
+
+
+# ==========================================================
+# PROYECTO / DEMANDA
+# ==========================================================
+
+def _extraer_proyecto(res, proyecto=None):
+    if proyecto is not None:
+        return proyecto
+
+    return _leer(res, "proyecto", None)
+
+
+def _extraer_consumo_24h(proyecto) -> Dict:
+    if proyecto is None:
+        return {}
+
+    return _leer(proyecto, "consumo_horario_24h_kwh", {}) or {}
+
+
+def _demanda_24h_desde_dict(consumo_horario_24h_kwh: dict) -> List[float]:
     return [
-        suma[h] / conteo[h] if conteo[h] else 0.0
-        for h in range(24)
-    ]
-
-
-# ==========================================================
-# HELPERS BATERÍA
-# ==========================================================
-
-def _extraer_series_bateria(bateria) -> dict:
-    def leer(obj, nombres, default=None):
-        if obj is None:
-            return default
-
-        for nombre in nombres:
-            if isinstance(obj, dict) and nombre in obj:
-                return obj.get(nombre)
-
-            valor = getattr(obj, nombre, None)
-            if valor is not None:
-                return valor
-
-        return default
-
-    def lista_24(valores):
-        if valores is None:
-            return None
-
-        if isinstance(valores, dict):
-            return [
-                float(valores.get(h, valores.get(str(h), 0.0)) or 0.0)
-                for h in range(24)
-            ]
-
-        if isinstance(valores, list):
-            salida = []
-
-            for x in valores[:24]:
-                try:
-                    salida.append(float(x or 0.0))
-                except Exception:
-                    salida.append(0.0)
-
-            if len(salida) < 24:
-                salida += [0.0] * (24 - len(salida))
-
-            return salida
-
-        return None
-
-    def tabla_24(tabla, nombres):
-        if not isinstance(tabla, list):
-            return None
-
-        salida = []
-
-        for fila in tabla[:24]:
-            if not isinstance(fila, dict):
-                salida.append(0.0)
-                continue
-
-            valor = 0.0
-
-            for nombre in nombres:
-                if nombre in fila:
-                    try:
-                        valor = float(fila.get(nombre) or 0.0)
-                    except Exception:
-                        valor = 0.0
-                    break
-
-            salida.append(valor)
-
-        if len(salida) < 24:
-            salida += [0.0] * (24 - len(salida))
-
-        return salida
-
-    resultado_bateria = leer(
-        bateria,
-        ["resultado_bateria", "bateria", "resultado"],
-        bateria,
-    )
-
-    tabla_24h = leer(
-        resultado_bateria,
-        ["tabla_24h", "tabla_horaria", "detalle_24h"],
-        None,
-    )
-
-    red_con_bateria = lista_24(
-        leer(
-            resultado_bateria,
-            [
-                "compra_red_con_bateria_24h",
-                "red_con_bateria_24h",
-                "demanda_red_con_bateria_24h",
-                "compra_red_24h_kwh",
-                "energia_red_24h_kwh",
-            ],
-            None,
-        )
-    )
-
-    descarga = lista_24(
-        leer(
-            resultado_bateria,
-            [
-                "descarga_bateria_24h",
-                "descarga_24h_kwh",
-                "energia_descargada_24h",
-                "bateria_descarga_24h_kwh",
-            ],
-            None,
-        )
-    )
-
-    carga = lista_24(
-        leer(
-            resultado_bateria,
-            [
-                "carga_bateria_24h",
-                "carga_24h_kwh",
-                "energia_cargada_24h",
-                "bateria_carga_24h_kwh",
-            ],
-            None,
-        )
-    )
-
-    soc = lista_24(
-        leer(
-            resultado_bateria,
-            [
-                "soc_24h_pct",
-                "soc_pct_24h",
-                "soc_24h",
-                "estado_carga_24h_pct",
-            ],
-            None,
-        )
-    )
-
-    if red_con_bateria is None:
-        red_con_bateria = tabla_24(
-            tabla_24h,
-            [
-                "compra_red_con_bateria_kwh",
-                "red_con_bateria_kwh",
-                "demanda_red_con_bateria_kwh",
-                "compra_red_kwh",
-                "red_kwh",
-            ],
-        )
-
-    if descarga is None:
-        descarga = tabla_24(
-            tabla_24h,
-            [
-                "descarga_kwh",
-                "descarga_bateria_kwh",
-                "energia_descargada_kwh",
-                "energia_entregada_kwh",
-                "bateria_a_carga_kwh",
-            ],
-        )
-
-    if carga is None:
-        carga = tabla_24(
-            tabla_24h,
-            [
-                "carga_kwh",
-                "carga_bateria_kwh",
-                "energia_cargada_kwh",
-                "fv_a_bateria_kwh",
-            ],
-        )
-
-    if soc is None:
-        soc = tabla_24(
-            tabla_24h,
-            [
-                "soc_pct",
-                "soc",
-                "soc_bateria_pct",
-                "estado_carga_pct",
-            ],
-        )
-
-    return {
-        "red_con_bateria": red_con_bateria,
-        "descarga": descarga,
-        "carga": carga,
-        "soc": soc,
-    }
-
-
-# ==========================================================
-# GRÁFICAS
-# ==========================================================
-
-def _chart_mensual(meses: List[str], energia: List[float], path: Path):
-    plt.figure()
-    plt.bar(meses, energia)
-
-    plt.title("Generación FV mensual")
-    plt.ylabel("Energía (kWh)")
-    plt.xticks(rotation=45)
-    plt.grid(True)
-
-    plt.tight_layout()
-    plt.savefig(path, dpi=160)
-    plt.close()
-
-
-def _chart_diaria(meses: List[str], energia: List[float], path: Path):
-    plt.figure()
-    plt.bar(meses, energia)
-
-    plt.title("Energía diaria promedio")
-    plt.ylabel("kWh/día")
-    plt.xticks(rotation=45)
-    plt.grid(True)
-
-    plt.tight_layout()
-    plt.savefig(path, dpi=160)
-    plt.close()
-
-
-def _chart_potencia_horaria(
-    energia_horaria_kwh: List[float],
-    path: Path,
-):
-    potencia_promedio = _promedio_fv_24h(energia_horaria_kwh)
-
-    horas = list(range(24))
-
-    plt.figure()
-    plt.plot(
-        horas,
-        potencia_promedio,
-        marker="o",
-    )
-
-    plt.title("Perfil horario de potencia FV")
-    plt.xlabel("Hora")
-    plt.ylabel("Potencia (kW)")
-    plt.xticks(range(24))
-    plt.grid(True)
-
-    plt.tight_layout()
-    plt.savefig(path, dpi=160)
-    plt.close()
-
-
-def _chart_energia_horaria(
-    energia_horaria_kwh: List[float],
-    path: Path,
-):
-    energia_promedio = _promedio_fv_24h(energia_horaria_kwh)
-
-    horas = list(range(24))
-
-    plt.figure()
-    plt.bar(
-        horas,
-        energia_promedio,
-    )
-
-    plt.title("Energía generada por hora")
-    plt.xlabel("Hora")
-    plt.ylabel("Energía (kWh)")
-    plt.xticks(range(24))
-    plt.grid(True)
-
-    plt.tight_layout()
-    plt.savefig(path, dpi=160)
-    plt.close()
-
-
-def _chart_demanda_vs_fv_horaria(
-    consumo_horario_24h_kwh: dict,
-    energia_horaria_kwh: List[float],
-    path: Path,
-    bateria=None,
-):
-    import numpy as np
-
-    horas = list(range(24))
-
-    demanda = [
         float(
             consumo_horario_24h_kwh.get(
                 h,
                 consumo_horario_24h_kwh.get(str(h), 0.0),
             ) or 0.0
         )
-        for h in horas
+        for h in range(24)
     ]
 
-    fv = _promedio_fv_24h(energia_horaria_kwh or [0.0] * 8760)
 
-    red_sin_bateria = [
-        max(d - f, 0.0)
-        for d, f in zip(demanda, fv)
+# ==========================================================
+# BATERÍA
+# ==========================================================
+
+def _extraer_bateria_directa(res, energia):
+    bateria = _leer(res, "bateria", None)
+
+    if bateria is None and energia is not None:
+        bateria = _leer(energia, "bateria", None)
+
+    return bateria
+
+
+def _extraer_bateria_desde_financiero(res):
+    financiero = _leer(res, "financiero", None)
+
+    if financiero is None:
+        return None
+
+    bateria_optima = _leer(financiero, "bateria_optima", None)
+
+    if bateria_optima is None:
+        return None
+
+    return _leer(bateria_optima, "resultado_bateria", None)
+
+
+def _resolver_bateria(res, energia):
+    bateria = _extraer_bateria_directa(res, energia)
+
+    if bateria is not None:
+        return bateria
+
+    return _extraer_bateria_desde_financiero(res)
+
+
+def _extraer_tabla_24h_bateria(resultado_bateria):
+    return (
+        _leer(resultado_bateria, "tabla_24h", None)
+        or _leer(resultado_bateria, "tabla_horaria", None)
+        or _leer(resultado_bateria, "detalle_24h", None)
+    )
+
+
+def _serie_24_desde_tabla(tabla, campos: List[str]) -> Optional[List[float]]:
+    if not isinstance(tabla, list):
+        return None
+
+    salida = []
+
+    for fila in tabla[:24]:
+        if not isinstance(fila, dict):
+            salida.append(0.0)
+            continue
+
+        valor = 0.0
+
+        for campo in campos:
+            if campo in fila:
+                try:
+                    valor = float(fila.get(campo) or 0.0)
+                except Exception:
+                    valor = 0.0
+                break
+
+        salida.append(valor)
+
+    while len(salida) < 24:
+        salida.append(0.0)
+
+    return salida
+
+
+def _serie_24_desde_atributos(obj, campos: List[str]) -> Optional[List[float]]:
+    for campo in campos:
+        valor = _leer(obj, campo, None)
+
+        if valor is not None:
+            return _lista_float(valor, 24, 0.0)
+
+    return None
+
+
+def _extraer_resultado_bateria(bateria):
+    if bateria is None:
+        return None
+
+    return (
+        _leer(bateria, "resultado_bateria", None)
+        or _leer(bateria, "bateria", None)
+        or _leer(bateria, "resultado", None)
+        or bateria
+    )
+
+
+def _extraer_red_con_bateria(resultado_bateria, tabla_24h):
+    campos_attr = [
+        "compra_red_con_bateria_24h",
+        "red_con_bateria_24h",
+        "demanda_red_con_bateria_24h",
+        "compra_red_24h_kwh",
+        "energia_red_24h_kwh",
     ]
 
-    autoconsumo = [
-        min(d, f)
-        for d, f in zip(demanda, fv)
+    campos_tabla = [
+        "compra_red_con_bateria_kwh",
+        "red_con_bateria_kwh",
+        "demanda_red_con_bateria_kwh",
+        "compra_red_kwh",
+        "red_kwh",
     ]
 
-    excedente = [
-        max(f - d, 0.0)
-        for d, f in zip(demanda, fv)
+    return (
+        _serie_24_desde_atributos(resultado_bateria, campos_attr)
+        or _serie_24_desde_tabla(tabla_24h, campos_tabla)
+    )
+
+
+def _extraer_descarga_bateria(resultado_bateria, tabla_24h):
+    campos_attr = [
+        "descarga_bateria_24h",
+        "descarga_24h_kwh",
+        "energia_descargada_24h",
+        "bateria_descarga_24h_kwh",
     ]
 
-    bat = _extraer_series_bateria(bateria)
+    campos_tabla = [
+        "descarga_kwh",
+        "descarga_bateria_kwh",
+        "energia_descargada_kwh",
+        "energia_entregada_kwh",
+        "bateria_a_carga_kwh",
+    ]
 
-    red_con_bateria = bat.get("red_con_bateria")
-    descarga = bat.get("descarga")
-    carga = bat.get("carga")
-    soc = bat.get("soc")
-
-    if red_con_bateria is None and descarga is not None:
-        red_con_bateria = [
-            max(red - desc, 0.0)
-            for red, desc in zip(red_sin_bateria, descarga)
-        ]
-
-    horas_np = np.array(horas, dtype=float)
-    demanda_np = np.array(demanda, dtype=float)
-    fv_np = np.array(fv, dtype=float)
-    red_np = np.array(red_sin_bateria, dtype=float)
-
-    plt.figure(figsize=(11, 5.8))
-    ax = plt.gca()
-
-    ax_soc = None
-
-    if soc is not None and sum(soc) > 0:
-        ax_soc = ax.twinx()
-
-    ax.fill_between(
-        horas_np,
-        red_np,
-        demanda_np,
-        where=demanda_np > red_np,
-        interpolate=True,
-        color="green",
-        alpha=0.16,
-        label="Demanda reducida por FV",
-        zorder=1,
+    return (
+        _serie_24_desde_atributos(resultado_bateria, campos_attr)
+        or _serie_24_desde_tabla(tabla_24h, campos_tabla)
     )
 
-    ax.fill_between(
-        horas_np,
-        demanda_np,
-        fv_np,
-        where=fv_np > demanda_np,
-        interpolate=True,
-        color="orange",
-        alpha=0.25,
-        label="Excedente FV",
-        zorder=2,
+
+def _extraer_carga_bateria(resultado_bateria, tabla_24h):
+    campos_attr = [
+        "carga_bateria_24h",
+        "carga_24h_kwh",
+        "energia_cargada_24h",
+        "bateria_carga_24h_kwh",
+    ]
+
+    campos_tabla = [
+        "carga_kwh",
+        "carga_bateria_kwh",
+        "energia_cargada_kwh",
+        "fv_a_bateria_kwh",
+    ]
+
+    return (
+        _serie_24_desde_atributos(resultado_bateria, campos_attr)
+        or _serie_24_desde_tabla(tabla_24h, campos_tabla)
     )
 
-    ax.plot(
-        horas_np,
-        demanda_np,
-        marker="o",
-        linewidth=2,
-        color="blue",
-        label="Demanda original",
-        zorder=5,
+
+def _extraer_soc_bateria(resultado_bateria, tabla_24h):
+    campos_attr = [
+        "soc_24h_pct",
+        "soc_pct_24h",
+        "soc_24h",
+        "estado_carga_24h_pct",
+    ]
+
+    campos_tabla = [
+        "soc_pct",
+        "soc",
+        "soc_bateria_pct",
+        "estado_carga_pct",
+    ]
+
+    return (
+        _serie_24_desde_atributos(resultado_bateria, campos_attr)
+        or _serie_24_desde_tabla(tabla_24h, campos_tabla)
     )
 
-    ax.plot(
-        horas_np,
-        fv_np,
-        marker="o",
-        linewidth=2,
-        color="green",
-        label="Generación FV",
-        zorder=6,
-    )
 
-    ax.plot(
-        horas_np,
-        red_np,
-        marker="o",
-        linewidth=2,
-        linestyle="--",
-        color="red",
-        label="Demanda neta desde red",
-        zorder=7,
-    )
+def _extraer_series_bateria(bateria) -> dict:
+    resultado_bateria = _extraer_resultado_bateria(bateria)
+    tabla_24h = _extraer_tabla_24h_bateria(resultado_bateria)
 
+    return {
+        "red_con_bateria": _extraer_red_con_bateria(resultado_bateria, tabla_24h),
+        "descarga": _extraer_descarga_bateria(resultado_bateria, tabla_24h),
+        "carga": _extraer_carga_bateria(resultado_bateria, tabla_24h),
+        "soc": _extraer_soc_bateria(resultado_bateria, tabla_24h),
+    }
+
+
+# ==========================================================
+# CÁLCULOS DEMANDA VS FV
+# ==========================================================
+
+def _calcular_red_sin_bateria(demanda: List[float], fv: List[float]) -> List[float]:
+    return [max(d - f, 0.0) for d, f in zip(demanda, fv)]
+
+
+def _calcular_autoconsumo(demanda: List[float], fv: List[float]) -> List[float]:
+    return [min(d, f) for d, f in zip(demanda, fv)]
+
+
+def _calcular_excedente(demanda: List[float], fv: List[float]) -> List[float]:
+    return [max(f - d, 0.0) for d, f in zip(demanda, fv)]
+
+
+def _calcular_red_con_bateria_si_falta(
+    red_sin_bateria: List[float],
+    red_con_bateria,
+    descarga,
+):
     if red_con_bateria is not None:
-        red_bat_np = np.array(red_con_bateria, dtype=float)
+        return red_con_bateria
 
-        ax.fill_between(
-            horas_np,
-            red_bat_np,
-            red_np,
-            where=red_np > red_bat_np,
-            interpolate=True,
-            color="purple",
-            alpha=0.18,
-            label="Reducción por batería",
-            zorder=3,
-        )
+    if descarga is None:
+        return None
 
-        ax.plot(
-            horas_np,
-            red_bat_np,
-            marker="o",
-            linewidth=2,
-            linestyle="-.",
-            color="purple",
-            label="Demanda neta con batería",
-            zorder=8,
-        )
+    return [
+        max(red - desc, 0.0)
+        for red, desc in zip(red_sin_bateria, descarga)
+    ]
 
-    if ax_soc is not None:
-        ax_soc.plot(
-            horas_np,
-            soc,
-            color="black",
-            linewidth=2.2,
-            linestyle=":",
-            label="SOC batería (%)",
-            zorder=9,
-        )
 
-        ax_soc.set_ylabel("SOC batería (%)")
-        ax_soc.set_ylim(0, 100)
-
+def _resumen_demanda_fv(
+    demanda: List[float],
+    fv: List[float],
+    autoconsumo: List[float],
+    excedente: List[float],
+    red_sin_bateria: List[float],
+    red_con_bateria=None,
+    descarga=None,
+    carga=None,
+    soc=None,
+) -> str:
     energia_demanda = sum(demanda)
     energia_fv = sum(fv)
     energia_autoconsumo = sum(autoconsumo)
@@ -573,6 +429,193 @@ def _chart_demanda_vs_fv_horaria(
     if soc is not None:
         texto += f"\nSOC mín/máx: {min(soc):.0f}% / {max(soc):.0f}%"
 
+    return texto
+
+
+# ==========================================================
+# GRÁFICAS BÁSICAS
+# ==========================================================
+
+def _guardar_figura(path: Path):
+    plt.tight_layout()
+    plt.savefig(path, dpi=160)
+    plt.close()
+
+
+def _chart_mensual(meses: List[str], energia: List[float], path: Path):
+    plt.figure()
+    plt.bar(meses, energia)
+    plt.title("Generación FV mensual")
+    plt.ylabel("Energía (kWh)")
+    plt.xticks(rotation=45)
+    plt.grid(True)
+    _guardar_figura(path)
+
+
+def _chart_diaria(meses: List[str], energia: List[float], path: Path):
+    plt.figure()
+    plt.bar(meses, energia)
+    plt.title("Energía diaria promedio")
+    plt.ylabel("kWh/día")
+    plt.xticks(rotation=45)
+    plt.grid(True)
+    _guardar_figura(path)
+
+
+def _chart_potencia_horaria(energia_horaria_kwh: List[float], path: Path):
+    potencia_promedio = _promedio_fv_24h(energia_horaria_kwh)
+    horas = list(range(24))
+
+    plt.figure()
+    plt.plot(horas, potencia_promedio, marker="o")
+    plt.title("Perfil horario de potencia FV")
+    plt.xlabel("Hora")
+    plt.ylabel("Potencia (kW)")
+    plt.xticks(range(24))
+    plt.grid(True)
+    _guardar_figura(path)
+
+
+def _chart_energia_horaria(energia_horaria_kwh: List[float], path: Path):
+    energia_promedio = _promedio_fv_24h(energia_horaria_kwh)
+    horas = list(range(24))
+
+    plt.figure()
+    plt.bar(horas, energia_promedio)
+    plt.title("Energía generada por hora")
+    plt.xlabel("Hora")
+    plt.ylabel("Energía (kWh)")
+    plt.xticks(range(24))
+    plt.grid(True)
+    _guardar_figura(path)
+
+
+def _chart_anual(energia_anual: float, path: Path):
+    plt.figure()
+    plt.bar(["Anual"], [energia_anual])
+    plt.title("Generación FV anual")
+    plt.ylabel("Energía (kWh)")
+    _guardar_figura(path)
+
+
+# ==========================================================
+# GRÁFICA DEMANDA VS FV
+# ==========================================================
+
+def _dibujar_area_fv(ax, horas_np, demanda_np, fv_np, red_np):
+    ax.fill_between(
+        horas_np,
+        red_np,
+        demanda_np,
+        where=demanda_np > red_np,
+        interpolate=True,
+        color="green",
+        alpha=0.16,
+        label="Demanda reducida por FV",
+        zorder=1,
+    )
+
+    ax.fill_between(
+        horas_np,
+        demanda_np,
+        fv_np,
+        where=fv_np > demanda_np,
+        interpolate=True,
+        color="orange",
+        alpha=0.25,
+        label="Excedente FV",
+        zorder=2,
+    )
+
+
+def _dibujar_lineas_base(ax, horas_np, demanda_np, fv_np, red_np):
+    ax.plot(
+        horas_np,
+        demanda_np,
+        marker="o",
+        linewidth=2,
+        color="blue",
+        label="Demanda original",
+        zorder=5,
+    )
+
+    ax.plot(
+        horas_np,
+        fv_np,
+        marker="o",
+        linewidth=2,
+        color="green",
+        label="Generación FV",
+        zorder=6,
+    )
+
+    ax.plot(
+        horas_np,
+        red_np,
+        marker="o",
+        linewidth=2,
+        linestyle="--",
+        color="red",
+        label="Demanda neta desde red",
+        zorder=7,
+    )
+
+
+def _dibujar_bateria(ax, horas_np, red_np, red_con_bateria):
+    if red_con_bateria is None:
+        return
+
+    import numpy as np
+
+    red_bat_np = np.array(red_con_bateria, dtype=float)
+
+    ax.fill_between(
+        horas_np,
+        red_bat_np,
+        red_np,
+        where=red_np > red_bat_np,
+        interpolate=True,
+        color="purple",
+        alpha=0.18,
+        label="Reducción por batería",
+        zorder=3,
+    )
+
+    ax.plot(
+        horas_np,
+        red_bat_np,
+        marker="o",
+        linewidth=2,
+        linestyle="-.",
+        color="purple",
+        label="Demanda neta con batería",
+        zorder=8,
+    )
+
+
+def _dibujar_soc(ax, horas_np, soc):
+    if soc is None or sum(soc) <= 0:
+        return None
+
+    ax_soc = ax.twinx()
+
+    ax_soc.plot(
+        horas_np,
+        soc,
+        color="black",
+        linewidth=2.2,
+        linestyle=":",
+        label="SOC batería (%)",
+        zorder=9,
+    )
+
+    ax_soc.set_ylabel("SOC batería (%)")
+    ax_soc.set_ylim(0, 100)
+
+    return ax_soc
+
+
+def _dibujar_caja_resumen(ax, texto: str):
     ax.text(
         0.02,
         0.97,
@@ -589,48 +632,146 @@ def _chart_demanda_vs_fv_horaria(
         zorder=10,
     )
 
+
+def _configurar_ejes_demanda(ax):
     ax.set_title("Demanda del cliente vs generación FV con batería")
     ax.set_xlabel("Hora del día")
     ax.set_ylabel("Energía promedio horaria (kWh)")
     ax.set_xticks(range(24))
     ax.grid(True, alpha=0.35)
 
+
+def _configurar_leyenda(ax, ax_soc=None):
     if ax_soc is not None:
         h1, l1 = ax.get_legend_handles_labels()
         h2, l2 = ax_soc.get_legend_handles_labels()
-
-        ax.legend(
-            h1 + h2,
-            l1 + l2,
-            loc="upper right",
-            fontsize=8,
-        )
+        ax.legend(h1 + h2, l1 + l2, loc="upper right", fontsize=8)
     else:
-        ax.legend(
-            loc="upper right",
-            fontsize=8,
-        )
-
-    plt.tight_layout()
-    plt.savefig(path, dpi=160)
-    plt.close()
+        ax.legend(loc="upper right", fontsize=8)
 
 
-def _chart_anual(energia_anual: float, path: Path):
-    plt.figure()
-    plt.bar(["Anual"], [energia_anual])
+def _chart_demanda_vs_fv_horaria(
+    consumo_horario_24h_kwh: dict,
+    energia_horaria_kwh: List[float],
+    path: Path,
+    bateria=None,
+):
+    import numpy as np
 
-    plt.title("Generación FV anual")
-    plt.ylabel("Energía (kWh)")
+    horas = list(range(24))
 
-    plt.tight_layout()
-    plt.savefig(path, dpi=160)
-    plt.close()
+    demanda = _demanda_24h_desde_dict(consumo_horario_24h_kwh)
+    fv = _promedio_fv_24h(energia_horaria_kwh or [0.0] * 8760)
+
+    red_sin_bateria = _calcular_red_sin_bateria(demanda, fv)
+    autoconsumo = _calcular_autoconsumo(demanda, fv)
+    excedente = _calcular_excedente(demanda, fv)
+
+    series_bateria = _extraer_series_bateria(bateria)
+
+    red_con_bateria = series_bateria.get("red_con_bateria")
+    descarga = series_bateria.get("descarga")
+    carga = series_bateria.get("carga")
+    soc = series_bateria.get("soc")
+
+    red_con_bateria = _calcular_red_con_bateria_si_falta(
+        red_sin_bateria,
+        red_con_bateria,
+        descarga,
+    )
+
+    horas_np = np.array(horas, dtype=float)
+    demanda_np = np.array(demanda, dtype=float)
+    fv_np = np.array(fv, dtype=float)
+    red_np = np.array(red_sin_bateria, dtype=float)
+
+    plt.figure(figsize=(11, 5.8))
+    ax = plt.gca()
+
+    _dibujar_area_fv(ax, horas_np, demanda_np, fv_np, red_np)
+    _dibujar_lineas_base(ax, horas_np, demanda_np, fv_np, red_np)
+    _dibujar_bateria(ax, horas_np, red_np, red_con_bateria)
+
+    ax_soc = _dibujar_soc(ax, horas_np, soc)
+
+    texto = _resumen_demanda_fv(
+        demanda=demanda,
+        fv=fv,
+        autoconsumo=autoconsumo,
+        excedente=excedente,
+        red_sin_bateria=red_sin_bateria,
+        red_con_bateria=red_con_bateria,
+        descarga=descarga,
+        carga=carga,
+        soc=soc,
+    )
+
+    _dibujar_caja_resumen(ax, texto)
+    _configurar_ejes_demanda(ax)
+    _configurar_leyenda(ax, ax_soc)
+
+    _guardar_figura(path)
 
 
 # ==========================================================
-# GENERADOR PRINCIPAL
+# GENERACIÓN DE CHARTS
 # ==========================================================
+
+def _generar_chart_mensual(base: Path, paths: dict, energia_mensual: List[float]):
+    p = base / "fv_energia_mensual.png"
+    _chart_mensual(MESES, energia_mensual, p)
+    paths["chart_energia_mensual"] = str(p)
+
+
+def _generar_chart_diario(base: Path, paths: dict, energia_mensual: List[float]):
+    energia_diaria = [
+        e / d if d else 0.0
+        for e, d in zip(energia_mensual, DIAS_MES)
+    ]
+
+    p = base / "fv_energia_diaria.png"
+    _chart_diaria(MESES, energia_diaria, p)
+    paths["chart_energia_diaria"] = str(p)
+
+
+def _generar_charts_horarios(base: Path, paths: dict, energia_horaria: List[float]):
+    p_potencia = base / "fv_potencia_horaria.png"
+    _chart_potencia_horaria(energia_horaria, p_potencia)
+    paths["chart_potencia_horaria"] = str(p_potencia)
+
+    p_energia = base / "fv_energia_horaria.png"
+    _chart_energia_horaria(energia_horaria, p_energia)
+    paths["chart_energia_horaria"] = str(p_energia)
+
+
+def _generar_chart_demanda_vs_fv(
+    base: Path,
+    paths: dict,
+    proyecto,
+    energia_horaria: List[float],
+    bateria=None,
+):
+    consumo_horario_24h_kwh = _extraer_consumo_24h(proyecto)
+
+    p = base / "demanda_vs_fv_horaria.png"
+
+    _chart_demanda_vs_fv_horaria(
+        consumo_horario_24h_kwh,
+        energia_horaria,
+        p,
+        bateria=bateria,
+    )
+
+    paths["chart_demanda_vs_fv_horaria"] = str(p)
+
+
+def _generar_chart_anual(base: Path, paths: dict, energia_mensual: List[float]):
+    energia_anual = sum(energia_mensual)
+
+    p = base / "fv_energia_anual.png"
+    _chart_anual(energia_anual, p)
+    paths["chart_anual"] = str(p)
+
 
 def generar_charts(
     res,
@@ -640,141 +781,27 @@ def generar_charts(
 ):
     base = _mkdir_charts(out_dir)
 
-    energia = (
-        res.get("energia")
-        if isinstance(res, dict)
-        else getattr(res, "energia", None)
-    )
+    energia = _extraer_energia_resultado(res)
+    bateria = _resolver_bateria(res, energia)
+    proyecto = _extraer_proyecto(res, proyecto)
 
-    bateria = (
-        res.get("bateria")
-        if isinstance(res, dict)
-        else getattr(res, "bateria", None)
-    )
-
-    if bateria is None and energia is not None:
-        bateria = getattr(energia, "bateria", None)
-
-    if bateria is None:
-    finanzas = (
-        res.get("financiero")
-        if isinstance(res, dict)
-        else getattr(res, "financiero", None)
-    )
-
-        if finanzas is not None:
-            bateria_optima = (
-                finanzas.get("bateria_optima")
-                if isinstance(finanzas, dict)
-                else getattr(finanzas, "bateria_optima", None)
-            )
-
-            if bateria_optima is not None:
-                bateria = (
-                    bateria_optima.get("resultado_bateria")
-                    if isinstance(bateria_optima, dict)
-                    else getattr(bateria_optima, "resultado_bateria", None)
-                    )
-        
-
-    if energia:
-        energia_raw = list(getattr(energia, "energia_util_12m", []))
-        energia_mensual = _extraer_energia(energia_raw)
-    else:
-        energia_mensual = [0.0] * 12
-
-    meses = [
-        "Ene", "Feb", "Mar", "Abr", "May", "Jun",
-        "Jul", "Ago", "Sep", "Oct", "Nov", "Dic",
-    ]
-
-    energia_anual = sum(energia_mensual)
+    energia_mensual = _extraer_energia_mensual(energia)
+    energia_horaria = _extraer_energia_horaria(energia)
 
     paths = {}
 
-    # ======================================================
-    # GRÁFICAS MENSUALES / DIARIAS
-    # ======================================================
+    _generar_chart_mensual(base, paths, energia_mensual)
+    _generar_chart_diario(base, paths, energia_mensual)
+    _generar_charts_horarios(base, paths, energia_horaria)
 
-    p1 = base / "fv_energia_mensual.png"
-    _chart_mensual(meses, energia_mensual, p1)
-    paths["chart_energia_mensual"] = str(p1)
-
-    energia_diaria = [
-        e / d if d else 0.0
-        for e, d in zip(energia_mensual, DIAS_MES)
-    ]
-
-    p2 = base / "fv_energia_diaria.png"
-    _chart_diaria(meses, energia_diaria, p2)
-    paths["chart_energia_diaria"] = str(p2)
-
-    # ======================================================
-    # SERIE HORARIA 8760
-    # ======================================================
-
-    energia_horaria = []
-
-    if energia:
-        energia_horaria = list(
-            getattr(
-                energia,
-                "energia_horaria_kwh",
-                [],
-            )
-            or []
-        )
-
-    p3 = base / "fv_potencia_horaria.png"
-    _chart_potencia_horaria(energia_horaria, p3)
-    paths["chart_potencia_horaria"] = str(p3)
-
-    p4 = base / "fv_energia_horaria.png"
-    _chart_energia_horaria(energia_horaria, p4)
-    paths["chart_energia_horaria"] = str(p4)
-
-    # ======================================================
-    # DEMANDA CLIENTE VS GENERACIÓN FV
-    # ======================================================
-
-    consumo_horario_24h_kwh = {}
-
-    if proyecto is None:
-        proyecto = (
-            res.get("proyecto")
-            if isinstance(res, dict)
-            else getattr(res, "proyecto", None)
-        )
-
-    if proyecto:
-        if isinstance(proyecto, dict):
-            consumo_horario_24h_kwh = (
-                proyecto.get("consumo_horario_24h_kwh", {})
-                or {}
-            )
-        else:
-            consumo_horario_24h_kwh = (
-                getattr(proyecto, "consumo_horario_24h_kwh", {})
-                or {}
-            )
-
-    p6 = base / "demanda_vs_fv_horaria.png"
-
-    _chart_demanda_vs_fv_horaria(
-        consumo_horario_24h_kwh,
-        energia_horaria,
-        p6,
+    _generar_chart_demanda_vs_fv(
+        base=base,
+        paths=paths,
+        proyecto=proyecto,
+        energia_horaria=energia_horaria,
         bateria=bateria,
     )
 
-    paths["chart_demanda_vs_fv_horaria"] = str(p6)
-
-    # ======================================================
-    # GRÁFICA ANUAL
-    # ======================================================
-
-    p5 = base / "fv_energia_anual.png"
-    _chart_anual(energia_anual, p5)
-    paths["chart_anual"] = str(p5)
+    _generar_chart_anual(base, paths, energia_mensual)
 
     return paths
