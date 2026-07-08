@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from math import ceil, floor
 from typing import List, Optional
+from collections import Counter
 
 from electrical.modelos.paneles import PanelSpec
 from electrical.modelos.inversor import InversorSpec
@@ -72,82 +73,100 @@ def _bounds(panel, inv, t_min, t_oper):
     return max(1, n_min), max(1, n_max), voc, vmp
 
 
-# =========================================================
-# SELECCIÓN
-# =========================================================
+def _strings_por_mppt_max(panel, inv) -> int:
+    imp = float(getattr(panel, "imp_a", 0.0) or 0.0)
+    imppt_max = float(getattr(inv, "imppt_max_a", 0.0) or 0.0)
 
-def _seleccionar(n_min, n_max, vmp, inv, n_total):
+    if imp <= 0 or imppt_max <= 0:
+        return 1
 
-    target = (inv.mppt_min_v + inv.mppt_max_v) / 2
-
-    best = None
-    best_score = float("inf")
-
-    for n in range(n_min, n_max + 1):
-
-        n_strings = max(1, n_total // n)
-        sobrantes = n_total - (n_strings * n)
-        v_string = n * vmp
-
-        error_v = abs(v_string - target)
-        score = error_v + sobrantes * 100
-
-        if score < best_score:
-            best_score = score
-            best = n
-
-    return best
-
-
-def _seleccionar_fijo(n_min, n_max):
-    # ya NO depende de divisibilidad
-    return max(range(n_min, n_max + 1), default=None)
+    return max(1, floor(imppt_max / imp))
 
 
 # =========================================================
 # DISTRIBUCIÓN
 # =========================================================
 
-def _distribuir(n_strings, n_inv, n_mppt):
-    """
-    Distribuye strings en modo round-robin por inversor.
-
-    Criterio:
-    - Primero asigna un string a cada inversor en MPPT 1.
-    - Si sobran strings, vuelve al inversor 1 y asigna MPPT 2.
-    - Así evita dejar inversores sin strings cuando hay suficientes strings.
-
-    Ejemplo:
-    10 strings, 7 inversores, 2 MPPT:
-    S1  -> INV1 MPPT1
-    S2  -> INV2 MPPT1
-    S3  -> INV3 MPPT1
-    S4  -> INV4 MPPT1
-    S5  -> INV5 MPPT1
-    S6  -> INV6 MPPT1
-    S7  -> INV7 MPPT1
-    S8  -> INV1 MPPT2
-    S9  -> INV2 MPPT2
-    S10 -> INV3 MPPT2
-    """
-
+def _distribuir(n_strings, n_inv, n_mppt, strings_por_mppt_max):
     posiciones = []
 
-    capacidad_total = n_inv * n_mppt
+    capacidad_total = n_inv * n_mppt * strings_por_mppt_max
 
     if n_strings > capacidad_total:
         raise ValueError(
-            f"No hay MPPT suficientes para distribuir strings: "
+            f"No hay capacidad suficiente para distribuir strings: "
             f"{n_strings} strings > {n_inv} inversores × {n_mppt} MPPT "
-            f"= {capacidad_total} entradas MPPT."
+            f"× {strings_por_mppt_max} strings/MPPT = {capacidad_total} strings."
         )
 
-    for idx in range(n_strings):
-        inversor = (idx % n_inv) + 1
-        mppt = (idx // n_inv) + 1
-        posiciones.append((inversor, mppt))
+    for inv in range(1, n_inv + 1):
+        for mppt in range(1, n_mppt + 1):
+            for _ in range(strings_por_mppt_max):
+                if len(posiciones) >= n_strings:
+                    return posiciones
+
+                posiciones.append((inv, mppt))
 
     return posiciones
+
+
+def _max_strings_por_mppt_usado(posiciones) -> int:
+    if not posiciones:
+        return 0
+
+    conteo = Counter(posiciones)
+    return max(conteo.values())
+
+
+# =========================================================
+# SELECCIÓN GENERALIZADA
+# =========================================================
+
+def _seleccionar(
+    n_min,
+    n_max,
+    vmp,
+    inv,
+    n_total,
+    strings_por_mppt_max,
+    n_inversores,
+):
+    target = (inv.mppt_min_v + inv.mppt_max_v) / 2
+
+    best = None
+    best_score = None
+
+    for n_series in range(n_min, n_max + 1):
+
+        n_strings = ceil(n_total / n_series)
+
+        if n_strings <= 0:
+            continue
+
+        paneles_usados = n_strings * n_series
+        sobrantes_virtuales = paneles_usados - n_total
+
+        capacidad = n_inversores * inv.n_mppt * strings_por_mppt_max
+
+        if n_strings > capacidad:
+            continue
+
+        v_string = n_series * vmp
+        error_v = abs(v_string - target)
+
+        score = (
+            sobrantes_virtuales,
+            n_strings,
+            error_v,
+            abs(n_series - ((n_min + n_max) / 2)),
+        )
+
+        if best_score is None or score < best_score:
+            best_score = score
+            best = n_series
+
+    return best
+
 
 # =========================================================
 # FUNCIÓN PRINCIPAL
@@ -177,10 +196,23 @@ def calcular_strings_fv(
             0,
         )
 
-    # --------------------------------------------------
-    # LIMITES
-    # --------------------------------------------------
-    n_min, n_max, voc_panel, vmp_panel = _bounds(panel, inversor, t_min_c, t_oper_c)
+    if n_inversores <= 0:
+        return StringsResultado(
+            False,
+            ["Cantidad de inversores inválida"],
+            [],
+            [],
+            RecomendacionCalc(0, 0, 0, 0),
+            BoundsCalc(0, 0),
+            n_paneles_total,
+        )
+
+    n_min, n_max, voc_panel, vmp_panel = _bounds(
+        panel,
+        inversor,
+        t_min_c,
+        t_oper_c,
+    )
 
     if n_max < n_min:
         return StringsResultado(
@@ -189,19 +221,18 @@ def calcular_strings_fv(
             [],
             [],
             RecomendacionCalc(0, 0, 0, 0),
-            BoundsCalc(0, 0),
-            0,
+            BoundsCalc(n_min, n_max),
+            n_paneles_total,
         )
 
-    # --------------------------------------------------
-    # SELECCIÓN (FIX CLAVE AQUÍ)
-    # --------------------------------------------------
-    if modo == "multizona":
+    strings_por_mppt_max = _strings_por_mppt_max(panel, inversor)
 
-        # 🔥 RESPETAR ZONA (CLAVE)
+    # ======================================================
+    # SELECCIÓN
+    # ======================================================
+    if modo in ("manual", "multizona"):
         n_series = n_paneles_total
 
-        # ⚠ VALIDACIÓN ELÉCTRICA (NO BLOQUEA)
         if n_series < n_min:
             warnings.append(
                 f"String muy corto ({n_series} paneles) → menor que mínimo MPPT ({n_min})"
@@ -212,46 +243,96 @@ def calcular_strings_fv(
                 f"String muy largo ({n_series} paneles) → supera máximo permitido ({n_max})"
             )
 
-    elif modo == "manual":
-        n_series = n_paneles_total
-
     else:
-        n_series = _seleccionar(n_min, n_max, vmp_panel, inversor, n_paneles_total)
+        n_series = _seleccionar(
+            n_min=n_min,
+            n_max=n_max,
+            vmp=vmp_panel,
+            inv=inversor,
+            n_total=n_paneles_total,
+            strings_por_mppt_max=strings_por_mppt_max,
+            n_inversores=n_inversores,
+        )
 
     if not n_series:
         return StringsResultado(
             False,
-            ["No se pudo seleccionar n_series"],
-            [],
+            [
+                "No se pudo seleccionar una configuración de strings válida "
+                "para el inversor seleccionado."
+            ],
+            warnings,
             [],
             RecomendacionCalc(0, 0, 0, 0),
-            BoundsCalc(0, 0),
-            0,
+            BoundsCalc(n_min, n_max),
+            n_paneles_total,
         )
 
-    # --------------------------------------------------
+    # ======================================================
     # STRINGS
-    # --------------------------------------------------
-    n_strings = max(1, n_paneles_total // n_series)
+    # ======================================================
+    n_strings = ceil(n_paneles_total / n_series)
 
-    if n_paneles_total % n_series != 0:
+    paneles_configurados = n_strings * n_series
+
+    if paneles_configurados != n_paneles_total:
         warnings.append(
-            f"Distribución no exacta ({n_paneles_total} paneles / {n_series} por string)"
+            f"Distribución no exacta: {n_paneles_total} paneles reales, "
+            f"{n_strings} strings × {n_series} paneles = {paneles_configurados}. "
+            "Revise si desea ajustar número de paneles o strings."
         )
 
-    # --------------------------------------------------
+    # ======================================================
     # DISTRIBUCIÓN
-    # --------------------------------------------------
-    distrib = _distribuir(n_strings, n_inversores, inversor.n_mppt)
+    # ======================================================
+    try:
+        distrib = _distribuir(
+            n_strings=n_strings,
+            n_inv=n_inversores,
+            n_mppt=inversor.n_mppt,
+            strings_por_mppt_max=strings_por_mppt_max,
+        )
+    except Exception as exc:
+        return StringsResultado(
+            False,
+            [str(exc)],
+            warnings,
+            [],
+            RecomendacionCalc(0, 0, 0, 0),
+            BoundsCalc(n_min, n_max),
+            n_paneles_total,
+        )
 
-    # --------------------------------------------------
+    max_paralelo_usado = _max_strings_por_mppt_usado(distrib)
+
+    corriente_mppt = max_paralelo_usado * float(panel.imp_a)
+    corriente_mppt_max = float(inversor.imppt_max_a)
+
+    if corriente_mppt > corriente_mppt_max:
+        return StringsResultado(
+            False,
+            [
+                f"Corriente MPPT excedida: {corriente_mppt:.2f} A > "
+                f"{corriente_mppt_max:.2f} A."
+            ],
+            warnings,
+            [],
+            RecomendacionCalc(0, 0, 0, 0),
+            BoundsCalc(n_min, n_max),
+            n_paneles_total,
+        )
+
+    if max_paralelo_usado > 1:
+        warnings.append(
+            f"Se usan hasta {max_paralelo_usado} strings en paralelo por MPPT. "
+            f"Corriente máxima estimada por MPPT: {corriente_mppt:.2f} A."
+        )
+
+    # ======================================================
     # PARÁMETROS
-    # --------------------------------------------------
+    # ======================================================
     vmp_string = n_series * vmp_panel
     voc_string = n_series * voc_panel
-
-    imp = panel.imp_a
-    isc = panel.isc_a
 
     strings = [
         StringCalc(
@@ -260,8 +341,8 @@ def calcular_strings_fv(
             n_series=n_series,
             vmp_string_v=vmp_string,
             voc_frio_string_v=voc_string,
-            imp_string_a=imp,
-            isc_string_a=isc,
+            imp_string_a=float(panel.imp_a),
+            isc_string_a=float(panel.isc_a),
         )
         for (i, m) in distrib
     ]
