@@ -43,8 +43,8 @@ def construir_datos_proyecto(ctx):
 
         cobertura_objetivo=float(getattr(ctx, "cobertura_objetivo", 1.0) or 1.0),
 
-        costo_usd_kwp=float(getattr(ctx, "costo_usd_kwp", 1000) or 1000),
-        tcambio=float(getattr(ctx, "tcambio", 26.5) or 26.5),
+        costo_usd_kwp=float(getattr(ctx, "costo_usd_kwp", 1200) or 1200),
+        tcambio=float(getattr(ctx, "tcambio", 26.75) or 26.75),
 
         tasa_anual=float(getattr(ctx, "tasa_anual", 0.1) or 0.1),
         plazo_anios=int(getattr(ctx, "plazo_anios", 10) or 10),
