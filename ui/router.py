@@ -107,6 +107,10 @@ def _init_ctx_campos(ctx):
     if not hasattr(ctx, "errores") or not isinstance(ctx.errores, list):
         ctx.errores = []
 
+    # datos cliente
+    if not hasattr(ctx, "datos_cliente") or not isinstance(ctx.datos_cliente, dict):
+        ctx.datos_cliente = {}
+
     # datos sistema FV
     if not hasattr(ctx, "sistema_fv") or not isinstance(ctx.sistema_fv, dict):
         ctx.sistema_fv = {}
