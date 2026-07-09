@@ -417,8 +417,17 @@ def build_resumen_tecnico(resultado, pal, styles, content_w):
     # ======================================================
     # RESUMEN DEL SISTEMA FV
     # ======================================================
-
     story.append(Paragraph("Resumen del sistema FV", styles["Heading1"]))
+    story.append(Spacer(1, 10))
+    
+    story.append(
+        Paragraph(
+            "Esta sección resume la configuración técnica principal del sistema fotovoltaico propuesto, "
+            "incluyendo potencia instalada, arreglo de módulos, selección de inversores y parámetros "
+            "eléctricos base del generador FV.",
+            styles["BodyText"],
+        )
+    )
     story.append(Spacer(1, 10))
 
     story.append(
