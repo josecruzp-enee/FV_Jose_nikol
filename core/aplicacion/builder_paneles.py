@@ -232,9 +232,6 @@ def construir_entrada_paneles(datos, sizing) -> EntradaPaneles:
     if not hasattr(datos, "equipos") or datos.equipos is None:
         raise ValueError("datos.equipos no definido")
 
-    panel_id, inversor_id = _extraer_ids_equipos(datos.equipos)
-    panel, inversor = _resolver_catalogos(panel_id, inversor_id)
-
     sf = _validar_sistema_fv(datos)
 
     modo = sf.get("modo")
@@ -242,15 +239,28 @@ def construir_entrada_paneles(datos, sizing) -> EntradaPaneles:
     if not modo:
         raise ValueError("sistema_fv sin modo")
 
-    modo = modo.lower()
+    modo = str(modo).lower()
 
-    # ==================================================
-    # MULTIZONA
-    # ==================================================
+    panel_id, inversor_id = _extraer_ids_equipos(datos.equipos)
+    panel_ui, inversor_ui = _resolver_catalogos(panel_id, inversor_id)
+
+    if modo == "paneles":
+        panel = panel_ui
+        inversor = inversor_ui
+    else:
+        panel = getattr(sizing, "panel", None) or panel_ui
+        inversor = getattr(sizing, "inversor", None) or inversor_ui
+
+    print("[BUILDER PANELES]")
+    print("modo:", modo)
+    print("panel:", getattr(panel, "codigo", None))
+    print("inversor:", getattr(inversor, "codigo", None))
+    print("sizing.n_inversores:", getattr(sizing, "n_inversores", None))
+    print("sizing.kw_ac:", getattr(sizing, "kw_ac", None))
+    print("sizing.kw_ac_total:", getattr(sizing, "kw_ac_total", None))
+    print("sizing.dc_ac_ratio:", getattr(sizing, "dc_ac_ratio", None))
+
     if modo == "multizona":
         return _build_multizona(sf, panel, inversor, sizing)
 
-    # ==================================================
-    # NORMAL (auto + manual simple)
-    # ==================================================
     return _build_normal(sf, panel, inversor, sizing)
