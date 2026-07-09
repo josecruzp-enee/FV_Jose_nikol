@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+# reportes/analisis_energetico.py
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -16,7 +18,29 @@ from reportes.helpers_pdf import (
 
 
 # =========================================================
-# BLOQUE: ANÁLISIS ENERGÉTICO
+# CAPÍTULO 2
+# ANÁLISIS ENERGÉTICO
+# =========================================================
+# Responsabilidad:
+# - Presentar consumo mensual.
+# - Presentar generación FV mensual.
+# - Presentar energía tomada de ENEE.
+# - Mostrar gráficas energéticas si existen.
+# - Mostrar interpretación técnica básica.
+#
+# Reglas de mantenimiento:
+# - No cambiar la firma de build_analisis_energetico().
+# - No cambiar nombres de variables usadas por otros módulos.
+# - No mover cálculos todavía.
+# - No eliminar safe_image; es opcional y compatible.
+# =========================================================
+
+
+# =========================================================
+# 1. ORQUESTADOR DEL CAPÍTULO
+# =========================================================
+# Esta función es llamada desde BLOQUES_REPORTE.
+# Mantener firma por compatibilidad.
 # =========================================================
 
 def build_analisis_energetico(
@@ -32,7 +56,7 @@ def build_analisis_energetico(
     story = []
 
     # =====================================================
-    # TÍTULO
+    # 1.1 TÍTULO DEL CAPÍTULO
     # =====================================================
     story.append(Paragraph("Análisis de Energía", styles["Title"]))
     story.append(Spacer(1, 8))
@@ -41,7 +65,7 @@ def build_analisis_energetico(
     story.append(Spacer(1, 6))
 
     # =====================================================
-    # DATA SEGURA
+    # 1.2 DATA SEGURA
     # =====================================================
     financiero = getattr(resultado, "financiero", None)
 
@@ -53,7 +77,7 @@ def build_analisis_energetico(
     tabla_12m = financiero.get("tabla_12m", [])
 
     # =====================================================
-    # TABLA
+    # 1.3 TABLA ENERGÉTICA MENSUAL
     # =====================================================
     header = ["Mes", "Consumo (kWh)", "FV (kWh)", "ENEE (kWh)"]
     rows = []
@@ -102,7 +126,7 @@ def build_analisis_energetico(
     story.append(Spacer(1, 10))
 
     # =====================================================
-    # GRÁFICAS (ROBUSTO)
+    # 1.4 GRÁFICAS ENERGÉTICAS
     # =====================================================
     GAP = 10
     CH_W = (content_w - GAP) / 2.0
@@ -148,7 +172,7 @@ def build_analisis_energetico(
         story.append(Spacer(1, 10))
 
     # =====================================================
-    # INTERPRETACIÓN
+    # 1.5 INTERPRETACIÓN TÉCNICA
     # =====================================================
     consumo_12m = get_field(datos, "consumo_12m", [])
     consumo_anual = sum(consumo_12m) if isinstance(consumo_12m, list) else 0
