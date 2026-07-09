@@ -1,20 +1,34 @@
+# -*- coding: utf-8 -*-
 # reportes/secciones_tecnicas/conclusiones.py
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
 
 # ======================================================
-# UTILIDADES SEGURAS
+# CONCLUSIONES EJECUTIVAS — REPORTE FV
+# ======================================================
+# Responsabilidad:
+# - Extraer métricas consolidadas del resultado.
+# - Clasificar viabilidad ejecutiva.
+# - Generar narrativa automática.
+# - Insertar la página de conclusiones en el PDF.
+#
+# Este módulo NO calcula ingeniería eléctrica.
+# Este módulo NO optimiza el sistema FV.
+# Este módulo NO modifica resultados.
+# Solo presenta e interpreta información ya calculada.
+# ======================================================
+
+
+# ======================================================
+# 1. UTILIDADES SEGURAS
 # ======================================================
 
 def _get(obj: Any, *paths: str, default: Any = None) -> Any:
     """
     Obtiene valores desde objetos, dataclasses o dicts sin romper el PDF.
-
-    Uso:
-        _get(resultado, "financiero.dscr", "finanzas.dscr", default=0)
     """
     for path in paths:
         actual = obj
@@ -45,6 +59,10 @@ def _num(valor: Any, default: float = 0.0) -> float:
         return default
 
 
+# ======================================================
+# 2. FORMATO
+# ======================================================
+
 def _fmt_lps(valor: Any) -> str:
     return f"L {_num(valor):,.2f}"
 
@@ -62,8 +80,9 @@ def _fmt_pct(valor: Any) -> str:
 
 
 # ======================================================
-# EXTRACCIÓN DE MÉTRICAS PRINCIPALES
+# 3. EXTRACCIÓN DE MÉTRICAS
 # ======================================================
+
 def extraer_metricas_conclusion(resultado: Any, datos: Any = None) -> dict:
     """
     Extrae métricas principales del resultado consolidado.
@@ -74,6 +93,7 @@ def extraer_metricas_conclusion(resultado: Any, datos: Any = None) -> dict:
     """
 
     energia = _get(resultado, "energia", default=None)
+
     financiero = _get(
         resultado,
         "finanzas",
@@ -81,10 +101,7 @@ def extraer_metricas_conclusion(resultado: Any, datos: Any = None) -> dict:
         "resultado_financiero",
         default=None,
     )
-    
-    # ======================================================
-    # LAYOUT
-    # ======================================================
+
     # ======================================================
     # LAYOUT
     # ======================================================
@@ -99,7 +116,11 @@ def extraer_metricas_conclusion(resultado: Any, datos: Any = None) -> dict:
             default=0.0,
         )
     )
-    
+
+    # ======================================================
+    # OPTIMIZACIÓN ECONÓMICA
+    # ======================================================
+
     opt = _get(resultado, "optimizacion_economica", default=None)
 
     if not opt and energia is not None:
@@ -111,11 +132,11 @@ def extraer_metricas_conclusion(resultado: Any, datos: Any = None) -> dict:
     if isinstance(opt, dict):
         sin = opt.get("sin_inyeccion", {}) or {}
         con = opt.get("con_inyeccion", {}) or {}
+
     # ======================================================
     # ENERGÍA
     # ======================================================
 
-    consumo_anual = 0.0
     consumo_12m = []
 
     if datos is not None:
@@ -330,15 +351,11 @@ def extraer_metricas_conclusion(resultado: Any, datos: Any = None) -> dict:
     if not ahorro_anual:
         ahorro_anual = sin.get("beneficio_neto_l_anual", 0.0)
 
-    if not ahorro_mensual and _num(ahorro_anual) > 0:
+    if not ahorro_mensual and _num(ahorro_anual) != 0:
         ahorro_mensual = _num(ahorro_anual) / 12.0
 
     beneficio_bruto_anual = _num(ahorro_anual)
-
-    beneficio_neto_anual = 0.0
-
-    if _num(ahorro_mensual) > 0:
-        beneficio_neto_anual = _num(ahorro_mensual) * 12.0
+    beneficio_neto_anual = _num(ahorro_mensual) * 12.0
 
     pago_actual = _get(
         resultado,
@@ -440,7 +457,7 @@ def extraer_metricas_conclusion(resultado: Any, datos: Any = None) -> dict:
                 for x in tabla_12m
             )
 
-    
+        beneficio_neto_anual = _num(ahorro_mensual) * 12.0
 
     return {
         "consumo_anual": _num(consumo_anual),
@@ -464,10 +481,11 @@ def extraer_metricas_conclusion(resultado: Any, datos: Any = None) -> dict:
         "area_layout": _num(area_layout),
         "escenario_base": sin,
         "escenario_inyeccion": con,
-        
     }
+
+
 # ======================================================
-# CLASIFICACIÓN EJECUTIVA
+# 4. CLASIFICACIÓN EJECUTIVA
 # ======================================================
 
 def clasificar_viabilidad(m: dict) -> tuple[str, str]:
@@ -498,7 +516,85 @@ def clasificar_viabilidad(m: dict) -> tuple[str, str]:
 
 
 # ======================================================
-# TEXTO AUTOMÁTICO DE CONCLUSIONES
+# 5. NARRATIVA EJECUTIVA
+# ======================================================
+
+def _texto_viabilidad(m: dict, estado: str, criterio_estado: str) -> str:
+    return (
+        f"El proyecto se clasifica como {estado}. "
+        f"{criterio_estado} "
+        f"El indicador DSCR calculado es {m['dscr']:.2f}, "
+        f"con un ahorro neto mensual estimado de {_fmt_lps(m['ahorro_mensual'])}."
+    )
+
+
+def _texto_resultado_energetico(m: dict) -> str:
+    return (
+        f"El sistema fotovoltaico propuesto tiene una potencia instalada de {_fmt_kwp(m['kwp'])} "
+        f"y una producción anual estimada de {_fmt_kwh(m['produccion_anual'])}. "
+        f"Esta generación cubre aproximadamente {_fmt_pct(m['cobertura_real'])} "
+        f"del consumo anual del cliente, cuyo consumo total es de {_fmt_kwh(m['consumo_anual'])}."
+    )
+
+
+def _texto_impacto_financiero(m: dict) -> str:
+    return (
+        f"El pago energético mensual actual se estima en {_fmt_lps(m['pago_actual'])}. "
+        f"Con el sistema FV y el financiamiento considerado, el pago total mensual proyectado "
+        f"es de aproximadamente {_fmt_lps(m['pago_total_fv'])}, incluyendo una cuota "
+        f"de financiamiento de {_fmt_lps(m['cuota'])}. "
+        f"El beneficio económico anual generado por la energía fotovoltaica "
+        f"se estima en {_fmt_lps(m['beneficio_bruto_anual'])}. "
+        f"Después de considerar el financiamiento del proyecto, "
+        f"el ahorro neto anual esperado para el cliente es de "
+        f"{_fmt_lps(m['beneficio_neto_anual'])}."
+    )
+
+
+def _texto_dimensionamiento() -> str:
+    return (
+        "El tamaño seleccionado prioriza autoconsumo, estabilidad financiera y control del excedente energético. "
+        "Aunque un sistema de mayor potencia puede incrementar la generación anual, también puede aumentar "
+        "la energía excedente y la dependencia de condiciones comerciales o regulatorias externas."
+    )
+
+
+def _texto_alcance_fisico(m: dict) -> str:
+    return (
+        f"La solución considera {m['n_paneles']} módulos fotovoltaicos "
+        f"de {m['potencia_panel_wp']:.0f} Wp. "
+        f"El área preliminar estimada para el arreglo es de {m['area_layout']:.2f} m². "
+        f"Este valor debe validarse en campo considerando obstáculos, sombras, orientación real, "
+        f"accesos de mantenimiento y revisión estructural de la cubierta."
+    )
+
+
+def _texto_recomendacion_final(estado: str) -> str:
+    if estado == "NO RECOMENDADO":
+        return (
+            "No se recomienda avanzar a ejecución bajo las condiciones financieras actuales. "
+            "Antes de continuar, se recomienda revisar CAPEX, tamaño del sistema, tasa, plazo, prima, "
+            "tarifa eléctrica aplicada y perfil horario real de demanda. Una vez ajustadas estas variables, "
+            "el proyecto debe evaluarse nuevamente."
+        )
+
+    if estado == "VIABLE CON OBSERVACIONES":
+        return (
+            "Se puede avanzar a una etapa de revisión técnica y financiera más detallada, "
+            "manteniendo como prioridad validar el perfil horario real de demanda, condiciones de instalación, "
+            "disponibilidad de área útil, capacidad estructural y condiciones definitivas de interconexión."
+        )
+
+    return (
+        "Se recomienda avanzar con el diseño base evaluado, manteniendo como prioridad el autoconsumo "
+        "y la reducción directa de la factura eléctrica. Antes de ejecución, se recomienda validar "
+        "perfil horario real de demanda, condiciones de instalación, disponibilidad de área útil, "
+        "capacidad estructural y condiciones definitivas de interconexión."
+    )
+
+
+# ======================================================
+# 6. GENERADOR DE CONTENIDO
 # ======================================================
 
 def generar_conclusiones_ejecutivas(resultado: Any, datos: Any = None) -> dict:
@@ -509,72 +605,32 @@ def generar_conclusiones_ejecutivas(resultado: Any, datos: Any = None) -> dict:
     m = extraer_metricas_conclusion(resultado, datos)
     estado, criterio_estado = clasificar_viabilidad(m)
 
-    conclusiones = []
-
-    conclusiones.append({
-        "titulo": "1. Viabilidad general del proyecto",
-        "texto": (
-            f"El proyecto se clasifica como {estado}. "
-            f"{criterio_estado} "
-            f"El indicador DSCR calculado es {m['dscr']:.2f}, "
-            f"con un ahorro neto mensual estimado de {_fmt_lps(m['ahorro_mensual'])}."
-        ),
-    })
-
-    conclusiones.append({
-        "titulo": "2. Resultado energético esperado",
-        "texto": (
-            f"El sistema fotovoltaico propuesto tiene una potencia instalada de {_fmt_kwp(m['kwp'])} "
-            f"y una producción anual estimada de {_fmt_kwh(m['produccion_anual'])}. "
-            f"Esta generación cubre aproximadamente {_fmt_pct(m['cobertura_real'])} "
-            f"del consumo anual del cliente, cuyo consumo total es de {_fmt_kwh(m['consumo_anual'])}."
-        ),
-    })
-
-    conclusiones.append({
-        "titulo": "3. Impacto financiero esperado",
-        "texto": (
-            f"El pago energético mensual actual se estima en {_fmt_lps(m['pago_actual'])}. "
-            f"Con el sistema FV y el financiamiento considerado, el pago total mensual proyectado "
-            f"se reduce a aproximadamente {_fmt_lps(m['pago_total_fv'])}, incluyendo una cuota "
-            f"de financiamiento de {_fmt_lps(m['cuota'])}. "
-            f"El beneficio económico anual generado por la energía fotovoltaica "
-            f"se estima en {_fmt_lps(m['beneficio_bruto_anual'])}. "
-            f"Después de considerar el financiamiento del proyecto, "
-            f"el ahorro neto anual esperado para el cliente es de "
-            f"{_fmt_lps(m['beneficio_neto_anual'])}."
-        ),
-    })
-
-    conclusiones.append({
-        "titulo": "4. Criterio técnico de dimensionamiento",
-        "texto": (
-            f"El tamaño seleccionado prioriza autoconsumo, estabilidad financiera y control del excedente energético. "
-            f"Aunque un sistema de mayor potencia puede incrementar la generación anual, también puede aumentar "
-            f"la energía excedente y la dependencia de condiciones comerciales o regulatorias externas."
-        ),
-    })
-
-    conclusiones.append({
-        "titulo": "5. Alcance físico preliminar",
-        "texto": (
-            f"La solución considera {m['n_paneles']} módulos fotovoltaicos "
-            f"de {m['potencia_panel_wp']:.0f} Wp. "
-            f"El área preliminar estimada para el arreglo es de {m['area_layout']:.2f} m². "
-            f"Este valor debe validarse en campo considerando obstáculos, sombras, orientación real, "
-            f"accesos de mantenimiento y revisión estructural de la cubierta."
-        ),
-    })
-
-    conclusiones.append({
-        "titulo": "6. Recomendación final",
-        "texto": (
-            f"Se recomienda avanzar con el diseño base evaluado, manteniendo como prioridad el autoconsumo "
-            f"y la reducción directa de la factura eléctrica. Antes de ejecución, se recomienda validar "
-            f"perfil horario real de demanda, condiciones de instalación, disponibilidad de área útil, "
-            f"capacidad estructural y condiciones definitivas de interconexión."
-        ),
-    })
+    conclusiones = [
+        {
+            "titulo": "1. Viabilidad general del proyecto",
+            "texto": _texto_viabilidad(m, estado, criterio_estado),
+        },
+        {
+            "titulo": "2. Resultado energético esperado",
+            "texto": _texto_resultado_energetico(m),
+        },
+        {
+            "titulo": "3. Impacto financiero esperado",
+            "texto": _texto_impacto_financiero(m),
+        },
+        {
+            "titulo": "4. Criterio técnico de dimensionamiento",
+            "texto": _texto_dimensionamiento(),
+        },
+        {
+            "titulo": "5. Alcance físico preliminar",
+            "texto": _texto_alcance_fisico(m),
+        },
+        {
+            "titulo": "6. Recomendación final",
+            "texto": _texto_recomendacion_final(estado),
+        },
+    ]
 
     return {
         "estado": estado,
@@ -584,19 +640,12 @@ def generar_conclusiones_ejecutivas(resultado: Any, datos: Any = None) -> dict:
 
 
 # ======================================================
-# FUNCIÓN REPORTLAB PARA INSERTAR PÁGINA
+# 7. RENDER REPORTLAB
 # ======================================================
 
 def agregar_pagina_conclusiones_ejecutivas(story, styles, resultado, datos=None, paths=None):
     """
     Agrega una página completa de conclusiones ejecutivas al PDF.
-
-    Requiere:
-        from reportlab.platypus import Paragraph, Spacer, PageBreak, Table, TableStyle
-        from reportlab.lib import colors
-        from reportlab.lib.units import cm
-
-    Se importa dentro de la función para no afectar otros módulos.
     """
 
     from reportlab.platypus import Paragraph, Spacer, PageBreak, Table, TableStyle
@@ -611,14 +660,16 @@ def agregar_pagina_conclusiones_ejecutivas(story, styles, resultado, datos=None,
                 name="BodyJustify",
                 parent=styles["BodyText"],
                 alignment=TA_JUSTIFY,
+            )
         )
-    )
-    
+
     data = generar_conclusiones_ejecutivas(resultado, datos)
 
     paths = paths or {}
+
     if paths.get("layout_area_rectangular_m2"):
         data["metricas"]["area_layout"] = float(paths["layout_area_rectangular_m2"])
+
     m = data["metricas"]
     estado = data["estado"]
 
@@ -639,6 +690,7 @@ def agregar_pagina_conclusiones_ejecutivas(story, styles, resultado, datos=None,
     ]
 
     tabla = Table(resumen, colWidths=[7.0 * cm, 8.5 * cm])
+
     tabla.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0B3D5C")),
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
