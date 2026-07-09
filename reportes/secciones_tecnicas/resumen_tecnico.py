@@ -518,6 +518,16 @@ def build_resumen_tecnico(resultado, pal, styles, content_w):
         leer(resultado, "comparativa_inversores", []),
     )
 
+    story.append(
+        Paragraph(
+            "La siguiente comparativa muestra las alternativas de inversores evaluadas por el motor. "
+            "La tabla se presenta únicamente como referencia técnica; la selección final corresponde "
+            "al resultado ya calculado por FV Engine.",
+            styles["BodyText"],
+        )
+    )
+    story.append(Spacer(1, 8))
+    
     story.extend(
         construir_tabla_comparativa_inversores_pdf(
             comparativa_inversores,
