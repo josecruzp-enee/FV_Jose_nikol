@@ -1,6 +1,8 @@
+# reportes/helpers_pdf.py
+
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 from reportlab.lib import colors
 from reportlab.lib.styles import ParagraphStyle
@@ -8,7 +10,24 @@ from reportlab.platypus import Paragraph, Table, TableStyle
 
 
 # ==========================================================
-# GET FIELD
+# HELPERS PDF
+# ==========================================================
+# Responsabilidad:
+# - Centralizar utilidades reutilizables del reporte PDF.
+# - Crear tablas base.
+# - Crear estilos uniformes.
+# - Crear cajas de texto.
+# - Formatear valores numéricos y monetarios.
+#
+# Reglas:
+# - No cambiar nombres de funciones existentes.
+# - No cambiar firmas usadas por capítulos.
+# - Mantener compatibilidad hacia atrás.
+# ==========================================================
+
+
+# ==========================================================
+# 1. LECTURA SEGURA DE CAMPOS
 # ==========================================================
 
 def get_field(x: Any, key: str, default: Any = "") -> Any:
@@ -18,7 +37,29 @@ def get_field(x: Any, key: str, default: Any = "") -> Any:
 
 
 # ==========================================================
-# SECTION BAR
+# 2. FORMATO DE VALORES
+# ==========================================================
+
+def money_L(x: float, dec: int = 2) -> str:
+    try:
+        x = float(x)
+    except Exception:
+        x = 0.0
+
+    return f"L {x:,.{dec}f}"
+
+
+def num(x: float, dec: int = 2) -> str:
+    try:
+        x = float(x)
+    except Exception:
+        x = 0.0
+
+    return f"{x:,.{dec}f}"
+
+
+# ==========================================================
+# 3. COMPONENTE: BARRA DE SECCIÓN
 # ==========================================================
 
 def section_bar(texto: str, pal: Dict[str, Any], content_w: float):
@@ -44,7 +85,7 @@ def section_bar(texto: str, pal: Dict[str, Any], content_w: float):
 
 
 # ==========================================================
-# MAKE TABLE
+# 4. COMPONENTE: TABLA BASE
 # ==========================================================
 
 def make_table(data, content_w, ratios=None, repeatRows=0):
@@ -60,7 +101,7 @@ def make_table(data, content_w, ratios=None, repeatRows=0):
 
 
 # ==========================================================
-# TABLE STYLE
+# 5. COMPONENTE: ESTILO UNIFORME DE TABLA
 # ==========================================================
 
 def table_style_uniform(pal, font_header=9, font_body=9):
@@ -82,7 +123,7 @@ def table_style_uniform(pal, font_header=9, font_body=9):
 
 
 # ==========================================================
-# BOX PARAGRAPH
+# 6. COMPONENTE: CAJA DE TEXTO
 # ==========================================================
 
 def box_paragraph(html_text, pal, content_w, font_size=10):
@@ -107,16 +148,3 @@ def box_paragraph(html_text, pal, content_w, font_size=10):
     ]))
 
     return t
-
-
-# ==========================================================
-# MONEY
-# ==========================================================
-
-def money_L(x: float, dec: int = 2) -> str:
-    try:
-        x = float(x)
-    except Exception:
-        x = 0.0
-
-    return f"L {x:,.{dec}f}"
