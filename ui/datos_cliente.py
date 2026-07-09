@@ -110,7 +110,7 @@ def render(ctx) -> None:
     else:
         prima_pct = 1.0
         tasa_anual = 0.0
-        plazo_anios = 1
+        plazo_anios = 0
         porcentaje_financiado = 0.0
 
     # guardar cliente
