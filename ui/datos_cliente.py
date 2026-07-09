@@ -25,7 +25,82 @@ def render(ctx) -> None:
     sf.setdefault("cliente_nombre", "Cliente Demo")
     sf.setdefault("cliente_ubicacion", "Ciudad")
     sf.setdefault("cliente_email", "correo@demo.com")
+        st.markdown("### Escenario económico")
 
+    sf.setdefault("usa_financiamiento", True)
+    sf.setdefault("costo_usd_kwp", 1200.0)
+    sf.setdefault("tcambio", 26.75)
+    sf.setdefault("prima_pct_ui", 10.0)
+    sf.setdefault("tasa_anual_ui", 19.5)
+    sf.setdefault("plazo_anios", 7)
+
+    costo_usd_kwp = st.number_input(
+        "Costo instalado (USD/kWp)",
+        min_value=0.0,
+        value=float(sf["costo_usd_kwp"]),
+        step=50.0,
+        key="costo_usd_kwp",
+    )
+
+    tcambio = st.number_input(
+        "Tipo de cambio (L/USD)",
+        min_value=0.0,
+        value=float(sf["tcambio"]),
+        step=0.01,
+        key="tcambio",
+    )
+
+    usa_financiamiento = st.checkbox(
+        "El cliente financiará el proyecto",
+        value=bool(sf["usa_financiamiento"]),
+        key="usa_financiamiento",
+    )
+
+    if usa_financiamiento:
+        prima_pct_ui = st.number_input(
+            "Prima (%)",
+            min_value=0.0,
+            max_value=100.0,
+            value=float(sf["prima_pct_ui"]),
+            step=1.0,
+            key="prima_pct_ui",
+        )
+
+        tasa_anual_ui = st.number_input(
+            "Tasa anual (%)",
+            min_value=0.0,
+            value=float(sf["tasa_anual_ui"]),
+            step=0.5,
+            key="tasa_anual_ui",
+        )
+
+        plazo_anios = st.number_input(
+            "Plazo (años)",
+            min_value=1,
+            value=int(sf["plazo_anios"]),
+            step=1,
+            key="plazo_anios",
+        )
+
+        ctx.modo_financiamiento = "credito_con_prima"
+        ctx.prima_pct = float(prima_pct_ui) / 100.0
+        ctx.porcentaje_financiado = 1.0 - ctx.prima_pct
+        ctx.tasa_anual = float(tasa_anual_ui) / 100.0
+        ctx.plazo_anios = int(plazo_anios)
+        ctx.nombre_financiamiento = "Crédito bancario"
+        ctx.entidad_financiera = "Banco"
+
+    else:
+        ctx.modo_financiamiento = "contado"
+        ctx.prima_pct = 1.0
+        ctx.porcentaje_financiado = 0.0
+        ctx.tasa_anual = 0.0
+        ctx.plazo_anios = 0
+        ctx.nombre_financiamiento = "Pago de contado"
+        ctx.entidad_financiera = "Cliente"
+
+    ctx.costo_usd_kwp = float(costo_usd_kwp)
+    ctx.tcambio = float(tcambio)
     # 🔥 NUEVO: coordenadas
     sf.setdefault("cliente_lat", 15.8)
     sf.setdefault("cliente_lon", -87.2)
