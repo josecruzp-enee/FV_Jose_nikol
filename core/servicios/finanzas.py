@@ -33,15 +33,22 @@ def obtener_perfil_financiamiento(datos: Datosproyecto | None = None) -> Dict[st
     """
     Perfil financiero centralizado.
 
-    Mantiene compatibilidad:
-    - Si datos trae tasa_anual, plazo_anios o porcentaje_financiado, puede seguir usándolos.
-    - Si no existen o vienen vacíos, usa el perfil bancario por defecto.
+    Modos soportados:
+    - contado
+    - credito_100
+    - credito_con_prima
     """
 
     perfil = dict(PERFIL_FINANCIAMIENTO_DEFAULT)
 
     if datos is None:
+        perfil["modo_financiamiento"] = "credito_con_prima"
         return perfil
+
+    modo = str(
+        getattr(datos, "modo_financiamiento", "credito_con_prima")
+        or "credito_con_prima"
+    ).strip().lower()
 
     nombre = getattr(datos, "nombre_financiamiento", None)
     entidad = getattr(datos, "entidad_financiera", None)
@@ -93,8 +100,47 @@ def obtener_perfil_financiamiento(datos: Datosproyecto | None = None) -> Dict[st
     except Exception:
         pass
 
-    return perfil
+    # ======================================================
+    # MODO: CONTADO
+    # ======================================================
+    if modo == "contado":
+        perfil["modo_financiamiento"] = "contado"
+        perfil["nombre"] = "Pago de contado"
+        perfil["entidad"] = "Cliente"
+        perfil["tasa_anual"] = 0.0
+        perfil["cat"] = 0.0
+        perfil["plazo_anios"] = 0
+        perfil["plazo_meses"] = 0
+        perfil["prima_pct"] = 1.0
+        perfil["porcentaje_financiado"] = 0.0
+        perfil["nota"] = "Proyecto evaluado bajo esquema de pago de contado, sin deuda financiera."
 
+    # ======================================================
+    # MODO: CRÉDITO 100%
+    # ======================================================
+    elif modo in ["credito_100", "credito100", "financiado_100"]:
+        perfil["modo_financiamiento"] = "credito_100"
+        perfil["nombre"] = "Crédito 100% financiado"
+        perfil["prima_pct"] = 0.0
+        perfil["porcentaje_financiado"] = 1.0
+
+    # ======================================================
+    # MODO: CRÉDITO CON PRIMA
+    # ======================================================
+    else:
+        perfil["modo_financiamiento"] = "credito_con_prima"
+
+        perfil["porcentaje_financiado"] = max(
+            0.0,
+            min(1.0, float(perfil.get("porcentaje_financiado", 0.90) or 0.90))
+        )
+
+        perfil["prima_pct"] = max(
+            0.0,
+            min(1.0, float(perfil.get("prima_pct", 0.10) or 0.10))
+        )
+
+    return perfil
 
 def calcular_detalle_financiamiento(
     *,
