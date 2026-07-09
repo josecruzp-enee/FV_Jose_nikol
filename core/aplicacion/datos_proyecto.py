@@ -204,38 +204,23 @@ def _crear_datos_base(ctx, cliente_data: dict, consumo_data: dict, fin_data: dic
 
 def _aplicar_financiamiento_extra(p, fin_data: dict):
     """
-    Agrega campos nuevos sin romper Datosproyecto.
-    Si el dataclass no los declara, Python normalmente permite atributos dinámicos
-    salvo que use slots.
+    Agrega campos financieros nuevos sin romper Datosproyecto.
     """
 
-    try:
-        p.nombre_financiamiento = fin_data["nombre_financiamiento"]
-    except Exception:
-        pass
-
-    try:
-        p.entidad_financiera = fin_data["entidad_financiera"]
-    except Exception:
-        pass
-
-    try:
-        p.prima_pct = fin_data["prima_pct"]
-    except Exception:
-        pass
-
-    try:
-        p.cat = fin_data["cat"]
-    except Exception:
-        pass
-
-    try:
-        p.plazo_meses = fin_data["plazo_meses"]
-    except Exception:
-        pass
+    for campo in [
+        "modo_financiamiento",
+        "nombre_financiamiento",
+        "entidad_financiera",
+        "prima_pct",
+        "cat",
+        "plazo_meses",
+    ]:
+        try:
+            setattr(p, campo, fin_data.get(campo))
+        except Exception:
+            pass
 
     return p
-
 
 # ======================================================
 # DEBUG TEMPORAL
