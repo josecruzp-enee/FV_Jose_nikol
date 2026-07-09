@@ -19,13 +19,12 @@ def render(ctx) -> None:
 
     sf = st.session_state
 
-    # ------------------------------------------------------
-    # VALORES POR DEFECTO (SOLO PRIMERA VEZ)
-    # ------------------------------------------------------
+    # defaults
     sf.setdefault("cliente_nombre", "Cliente Demo")
     sf.setdefault("cliente_ubicacion", "Ciudad")
     sf.setdefault("cliente_email", "correo@demo.com")
-    st.markdown("### Escenario económico")
+    sf.setdefault("cliente_lat", 15.8)
+    sf.setdefault("cliente_lon", -87.2)
 
     sf.setdefault("usa_financiamiento", True)
     sf.setdefault("costo_usd_kwp", 1200.0)
@@ -33,6 +32,28 @@ def render(ctx) -> None:
     sf.setdefault("prima_pct_ui", 10.0)
     sf.setdefault("tasa_anual_ui", 19.5)
     sf.setdefault("plazo_anios", 7)
+
+    # asegurar diccionarios
+    if not hasattr(ctx, "datos_cliente") or not isinstance(ctx.datos_cliente, dict):
+        ctx.datos_cliente = {}
+
+    if not hasattr(ctx, "sistema_fv") or not isinstance(ctx.sistema_fv, dict):
+        ctx.sistema_fv = {}
+
+    # inputs cliente
+    cliente = st.text_input("Nombre del cliente", key="cliente_nombre")
+    ubicacion = st.text_input("Ubicación", key="cliente_ubicacion")
+    email = st.text_input("Email (opcional)", key="cliente_email")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        lat = st.number_input("Latitud", key="cliente_lat", format="%.6f")
+
+    with col2:
+        lon = st.number_input("Longitud", key="cliente_lon", format="%.6f")
+
+    st.markdown("### Escenario económico")
 
     costo_usd_kwp = st.number_input(
         "Costo instalado (USD/kWp)",
@@ -82,98 +103,45 @@ def render(ctx) -> None:
             key="plazo_anios",
         )
 
-        ctx.modo_financiamiento = "credito_con_prima"
-        ctx.prima_pct = float(prima_pct_ui) / 100.0
-        ctx.porcentaje_financiado = 1.0 - ctx.prima_pct
-        ctx.tasa_anual = float(tasa_anual_ui) / 100.0
-        ctx.plazo_anios = int(plazo_anios)
-        ctx.nombre_financiamiento = "Crédito bancario"
-        ctx.entidad_financiera = "Banco"
+        prima_pct = float(prima_pct_ui) / 100.0
+        tasa_anual = float(tasa_anual_ui) / 100.0
+        porcentaje_financiado = 1.0 - prima_pct
 
     else:
-        ctx.modo_financiamiento = "contado"
-        ctx.prima_pct = 1.0
-        ctx.porcentaje_financiado = 0.0
-        ctx.tasa_anual = 0.0
-        ctx.plazo_anios = 0
-        ctx.nombre_financiamiento = "Pago de contado"
-        ctx.entidad_financiera = "Cliente"
+        prima_pct = 1.0
+        tasa_anual = 0.0
+        plazo_anios = 0
+        porcentaje_financiado = 0.0
 
-        ctx.costo_usd_kwp = float(costo_usd_kwp)
-        ctx.tcambio = float(tcambio)
-        # 🔥 NUEVO: coordenadas
-        sf.setdefault("cliente_lat", 15.8)
-        sf.setdefault("cliente_lon", -87.2)
+    # guardar cliente
+    ctx.datos_cliente.update({
+        "cliente": cliente.strip(),
+        "ubicacion": ubicacion.strip(),
+        "email": email.strip(),
+        "lat": float(lat),
+        "lon": float(lon),
+    })
 
-        ctx.datos_cliente = {
-        "cliente": cliente,
-        "ubicacion": ubicacion,
-        "email": email,
-        "lat": float(sf["cliente_lat"]),
-        "lon": float(sf["cliente_lon"]),
-    }
-
-    ctx.sistema_fv["costo_usd_kwp"] = float(costo_usd_kwp)
-    ctx.sistema_fv["tcambio"] = float(tcambio)
-    
-    ctx.sistema_fv["usa_financiamiento"] = bool(sf["usa_financiamiento"])
-    ctx.sistema_fv["prima_pct"] = float(sf["prima_pct_ui"])
-
-    ctx.sistema_fv["tasa_anual"] = float(sf["tasa_anual_ui"]) / 100.0
-    ctx.sistema_fv["plazo_anios"] = int(sf["plazo_anios"])
-
-    if sf["usa_financiamiento"]:
-        ctx.sistema_fv["porcentaje_financiado"] = (
-            1.0 - float(sf["prima_pct_ui"]) / 100.0
-        )
-    else:
-        ctx.sistema_fv["porcentaje_financiado"] = 0.0
-    # ------------------------------------------------------
-    # INPUTS
-    # ------------------------------------------------------
-    cliente = st.text_input(
-        "Nombre del cliente",
-        key="cliente_nombre",
-    )
-
-    ubicacion = st.text_input(
-        "Ubicación",
-        key="cliente_ubicacion",
-    )
-
-    email = st.text_input(
-        "Email (opcional)",
-        key="cliente_email",
-    )
-
-    # 🔥 NUEVO: coordenadas visibles (puedes ocultarlas luego)
-    col1, col2 = st.columns(2)
-
-    with col1:
-        lat = st.number_input(
-            "Latitud",
-            key="cliente_lat",
-            format="%.6f"
-        )
-
-    with col2:
-        lon = st.number_input(
-            "Longitud",
-            key="cliente_lon",
-            format="%.6f"
-        )
-
-    # ------------------------------------------------------
-    # GUARDAR EN CONTEXTO
-    # ------------------------------------------------------
-    ctx.datos_cliente["cliente"] = cliente.strip()
-    ctx.datos_cliente["ubicacion"] = ubicacion.strip()
-    ctx.datos_cliente["email"] = email.strip()
-
-    # 🔥 CLAVE: guardar coordenadas en ctx global
+    # guardar también global por compatibilidad
     ctx.lat = float(lat)
     ctx.lon = float(lon)
 
+    # guardar económico
+    ctx.sistema_fv["costo_usd_kwp"] = float(costo_usd_kwp)
+    ctx.sistema_fv["tcambio"] = float(tcambio)
+    ctx.sistema_fv["usa_financiamiento"] = bool(usa_financiamiento)
+    ctx.sistema_fv["prima_pct"] = float(prima_pct)
+    ctx.sistema_fv["tasa_anual"] = float(tasa_anual)
+    ctx.sistema_fv["plazo_anios"] = int(plazo_anios)
+    ctx.sistema_fv["porcentaje_financiado"] = float(porcentaje_financiado)
+
+    # compatibilidad legacy
+    ctx.costo_usd_kwp = float(costo_usd_kwp)
+    ctx.tcambio = float(tcambio)
+    ctx.prima_pct = float(prima_pct)
+    ctx.tasa_anual = float(tasa_anual)
+    ctx.plazo_anios = int(plazo_anios)
+    ctx.porcentaje_financiado = float(porcentaje_financiado)
 
 # ==========================================================
 # Validación
