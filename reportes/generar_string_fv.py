@@ -96,7 +96,6 @@ def generar_string_fv(strings, out_path, *_, **__):
     y_step = 0.98
     y_gap_inv = 0.78
 
-    total_strings = len(strings_ordenados)
     total_strings_validos = sum(
         1
         for items in grupos_inv.values()
@@ -157,7 +156,6 @@ def generar_string_fv(strings, out_path, *_, **__):
 
             y_centros_inv.append(y_mid)
 
-            # Etiqueta string real
             ax.text(
                 X_LABEL,
                 y_mid,
@@ -168,7 +166,6 @@ def generar_string_fv(strings, out_path, *_, **__):
                 weight="bold",
             )
 
-            # Texto de serie
             ax.text(
                 X_PANEL,
                 y - 0.10,
@@ -179,7 +176,6 @@ def generar_string_fv(strings, out_path, *_, **__):
                 color="#444444",
             )
 
-            # Paneles en serie
             for i in range(n):
                 x = X_PANEL + i * (panel_w + gap)
 
@@ -299,20 +295,55 @@ def generar_string_fv(strings, out_path, *_, **__):
             ax.plot(mppt_x, y_borne_pos, "o", color="red", markersize=4)
             ax.plot(mppt_x, y_borne_neg, "o", color="black", markersize=4)
 
+            # Punto de quiebre para cables a 90°
+            x_bus = mppt_x - 0.35
+
             for c in conns:
 
-                # Positivo
+                # ==============================
+                # Positivo con giros de 90°
+                # ==============================
                 ax.plot(
-                    [c["x_end"], mppt_x],
+                    [c["x_end"], x_bus],
+                    [c["y_pos"], c["y_pos"]],
+                    color="red",
+                    lw=1.55,
+                )
+
+                ax.plot(
+                    [x_bus, x_bus],
                     [c["y_pos"], y_borne_pos],
                     color="red",
                     lw=1.55,
                 )
 
-                # Negativo
                 ax.plot(
-                    [c["x_end"], mppt_x],
+                    [x_bus, mppt_x],
+                    [y_borne_pos, y_borne_pos],
+                    color="red",
+                    lw=1.55,
+                )
+
+                # ==============================
+                # Negativo con giros de 90°
+                # ==============================
+                ax.plot(
+                    [c["x_end"], x_bus],
+                    [c["y_neg"], c["y_neg"]],
+                    color="black",
+                    lw=1.55,
+                )
+
+                ax.plot(
+                    [x_bus, x_bus],
                     [c["y_neg"], y_borne_neg],
+                    color="black",
+                    lw=1.55,
+                )
+
+                ax.plot(
+                    [x_bus, mppt_x],
+                    [y_borne_neg, y_borne_neg],
                     color="black",
                     lw=1.55,
                 )
