@@ -70,19 +70,24 @@ def _leer_consumo(ctx) -> dict:
 # ======================================================
 # FINANCIAMIENTO
 # ======================================================
-
 def _leer_financiamiento(ctx) -> dict:
     """
-    Perfil financiero por defecto:
-    Crédito PyME Invierta Prendario.
+    Lee el modo financiero desde ctx.
 
-    Mantiene compatibilidad:
-    si ctx trae valores, se respetan.
-    si no trae valores, usa el banco por defecto.
+    Modos soportados:
+    - contado
+    - credito_100
+    - credito_con_prima
     """
+
+    modo_financiamiento = str(
+        _get(ctx, "modo_financiamiento", "credito_con_prima")
+        or "credito_con_prima"
+    ).strip().lower()
 
     tasa_anual = _as_float(_get(ctx, "tasa_anual", 0.195), 0.195)
     plazo_anios = _as_int(_get(ctx, "plazo_anios", 7), 7)
+
     porcentaje_financiado = _as_float(
         _get(ctx, "porcentaje_financiado", 0.90),
         0.90,
@@ -95,14 +100,61 @@ def _leer_financiamiento(ctx) -> dict:
 
     cat = _as_float(_get(ctx, "cat", 0.2196), 0.2196)
 
+    nombre_financiamiento = str(
+        _get(ctx, "nombre_financiamiento", "Crédito PyME Invierta Prendario")
+        or "Crédito PyME Invierta Prendario"
+    )
+
+    entidad_financiera = str(
+        _get(ctx, "entidad_financiera", "Banco")
+        or "Banco"
+    )
+
+    # ======================================================
+    # MODO: PAGO DE CONTADO
+    # ======================================================
+    if modo_financiamiento == "contado":
+        nombre_financiamiento = "Pago de contado"
+        entidad_financiera = "Cliente"
+        tasa_anual = 0.0
+        plazo_anios = 0
+        porcentaje_financiado = 0.0
+        prima_pct = 1.0
+        cat = 0.0
+
+    # ======================================================
+    # MODO: CRÉDITO 100%
+    # ======================================================
+    elif modo_financiamiento in ["credito_100", "credito100", "financiado_100"]:
+        modo_financiamiento = "credito_100"
+        nombre_financiamiento = "Crédito 100% financiado"
+        porcentaje_financiado = 1.0
+        prima_pct = 0.0
+
+    # ======================================================
+    # MODO: CRÉDITO CON PRIMA
+    # ======================================================
+    else:
+        modo_financiamiento = "credito_con_prima"
+
+        porcentaje_financiado = max(
+            0.0,
+            min(1.0, porcentaje_financiado)
+        )
+
+        prima_pct = max(
+            0.0,
+            min(1.0, prima_pct)
+        )
+
+        # Si el usuario no definió prima explícita, se deriva del % financiado.
+        if _get(ctx, "prima_pct", None) is None:
+            prima_pct = max(0.0, 1.0 - porcentaje_financiado)
+
     return {
-        "nombre_financiamiento": str(
-            _get(ctx, "nombre_financiamiento", "Crédito PyME Invierta Prendario")
-            or "Crédito PyME Invierta Prendario"
-        ),
-        "entidad_financiera": str(
-            _get(ctx, "entidad_financiera", "Banco") or "Banco"
-        ),
+        "modo_financiamiento": modo_financiamiento,
+        "nombre_financiamiento": nombre_financiamiento,
+        "entidad_financiera": entidad_financiera,
         "tasa_anual": tasa_anual,
         "plazo_anios": plazo_anios,
         "plazo_meses": plazo_anios * 12,
