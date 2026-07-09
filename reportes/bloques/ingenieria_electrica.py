@@ -1,3 +1,21 @@
+# -*- coding: utf-8 -*-
+# reportes/ingenieria_electrica.py
+
+from __future__ import annotations
+
+from pathlib import Path
+
+from reportlab.lib import colors
+from reportlab.lib.colors import HexColor
+from reportlab.platypus import (
+    Paragraph,
+    Spacer,
+    PageBreak,
+    Image,
+    Table,
+    TableStyle,
+)
+
 from ..secciones_tecnicas.resumen_tecnico import build_resumen_tecnico
 from ..secciones_tecnicas.tabla_strings import crear_tabla_strings
 from ..secciones_tecnicas.tabla_nec import (
@@ -8,21 +26,38 @@ from ..secciones_tecnicas.tabla_nec import (
 )
 from ..secciones_tecnicas.layout_paneles import insertar_layout_paneles
 from ..secciones_tecnicas.tabla_distribucion_strings import crear_tabla_distribucion_inversores
-from pathlib import Path
-from reportlab.platypus import (
-    Paragraph,
-    Spacer,
-    PageBreak,
-    Image,
-    Table,
-    TableStyle,
-)
 from reportes.secciones_tecnicas.conclusiones import agregar_pagina_conclusiones_ejecutivas
-from reportlab.lib import colors
-from reportlab.platypus import Table, TableStyle, Paragraph, Spacer
-from reportlab.lib.colors import HexColor
+
+
 # =========================================================
-# LECTURA SEGURA
+# CAPÍTULO 5
+# INGENIERÍA ELÉCTRICA
+# =========================================================
+# Responsabilidad:
+# - Presentar resumen técnico del sistema FV.
+# - Mostrar distribución y configuración de strings.
+# - Mostrar parámetros eléctricos.
+# - Mostrar dimensionamiento NEC.
+# - Mostrar indicadores técnicos.
+# - Mostrar caída de voltaje.
+# - Mostrar gráficas FV.
+# - Mostrar batería recomendada si existe.
+# - Mostrar optimización económica si existe.
+# - Mostrar conclusiones ejecutivas técnicas.
+# - Mostrar layout preliminar y layout gráfico.
+# - Generar y mostrar diagrama de string FV.
+#
+# Reglas de mantenimiento:
+# - No cambiar la firma de build_ingenieria_electrica().
+# - No cambiar nombres de funciones _section_*.
+# - No cambiar rutas ni claves de paths.
+# - No mover cálculos todavía.
+# - No eliminar safe_image; es compatible hacia atrás.
+# =========================================================
+
+
+# =========================================================
+# 1. UTILIDADES INTERNAS DEL CAPÍTULO
 # =========================================================
 
 def leer(obj, campo, default=None):
@@ -35,10 +70,6 @@ def leer(obj, campo, default=None):
 
     return getattr(obj, campo, default)
 
-
-# =========================================================
-# UTILIDAD GRÁFICOS
-# =========================================================
 
 def _insert_chart(story, path, styles, content_w, error_msg):
 
@@ -58,7 +89,7 @@ def _insert_chart(story, path, styles, content_w, error_msg):
 
 
 # =========================================================
-# SECCIONES
+# 2. SECCIONES TÉCNICAS PRINCIPALES
 # =========================================================
 
 def _section_resumen(story, resultado, pal, styles, content_w):
@@ -122,6 +153,22 @@ def _section_nec(story, resultado, pal, styles, content_w):
 
     story.append(Spacer(1, 12))
 
+
+def _section_indicadores(story, resultado, pal, styles, content_w):
+
+    story.append(Paragraph("Indicadores técnicos del sistema", styles["Heading2"]))
+    story.append(Spacer(1, 6))
+
+    tabla = crear_tabla_indicadores(resultado, pal, content_w)
+
+    if tabla:
+        story.append(tabla)
+    else:
+        story.append(Paragraph("No hay indicadores disponibles.", styles["BodyText"]))
+
+    story.append(Spacer(1, 12))
+
+
 def _section_caida_voltaje(story, resultado, pal, styles, content_w):
 
     story.append(
@@ -150,24 +197,245 @@ def _section_caida_voltaje(story, resultado, pal, styles, content_w):
         )
 
     story.append(Spacer(1, 12))
-    
-def _section_indicadores(story, resultado, pal, styles, content_w):
 
-    story.append(Paragraph("Indicadores técnicos del sistema", styles["Heading2"]))
+
+# =========================================================
+# 3. SECCIONES DE GRÁFICAS FV
+# =========================================================
+
+def _section_potencia_horaria(story, paths, styles, content_w):
+
+    story.append(Paragraph("Perfil horario de potencia fotovoltaica", styles["Heading2"]))
     story.append(Spacer(1, 6))
 
-    tabla = crear_tabla_indicadores(resultado, pal, content_w)
+    chart = None
 
-    if tabla:
-        story.append(tabla)
-    else:
-        story.append(Paragraph("No hay indicadores disponibles.", styles["BodyText"]))
+    if isinstance(paths, dict):
+        chart = paths.get("chart_potencia_horaria") or paths.get("chart_horaria")
+
+    _insert_chart(
+        story,
+        chart,
+        styles,
+        content_w,
+        "No se pudo generar la gráfica de potencia horaria."
+    )
+
+
+def _section_energia_horaria(story, paths, styles, content_w):
+
+    story.append(Paragraph("Energía generada por hora", styles["Heading2"]))
+    story.append(Spacer(1, 6))
+
+    chart = None
+
+    if isinstance(paths, dict):
+        chart = paths.get("chart_energia_horaria") or paths.get("chart_diaria")
+
+    _insert_chart(
+        story,
+        chart,
+        styles,
+        content_w,
+        "No se pudo generar la gráfica de energía horaria."
+    )
+
+
+def _section_demanda_vs_fv_horaria(story, paths, styles, content_w):
+
+    story.append(Paragraph("Demanda del cliente vs generación fotovoltaica", styles["Heading2"]))
+    story.append(Spacer(1, 6))
+
+    chart = None
+
+    if isinstance(paths, dict):
+        chart = paths.get("chart_demanda_vs_fv_horaria")
+
+    _insert_chart(
+        story,
+        chart,
+        styles,
+        content_w,
+        "No se pudo generar la gráfica de demanda del cliente vs generación FV."
+    )
+
+
+def _section_energia_mensual(story, paths, styles, content_w):
+
+    story.append(Paragraph("Generación fotovoltaica mensual", styles["Heading2"]))
+    story.append(Spacer(1, 6))
+
+    chart = None
+
+    if isinstance(paths, dict):
+        chart = paths.get("chart_energia_mensual") or paths.get("chart_mensual")
+
+    _insert_chart(
+        story,
+        chart,
+        styles,
+        content_w,
+        "No se pudo generar la gráfica de generación mensual."
+    )
+
+
+# =========================================================
+# 4. SECCIÓN: BATERÍA RECOMENDADA
+# =========================================================
+
+def _section_bateria(story, resultado, energia, styles):
+
+    if energia is None:
+        return
+
+    financiero = leer(resultado, "financiero", {}) or {}
+
+    if not isinstance(financiero, dict):
+        financiero = {}
+
+    bateria_optima = financiero.get("bateria_optima", {}) or {}
+    opciones_bateria = leer(energia, "opciones_bateria", []) or []
+
+    bateria_rec = opciones_bateria[0] if opciones_bateria else None
+    bateria = bateria_optima.get("resultado_bateria")
+
+    if bateria_rec is None and bateria is None:
+        return
+
+    story.append(Paragraph("Batería recomendada", styles["Heading2"]))
+    story.append(Spacer(1, 6))
+
+    data = [
+        ["Concepto", "Valor"],
+    ]
+
+    # =====================================================
+    # BATERÍA RECOMENDADA
+    # =====================================================
+    if bateria_rec is not None:
+        data.extend([
+            [
+                "Capacidad útil recomendada",
+                f"{float(leer(bateria_rec, 'capacidad_util_kwh', 0.0) or 0.0):.1f} kWh"
+            ],
+            [
+                "Potencia recomendada",
+                f"{float(leer(bateria_rec, 'potencia_max_kw', 0.0) or 0.0):.1f} kW"
+            ],
+            [
+                "Excedente FV diario estimado",
+                f"{float(leer(bateria_rec, 'excedente_diario_kwh', 0.0) or 0.0):.1f} kWh/día"
+            ],
+            [
+                "Consumo nocturno estimado",
+                f"{float(leer(bateria_rec, 'consumo_nocturno_kwh', 0.0) or 0.0):.1f} kWh/día"
+            ],
+            [
+                "Energía objetivo recuperable",
+                f"{float(leer(bateria_rec, 'energia_objetivo_kwh', 0.0) or 0.0):.1f} kWh/día"
+            ],
+        ])
+
+    # =====================================================
+    # RESULTADO DE BATERÍA ÓPTIMA
+    # =====================================================
+    bateria_ok = bool(leer(bateria, "ok", False)) if bateria is not None else False
+
+    if bateria is not None and bateria_ok:
+
+        data.extend([
+            [
+                "Capacidad batería instalada",
+                f"{float(leer(bateria_optima, 'capacidad_bateria_kwh', 0.0) or 0.0):.1f} kWh"
+            ],
+            [
+                "Potencia batería instalada",
+                f"{float(leer(bateria_optima, 'potencia_bateria_kw', 0.0) or 0.0):.1f} kW"
+            ],
+            [
+                "Compra red sin batería",
+                f"{float(leer(bateria, 'compra_red_sin_bateria_kwh', 0.0) or 0.0):.1f} kWh/día"
+            ],
+            [
+                "Compra red con batería",
+                f"{float(leer(bateria, 'compra_red_con_bateria_kwh', 0.0) or 0.0):.1f} kWh/día"
+            ],
+            [
+                "Excedente sin batería",
+                f"{float(leer(bateria, 'excedente_sin_bateria_kwh', 0.0) or 0.0):.1f} kWh/día"
+            ],
+            [
+                "Excedente con batería",
+                f"{float(leer(bateria, 'excedente_con_bateria_kwh', 0.0) or 0.0):.1f} kWh/día"
+            ],
+            [
+                "Cobertura sin batería",
+                f"{float(leer(bateria, 'cobertura_sin_bateria_pct', 0.0) or 0.0):.1f}%"
+            ],
+            [
+                "Cobertura con batería",
+                f"{float(leer(bateria, 'cobertura_con_bateria_pct', 0.0) or 0.0):.1f}%"
+            ],
+        ])
+
+    # =====================================================
+    # COSTOS DE BATERÍA
+    # =====================================================
+    capacidad_bateria = float(
+        bateria_optima.get("capacidad_bateria_kwh", 0.0) or 0.0
+    )
+
+    capex_bateria = float(
+        bateria_optima.get("capex_bateria_L", 0.0) or 0.0
+    )
+
+    if capacidad_bateria > 0:
+
+        data.extend([
+            [
+                "Capacidad batería utilizada",
+                f"{capacidad_bateria:.1f} kWh"
+            ],
+            [
+                "Costo estimado batería",
+                f"L {capex_bateria:,.0f}"
+            ],
+            [
+                "Escenario seleccionado",
+                str(bateria_optima.get("nombre", ""))
+            ],
+        ])
+
+    t = Table(
+        data,
+        colWidths=[220, 220]
+    )
+
+    t.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), HexColor("#1F4E79")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), HexColor("#FFFFFF")),
+        ("GRID", (0, 0), (-1, -1), 0.25, HexColor("#CCCCCC")),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("ALIGN", (1, 1), (1, -1), "RIGHT"),
+    ]))
+
+    story.append(t)
+    story.append(Spacer(1, 8))
+
+    story.append(
+        Paragraph(
+            "La batería mostrada corresponde al escenario financiero óptimo evaluado por el motor de optimización.",
+            styles["BodyText"]
+        )
+    )
 
     story.append(Spacer(1, 12))
 
 
-
-
+# =========================================================
+# 5. SECCIÓN: OPTIMIZACIÓN ECONÓMICA
+# =========================================================
 
 def _section_optimizacion_economica(
     story,
@@ -415,230 +683,11 @@ def _section_optimizacion_economica(
     )
 
     story.append(Spacer(1, 12))
+
+
 # =========================================================
-# GRÁFICOS FV
+# 6. SECCIÓN: LAYOUT PRELIMINAR
 # =========================================================
-
-def _section_potencia_horaria(story, paths, styles, content_w):
-
-    story.append(Paragraph("Perfil horario de potencia fotovoltaica", styles["Heading2"]))
-    story.append(Spacer(1, 6))
-
-    chart = None
-
-    if isinstance(paths, dict):
-        chart = paths.get("chart_potencia_horaria") or paths.get("chart_horaria")
-
-    _insert_chart(
-        story,
-        chart,
-        styles,
-        content_w,
-        "No se pudo generar la gráfica de potencia horaria."
-    )
-
-def _section_bateria(story, resultado, energia, styles):
-
-    if energia is None:
-        return
-
-    financiero = leer(resultado, "financiero", {}) or {}
-
-    if not isinstance(financiero, dict):
-        financiero = {}
-
-    bateria_optima = financiero.get("bateria_optima", {}) or {}
-    opciones_bateria = leer(energia, "opciones_bateria", []) or []
-
-    bateria_rec = opciones_bateria[0] if opciones_bateria else None
-    bateria = bateria_optima.get("resultado_bateria")
-
-    if bateria_rec is None and bateria is None:
-        return
-
-    story.append(Paragraph("Batería recomendada", styles["Heading2"]))
-    story.append(Spacer(1, 6))
-
-    data = [
-        ["Concepto", "Valor"],
-    ]
-
-    # =====================================================
-    # BATERÍA RECOMENDADA
-    # =====================================================
-    if bateria_rec is not None:
-        data.extend([
-            [
-                "Capacidad útil recomendada",
-                f"{float(leer(bateria_rec, 'capacidad_util_kwh', 0.0) or 0.0):.1f} kWh"
-            ],
-            [
-                "Potencia recomendada",
-                f"{float(leer(bateria_rec, 'potencia_max_kw', 0.0) or 0.0):.1f} kW"
-            ],
-            [
-                "Excedente FV diario estimado",
-                f"{float(leer(bateria_rec, 'excedente_diario_kwh', 0.0) or 0.0):.1f} kWh/día"
-            ],
-            [
-                "Consumo nocturno estimado",
-                f"{float(leer(bateria_rec, 'consumo_nocturno_kwh', 0.0) or 0.0):.1f} kWh/día"
-            ],
-            [
-                "Energía objetivo recuperable",
-                f"{float(leer(bateria_rec, 'energia_objetivo_kwh', 0.0) or 0.0):.1f} kWh/día"
-            ],
-        ])
-
-    # =====================================================
-    # RESULTADO DE BATERÍA ÓPTIMA
-    # =====================================================
-    bateria_ok = bool(leer(bateria, "ok", False)) if bateria is not None else False
-
-    if bateria is not None and bateria_ok:
-
-        data.extend([
-            [
-                "Capacidad batería instalada",
-                f"{float(leer(bateria_optima, 'capacidad_bateria_kwh', 0.0) or 0.0):.1f} kWh"
-            ],
-            [
-                "Potencia batería instalada",
-                f"{float(leer(bateria_optima, 'potencia_bateria_kw', 0.0) or 0.0):.1f} kW"
-            ],
-            [
-                "Compra red sin batería",
-                f"{float(leer(bateria, 'compra_red_sin_bateria_kwh', 0.0) or 0.0):.1f} kWh/día"
-            ],
-            [
-                "Compra red con batería",
-                f"{float(leer(bateria, 'compra_red_con_bateria_kwh', 0.0) or 0.0):.1f} kWh/día"
-            ],
-            [
-                "Excedente sin batería",
-                f"{float(leer(bateria, 'excedente_sin_bateria_kwh', 0.0) or 0.0):.1f} kWh/día"
-            ],
-            [
-                "Excedente con batería",
-                f"{float(leer(bateria, 'excedente_con_bateria_kwh', 0.0) or 0.0):.1f} kWh/día"
-            ],
-            [
-                "Cobertura sin batería",
-                f"{float(leer(bateria, 'cobertura_sin_bateria_pct', 0.0) or 0.0):.1f}%"
-            ],
-            [
-                "Cobertura con batería",
-                f"{float(leer(bateria, 'cobertura_con_bateria_pct', 0.0) or 0.0):.1f}%"
-            ],
-        ])
-
-    # =====================================================
-    # COSTOS DE BATERÍA
-    # =====================================================
-    capacidad_bateria = float(
-        bateria_optima.get("capacidad_bateria_kwh", 0.0) or 0.0
-    )
-
-    capex_bateria = float(
-        bateria_optima.get("capex_bateria_L", 0.0) or 0.0
-    )
-
-    if capacidad_bateria > 0:
-
-        data.extend([
-            [
-                "Capacidad batería utilizada",
-                f"{capacidad_bateria:.1f} kWh"
-            ],
-            [
-                "Costo estimado batería",
-                f"L {capex_bateria:,.0f}"
-            ],
-            [
-                "Escenario seleccionado",
-                str(bateria_optima.get("nombre", ""))
-            ],
-        ])
-
-    t = Table(
-        data,
-        colWidths=[220, 220]
-    )
-
-    t.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), HexColor("#1F4E79")),
-        ("TEXTCOLOR", (0, 0), (-1, 0), HexColor("#FFFFFF")),
-        ("GRID", (0, 0), (-1, -1), 0.25, HexColor("#CCCCCC")),
-        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("ALIGN", (1, 1), (1, -1), "RIGHT"),
-    ]))
-
-    story.append(t)
-    story.append(Spacer(1, 8))
-
-    story.append(
-        Paragraph(
-            "La batería mostrada corresponde al escenario financiero óptimo evaluado por el motor de optimización.",
-            styles["BodyText"]
-        )
-    )
-
-    story.append(Spacer(1, 12))
-
-def _section_energia_horaria(story, paths, styles, content_w):
-
-    story.append(Paragraph("Energía generada por hora", styles["Heading2"]))
-    story.append(Spacer(1, 6))
-
-    chart = None
-
-    if isinstance(paths, dict):
-        chart = paths.get("chart_energia_horaria") or paths.get("chart_diaria")
-
-    _insert_chart(
-        story,
-        chart,
-        styles,
-        content_w,
-        "No se pudo generar la gráfica de energía horaria."
-    )
-
-def _section_demanda_vs_fv_horaria(story, paths, styles, content_w):
-
-    story.append(Paragraph("Demanda del cliente vs generación fotovoltaica", styles["Heading2"]))
-    story.append(Spacer(1, 6))
-
-    chart = None
-
-    if isinstance(paths, dict):
-        chart = paths.get("chart_demanda_vs_fv_horaria")
-
-    _insert_chart(
-        story,
-        chart,
-        styles,
-        content_w,
-        "No se pudo generar la gráfica de demanda del cliente vs generación FV."
-    )
-
-def _section_energia_mensual(story, paths, styles, content_w):
-
-    story.append(Paragraph("Generación fotovoltaica mensual", styles["Heading2"]))
-    story.append(Spacer(1, 6))
-
-    chart = None
-
-    if isinstance(paths, dict):
-        chart = paths.get("chart_energia_mensual") or paths.get("chart_mensual")
-
-    _insert_chart(
-        story,
-        chart,
-        styles,
-        content_w,
-        "No se pudo generar la gráfica de generación mensual."
-    )
 
 def _section_layout_preliminar(story, resultado, pal, styles, content_w, paths=None):
 
@@ -724,8 +773,13 @@ def _section_layout_preliminar(story, resultado, pal, styles, content_w, paths=N
     story.append(Spacer(1, 8))
     story.append(Paragraph(nota, styles["BodyText"]))
     story.append(Spacer(1, 12))
+
+
 # =========================================================
-# PAGE 5
+# 7. ORQUESTADOR DEL CAPÍTULO
+# =========================================================
+# Esta función es llamada desde BLOQUES_REPORTE.
+# Mantener firma por compatibilidad.
 # =========================================================
 
 def build_ingenieria_electrica(resultado, datos, paths, pal, styles, content_w, safe_image=None):
@@ -735,9 +789,9 @@ def build_ingenieria_electrica(resultado, datos, paths, pal, styles, content_w, 
     resultado = resultado or {}
     paths = paths or {}
 
-    # =========================================================
-    # OBTENER STRINGS (CORRECTO)
-    # =========================================================
+    # =====================================================
+    # 7.1 OBTENER STRINGS
+    # =====================================================
     paneles = leer(resultado, "paneles", None)
 
     if paneles and hasattr(paneles, "strings") and paneles.strings:
@@ -745,10 +799,11 @@ def build_ingenieria_electrica(resultado, datos, paths, pal, styles, content_w, 
     else:
         strings = []
 
-    # =========================================================
-    # SECCIONES
-    # =========================================================
+    # =====================================================
+    # 7.2 SECCIONES DEL CAPÍTULO
+    # =====================================================
     energia = leer(resultado, "energia", None)
+
     _section_resumen(story, resultado, pal, styles, content_w)
     _section_distribucion_strings(story, strings, pal, styles, content_w)
     _section_config_strings(story, strings, pal, styles, content_w)
@@ -765,13 +820,21 @@ def build_ingenieria_electrica(resultado, datos, paths, pal, styles, content_w, 
     _section_optimizacion_economica(story, resultado, pal, styles, content_w)
     agregar_pagina_conclusiones_ejecutivas(story, styles, resultado, datos, paths=paths)
     _section_layout_preliminar(story, resultado, pal, styles, content_w, paths=paths)
-    insertar_layout_paneles(story, paths, styles, content_w, safe_image, datos.get("sistema_fv", {}) if datos else {},)
+
+    insertar_layout_paneles(
+        story,
+        paths,
+        styles,
+        content_w,
+        safe_image,
+        datos.get("sistema_fv", {}) if datos else {},
+    )
 
     story.append(PageBreak())
 
-    # =========================================================
-    # GENERAR STRING FV (CORRECTO)
-    # =========================================================
+    # =====================================================
+    # 7.3 GENERAR DIAGRAMA STRING FV
+    # =====================================================
     string_fv_path = None
 
     try:
@@ -791,9 +854,9 @@ def build_ingenieria_electrica(resultado, datos, paths, pal, styles, content_w, 
         print("Error generando string FV:", e)
         string_fv_path = None
 
-    # =========================================================
-    # MOSTRAR STRING FV
-    # =========================================================
+    # =====================================================
+    # 7.4 MOSTRAR DIAGRAMA STRING FV
+    # =====================================================
     existe_imagen = string_fv_path and Path(str(string_fv_path)).exists()
 
     if existe_imagen:
@@ -814,7 +877,6 @@ def build_ingenieria_electrica(resultado, datos, paths, pal, styles, content_w, 
 
         story.append(Spacer(1, 12))
 
-        # 🔥 TEXTO CORRECTO (NO MIENTE)
         story.append(
             Paragraph(
                 "Configuración real del generador fotovoltaico. "
@@ -839,7 +901,6 @@ def build_ingenieria_electrica(resultado, datos, paths, pal, styles, content_w, 
         story.append(Paragraph(msg, styles["BodyText"]))
         story.append(Spacer(1, 6))
 
-        # 🔥 DEBUG REAL (NO basura vieja)
         story.append(
             Paragraph(
                 f"DEBUG → strings_detectados={len(strings)}",
