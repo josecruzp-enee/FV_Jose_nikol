@@ -251,12 +251,12 @@ def construir_tabla_comparativa_inversores_pdf(
     content_w,
 ):
     """
-    Construye la tabla PDF de comparación de inversores.
+    Construye la sección PDF de comparación de inversores.
 
     Nota:
     - No calcula selección de inversores.
     - Solo presenta resultado["comparativa_inversores"].
-    - Ajuste visual seguro: mejora anchos y evita textos partidos.
+    - Muestra una opción recomendada y un resumen de alternativas.
     """
 
     elementos = []
@@ -264,10 +264,85 @@ def construir_tabla_comparativa_inversores_pdf(
     if not comparativa_inversores:
         return elementos
 
+    normal = styles["Normal"]
+
+    # ======================================================
+    # TÍTULO DE SECCIÓN
+    # ======================================================
+
     elementos.append(Paragraph("Comparativa de inversores", styles["Heading2"]))
     elementos.append(Spacer(1, 8))
 
-    normal = styles["Normal"]
+    elementos.append(
+        Paragraph(
+            "La siguiente comparativa resume las principales alternativas de inversores "
+            "evaluadas por FV Engine. La opción recomendada corresponde al resultado "
+            "seleccionado por el motor de dimensionamiento.",
+            styles["BodyText"],
+        )
+    )
+    elementos.append(Spacer(1, 10))
+
+    # ======================================================
+    # OPCIÓN RECOMENDADA
+    # ======================================================
+
+    seleccionada = comparativa_inversores[0]
+
+    estado_sel = str(seleccionada.get("estado", "") or "")
+    motivo_sel = str(seleccionada.get("motivo", "") or "")
+
+    resumen = [
+        ["Parámetro", "Valor"],
+        ["Configuración", Paragraph(str(seleccionada.get("configuracion", "") or ""), normal)],
+        ["Potencia AC total", f"{float(seleccionada.get('kw_ac_total', 0) or 0):.2f} kW"],
+        ["Relación DC/AC", f"{float(seleccionada.get('dc_ac_real', seleccionada.get('ratio_real', 0)) or 0):.2f}"],
+        ["Cantidad de inversores", str(seleccionada.get("n_inversores", ""))],
+        ["Estado", Paragraph(estado_sel.replace(" ", "&nbsp;"), normal)],
+        ["Criterio de selección", Paragraph(motivo_sel, normal)],
+    ]
+
+    tabla_resumen = Table(
+        resumen,
+        colWidths=[
+            content_w * 0.32,
+            content_w * 0.68,
+        ],
+    )
+
+    tabla_resumen.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1F4E78")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTNAME", (0, 1), (0, -1), "Helvetica-Bold"),
+
+        ("FONTSIZE", (0, 0), (-1, 0), 8),
+        ("FONTSIZE", (0, 1), (-1, -1), 8),
+
+        ("BACKGROUND", (0, 1), (-1, -1), colors.HexColor("#F4F6F8")),
+        ("GRID", (0, 0), (-1, -1), 0.25, colors.lightgrey),
+
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 6),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+    ]))
+
+    elementos.append(Paragraph("Opción recomendada", styles["Heading3"]))
+    elementos.append(Spacer(1, 6))
+    elementos.append(tabla_resumen)
+    elementos.append(Spacer(1, 12))
+
+    # ======================================================
+    # ALTERNATIVAS PRINCIPALES
+    # ======================================================
+
+    max_filas = 6
+    alternativas = comparativa_inversores[:max_filas]
+
+    elementos.append(Paragraph("Alternativas principales evaluadas", styles["Heading3"]))
+    elementos.append(Spacer(1, 6))
 
     data = [[
         "Op.",
@@ -276,10 +351,9 @@ def construir_tabla_comparativa_inversores_pdf(
         "DC/AC",
         "Inv.",
         "Estado",
-        "Motivo",
     ]]
 
-    for fila in comparativa_inversores:
+    for fila in alternativas:
         estado = str(fila.get("estado", "") or "")
 
         data.append([
@@ -289,48 +363,43 @@ def construir_tabla_comparativa_inversores_pdf(
             f"{float(fila.get('dc_ac_real', fila.get('ratio_real', 0)) or 0):.2f}",
             str(fila.get("n_inversores", "")),
             Paragraph(estado.replace(" ", "&nbsp;"), normal),
-            Paragraph(str(fila.get("motivo", "") or ""), normal),
         ])
 
     tabla_pdf = Table(
         data,
         colWidths=[
-            content_w * 0.055,  # Op.
-            content_w * 0.255,  # Configuración
-            content_w * 0.095,  # kW AC
-            content_w * 0.085,  # DC/AC
-            content_w * 0.070,  # Inv.
-            content_w * 0.145,  # Estado
-            content_w * 0.295,  # Motivo
+            content_w * 0.07,
+            content_w * 0.38,
+            content_w * 0.13,
+            content_w * 0.12,
+            content_w * 0.10,
+            content_w * 0.20,
         ],
         repeatRows=1,
     )
 
-    estilo = TableStyle([
+    tabla_pdf.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1F4E78")),
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
         ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
 
-        ("FONTSIZE", (0, 0), (-1, 0), 6.2),
-        ("FONTSIZE", (0, 1), (-1, -1), 5.4),
+        ("FONTSIZE", (0, 0), (-1, 0), 7),
+        ("FONTSIZE", (0, 1), (-1, -1), 7),
 
         ("ALIGN", (0, 0), (-1, 0), "CENTER"),
         ("ALIGN", (0, 1), (0, -1), "CENTER"),
         ("ALIGN", (2, 1), (5, -1), "CENTER"),
-        ("ALIGN", (6, 1), (6, -1), "LEFT"),
 
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
         ("GRID", (0, 0), (-1, -1), 0.25, colors.lightgrey),
 
-        ("TOPPADDING", (0, 0), (-1, -1), 3),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
-        ("LEFTPADDING", (0, 0), (-1, -1), 3),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 3),
-    ])
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ("LEFTPADDING", (0, 0), (-1, -1), 4),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+    ]))
 
-    tabla_pdf.setStyle(estilo)
-
-    for i, fila in enumerate(comparativa_inversores, start=1):
+    for i, fila in enumerate(alternativas, start=1):
         if str(fila.get("estado", "") or "").upper() == "ÓPTIMO":
             tabla_pdf.setStyle(TableStyle([
                 ("BACKGROUND", (0, i), (-1, i), colors.HexColor("#D9EAD3")),
@@ -338,7 +407,24 @@ def construir_tabla_comparativa_inversores_pdf(
             ]))
 
     elementos.append(tabla_pdf)
-    elementos.append(Spacer(1, 16))
+    elementos.append(Spacer(1, 8))
+
+    # ======================================================
+    # NOTA TÉCNICA
+    # ======================================================
+
+    total_opciones = len(comparativa_inversores)
+
+    if total_opciones > max_filas:
+        elementos.append(
+            Paragraph(
+                f"Nota técnica: FV Engine evaluó {total_opciones} configuraciones posibles "
+                f"de inversores. Para facilitar la lectura del informe, esta sección muestra "
+                f"únicamente las {max_filas} alternativas principales.",
+                styles["Italic"],
+            )
+        )
+        elementos.append(Spacer(1, 12))
 
     return elementos
 
