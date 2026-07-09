@@ -160,19 +160,8 @@ def build_analisis_financiero(
 
     story: List[Any] = []
 
-    # =====================================================
-    # 3.1 TÍTULO DEL CAPÍTULO
-    # =====================================================
-    story.append(
-        Paragraph("Financiamiento — Evolución del Préstamo", styles["Title"])
-    )
-    story.append(Spacer(1, 10))
-
-    # =====================================================
-    # 3.2 LECTURA SEGURA DE DATOS FINANCIEROS
-    # =====================================================
-
     financiero = leer(resultado, "financiero", {}) or {}
+    sistema_fv = get_field(datos, "sistema_fv", {}) or {}
 
     capex = float(leer(financiero, "capex_L", 0.0))
 
@@ -188,10 +177,21 @@ def build_analisis_financiero(
         leer(
             financiero,
             "porcentaje_financiado",
-            get_field(datos, "porcentaje_financiado", 1.0),
+            sistema_fv.get(
+                "porcentaje_financiado",
+                get_field(datos, "porcentaje_financiado", 1.0),
+            ),
         )
     )
     pct_fin = max(0.0, min(1.0, pct_fin))
+
+    usa_financiamiento = bool(
+        leer(
+            financiero,
+            "usa_financiamiento",
+            sistema_fv.get("usa_financiamiento", pct_fin > 0),
+        )
+    )
 
     prima_pct = float(
         leer(
@@ -221,7 +221,10 @@ def build_analisis_financiero(
         leer(
             financiero,
             "tasa_anual",
-            get_field(datos, "tasa_anual", 0.0),
+            sistema_fv.get(
+                "tasa_anual",
+                get_field(datos, "tasa_anual", 0.0),
+            ),
         )
     )
 
@@ -231,7 +234,10 @@ def build_analisis_financiero(
         leer(
             financiero,
             "plazo_anios",
-            get_field(datos, "plazo_anios", 10),
+            sistema_fv.get(
+                "plazo_anios",
+                get_field(datos, "plazo_anios", 0),
+            ),
         )
     )
 
@@ -247,7 +253,7 @@ def build_analisis_financiero(
         leer(
             financiero,
             "nombre_financiamiento",
-            "Financiamiento seleccionado",
+            "Financiamiento seleccionado" if usa_financiamiento else "Pago de contado",
         )
     )
 
@@ -268,8 +274,42 @@ def build_analisis_financiero(
     )
 
     # =====================================================
-    # 3.3 TABLA DEL MOTOR O FALLBACK DE AMORTIZACIÓN
+    # CASO 1: PAGO DE CONTADO
     # =====================================================
+
+    if (not usa_financiamiento) or principal <= 0 or pct_fin <= 0:
+
+        story.append(
+            Paragraph("Análisis económico — Pago de contado", styles["Title"])
+        )
+        story.append(Spacer(1, 10))
+
+        nota = (
+            "<b>Lectura ejecutiva</b><br/>"
+            f"• Modalidad de pago: <b>Contado</b><br/>"
+            f"• CAPEX total estimado: <b>{money_L(capex)}</b><br/>"
+            "• Monto financiado: <b>L 0.00</b><br/>"
+            "• Este escenario no contempla préstamo bancario, "
+            "por lo que no aplica prima financiera, cuota mensual, "
+            "plazo, tasa de interés, amortización ni DSCR asociado a deuda."
+        )
+
+        if nota_financiamiento:
+            nota += f"<br/><br/><i>{nota_financiamiento}</i>"
+
+        story.append(box_paragraph(nota, pal, content_w, font_size=10))
+        story.append(PageBreak())
+
+        return story
+
+    # =====================================================
+    # CASO 2: FINANCIAMIENTO
+    # =====================================================
+
+    story.append(
+        Paragraph("Financiamiento — Evolución del Préstamo", styles["Title"])
+    )
+    story.append(Spacer(1, 10))
 
     anual = leer(financiero, "tabla_amortizacion", [])
 
@@ -281,10 +321,6 @@ def build_analisis_financiero(
             plazo_anios=plazo_anios,
             plazo_meses=plazo_meses,
         )
-
-    # =====================================================
-    # 3.4 TABLA PDF DE AMORTIZACIÓN
-    # =====================================================
 
     header = [
         "Año",
@@ -337,10 +373,6 @@ def build_analisis_financiero(
 
     story.append(t)
     story.append(Spacer(1, 10))
-
-    # =====================================================
-    # 3.5 LECTURA EJECUTIVA DEL FINANCIAMIENTO
-    # =====================================================
 
     saldo_ultimo = principal
 
