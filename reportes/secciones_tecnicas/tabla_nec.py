@@ -5,15 +5,71 @@ from reportlab.platypus import Table, TableStyle
 
 
 # ==========================================================
+# TABLAS NEC / INGENIERÍA ELÉCTRICA
+# ==========================================================
+# Responsabilidad:
+# - Presentar parámetros eléctricos.
+# - Presentar dimensionamiento NEC.
+# - Presentar indicadores técnicos.
+# - Presentar análisis de caída de voltaje.
+#
+# Este módulo NO calcula corrientes.
+# Este módulo NO selecciona conductores.
+# Este módulo NO define protecciones.
+# Solo presenta resultados ya calculados.
+# ==========================================================
+
+
+# ==========================================================
+# UTILIDADES INTERNAS
+# ==========================================================
+
+def _tabla_sin_datos(mensaje):
+    tbl = Table([[mensaje]])
+    return tbl
+
+
+def _aplicar_estilo_tabla(
+    tbl,
+    pal,
+    font_size=9,
+    header_size=9,
+    align_numeric_from_col=1,
+):
+    tbl.setStyle(TableStyle([
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("BACKGROUND", (0, 0), (-1, 0), pal["SOFT"]),
+        ("TEXTCOLOR", (0, 0), (-1, 0), pal["PRIMARY"]),
+
+        ("ALIGN", (0, 0), (-1, 0), "CENTER"),
+        ("ALIGN", (align_numeric_from_col, 1), (-1, -1), "RIGHT"),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+
+        ("GRID", (0, 0), (-1, -1), 0.3, pal["BORDER"]),
+
+        ("FONTSIZE", (0, 0), (-1, 0), header_size),
+        ("FONTSIZE", (0, 1), (-1, -1), font_size),
+
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ("LEFTPADDING", (0, 0), (-1, -1), 3),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 3),
+    ]))
+
+    return tbl
+
+
+# ==========================================================
 # TABLA 1 — PARÁMETROS ELÉCTRICOS
 # ==========================================================
+
 def crear_tabla_parametros_electricos(resultado, pal, content_w):
 
     electrical = getattr(resultado, "electrical", None)
     corr = getattr(electrical, "corrientes", None) if electrical else None
 
     if corr is None:
-        return Table([["SIN DATOS ELÉCTRICOS"]])
+        return _tabla_sin_datos("SIN DATOS ELÉCTRICOS")
 
     def leer(nivel):
         d = getattr(corr, nivel, None)
@@ -31,7 +87,7 @@ def crear_tabla_parametros_electricos(resultado, pal, content_w):
     dc_nom, dc_dis = leer("dc_total")
     ac_nom, ac_dis = leer("ac")
     ac_inv_nom, ac_inv_dis = leer("ac_inversor")
-    
+
     rows = [
         ["Nivel", "Corriente operación (A)", "Corriente diseño (A)"],
         ["Panel", panel_nom, panel_dis],
@@ -42,25 +98,31 @@ def crear_tabla_parametros_electricos(resultado, pal, content_w):
         ["AC total del sistema", ac_nom, ac_dis],
     ]
 
-    colw = [content_w * 0.4, content_w * 0.3, content_w * 0.3]
+    colw = [
+        content_w * 0.40,
+        content_w * 0.30,
+        content_w * 0.30,
+    ]
 
-    tbl = Table(rows, colWidths=colw)
+    tbl = Table(
+        rows,
+        colWidths=colw,
+        repeatRows=1,
+    )
 
-    tbl.setStyle(TableStyle([
-        ("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),
-        ("BACKGROUND",(0,0),(-1,0),pal["SOFT"]),
-        ("TEXTCOLOR",(0,0),(-1,0),pal["PRIMARY"]),
-        ("ALIGN",(1,1),(-1,-1),"RIGHT"),
-        ("GRID",(0,0),(-1,-1),0.3,pal["BORDER"]),
-        ("FONTSIZE",(0,0),(-1,-1),10),
-    ]))
-
-    return tbl
+    return _aplicar_estilo_tabla(
+        tbl,
+        pal,
+        font_size=9,
+        header_size=9,
+        align_numeric_from_col=1,
+    )
 
 
 # ==========================================================
-# TABLA 2 — DIMENSIONAMIENTO ELÉCTRICO
+# TABLA 2 — DIMENSIONAMIENTO ELÉCTRICO NEC
 # ==========================================================
+
 def crear_tabla_dimensionamiento_nec(resultado, pal, content_w):
 
     electrical = getattr(resultado, "electrical", None)
@@ -70,7 +132,7 @@ def crear_tabla_dimensionamiento_nec(resultado, pal, content_w):
     conductores = getattr(electrical, "conductores", None) if electrical else None
 
     if corr is None:
-        return Table([["SIN DATOS ELÉCTRICOS"]])
+        return _tabla_sin_datos("SIN DATOS ELÉCTRICOS")
 
     # ======================================================
     # CONDUCTORES
@@ -86,10 +148,10 @@ def crear_tabla_dimensionamiento_nec(resultado, pal, content_w):
     cond_ac_principal = "—"
 
     for t in dc_mppt:
-        cond_dc = f'{getattr(t, "calibre", "—")} {getattr(t, "material", "")}'
+        cond_dc = f'{getattr(t, "calibre", "—")} {getattr(t, "material", "")}'.strip()
 
     if ac_principal:
-        cond_ac_principal = f'{getattr(ac_principal, "calibre", "—")} {getattr(ac_principal, "material", "")}'
+        cond_ac_principal = f'{getattr(ac_principal, "calibre", "—")} {getattr(ac_principal, "material", "")}'.strip()
 
     # ======================================================
     # PROTECCIONES
@@ -132,7 +194,7 @@ def crear_tabla_dimensionamiento_nec(resultado, pal, content_w):
             i_op,
             i_dis,
             prot_txt,
-            cond_txt
+            cond_txt,
         ])
 
     # ======================================================
@@ -149,7 +211,7 @@ def crear_tabla_dimensionamiento_nec(resultado, pal, content_w):
             c = ac_inversores[idx] if idx < len(ac_inversores) else None
 
             cond_txt = (
-                f'{getattr(c, "calibre", "—")} {getattr(c, "material", "")}'
+                f'{getattr(c, "calibre", "—")} {getattr(c, "material", "")}'.strip()
                 if c else "—"
             )
 
@@ -160,10 +222,11 @@ def crear_tabla_dimensionamiento_nec(resultado, pal, content_w):
                 f"{getattr(inv_corr, 'i_operacion_a', 0):.2f}",
                 f"{getattr(inv_corr, 'i_diseno_a', 0):.2f}",
                 prot_txt,
-                cond_txt
+                cond_txt,
             ])
 
     else:
+
         d = getattr(corr, "ac_inversor", None)
 
         rows.append([
@@ -189,29 +252,32 @@ def crear_tabla_dimensionamiento_nec(resultado, pal, content_w):
     ])
 
     colw = [
-        content_w * 0.22,
-        content_w * 0.18,
-        content_w * 0.18,
+        content_w * 0.24,
+        content_w * 0.17,
+        content_w * 0.17,
         content_w * 0.20,
         content_w * 0.22,
     ]
 
-    tbl = Table(rows, colWidths=colw)
+    tbl = Table(
+        rows,
+        colWidths=colw,
+        repeatRows=1,
+    )
 
-    tbl.setStyle(TableStyle([
-        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-        ("BACKGROUND", (0, 0), (-1, 0), pal["SOFT"]),
-        ("TEXTCOLOR", (0, 0), (-1, 0), pal["PRIMARY"]),
-        ("ALIGN", (1, 1), (2, -1), "RIGHT"),
-        ("GRID", (0, 0), (-1, -1), 0.3, pal["BORDER"]),
-        ("FONTSIZE", (0, 0), (-1, -1), 10),
-    ]))
+    return _aplicar_estilo_tabla(
+        tbl,
+        pal,
+        font_size=8.5,
+        header_size=8.5,
+        align_numeric_from_col=1,
+    )
 
-    return tbl
 
 # ==========================================================
 # TABLA 3 — INDICADORES TÉCNICOS
 # ==========================================================
+
 def crear_tabla_indicadores(resultado, pal, content_w):
 
     sizing = getattr(resultado, "sizing", None)
@@ -257,7 +323,6 @@ def crear_tabla_indicadores(resultado, pal, content_w):
 
     # ======================================================
     # POTENCIA DC REAL
-    # Fuente prioritaria: strings reales + panel real
     # ======================================================
 
     if paneles_en_strings > 0 and panel_wp > 0:
@@ -319,22 +384,25 @@ def crear_tabla_indicadores(resultado, pal, content_w):
         content_w * 0.45,
     ]
 
-    tbl = Table(rows, colWidths=colw)
+    tbl = Table(
+        rows,
+        colWidths=colw,
+        repeatRows=1,
+    )
 
-    tbl.setStyle(TableStyle([
-        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-        ("BACKGROUND", (0, 0), (-1, 0), pal["SOFT"]),
-        ("TEXTCOLOR", (0, 0), (-1, 0), pal["PRIMARY"]),
-        ("ALIGN", (1, 1), (1, -1), "RIGHT"),
-        ("GRID", (0, 0), (-1, -1), 0.3, pal["BORDER"]),
-        ("FONTSIZE", (0, 0), (-1, -1), 10),
-    ]))
+    return _aplicar_estilo_tabla(
+        tbl,
+        pal,
+        font_size=9,
+        header_size=9,
+        align_numeric_from_col=1,
+    )
 
-    return tbl
 
 # ==========================================================
 # TABLA 4 — ANÁLISIS DE CAÍDA DE VOLTAJE
 # ==========================================================
+
 def crear_tabla_caida_voltaje(resultado, pal, content_w):
 
     electrical = getattr(resultado, "electrical", None)
@@ -343,23 +411,21 @@ def crear_tabla_caida_voltaje(resultado, pal, content_w):
     tramos = getattr(conductores, "tramos", None) if conductores else None
 
     if tramos is None:
-        return Table([["SIN DATOS DE CAÍDA DE VOLTAJE"]])
+        return _tabla_sin_datos("SIN DATOS DE CAÍDA DE VOLTAJE")
 
     dc_mppt = getattr(tramos, "dc_mppt", []) or []
     ac_inversores = getattr(tramos, "ac_inversores", []) or []
     ac_principal = getattr(tramos, "ac_principal", None)
 
-    rows = [
-        [
-            "Circuito",
-            "Conductor",
-            "Long.",
-            "I diseño",
-            "VD",
-            "Límite",
-            "Estado",
-        ]
-    ]
+    rows = [[
+        "Circuito",
+        "Conductor",
+        "Long.",
+        "I diseño",
+        "VD",
+        "Límite",
+        "Estado",
+    ]]
 
     def nombre_legible(nombre: str) -> str:
 
@@ -405,25 +471,25 @@ def crear_tabla_caida_voltaje(resultado, pal, content_w):
         agregar_fila(ac_principal)
 
     colw = [
-        content_w * 0.19,
+        content_w * 0.20,
         content_w * 0.14,
         content_w * 0.12,
-        content_w * 0.16,
+        content_w * 0.15,
         content_w * 0.10,
         content_w * 0.12,
         content_w * 0.17,
     ]
 
-    tbl = Table(rows, colWidths=colw, repeatRows=1)
+    tbl = Table(
+        rows,
+        colWidths=colw,
+        repeatRows=1,
+    )
 
-    tbl.setStyle(TableStyle([
-        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-        ("BACKGROUND", (0, 0), (-1, 0), pal["SOFT"]),
-        ("TEXTCOLOR", (0, 0), (-1, 0), pal["PRIMARY"]),
-        ("ALIGN", (2, 1), (-1, -1), "RIGHT"),
-        ("GRID", (0, 0), (-1, -1), 0.3, pal["BORDER"]),
-        ("FONTSIZE", (0, 0), (-1, -1), 8),
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-    ]))
-
-    return tbl
+    return _aplicar_estilo_tabla(
+        tbl,
+        pal,
+        font_size=8,
+        header_size=8,
+        align_numeric_from_col=2,
+    )
