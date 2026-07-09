@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from reportlab.platypus import Paragraph, Spacer, Table, TableStyle
+from reportlab.lib import colors
 
 
 # ==========================================================
@@ -17,7 +18,7 @@ def leer(obj, campo, default=None):
 
 
 # ==========================================================
-# TABLA ESTILIZADA
+# TABLA ESTILIZADA GENERAL
 # ==========================================================
 
 def tabla(data, pal, content_w):
@@ -25,20 +26,14 @@ def tabla(data, pal, content_w):
     tbl = Table(data, colWidths=[content_w * 0.55, content_w * 0.45])
 
     tbl.setStyle(TableStyle([
-
         ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
         ("BACKGROUND", (0, 0), (-1, 0), pal["SOFT"]),
         ("TEXTCOLOR", (0, 0), (-1, 0), pal["PRIMARY"]),
-
         ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
-
         ("GRID", (0, 0), (-1, -1), 0.3, pal["BORDER"]),
-
         ("FONTSIZE", (0, 0), (-1, -1), 10),
-
         ("TOPPADDING", (0, 0), (-1, -1), 6),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-
     ]))
 
     return tbl
@@ -112,8 +107,11 @@ def obtener_datos_string(strings):
         vmp = float(leer(s, "vmp_string_v", 0))
 
         voc = float(
-            leer(s, "voc_frio_string_v",
-            leer(s, "voc_string_v", 0))
+            leer(
+                s,
+                "voc_frio_string_v",
+                leer(s, "voc_string_v", 0),
+            )
         )
 
         imp = float(leer(s, "imp_string_a", 0))
@@ -150,11 +148,13 @@ def obtener_derivados(
     panel_wp = float(panel_pmax_w or 0)
 
     if panel_wp <= 0 and n_paneles > 0:
-        panel_wp = (kwp_dc * 1000 / n_paneles)
+        panel_wp = kwp_dc * 1000 / n_paneles
 
     return potencia_inversor, relacion_dc_ac, n_paneles, 0, panel_wp, kwp_dc
+
+
 # ==========================================================
-# TABLAS
+# DATA PARA TABLAS
 # ==========================================================
 
 def data_resumen_sistema(
@@ -172,16 +172,13 @@ def data_resumen_sistema(
 
     return [
         ["Parámetro", "Valor"],
-
         ["Potencia DC instalada", f"{kwp_dc:.2f} kWp"],
         ["Potencia AC instalada", f"{kw_ac_total:.2f} kW"],
         ["Relación DC/AC", f"{relacion_dc_ac:.2f}"],
-
         ["Número de módulos", f"{paneles_usados} × {panel_wp:.0f} Wp"],
-
-        ["Número de inversores",
-         f"{n_inversores} × {potencia_inversor:.1f} kW"],
+        ["Número de inversores", f"{n_inversores} × {potencia_inversor:.1f} kW"],
     ]
+
 
 def data_generador_fv(
     *,
@@ -194,17 +191,12 @@ def data_generador_fv(
 ):
 
     return [
-
         ["Parámetro", "Valor"],
-
         ["Configuración strings", f"{n_series}S × {n_strings} strings"],
-
         ["Voltaje operativo string (Vmp)", f"{vmp:.0f} V"],
         ["Voltaje máximo en frío (Voc)", f"{voc:.0f} V"],
-
         ["Corriente por string (Imp)", f"{string_i:.2f} A"],
         ["Corriente de cortocircuito (Isc)", f"{isc:.2f} A"],
-
         ["Strings totales", n_strings],
     ]
 
@@ -212,83 +204,59 @@ def data_generador_fv(
 def data_ficha_panel(panel, panel_wp):
 
     return [
-
         ["Parámetro", "Valor"],
-
         ["Marca", leer(panel, "marca", "—")],
         ["Modelo", leer(panel, "nombre", "—")],
         ["Código", leer(panel, "codigo", "—")],
-
-        ["Potencia nominal",
-         f'{float(leer(panel, "pmax_w", panel_wp)):.0f} Wp'],
-
-        ["Voltaje máximo potencia (Vmp)",
-         f'{float(leer(panel, "vmp_v", 0)):.2f} V'],
-
-        ["Voltaje circuito abierto (Voc)",
-         f'{float(leer(panel, "voc_v", 0)):.2f} V'],
-
-        ["Corriente máxima potencia (Imp)",
-         f'{float(leer(panel, "imp_a", 0)):.2f} A'],
-
-        ["Corriente cortocircuito (Isc)",
-         f'{float(leer(panel, "isc_a", 0)):.2f} A'],
-
-        ["Coeficiente Voc",
-         f'{float(leer(panel, "coef_voc_pct_c", 0)):.2f} %/°C'],
-
-        ["Coeficiente Vmp",
-         f'{float(leer(panel, "coef_vmp_pct_c", 0)):.2f} %/°C'],
-
-        ["Coeficiente potencia",
-         f'{float(leer(panel, "coef_potencia_pct_c", 0)):.2f} %/°C'],
-
-        ["NOCT",
-         f'{float(leer(panel, "noct_c", 0)):.1f} °C'],
+        ["Potencia nominal", f'{float(leer(panel, "pmax_w", panel_wp)):.0f} Wp'],
+        ["Voltaje máximo potencia (Vmp)", f'{float(leer(panel, "vmp_v", 0)):.2f} V'],
+        ["Voltaje circuito abierto (Voc)", f'{float(leer(panel, "voc_v", 0)):.2f} V'],
+        ["Corriente máxima potencia (Imp)", f'{float(leer(panel, "imp_a", 0)):.2f} A'],
+        ["Corriente cortocircuito (Isc)", f'{float(leer(panel, "isc_a", 0)):.2f} A'],
+        ["Coeficiente Voc", f'{float(leer(panel, "coef_voc_pct_c", 0)):.2f} %/°C'],
+        ["Coeficiente Vmp", f'{float(leer(panel, "coef_vmp_pct_c", 0)):.2f} %/°C'],
+        ["Coeficiente potencia", f'{float(leer(panel, "coef_potencia_pct_c", 0)):.2f} %/°C'],
+        ["NOCT", f'{float(leer(panel, "noct_c", 0)):.1f} °C'],
     ]
 
 
 def data_ficha_inversor(inversor, kw_ac_unitario, kw_ac_total, n_inversores):
 
     return [
-
         ["Parámetro", "Valor"],
-
         ["Marca", leer(inversor, "marca", "—")],
         ["Modelo", leer(inversor, "nombre", "—")],
         ["Código", leer(inversor, "codigo", "—")],
-
-        ["Potencia AC nominal por inversor",
-         f'{float(leer(inversor, "kw_ac", kw_ac_unitario)):.2f} kW'],
-
+        ["Potencia AC nominal por inversor", f'{float(leer(inversor, "kw_ac", kw_ac_unitario)):.2f} kW'],
         ["Cantidad de inversores", n_inversores],
-
-        ["Potencia AC total",
-         f"{kw_ac_total:.2f} kW"],
-
-        ["Número de MPPT por inversor",
-         leer(inversor, "n_mppt", "—")],
-
-        ["Ventana MPPT",
-         f'{float(leer(inversor, "mppt_min_v", 0)):.0f} - '
-         f'{float(leer(inversor, "mppt_max_v", 0)):.0f} V'],
-
-        ["Voltaje DC máximo",
-         f'{float(leer(inversor, "vdc_max_v", 0)):.0f} V'],
-
-        ["Corriente máxima MPPT",
-         f'{float(leer(inversor, "imppt_max_a", 0) or 0):.2f} A'],
+        ["Potencia AC total", f"{kw_ac_total:.2f} kW"],
+        ["Número de MPPT por inversor", leer(inversor, "n_mppt", "—")],
+        [
+            "Ventana MPPT",
+            f'{float(leer(inversor, "mppt_min_v", 0)):.0f} - '
+            f'{float(leer(inversor, "mppt_max_v", 0)):.0f} V',
+        ],
+        ["Voltaje DC máximo", f'{float(leer(inversor, "vdc_max_v", 0)):.0f} V'],
+        ["Corriente máxima MPPT", f'{float(leer(inversor, "imppt_max_a", 0) or 0):.2f} A'],
     ]
 
-def construir_tabla_comparativa_inversores_pdf(comparativa_inversores, styles):
-    """
-    Construye tabla PDF de comparación de inversores.
-    Requiere resultado["comparativa_inversores"].
-    """
 
-    from reportlab.platypus import Table, TableStyle, Paragraph, Spacer
-    from reportlab.lib import colors
-    from reportlab.lib.units import cm
+# ==========================================================
+# TABLA COMPARATIVA DE INVERSORES
+# ==========================================================
+
+def construir_tabla_comparativa_inversores_pdf(
+    comparativa_inversores,
+    styles,
+    content_w,
+):
+    """
+    Construye la tabla PDF de comparación de inversores.
+
+    Nota:
+    - No calcula selección de inversores.
+    - Solo presenta resultado["comparativa_inversores"].
+    """
 
     elementos = []
 
@@ -296,70 +264,81 @@ def construir_tabla_comparativa_inversores_pdf(comparativa_inversores, styles):
         return elementos
 
     elementos.append(Paragraph("Comparativa de inversores", styles["Heading2"]))
+    elementos.append(Spacer(1, 8))
+
+    normal = styles["Normal"]
 
     data = [[
-        "Opción",
+        "Op.",
         "Configuración",
-        "kW AC total",
+        "kW AC",
         "DC/AC",
-        "N° inv.",
+        "Inv.",
         "Estado",
         "Motivo",
     ]]
 
     for fila in comparativa_inversores:
         data.append([
-            fila.get("opcion", ""),
-            fila.get("configuracion", ""),
-            f"{fila.get('kw_ac_total', 0):.2f}",
-            f"{fila.get('dc_ac_real', fila.get('ratio_real', 0)):.2f}",
-            fila.get("n_inversores", ""),
-            fila.get("estado", ""),
-            Paragraph(str(fila.get("motivo", "")), styles["Normal"]),
+            str(fila.get("opcion", "")),
+            Paragraph(str(fila.get("configuracion", "")), normal),
+            f"{float(fila.get('kw_ac_total', 0) or 0):.2f}",
+            f"{float(fila.get('dc_ac_real', fila.get('ratio_real', 0)) or 0):.2f}",
+            str(fila.get("n_inversores", "")),
+            Paragraph(str(fila.get("estado", "")), normal),
+            Paragraph(str(fila.get("motivo", "")), normal),
         ])
 
-    tabla = Table(
+    tabla_pdf = Table(
         data,
         colWidths=[
-            1.2 * cm,
-            3.0 * cm,
-            2.2 * cm,
-            1.6 * cm,
-            1.5 * cm,
-            2.2 * cm,
-            6.0 * cm,
+            content_w * 0.06,
+            content_w * 0.25,
+            content_w * 0.10,
+            content_w * 0.09,
+            content_w * 0.08,
+            content_w * 0.12,
+            content_w * 0.30,
         ],
         repeatRows=1,
     )
 
-    tabla.setStyle(TableStyle([
+    tabla_pdf.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1F4E78")),
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
         ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+
+        ("FONTSIZE", (0, 0), (-1, 0), 6),
+        ("FONTSIZE", (0, 1), (-1, -1), 5.6),
+
         ("ALIGN", (0, 0), (-1, 0), "CENTER"),
-        ("ALIGN", (0, 1), (5, -1), "CENTER"),
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("GRID", (0, 0), (-1, -1), 0.35, colors.grey),
-        ("FONTSIZE", (0, 0), (-1, -1), 7),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
-        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("ALIGN", (0, 1), (0, -1), "CENTER"),
+        ("ALIGN", (2, 1), (4, -1), "CENTER"),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+
+        ("GRID", (0, 0), (-1, -1), 0.25, colors.lightgrey),
+
+        ("TOPPADDING", (0, 0), (-1, -1), 3),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+        ("LEFTPADDING", (0, 0), (-1, -1), 3),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 3),
     ]))
 
-    # Resaltar opción óptima
     for i, fila in enumerate(comparativa_inversores, start=1):
-        if fila.get("estado") == "ÓPTIMO":
-            tabla.setStyle(TableStyle([
+        if str(fila.get("estado", "")).upper() == "ÓPTIMO":
+            tabla_pdf.setStyle(TableStyle([
                 ("BACKGROUND", (0, i), (-1, i), colors.HexColor("#D9EAD3")),
                 ("FONTNAME", (0, i), (-1, i), "Helvetica-Bold"),
             ]))
 
-    elementos.append(tabla)
-    elementos.append(Spacer(1, 10))
+    elementos.append(tabla_pdf)
+    elementos.append(Spacer(1, 16))
 
     return elementos
 
+
 # ==========================================================
-# RESUMEN TÉCNICO
+# CONSTRUCTOR PRINCIPAL DEL RESUMEN TÉCNICO
 # ==========================================================
 
 def build_resumen_tecnico(resultado, pal, styles, content_w):
@@ -367,7 +346,7 @@ def build_resumen_tecnico(resultado, pal, styles, content_w):
     story = []
 
     # ======================================================
-    # FUENTES CORRECTAS (SEGÚN TU MODELO)
+    # FUENTES
     # ======================================================
 
     sizing, paneles, corr = obtener_fuentes(resultado)
@@ -381,14 +360,10 @@ def build_resumen_tecnico(resultado, pal, styles, content_w):
     )
 
     # ======================================================
-    # STRINGS DESDE paneles
+    # STRINGS Y ARRAY
     # ======================================================
 
     strings = obtener_strings(paneles)
-
-    # ======================================================
-    # ARRAY
-    # ======================================================
 
     array = obtener_array(paneles)
     n_strings = leer(array, "n_strings_total", len(strings))
@@ -406,7 +381,7 @@ def build_resumen_tecnico(resultado, pal, styles, content_w):
     string_i = leer(leer(corr, "string", {}), "i_operacion_a", imp)
 
     # ======================================================
-    # DERIVADOS
+    # DERIVADOS DE PRESENTACIÓN
     # ======================================================
 
     panel = leer(paneles, "panel", None) if paneles else None
@@ -433,33 +408,36 @@ def build_resumen_tecnico(resultado, pal, styles, content_w):
         n_strings=n_strings,
         panel_pmax_w=panel_pmax_w,
     )
-    
+
     # ======================================================
-    # TABLA SISTEMA
+    # RESUMEN DEL SISTEMA FV
     # ======================================================
 
     story.append(Paragraph("Resumen del sistema FV", styles["Heading1"]))
     story.append(Spacer(1, 10))
 
-    story.append(tabla(
-        data_resumen_sistema(
-            kwp_dc=kwp_dc,
-            kw_ac_total=kw_ac_total,
-            relacion_dc_ac=relacion_dc_ac,
-            n_paneles=n_paneles,
-            panel_wp=panel_wp,
-            paneles_usados=paneles_usados,
-            paneles_sobrantes=paneles_sobrantes,
-            n_inversores=n_inversores,
-            potencia_inversor=potencia_inversor,
-        ),
-        pal,
-        content_w
-    ))
+    story.append(
+        tabla(
+            data_resumen_sistema(
+                kwp_dc=kwp_dc,
+                kw_ac_total=kw_ac_total,
+                relacion_dc_ac=relacion_dc_ac,
+                n_paneles=n_paneles,
+                panel_wp=panel_wp,
+                paneles_usados=paneles_usados,
+                paneles_sobrantes=paneles_sobrantes,
+                n_inversores=n_inversores,
+                potencia_inversor=potencia_inversor,
+            ),
+            pal,
+            content_w,
+        )
+    )
+
     story.append(Spacer(1, 16))
 
     # ======================================================
-    # GENERADOR FV
+    # GENERADOR FOTOVOLTAICO
     # ======================================================
 
     agregar_tabla(
@@ -523,23 +501,20 @@ def build_resumen_tecnico(resultado, pal, styles, content_w):
     comparativa_inversores = leer(
         sizing,
         "comparativa_inversores",
-        leer(resultado, "comparativa_inversores", [])
-    )
-
-    print(
-        "[DEBUG PDF] comparativa_inversores:",
-        len(comparativa_inversores)
-        if comparativa_inversores else 0
+        leer(resultado, "comparativa_inversores", []),
     )
 
     story.extend(
         construir_tabla_comparativa_inversores_pdf(
             comparativa_inversores,
             styles,
+            content_w,
         )
     )
 
     return story
+
+
 # ==========================================================
 # RESUMEN DE MANTENIMIENTO
 # ==========================================================
@@ -554,32 +529,9 @@ def build_resumen_tecnico(resultado, pal, styles, content_w):
 # - Mostrar configuración del generador FV.
 # - Mostrar ficha técnica del módulo FV.
 # - Mostrar ficha técnica del inversor.
+# - Mostrar comparativa de inversores.
 #
-# Funciones principales:
-# - build_resumen_tecnico():
-#     Orquesta la construcción del bloque completo.
-# - obtener_fuentes():
-#     Extrae sizing, paneles y corrientes.
-# - obtener_datos_sizing():
-#     Extrae potencias, número de paneles e inversores.
-# - obtener_strings():
-#     Obtiene strings desde resultado.paneles.
-# - obtener_array():
-#     Obtiene el array fotovoltaico desde resultado.paneles.
-# - obtener_datos_string():
-#     Extrae datos eléctricos del primer string.
-# - obtener_derivados():
-#     Calcula variables derivadas para presentación.
-# - data_resumen_sistema():
-#     Construye las filas del resumen del sistema.
-# - data_generador_fv():
-#     Construye las filas del generador FV.
-# - data_ficha_panel():
-#     Construye las filas de la ficha técnica del módulo.
-# - data_ficha_inversor():
-#     Construye las filas de la ficha técnica del inversor.
-#
+# Este módulo NO selecciona inversores.
 # Este módulo NO calcula ingeniería eléctrica.
-# Este módulo NO selecciona paneles ni inversores.
 # Este módulo NO calcula corrientes, conductores ni protecciones.
 # ==========================================================
