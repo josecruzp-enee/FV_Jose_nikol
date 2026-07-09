@@ -351,17 +351,30 @@ def calcular_cuota_mensual_perfil(
     perfil: Dict[str, Any],
 ) -> float:
     """
-    Nueva función compatible con perfil bancario.
-    No sustituye calcular_cuota_mensual(), solo la usa internamente.
+    Calcula cuota mensual según perfil financiero.
+
+    Si es contado o no hay monto financiado, la cuota es 0.
     """
+
+    modo = str(perfil.get("modo_financiamiento", "") or "").strip().lower()
+    pct_fin = float(perfil.get("porcentaje_financiado", 1.0) or 0.0)
+    plazo_anios = int(perfil.get("plazo_anios", 0) or 0)
+
+    if modo == "contado":
+        return 0.0
+
+    if pct_fin <= 0:
+        return 0.0
+
+    if plazo_anios <= 0:
+        return 0.0
 
     return calcular_cuota_mensual(
         capex_L_=capex_L_,
         tasa_anual=float(perfil.get("tasa_anual", 0.0) or 0.0),
-        plazo_anios=int(perfil.get("plazo_anios", 0) or 0),
-        pct_fin=float(perfil.get("porcentaje_financiado", 1.0) or 1.0),
+        plazo_anios=plazo_anios,
+        pct_fin=pct_fin,
     )
-
 
 def om_mensual(capex_L_: float, om_anual_pct: float) -> float:
     return (float(om_anual_pct) * float(capex_L_)) / 12.0
@@ -958,6 +971,7 @@ def ejecutar_finanzas(
         # Nuevas salidas financieras
         # ============================
         "financiamiento": perfil_financiamiento,
+        "modo_financiamiento": perfil_financiamiento.get("modo_financiamiento"),
         "nombre_financiamiento": perfil_financiamiento.get("nombre"),
         "entidad_financiera": perfil_financiamiento.get("entidad"),
         "nota_financiamiento": perfil_financiamiento.get("nota"),
