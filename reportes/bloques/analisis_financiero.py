@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+# reportes/analisis_financiero.py
+
 from __future__ import annotations
 
 from typing import Any, Dict, List
@@ -11,8 +14,28 @@ from reportes.helpers_pdf import (
     get_field,
     money_L,
 )
+
+
 # =========================================================
-# LECTURA SEGURA
+# CAPÍTULO 3
+# ANÁLISIS FINANCIERO
+# =========================================================
+# Responsabilidad:
+# - Presentar la evolución del préstamo.
+# - Mostrar amortización anual.
+# - Mostrar CAPEX, prima, monto financiado, tasa y plazo.
+# - Mostrar lectura ejecutiva del financiamiento.
+#
+# Reglas de mantenimiento:
+# - No cambiar la firma de build_analisis_financiero().
+# - No cambiar nombres de variables usadas por otros módulos.
+# - No mover cálculos todavía.
+# - Mantener amortizacion_anual() como fallback compatible.
+# =========================================================
+
+
+# =========================================================
+# 1. UTILIDADES INTERNAS DEL CAPÍTULO
 # =========================================================
 
 def leer(obj, campo, default=None):
@@ -27,12 +50,10 @@ def leer(obj, campo, default=None):
 
 
 # =========================================================
-# FALLBACK — amortización
+# 2. FALLBACK: AMORTIZACIÓN ANUAL
 # =========================================================
-
-# =========================================================
-# FALLBACK — amortización
-# Compatible con plazo en años o meses
+# Compatible con plazo en años o meses.
+# Se usa solo cuando financiero["tabla_amortizacion"] no existe.
 # =========================================================
 
 def amortizacion_anual(
@@ -120,9 +141,14 @@ def amortizacion_anual(
 
     return out
 
+
 # =========================================================
-# PAGE 3
+# 3. ORQUESTADOR DEL CAPÍTULO
 # =========================================================
+# Esta función es llamada desde BLOQUES_REPORTE.
+# Mantener firma por compatibilidad.
+# =========================================================
+
 def build_analisis_financiero(
     resultado: Dict[str, Any],
     datos: Any,
@@ -134,13 +160,16 @@ def build_analisis_financiero(
 
     story: List[Any] = []
 
+    # =====================================================
+    # 3.1 TÍTULO DEL CAPÍTULO
+    # =====================================================
     story.append(
         Paragraph("Financiamiento — Evolución del Préstamo", styles["Title"])
     )
     story.append(Spacer(1, 10))
 
     # =====================================================
-    # LECTURA SEGURA
+    # 3.2 LECTURA SEGURA DE DATOS FINANCIEROS
     # =====================================================
 
     financiero = leer(resultado, "financiero", {}) or {}
@@ -239,7 +268,7 @@ def build_analisis_financiero(
     )
 
     # =====================================================
-    # TABLA DEL MOTOR / FALLBACK
+    # 3.3 TABLA DEL MOTOR O FALLBACK DE AMORTIZACIÓN
     # =====================================================
 
     anual = leer(financiero, "tabla_amortizacion", [])
@@ -254,7 +283,7 @@ def build_analisis_financiero(
         )
 
     # =====================================================
-    # TABLA PDF
+    # 3.4 TABLA PDF DE AMORTIZACIÓN
     # =====================================================
 
     header = [
@@ -310,7 +339,7 @@ def build_analisis_financiero(
     story.append(Spacer(1, 10))
 
     # =====================================================
-    # LECTURA EJECUTIVA
+    # 3.5 LECTURA EJECUTIVA DEL FINANCIAMIENTO
     # =====================================================
 
     saldo_ultimo = principal
