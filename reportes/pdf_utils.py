@@ -1,3 +1,5 @@
+# reportes/pdf_utils.py
+
 from __future__ import annotations
 
 from typing import Any, Dict, List
@@ -8,7 +10,22 @@ from reportlab.platypus import Paragraph, Table, TableStyle
 
 
 # ==========================================================
-# Helpers básicos
+# PDF UTILS
+# ==========================================================
+# Responsabilidad:
+# - Centralizar componentes reutilizables del PDF.
+# - Mantener compatibilidad con capítulos existentes.
+# - Servir como capa común para tablas, cajas, barras y formatos.
+#
+# Reglas:
+# - No cambiar nombres de funciones.
+# - No cambiar firmas existentes.
+# - No eliminar helpers usados por capítulos.
+# ==========================================================
+
+
+# ==========================================================
+# 1. LECTURA SEGURA DE CAMPOS
 # ==========================================================
 
 def get_field(x: Any, key: str, default: Any = "") -> Any:
@@ -18,7 +35,31 @@ def get_field(x: Any, key: str, default: Any = "") -> Any:
 
 
 # ==========================================================
-# Section Bar
+# 2. FORMATEO DE VALORES
+# ==========================================================
+
+def money_L(x: float, dec: int = 2) -> str:
+    try:
+        x = float(x)
+    except Exception:
+        x = 0.0
+
+    fmt = f"{{:,.{dec}f}}"
+    return "L " + fmt.format(x)
+
+
+def num(x: float, dec: int = 2) -> str:
+    try:
+        x = float(x)
+    except Exception:
+        x = 0.0
+
+    fmt = f"{{:,.{dec}f}}"
+    return fmt.format(x)
+
+
+# ==========================================================
+# 3. COMPONENTE: BARRA DE SECCIÓN
 # ==========================================================
 
 def section_bar(texto: str, pal: Dict[str, Any], content_w: float):
@@ -32,6 +73,7 @@ def section_bar(texto: str, pal: Dict[str, Any], content_w: float):
 
     p = Paragraph(texto, style)
     t = Table([[p]], colWidths=[content_w])
+
     t.setStyle(
         TableStyle(
             [
@@ -42,11 +84,12 @@ def section_bar(texto: str, pal: Dict[str, Any], content_w: float):
             ]
         )
     )
+
     return t
 
 
 # ==========================================================
-# Tables base
+# 4. COMPONENTE: TABLA BASE
 # ==========================================================
 
 def make_table(
@@ -66,6 +109,10 @@ def make_table(
     return Table(data, colWidths=col_widths, repeatRows=repeatRows)
 
 
+# ==========================================================
+# 5. COMPONENTE: ESTILO UNIFORME DE TABLA
+# ==========================================================
+
 def table_style_uniform(
     pal: Dict[str, Any],
     *,
@@ -82,8 +129,10 @@ def table_style_uniform(
             ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
             ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
             ("FONTSIZE", (0, 0), (-1, 0), font_header),
+
             ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
             ("FONTSIZE", (0, 1), (-1, -1), font_body),
+
             ("GRID", (0, 0), (-1, -1), 0.6, border),
             ("BACKGROUND", (0, 1), (-1, -1), soft),
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
@@ -92,11 +141,12 @@ def table_style_uniform(
 
 
 # ==========================================================
-# Tablas 4 columnas
+# 6. COMPONENTE: TABLA DE 4 COLUMNAS
 # ==========================================================
 
 def tabla_4cols(header, rows, content_w, pal, font_header=9, font_body=9):
     data = [header] + rows
+
     t = make_table(
         data,
         content_w,
@@ -127,7 +177,7 @@ def tabla_4cols(header, rows, content_w, pal, font_header=9, font_body=9):
 
 
 # ==========================================================
-# Tablas 2 columnas
+# 7. COMPONENTE: TABLA DE 2 COLUMNAS
 # ==========================================================
 
 def tabla_2cols(
@@ -140,6 +190,7 @@ def tabla_2cols(
     font_body=9,
 ):
     data = [header] + rows
+
     t = make_table(
         data,
         content_w,
@@ -173,7 +224,7 @@ def tabla_2cols(
 
 
 # ==========================================================
-# Caja con párrafo
+# 8. COMPONENTE: CAJA DE TEXTO
 # ==========================================================
 
 def box_paragraph(
@@ -207,27 +258,3 @@ def box_paragraph(
     )
 
     return t
-
-
-# ==========================================================
-# Formateo monetario autónomo (SIN dependencias externas)
-# ==========================================================
-
-def money_L(x: float, dec: int = 2) -> str:
-    try:
-        x = float(x)
-    except Exception:
-        x = 0.0
-
-    fmt = f"{{:,.{dec}f}}"
-    return "L " + fmt.format(x)
-
-
-def num(x: float, dec: int = 2) -> str:
-    try:
-        x = float(x)
-    except Exception:
-        x = 0.0
-
-    fmt = f"{{:,.{dec}f}}"
-    return fmt.format(x)
