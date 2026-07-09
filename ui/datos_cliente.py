@@ -25,7 +25,7 @@ def render(ctx) -> None:
     sf.setdefault("cliente_nombre", "Cliente Demo")
     sf.setdefault("cliente_ubicacion", "Ciudad")
     sf.setdefault("cliente_email", "correo@demo.com")
-        st.markdown("### Escenario económico")
+    st.markdown("### Escenario económico")
 
     sf.setdefault("usa_financiamiento", True)
     sf.setdefault("costo_usd_kwp", 1200.0)
