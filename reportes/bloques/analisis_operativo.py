@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
+# reportes/analisis_operativo.py
+
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 from reportlab.platypus import Paragraph, Spacer, TableStyle, PageBreak
 
@@ -15,8 +17,27 @@ from reportes.helpers_pdf import (
 
 
 # =========================================================
-# LECTURA SEGURA
+# CAPÍTULO 4
+# ANÁLISIS OPERATIVO
 # =========================================================
+# Responsabilidad:
+# - Presentar el impacto mensual del año 1.
+# - Comparar pago actual, pago ENEE, cuota y ahorro.
+# - Mostrar configuración DC resumida si existe.
+# - Mostrar resumen eléctrico NEC si existe.
+#
+# Reglas de mantenimiento:
+# - No cambiar la firma de build_analisis_operativo().
+# - No cambiar nombres de variables usadas por otros módulos.
+# - No mover cálculos todavía.
+# - Mantener tabla_impacto_mensual_anio1() como función auxiliar.
+# =========================================================
+
+
+# =========================================================
+# 1. UTILIDADES INTERNAS DEL CAPÍTULO
+# =========================================================
+
 def leer(obj, campo, default=None):
 
     if obj is None:
@@ -29,8 +50,9 @@ def leer(obj, campo, default=None):
 
 
 # =========================================================
-# TABLA IMPACTO AÑO 1
+# 2. SECCIÓN: TABLA DE IMPACTO MENSUAL AÑO 1
 # =========================================================
+
 def tabla_impacto_mensual_anio1(resultado: Any, pal: dict, content_w: float):
 
     financiero = leer(resultado, "financiero", {}) or {}
@@ -135,8 +157,12 @@ def tabla_impacto_mensual_anio1(resultado: Any, pal: dict, content_w: float):
 
 
 # =========================================================
-# BLOQUE OPERATIVO
+# 3. ORQUESTADOR DEL CAPÍTULO
 # =========================================================
+# Esta función es llamada desde BLOQUES_REPORTE.
+# Mantener firma por compatibilidad.
+# =========================================================
+
 def build_analisis_operativo(
     resultado: Any,
     datos: Any,
@@ -148,20 +174,25 @@ def build_analisis_operativo(
 
     story = []
 
+    # =====================================================
+    # 3.1 TÍTULO DEL CAPÍTULO
+    # =====================================================
     story.append(Paragraph("Impacto energético y financiero", styles["Title"]))
     story.append(Spacer(1, 10))
 
     story.append(Paragraph("Comparación mensual — Año 1", styles["H2b"]))
     story.append(Spacer(1, 6))
 
-    # 🔥 TABLA (SIEMPRE SEGURA)
+    # =====================================================
+    # 3.2 TABLA DE IMPACTO MENSUAL
+    # =====================================================
     tabla = tabla_impacto_mensual_anio1(resultado, pal, content_w)
 
     if tabla:
         story += tabla
 
     # =====================================================
-    # CONFIGURACIÓN DC
+    # 3.3 CONFIGURACIÓN ELÉCTRICA DC
     # =====================================================
     strings_block = leer(resultado, "strings", None)
     strings = leer(strings_block, "strings", []) if strings_block else []
@@ -188,7 +219,7 @@ def build_analisis_operativo(
         story.append(Spacer(1, 8))
 
     # =====================================================
-    # RESUMEN NEC
+    # 3.4 RESUMEN ELÉCTRICO NEC
     # =====================================================
     nec_block = leer(resultado, "nec", {})
     nec_paq = leer(nec_block, "paquete_nec", {})
