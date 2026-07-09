@@ -256,6 +256,7 @@ def construir_tabla_comparativa_inversores_pdf(
     Nota:
     - No calcula selección de inversores.
     - Solo presenta resultado["comparativa_inversores"].
+    - Ajuste visual seguro: mejora anchos y evita textos partidos.
     """
 
     elementos = []
@@ -279,53 +280,58 @@ def construir_tabla_comparativa_inversores_pdf(
     ]]
 
     for fila in comparativa_inversores:
+        estado = str(fila.get("estado", "") or "")
+
         data.append([
             str(fila.get("opcion", "")),
-            Paragraph(str(fila.get("configuracion", "")), normal),
+            Paragraph(str(fila.get("configuracion", "") or ""), normal),
             f"{float(fila.get('kw_ac_total', 0) or 0):.2f}",
             f"{float(fila.get('dc_ac_real', fila.get('ratio_real', 0)) or 0):.2f}",
             str(fila.get("n_inversores", "")),
-            Paragraph(str(fila.get("estado", "")), normal),
-            Paragraph(str(fila.get("motivo", "")), normal),
+            Paragraph(estado.replace(" ", "&nbsp;"), normal),
+            Paragraph(str(fila.get("motivo", "") or ""), normal),
         ])
 
     tabla_pdf = Table(
         data,
         colWidths=[
-            content_w * 0.06,
-            content_w * 0.25,
-            content_w * 0.10,
-            content_w * 0.09,
-            content_w * 0.08,
-            content_w * 0.12,
-            content_w * 0.30,
+            content_w * 0.055,  # Op.
+            content_w * 0.255,  # Configuración
+            content_w * 0.095,  # kW AC
+            content_w * 0.085,  # DC/AC
+            content_w * 0.070,  # Inv.
+            content_w * 0.145,  # Estado
+            content_w * 0.295,  # Motivo
         ],
         repeatRows=1,
     )
 
-    tabla_pdf.setStyle(TableStyle([
+    estilo = TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1F4E78")),
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
         ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
 
-        ("FONTSIZE", (0, 0), (-1, 0), 6),
-        ("FONTSIZE", (0, 1), (-1, -1), 5.6),
+        ("FONTSIZE", (0, 0), (-1, 0), 6.2),
+        ("FONTSIZE", (0, 1), (-1, -1), 5.4),
 
         ("ALIGN", (0, 0), (-1, 0), "CENTER"),
         ("ALIGN", (0, 1), (0, -1), "CENTER"),
-        ("ALIGN", (2, 1), (4, -1), "CENTER"),
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("ALIGN", (2, 1), (5, -1), "CENTER"),
+        ("ALIGN", (6, 1), (6, -1), "LEFT"),
 
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
         ("GRID", (0, 0), (-1, -1), 0.25, colors.lightgrey),
 
         ("TOPPADDING", (0, 0), (-1, -1), 3),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
         ("LEFTPADDING", (0, 0), (-1, -1), 3),
         ("RIGHTPADDING", (0, 0), (-1, -1), 3),
-    ]))
+    ])
+
+    tabla_pdf.setStyle(estilo)
 
     for i, fila in enumerate(comparativa_inversores, start=1):
-        if str(fila.get("estado", "")).upper() == "ÓPTIMO":
+        if str(fila.get("estado", "") or "").upper() == "ÓPTIMO":
             tabla_pdf.setStyle(TableStyle([
                 ("BACKGROUND", (0, i), (-1, i), colors.HexColor("#D9EAD3")),
                 ("FONTNAME", (0, i), (-1, i), "Helvetica-Bold"),
@@ -335,7 +341,6 @@ def construir_tabla_comparativa_inversores_pdf(
     elementos.append(Spacer(1, 16))
 
     return elementos
-
 
 # ==========================================================
 # CONSTRUCTOR PRINCIPAL DEL RESUMEN TÉCNICO
