@@ -1,6 +1,9 @@
+# reportes/resumen_ejecutivo.py
+
 from __future__ import annotations
 
 from datetime import datetime
+
 from reportlab.platypus import Paragraph, Spacer, PageBreak
 from reportlab.platypus import TableStyle
 
@@ -18,7 +21,26 @@ from reportes.pdf_utils import money_L, num
 
 
 # =========================================================
-# UTILIDAD
+# CAPÍTULO 1
+# RESUMEN EJECUTIVO
+# =========================================================
+# Responsabilidad:
+# - Presentar la información principal del estudio FV.
+# - Mostrar datos del cliente.
+# - Mostrar solución propuesta.
+# - Mostrar impacto económico mensual.
+# - Mostrar conclusión ejecutiva.
+#
+# Reglas de mantenimiento:
+# - No cambiar nombres de funciones p1_* sin revisar llamadas.
+# - No cambiar la firma de build_resumen_ejecutivo().
+# - No mover cálculos todavía.
+# - No cambiar variables de entrada/salida.
+# =========================================================
+
+
+# =========================================================
+# 1. UTILIDADES INTERNAS DEL CAPÍTULO
 # =========================================================
 
 def leer(obj, campo, default=None):
@@ -50,7 +72,7 @@ def _financiero_para_pdf(financiero):
 
 
 # =========================================================
-# CLIENTE
+# 2. SECCIÓN: DATOS DEL CLIENTE Y SITUACIÓN ENERGÉTICA
 # =========================================================
 
 def p1_tabla_cliente(datos, sizing, fecha, pal, content_w):
@@ -85,7 +107,7 @@ def p1_tabla_cliente(datos, sizing, fecha, pal, content_w):
 
 
 # =========================================================
-# SOLUCIÓN
+# 3. SECCIÓN: SOLUCIÓN PROPUESTA E INDICADORES CLAVE
 # =========================================================
 
 def p1_tabla_solucion_unica(datos, sizing, energia, financiero, pal, content_w, paneles=None):
@@ -218,7 +240,7 @@ def p1_tabla_solucion_unica(datos, sizing, energia, financiero, pal, content_w, 
 
 
 # =========================================================
-# DECISIÓN
+# 4. SECCIÓN: DECISIÓN DEL CLIENTE / IMPACTO MENSUAL
 # =========================================================
 
 def p1_tabla_decision(financiero, pal, content_w):
@@ -287,7 +309,7 @@ def p1_tabla_decision(financiero, pal, content_w):
 
 
 # =========================================================
-# CONCLUSIÓN
+# 5. SECCIÓN: CONCLUSIÓN EJECUTIVA
 # =========================================================
 
 def p1_conclusion(financiero, sizing, datos, pal, content_w, paneles=None):
@@ -389,7 +411,10 @@ def p1_conclusion(financiero, sizing, datos, pal, content_w, paneles=None):
 
 
 # =========================================================
-# ORQUESTADOR
+# 6. ORQUESTADOR DEL CAPÍTULO
+# =========================================================
+# Esta función es llamada desde BLOQUES_REPORTE.
+# No cambiar su firma sin revisar generar_pdf_profesional.py.
 # =========================================================
 
 def build_resumen_ejecutivo(resultado, datos, paths, pal, styles, content_w):
@@ -406,6 +431,9 @@ def build_resumen_ejecutivo(resultado, datos, paths, pal, styles, content_w):
     story.append(Paragraph("Reporte Ejecutivo — Evaluación Fotovoltaica", styles["Title"]))
     story.append(Spacer(1, 10))
 
+    # -----------------------------------------------------
+    # Orden visual del capítulo
+    # -----------------------------------------------------
     story += p1_tabla_cliente(datos, sizing, fecha, pal, content_w)
     story += p1_tabla_solucion_unica(datos, sizing, energia, financiero, pal, content_w, paneles=paneles)
     story += p1_tabla_decision(financiero, pal, content_w)
