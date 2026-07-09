@@ -99,12 +99,35 @@ def render(ctx) -> None:
         ctx.nombre_financiamiento = "Pago de contado"
         ctx.entidad_financiera = "Cliente"
 
-    ctx.costo_usd_kwp = float(costo_usd_kwp)
-    ctx.tcambio = float(tcambio)
-    # 🔥 NUEVO: coordenadas
-    sf.setdefault("cliente_lat", 15.8)
-    sf.setdefault("cliente_lon", -87.2)
+        ctx.costo_usd_kwp = float(costo_usd_kwp)
+        ctx.tcambio = float(tcambio)
+        # 🔥 NUEVO: coordenadas
+        sf.setdefault("cliente_lat", 15.8)
+        sf.setdefault("cliente_lon", -87.2)
 
+        ctx.datos_cliente = {
+        "cliente": cliente,
+        "ubicacion": ubicacion,
+        "email": email,
+        "lat": float(sf["cliente_lat"]),
+        "lon": float(sf["cliente_lon"]),
+    }
+
+    ctx.sistema_fv["costo_usd_kwp"] = float(costo_usd_kwp)
+    ctx.sistema_fv["tcambio"] = float(tcambio)
+    
+    ctx.sistema_fv["usa_financiamiento"] = bool(sf["usa_financiamiento"])
+    ctx.sistema_fv["prima_pct"] = float(sf["prima_pct_ui"])
+
+    ctx.sistema_fv["tasa_anual"] = float(sf["tasa_anual_ui"]) / 100.0
+    ctx.sistema_fv["plazo_anios"] = int(sf["plazo_anios"])
+
+    if sf["usa_financiamiento"]:
+        ctx.sistema_fv["porcentaje_financiado"] = (
+            1.0 - float(sf["prima_pct_ui"]) / 100.0
+        )
+    else:
+        ctx.sistema_fv["porcentaje_financiado"] = 0.0
     # ------------------------------------------------------
     # INPUTS
     # ------------------------------------------------------
