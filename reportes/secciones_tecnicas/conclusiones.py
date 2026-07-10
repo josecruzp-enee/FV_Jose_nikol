@@ -637,18 +637,54 @@ def _texto_resultado_energetico(m: dict) -> str:
 
 
 def _texto_impacto_financiero(m: dict) -> str:
+    """
+    Describe el impacto financiero evitando hablar de deuda
+    cuando el escenario corresponde a pago de contado.
+    """
+
+    if _es_pago_contado(m):
+        ahorro_anual = _num(m["beneficio_neto_anual"])
+        capex = _num(m["capex"])
+
+        payback = (
+            capex / ahorro_anual
+            if capex > 0 and ahorro_anual > 0
+            else None
+        )
+
+        texto_payback = ""
+
+        if payback is not None:
+            texto_payback = (
+                f" El período simple estimado de recuperación "
+                f"de la inversión es de {payback:.1f} años."
+            )
+
+        return (
+            f"El pago energético mensual actual se estima en "
+            f"{_fmt_lps(m['pago_actual'])}. "
+            f"El proyecto fue evaluado bajo modalidad de pago de contado, "
+            f"sin cuota ni deuda financiera. Después de considerar los "
+            f"costos operativos, el ahorro neto mensual esperado es de "
+            f"{_fmt_lps(m['ahorro_mensual'])}, equivalente a "
+            f"{_fmt_lps(m['beneficio_neto_anual'])} anuales."
+            f"{texto_payback}"
+        )
+
     return (
-        f"El pago energético mensual actual se estima en {_fmt_lps(m['pago_actual'])}. "
-        f"Con el sistema FV y el financiamiento considerado, el pago total mensual proyectado "
-        f"es de aproximadamente {_fmt_lps(m['pago_total_fv'])}, incluyendo una cuota "
-        f"de financiamiento de {_fmt_lps(m['cuota'])}. "
-        f"El beneficio económico anual generado por la energía fotovoltaica "
-        f"se estima en {_fmt_lps(m['beneficio_bruto_anual'])}. "
-        f"Después de considerar el financiamiento del proyecto, "
-        f"el ahorro neto anual esperado para el cliente es de "
+        f"El pago energético mensual actual se estima en "
+        f"{_fmt_lps(m['pago_actual'])}. "
+        f"Con el sistema FV y el financiamiento considerado, el pago "
+        f"total mensual proyectado es de aproximadamente "
+        f"{_fmt_lps(m['pago_total_fv'])}, incluyendo una cuota de "
+        f"financiamiento de {_fmt_lps(m['cuota'])}. "
+        f"El beneficio económico anual generado por la energía "
+        f"fotovoltaica se estima en "
+        f"{_fmt_lps(m['beneficio_bruto_anual'])}. "
+        f"Después de considerar el financiamiento, el ahorro neto "
+        f"anual esperado es de "
         f"{_fmt_lps(m['beneficio_neto_anual'])}."
     )
-
 
 def _texto_dimensionamiento() -> str:
     return (
