@@ -29,14 +29,20 @@ PERFIL_FINANCIAMIENTO_DEFAULT = {
 }
 
 
-def obtener_perfil_financiamiento(datos: Datosproyecto | None = None) -> Dict[str, Any]:
+def obtener_perfil_financiamiento(
+    datos: Datosproyecto | None = None,
+) -> Dict[str, Any]:
     """
-    Perfil financiero centralizado.
+    Construye el perfil financiero del proyecto.
 
-    Modos soportados:
-    - contado
-    - credito_100
-    - credito_con_prima
+    Reglas:
+    - contado: prima 100%, financiamiento 0%.
+    - credito_100: prima 0%, financiamiento 100%.
+    - credito_con_prima:
+        porcentaje_financiado = 1 - prima_pct.
+
+    La prima es la fuente principal para evitar inconsistencias
+    entre prima_pct y porcentaje_financiado.
     """
 
     perfil = dict(PERFIL_FINANCIAMIENTO_DEFAULT)
@@ -46,7 +52,11 @@ def obtener_perfil_financiamiento(datos: Datosproyecto | None = None) -> Dict[st
         return perfil
 
     modo = str(
-        getattr(datos, "modo_financiamiento", "credito_con_prima")
+        getattr(
+            datos,
+            "modo_financiamiento",
+            "credito_con_prima",
+        )
         or "credito_con_prima"
     ).strip().lower()
 
@@ -54,8 +64,8 @@ def obtener_perfil_financiamiento(datos: Datosproyecto | None = None) -> Dict[st
     entidad = getattr(datos, "entidad_financiera", None)
     tasa = getattr(datos, "tasa_anual", None)
     plazo_anios = getattr(datos, "plazo_anios", None)
-    pct_fin = getattr(datos, "porcentaje_financiado", None)
-    prima_pct = getattr(datos, "prima_pct", None)
+    prima_datos = getattr(datos, "prima_pct", None)
+    pct_fin_datos = getattr(datos, "porcentaje_financiado", None)
     cat = getattr(datos, "cat", None)
 
     if nombre:
@@ -67,37 +77,20 @@ def obtener_perfil_financiamiento(datos: Datosproyecto | None = None) -> Dict[st
     try:
         if tasa is not None:
             perfil["tasa_anual"] = float(tasa)
-    except Exception:
+    except (TypeError, ValueError):
         pass
 
     try:
         if plazo_anios is not None:
             perfil["plazo_anios"] = int(plazo_anios)
             perfil["plazo_meses"] = int(plazo_anios) * 12
-    except Exception:
-        pass
-
-    try:
-        if pct_fin is not None:
-            perfil["porcentaje_financiado"] = float(pct_fin)
-    except Exception:
-        pass
-
-    try:
-        if prima_pct is not None:
-            perfil["prima_pct"] = float(prima_pct)
-        else:
-            perfil["prima_pct"] = max(
-                0.0,
-                1.0 - float(perfil["porcentaje_financiado"])
-            )
-    except Exception:
+    except (TypeError, ValueError):
         pass
 
     try:
         if cat is not None:
             perfil["cat"] = float(cat)
-    except Exception:
+    except (TypeError, ValueError):
         pass
 
     # ======================================================
@@ -113,31 +106,75 @@ def obtener_perfil_financiamiento(datos: Datosproyecto | None = None) -> Dict[st
         perfil["plazo_meses"] = 0
         perfil["prima_pct"] = 1.0
         perfil["porcentaje_financiado"] = 0.0
-        perfil["nota"] = "Proyecto evaluado bajo esquema de pago de contado, sin deuda financiera."
+        perfil["nota"] = (
+            "Proyecto evaluado bajo esquema de pago de contado, "
+            "sin deuda financiera."
+        )
+
+        return perfil
 
     # ======================================================
     # MODO: CRÉDITO 100%
     # ======================================================
-    elif modo in ["credito_100", "credito100", "financiado_100"]:
+    if modo in [
+        "credito_100",
+        "credito100",
+        "financiado_100",
+    ]:
         perfil["modo_financiamiento"] = "credito_100"
         perfil["nombre"] = "Crédito 100% financiado"
         perfil["prima_pct"] = 0.0
         perfil["porcentaje_financiado"] = 1.0
 
+        return perfil
+
     # ======================================================
     # MODO: CRÉDITO CON PRIMA
     # ======================================================
+    perfil["modo_financiamiento"] = "credito_con_prima"
+
+    # La prima tiene prioridad porque es el valor capturado
+    # directamente en la interfaz.
+    if prima_datos is not None:
+        try:
+            prima_pct = float(prima_datos)
+        except (TypeError, ValueError):
+            prima_pct = 0.10
+
+        prima_pct = max(0.0, min(1.0, prima_pct))
+        pct_fin = 1.0 - prima_pct
+
+    elif pct_fin_datos is not None:
+        try:
+            pct_fin = float(pct_fin_datos)
+        except (TypeError, ValueError):
+            pct_fin = 0.90
+
+        pct_fin = max(0.0, min(1.0, pct_fin))
+        prima_pct = 1.0 - pct_fin
+
     else:
-        perfil["modo_financiamiento"] = "credito_con_prima"
+        prima_pct = 0.10
+        pct_fin = 0.90
 
-        perfil["porcentaje_financiado"] = max(
-            0.0,
-            min(1.0, float(perfil.get("porcentaje_financiado", 0.90) or 0.90))
-        )
+    perfil["prima_pct"] = prima_pct
+    perfil["porcentaje_financiado"] = pct_fin
 
-        perfil["prima_pct"] = max(
-            0.0,
-            min(1.0, float(perfil.get("prima_pct", 0.10) or 0.10))
+    # Una prima del 100% equivale financieramente
+    # a una compra de contado.
+    if prima_pct >= 1.0:
+        perfil["modo_financiamiento"] = "contado"
+        perfil["nombre"] = "Pago de contado"
+        perfil["entidad"] = "Cliente"
+        perfil["tasa_anual"] = 0.0
+        perfil["cat"] = 0.0
+        perfil["plazo_anios"] = 0
+        perfil["plazo_meses"] = 0
+        perfil["prima_pct"] = 1.0
+        perfil["porcentaje_financiado"] = 0.0
+        perfil["nota"] = (
+            "Prima equivalente al 100% del CAPEX. "
+            "Proyecto evaluado sin deuda financiera."
         )
 
     return perfil
@@ -147,21 +184,36 @@ def calcular_detalle_financiamiento(
     capex_L_: float,
     perfil: Dict[str, Any],
 ) -> Dict[str, float]:
+    """
+    Calcula prima y monto financiado manteniendo consistencia.
+
+    No utiliza `or` porque 0.0 es un valor financiero válido.
+    """
 
     capex = float(capex_L_ or 0.0)
-    prima_pct = float(perfil.get("prima_pct", 0.0) or 0.0)
-    pct_fin = float(perfil.get("porcentaje_financiado", 1.0) or 1.0)
+
+    prima_valor = perfil.get("prima_pct", 0.0)
+
+    if prima_valor is None:
+        prima_valor = 0.0
+
+    prima_pct = max(
+        0.0,
+        min(1.0, float(prima_valor)),
+    )
+
+    # La prima determina el porcentaje financiado.
+    porcentaje_financiado = 1.0 - prima_pct
 
     prima_L = capex * prima_pct
-    monto_financiado_L = capex * pct_fin
+    monto_financiado_L = capex * porcentaje_financiado
 
     return {
         "prima_pct": prima_pct,
         "prima_L": prima_L,
-        "porcentaje_financiado": pct_fin,
+        "porcentaje_financiado": porcentaje_financiado,
         "monto_financiado_L": monto_financiado_L,
     }
-
 
 def _normalizar_energia(energia):
 
