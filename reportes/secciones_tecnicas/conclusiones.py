@@ -599,13 +599,31 @@ def clasificar_viabilidad(m: dict) -> tuple[str, str]:
 # ======================================================
 # 5. NARRATIVA EJECUTIVA
 # ======================================================
+def _texto_viabilidad(
+    m: dict,
+    estado: str,
+    criterio_estado: str,
+) -> str:
+    """
+    Genera la narrativa de viabilidad según contado o crédito.
+    """
 
-def _texto_viabilidad(m: dict, estado: str, criterio_estado: str) -> str:
+    ahorro_mensual = _fmt_lps(m["ahorro_mensual"])
+
+    if _es_pago_contado(m):
+        return (
+            f"El proyecto se clasifica como {estado}. "
+            f"{criterio_estado} "
+            f"El escenario corresponde a pago de contado, por lo que "
+            f"el indicador DSCR no aplica. El ahorro neto mensual "
+            f"estimado es de {ahorro_mensual}."
+        )
+
     return (
         f"El proyecto se clasifica como {estado}. "
         f"{criterio_estado} "
-        f"El indicador DSCR calculado es {m['dscr']:.2f}, "
-        f"con un ahorro neto mensual estimado de {_fmt_lps(m['ahorro_mensual'])}."
+        f"El indicador DSCR calculado es {_fmt_dscr(m)}, "
+        f"con un ahorro neto mensual estimado de {ahorro_mensual}."
     )
 
 
