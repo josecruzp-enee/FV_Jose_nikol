@@ -491,8 +491,16 @@ def simular_12_meses(
 # ==========================================================
 
 def _evaluacion_mensual(tabla: list, cuota: float) -> dict:
+    """
+    Evalúa el comportamiento financiero mensual.
 
-    if not tabla or len(tabla) == 0:
+    Reglas:
+    - El DSCR solo se calcula cuando existe deuda financiera.
+    - El O&M es un gasto operativo, no servicio de deuda.
+    - En pago de contado, DSCR = None.
+    """
+
+    if not tabla:
         return {
             "estado": "ERROR",
             "nota": "Tabla financiera vacía",
@@ -502,41 +510,91 @@ def _evaluacion_mensual(tabla: list, cuota: float) -> dict:
             "peor_mes": 0.0,
         }
 
-    ahorros = [x.get("ahorro_L", 0.0) for x in tabla]
-    netos = [x.get("neto_L", 0.0) for x in tabla]
-    oms = [x.get("om_L", 0.0) for x in tabla]
+    ahorros = [
+        float(x.get("ahorro_L", 0.0) or 0.0)
+        for x in tabla
+    ]
+
+    netos = [
+        float(x.get("neto_L", 0.0) or 0.0)
+        for x in tabla
+    ]
 
     ahorro_prom = sum(ahorros) / len(ahorros)
     neto_prom = sum(netos) / len(netos)
     peor_mes = min(netos)
-    om_prom = sum(oms) / len(oms)
 
-    deuda_mensual = cuota + om_prom
+    cuota_mensual = max(
+        0.0,
+        float(cuota or 0.0),
+    )
 
-    if deuda_mensual > 0:
-        dscr = ahorro_prom / deuda_mensual
-    else:
+    # ======================================================
+    # PAGO DE CONTADO — SIN SERVICIO DE DEUDA
+    # ======================================================
+
+    if cuota_mensual <= 0:
         dscr = None
 
-    if dscr is None:
-        estado = "SIN FINANCIAMIENTO"
-        nota = "Sistema evaluado sin deuda (flujo directo)."
+        if neto_prom > 0 and peor_mes >= 0:
+            estado = "VIABLE"
+            nota = (
+                "Proyecto evaluado sin deuda financiera. "
+                "El flujo neto es positivo en todos los meses."
+            )
 
-    elif dscr >= 1.20 and peor_mes >= 0:
-        estado = "VIABLE"
-        nota = "Excelente cobertura financiera. Flujo positivo en todos los meses."
+        elif neto_prom > 0:
+            estado = "VIABLE CON OBSERVACIONES"
+            nota = (
+                "Proyecto evaluado sin deuda financiera. "
+                "El flujo promedio es positivo, aunque existen "
+                "meses que requieren revisión."
+            )
 
-    elif dscr >= 1.00:
-        estado = "ACEPTABLE"
-        nota = "Sistema sostenible. Flujo cercano al equilibrio."
+        else:
+            estado = "NO VIABLE"
+            nota = (
+                "Proyecto evaluado sin deuda financiera, pero los "
+                "ahorros no cubren adecuadamente los costos operativos."
+            )
 
-    elif dscr >= 0.80:
-        estado = "MARGINAL"
-        nota = "Riesgo moderado. Algunos meses pueden ser ajustados."
+    # ======================================================
+    # PROYECTO FINANCIADO — EVALUAR DSCR
+    # ======================================================
 
     else:
-        estado = "NO VIABLE"
-        nota = "Los ahorros no cubren adecuadamente la deuda."
+        # El DSCR mide cobertura del servicio de deuda.
+        # El O&M ya está incluido en el flujo neto y no debe
+        # sumarse nuevamente al denominador.
+        dscr = ahorro_prom / cuota_mensual
+
+        if dscr >= 1.20 and neto_prom > 0 and peor_mes >= 0:
+            estado = "VIABLE"
+            nota = (
+                "Excelente cobertura financiera. "
+                "Flujo positivo en todos los meses."
+            )
+
+        elif dscr >= 1.00 and neto_prom > 0:
+            estado = "ACEPTABLE"
+            nota = (
+                "El proyecto cubre el servicio de deuda, aunque "
+                "su margen financiero debe revisarse."
+            )
+
+        elif dscr >= 0.80:
+            estado = "MARGINAL"
+            nota = (
+                "Cobertura financiera ajustada. "
+                "Algunos meses pueden presentar flujo insuficiente."
+            )
+
+        else:
+            estado = "NO VIABLE"
+            nota = (
+                "Los ahorros no cubren adecuadamente "
+                "el servicio de deuda."
+            )
 
     return {
         "estado": estado,
@@ -546,7 +604,6 @@ def _evaluacion_mensual(tabla: list, cuota: float) -> dict:
         "neto_prom": neto_prom,
         "peor_mes": peor_mes,
     }
-
 
 # ==========================================================
 # 🔵 TIR
