@@ -78,6 +78,34 @@ def _fmt_kwp(valor: Any) -> str:
 def _fmt_pct(valor: Any) -> str:
     return f"{_num(valor):,.1f}%"
 
+def _es_pago_contado(m: dict) -> bool:
+    """
+    Determina si el escenario fue evaluado sin deuda financiera.
+
+    La cuota mensual es el criterio final porque en pago de contado
+    el motor financiero devuelve cuota igual a cero.
+    """
+
+    cuota = _num(m.get("cuota", 0.0))
+
+    return cuota <= 0.000001
+
+
+def _fmt_dscr(m: dict) -> str:
+    """
+    Presenta el DSCR únicamente cuando existe financiamiento.
+    """
+
+    if _es_pago_contado(m):
+        return "No aplica"
+
+    dscr = m.get("dscr")
+
+    if dscr is None:
+        return "No disponible"
+
+    return f"{_num(dscr):.2f}"   
+
 
 # ======================================================
 # 3. EXTRACCIÓN DE MÉTRICAS
