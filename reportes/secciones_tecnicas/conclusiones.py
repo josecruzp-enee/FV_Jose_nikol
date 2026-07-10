@@ -703,30 +703,32 @@ def _texto_alcance_fisico(m: dict) -> str:
         f"accesos de mantenimiento y revisión estructural de la cubierta."
     )
 
-
 def _texto_recomendacion_final(estado: str) -> str:
     if estado == "NO RECOMENDADO":
         return (
-            "No se recomienda avanzar a ejecución bajo las condiciones financieras actuales. "
-            "Antes de continuar, se recomienda revisar CAPEX, tamaño del sistema, tasa, plazo, prima, "
-            "tarifa eléctrica aplicada y perfil horario real de demanda. Una vez ajustadas estas variables, "
-            "el proyecto debe evaluarse nuevamente."
+            "No se recomienda avanzar a ejecución bajo las condiciones "
+            "económicas actuales. Antes de continuar, se recomienda revisar "
+            "CAPEX, tamaño del sistema, tarifa eléctrica aplicada y perfil "
+            "horario real de demanda. Si existe financiamiento, también deben "
+            "revisarse la tasa, el plazo y la prima."
         )
 
     if estado == "VIABLE CON OBSERVACIONES":
         return (
-            "Se puede avanzar a una etapa de revisión técnica y financiera más detallada, "
-            "manteniendo como prioridad validar el perfil horario real de demanda, condiciones de instalación, "
-            "disponibilidad de área útil, capacidad estructural y condiciones definitivas de interconexión."
+            "Se puede avanzar a una etapa de revisión técnica y económica "
+            "más detallada. Deben validarse el perfil horario real de demanda, "
+            "el período de recuperación, las condiciones de instalación, "
+            "el área útil, la capacidad estructural y las condiciones "
+            "definitivas de interconexión."
         )
 
     return (
-        "Se recomienda avanzar con el diseño base evaluado, manteniendo como prioridad el autoconsumo "
-        "y la reducción directa de la factura eléctrica. Antes de ejecución, se recomienda validar "
-        "perfil horario real de demanda, condiciones de instalación, disponibilidad de área útil, "
-        "capacidad estructural y condiciones definitivas de interconexión."
+        "Se recomienda avanzar con el diseño base evaluado, manteniendo "
+        "como prioridad el autoconsumo y la reducción directa de la factura "
+        "eléctrica. Antes de la ejecución deben validarse el perfil horario "
+        "real de demanda, las condiciones de instalación, el área útil, "
+        "la capacidad estructural y las condiciones de interconexión."
     )
-
 
 # ======================================================
 # 6. GENERADOR DE CONTENIDO
