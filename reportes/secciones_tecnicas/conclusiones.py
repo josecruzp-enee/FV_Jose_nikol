@@ -822,7 +822,7 @@ def agregar_pagina_conclusiones_ejecutivas(story, styles, resultado, datos=None,
         ["Producción anual estimada", _fmt_kwh(m["produccion_anual"])],
         ["Cobertura energética real", _fmt_pct(m["cobertura_real"])],
         ["Ahorro neto mensual", _fmt_lps(m["ahorro_mensual"])],
-        ["DSCR", f"{m['dscr']:.2f}"],
+        ["DSCR", _fmt_dscr(m)],
         ["CAPEX estimado", _fmt_lps(m["capex"])],
     ]
 
