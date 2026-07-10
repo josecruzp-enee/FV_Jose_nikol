@@ -518,30 +518,83 @@ def extraer_metricas_conclusion(resultado: Any, datos: Any = None) -> dict:
 
 def clasificar_viabilidad(m: dict) -> tuple[str, str]:
     """
-    Devuelve estado ejecutivo y explicación corta.
+    Clasifica la viabilidad según la modalidad financiera.
+
+    - Contado: ahorro, flujo mensual y recuperación.
+    - Financiado: DSCR, ahorro neto y peor mes.
     """
 
-    dscr = m["dscr"]
-    ahorro = m["ahorro_mensual"]
-    peor_mes = m["peor_mes"]
+    ahorro = _num(m.get("ahorro_mensual", 0.0))
+    peor_mes = _num(m.get("peor_mes", 0.0))
+    capex = _num(m.get("capex", 0.0))
+    dscr = m.get("dscr")
 
-    if dscr >= 1.20 and ahorro > 0 and peor_mes >= 0:
-        return (
-            "VIABLE",
-            "El proyecto presenta capacidad financiera adecuada, ahorro neto positivo y margen de pago suficiente bajo las condiciones evaluadas.",
+    # ======================================================
+    # PAGO DE CONTADO
+    # ======================================================
+
+    if _es_pago_contado(m):
+        ahorro_anual = ahorro * 12.0
+
+        payback_anios = (
+            capex / ahorro_anual
+            if capex > 0 and ahorro_anual > 0
+            else None
         )
 
-    if dscr >= 1.00 and ahorro > 0:
+        if ahorro <= 0:
+            return (
+                "NO RECOMENDADO",
+                "El proyecto no genera ahorro neto positivo bajo "
+                "las condiciones económicas evaluadas.",
+            )
+
+        if peor_mes < 0:
+            return (
+                "VIABLE CON OBSERVACIONES",
+                "El proyecto genera ahorro promedio positivo sin deuda "
+                "financiera, aunque presenta meses con flujo ajustado.",
+            )
+
+        if payback_anios is not None and payback_anios <= 10:
+            return (
+                "VIABLE",
+                "El proyecto genera flujo neto positivo sin deuda "
+                f"financiera y recupera la inversión en aproximadamente "
+                f"{payback_anios:.1f} años.",
+            )
+
         return (
             "VIABLE CON OBSERVACIONES",
-            "El proyecto genera ahorro, pero el margen financiero debe revisarse con mayor detalle antes de comprometer financiamiento.",
+            "El proyecto genera ahorro neto positivo sin deuda financiera, "
+            "aunque el período de recuperación requiere revisión.",
+        )
+
+    # ======================================================
+    # PROYECTO FINANCIADO
+    # ======================================================
+
+    dscr_num = _num(dscr, default=0.0)
+
+    if dscr_num >= 1.20 and ahorro > 0 and peor_mes >= 0:
+        return (
+            "VIABLE",
+            "El proyecto presenta capacidad financiera adecuada, ahorro "
+            "neto positivo y margen suficiente para atender la deuda.",
+        )
+
+    if dscr_num >= 1.00 and ahorro > 0:
+        return (
+            "VIABLE CON OBSERVACIONES",
+            "El proyecto genera ahorro y cubre la deuda, pero su margen "
+            "financiero debe revisarse antes de la ejecución.",
         )
 
     return (
         "NO RECOMENDADO",
-        "El proyecto no muestra suficiente margen financiero bajo las condiciones actuales y requiere ajuste de tamaño, CAPEX o esquema de financiamiento.",
+        "Los ahorros generados no proporcionan cobertura suficiente "
+        "para atender la deuda bajo las condiciones actuales.",
     )
-
 
 # ======================================================
 # 5. NARRATIVA EJECUTIVA
