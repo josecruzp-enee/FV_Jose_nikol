@@ -87,28 +87,162 @@ def _strings_por_mppt_max(panel, inv) -> int:
 # DISTRIBUCIÓN
 # =========================================================
 
-def _distribuir(n_strings, n_inv, n_mppt, strings_por_mppt_max):
-    posiciones = []
+def _distribuir(
+    n_strings,
+    n_inv,
+    n_mppt,
+    strings_por_mppt_max,
+):
+    """
+    Distribuye los strings equilibradamente.
 
-    capacidad_total = n_inv * n_mppt * strings_por_mppt_max
+    Orden de prioridad:
+    1. Balancear strings entre inversores.
+    2. Balancear strings entre los MPPT de cada inversor.
+    3. No superar la cantidad máxima de strings por MPPT.
+
+    Ejemplo:
+        9 strings
+        3 inversores
+        2 MPPT por inversor
+        2 strings máximos por MPPT
+
+    Resultado:
+        INV 1 -> MPPT 1: 2 | MPPT 2: 1
+        INV 2 -> MPPT 1: 2 | MPPT 2: 1
+        INV 3 -> MPPT 1: 2 | MPPT 2: 1
+    """
+
+    n_strings = int(n_strings)
+    n_inv = int(n_inv)
+    n_mppt = int(n_mppt)
+    strings_por_mppt_max = int(strings_por_mppt_max)
+
+    # ======================================================
+    # VALIDACIONES
+    # ======================================================
+
+    if n_strings <= 0:
+        return []
+
+    if n_inv <= 0:
+        raise ValueError(
+            "La cantidad de inversores debe ser mayor que cero."
+        )
+
+    if n_mppt <= 0:
+        raise ValueError(
+            "La cantidad de MPPT por inversor debe ser mayor que cero."
+        )
+
+    if strings_por_mppt_max <= 0:
+        raise ValueError(
+            "La capacidad de strings por MPPT debe ser mayor que cero."
+        )
+
+    capacidad_por_inversor = (
+        n_mppt
+        * strings_por_mppt_max
+    )
+
+    capacidad_total = (
+        n_inv
+        * capacidad_por_inversor
+    )
 
     if n_strings > capacidad_total:
         raise ValueError(
             f"No hay capacidad suficiente para distribuir strings: "
-            f"{n_strings} strings > {n_inv} inversores × {n_mppt} MPPT "
-            f"× {strings_por_mppt_max} strings/MPPT = {capacidad_total} strings."
+            f"{n_strings} strings > "
+            f"{n_inv} inversores × "
+            f"{n_mppt} MPPT × "
+            f"{strings_por_mppt_max} strings/MPPT = "
+            f"{capacidad_total} strings."
         )
 
-    for inv in range(1, n_inv + 1):
-        for mppt in range(1, n_mppt + 1):
-            for _ in range(strings_por_mppt_max):
-                if len(posiciones) >= n_strings:
-                    return posiciones
+    # ======================================================
+    # BALANCE ENTRE INVERSORES
+    # ======================================================
 
-                posiciones.append((inv, mppt))
+    strings_base_por_inversor = n_strings // n_inv
+    strings_restantes = n_strings % n_inv
+
+    strings_por_inversor = []
+
+    for indice_inv in range(n_inv):
+        cantidad = strings_base_por_inversor
+
+        if indice_inv < strings_restantes:
+            cantidad += 1
+
+        if cantidad > capacidad_por_inversor:
+            raise ValueError(
+                f"El inversor {indice_inv + 1} recibiría "
+                f"{cantidad} strings, pero su capacidad máxima es "
+                f"{capacidad_por_inversor}."
+            )
+
+        strings_por_inversor.append(cantidad)
+
+    # ======================================================
+    # BALANCE ENTRE MPPT DE CADA INVERSOR
+    # ======================================================
+
+    posiciones = []
+
+    for indice_inv, cantidad_strings in enumerate(
+        strings_por_inversor,
+        start=1,
+    ):
+        conteo_mppt = [0] * n_mppt
+
+        for _ in range(cantidad_strings):
+
+            # Elegir el MPPT con menor cantidad de strings.
+            # En empate se utiliza primero el MPPT de menor número.
+            indice_mppt = min(
+                range(n_mppt),
+                key=lambda i: conteo_mppt[i],
+            )
+
+            if conteo_mppt[indice_mppt] >= strings_por_mppt_max:
+                raise ValueError(
+                    f"No hay capacidad disponible en los MPPT "
+                    f"del inversor {indice_inv}."
+                )
+
+            conteo_mppt[indice_mppt] += 1
+
+            posiciones.append(
+                (
+                    indice_inv,
+                    indice_mppt + 1,
+                )
+            )
+
+    # ======================================================
+    # VALIDACIÓN FINAL
+    # ======================================================
+
+    if len(posiciones) != n_strings:
+        raise ValueError(
+            f"Distribución incompleta: se asignaron "
+            f"{len(posiciones)} de {n_strings} strings."
+        )
+
+    conteo_final = Counter(posiciones)
+
+    if conteo_final:
+        max_paralelo = max(conteo_final.values())
+
+        if max_paralelo > strings_por_mppt_max:
+            raise ValueError(
+                f"La distribución asignó {max_paralelo} strings "
+                f"a un MPPT, superando el máximo permitido de "
+                f"{strings_por_mppt_max}."
+            )
 
     return posiciones
-
 
 def _max_strings_por_mppt_usado(posiciones) -> int:
     if not posiciones:
