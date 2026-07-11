@@ -4,7 +4,13 @@ from .resumen_ejecutivo import build_resumen_ejecutivo
 from .analisis_energetico import build_analisis_energetico
 from .analisis_financiero import build_analisis_financiero
 from .analisis_operativo import build_analisis_operativo
-from .ingenieria_electrica import build_ingenieria_electrica
+from .ingenieria_electrica import (
+    build_solucion_tecnica,
+    build_layout_fv,
+    build_operacion_fv,
+    build_conclusiones,
+    build_anexo_electrico,
+)
 
 
 # ==========================================================
@@ -20,18 +26,30 @@ from .ingenieria_electrica import build_ingenieria_electrica
 #   agregarla al final o en la posición deseada.
 # ==========================================================
 BLOQUES_REPORTE = [
-    # 1. Resumen inicial para toma de decisión
+    # 1. Resumen para decisión
     build_resumen_ejecutivo,
 
-    # 2. Producción, consumo, cobertura y balance energético
+    # 2. Conclusiones y recomendación
+    build_conclusiones,
+
+    # 3. Análisis energético
     build_analisis_energetico,
 
-    # 3. CAPEX, modalidad de pago, financiamiento y retorno
+    # 4. Evaluación económica
     build_analisis_financiero,
 
-    # 4. Factura residual y comportamiento económico mensual
+    # 5. Comportamiento mensual
     build_analisis_operativo,
 
-    # 5. Solución FV, conclusiones y anexo técnico eléctrico
-    build_ingenieria_electrica,
+    # 6. Solución técnica propuesta
+    build_solucion_tecnica,
+
+    # 7. Distribución física
+    build_layout_fv,
+
+    # 8. Operación y optimización
+    build_operacion_fv,
+
+    # 9. Respaldo técnico
+    build_anexo_electrico,
 ]
