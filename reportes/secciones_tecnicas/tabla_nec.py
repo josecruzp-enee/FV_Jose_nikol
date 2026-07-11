@@ -302,19 +302,14 @@ def crear_tabla_dimensionamiento_nec(
     # Así, corriente y conductor pertenecen al mismo MPPT.
     # ======================================================
 
+    
     tramo_mppt_critico = (
-        max(
-            dc_mppt,
-            key=lambda tramo: float(
-                getattr(
-                    tramo,
-                    "i_diseno_a",
-                    0.0,
-                )
-                or 0.0
-            ),
+        getattr(
+            tramos,
+            "dc_mppt_critico",
+            None,
         )
-        if dc_mppt
+        if tramos
         else None
     )
 
