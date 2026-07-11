@@ -429,8 +429,23 @@ def build_analisis_financiero(
     content_w: float,
 ):
 
-    params = _leer_parametros_financieros(resultado, datos)
+    params = _leer_parametros_financieros(
+        resultado,
+        datos,
+    )
 
+    # En pago de contado no se genera una página financiera
+    # independiente. El impacto económico se presenta en la
+    # comparación mensual.
+    if not params["usa_financiamiento"]:
+        return []
+
+    return _build_bloque_financiado(
+        params,
+        pal,
+        styles,
+        content_w,
+    )
     if not params["usa_financiamiento"]:
         return _build_bloque_contado(params, pal, styles, content_w)
 
