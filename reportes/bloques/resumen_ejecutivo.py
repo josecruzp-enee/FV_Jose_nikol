@@ -420,21 +420,52 @@ def p1_tabla_decision(financiero, pal, content_w):
 # 5. SECCIÓN: CONCLUSIÓN EJECUTIVA
 # =========================================================
 
-def p1_conclusion(financiero, sizing, datos, pal, content_w, paneles=None):
+def p1_conclusion(
+    financiero,
+    sizing,
+    datos,
+    pal,
+    content_w,
+    paneles=None,
+):
 
     financiero_pdf = _financiero_para_pdf(financiero)
 
-    evaluacion = leer(financiero_pdf, "evaluacion", {}) or {}
+    evaluacion = leer(
+        financiero_pdf,
+        "evaluacion",
+        {},
+    ) or {}
 
     ds_val = evaluacion.get("dscr", None)
-    ds_txt = "—" if ds_val is None else f"{ds_val:.2f}"
 
-    peor = float(evaluacion.get("peor_mes", 0.0))
+    ds_txt = (
+        "No aplica"
+        if ds_val is None
+        else f"{ds_val:.2f}"
+    )
 
-    strings = leer(paneles, "strings", []) if paneles else []
-    panel_obj = leer(paneles, "panel", None) if paneles else None
+    ahorro_minimo = float(
+        evaluacion.get("peor_mes", 0.0)
+    )
 
-    panel_wp = float(leer(panel_obj, "pmax_w", 0.0)) if panel_obj else 0.0
+    strings = (
+        leer(paneles, "strings", [])
+        if paneles
+        else []
+    )
+
+    panel_obj = (
+        leer(paneles, "panel", None)
+        if paneles
+        else None
+    )
+
+    panel_wp = (
+        float(leer(panel_obj, "pmax_w", 0.0))
+        if panel_obj
+        else 0.0
+    )
 
     n_paneles = sum(
         int(leer(s, "n_series", 0) or 0)
@@ -444,14 +475,19 @@ def p1_conclusion(financiero, sizing, datos, pal, content_w, paneles=None):
     if n_paneles > 0 and panel_wp > 0:
         kwp = n_paneles * panel_wp / 1000.0
     else:
-        kwp = float(leer(sizing, "kwp_dc", 0.0))
+        kwp = float(
+            leer(sizing, "kwp_dc", 0.0)
+        )
 
     # =====================================================
-    # IMPACTO FINANCIERO REAL
-    # Si hay batería óptima, usa tabla_12m de esa batería.
+    # IMPACTO FINANCIERO
     # =====================================================
 
-    tabla = leer(financiero_pdf, "tabla_12m", [])
+    tabla = leer(
+        financiero_pdf,
+        "tabla_12m",
+        [],
+    )
 
     if tabla:
         pago_actual = sum(
@@ -473,7 +509,11 @@ def p1_conclusion(financiero, sizing, datos, pal, content_w, paneles=None):
         leer(
             financiero_pdf,
             "cuota_mensual_L",
-            leer(financiero_pdf, "cuota_mensual", 0.0),
+            leer(
+                financiero_pdf,
+                "cuota_mensual",
+                0.0,
+            ),
         )
     )
 
@@ -481,41 +521,83 @@ def p1_conclusion(financiero, sizing, datos, pal, content_w, paneles=None):
     impacto = pago_actual - pago_total
 
     # =====================================================
-    # COBERTURA REAL
+    # COBERTURA ENERGÉTICA
     # =====================================================
 
-    consumo_12m = get_field(datos, "consumo_12m", [])
-    consumo_anual = sum(consumo_12m) if isinstance(consumo_12m, list) else 0.0
+    consumo_12m = get_field(
+        datos,
+        "consumo_12m",
+        [],
+    )
 
-    energia_real = sum(
-        float(x.get("fv_kwh", 0.0))
-        for x in tabla
-        if isinstance(x, dict)
-    ) if tabla else 0.0
+    consumo_anual = (
+        sum(consumo_12m)
+        if isinstance(consumo_12m, list)
+        else 0.0
+    )
 
-    cobertura_real = energia_real / consumo_anual if consumo_anual > 0 else 0.0
+    energia_real = (
+        sum(
+            float(x.get("fv_kwh", 0.0))
+            for x in tabla
+            if isinstance(x, dict)
+        )
+        if tabla
+        else 0.0
+    )
 
-    cobertura_obj = float(get_field(datos, "cobertura_objetivo", 0.0))
+    cobertura_real = (
+        energia_real / consumo_anual
+        if consumo_anual > 0
+        else 0.0
+    )
 
-    capacidad_bateria = float(leer(financiero_pdf, "capacidad_bateria_kwh", 0.0) or 0.0)
+    cobertura_obj = float(
+        get_field(
+            datos,
+            "cobertura_objetivo",
+            0.0,
+        )
+    )
+
+    capacidad_bateria = float(
+        leer(
+            financiero_pdf,
+            "capacidad_bateria_kwh",
+            0.0,
+        ) or 0.0
+    )
 
     linea_bateria = ""
 
     if capacidad_bateria > 0:
-        linea_bateria = f"• Batería evaluada: <b>{capacidad_bateria:.1f} kWh</b><br/>"
+        linea_bateria = (
+            f"• Batería evaluada: "
+            f"<b>{capacidad_bateria:.1f} kWh</b><br/>"
+        )
 
     concl = f"""
     <b>Conclusión ejecutiva</b><br/><br/>
-    • Impacto financiero: <b>{money_L(impacto)}/mes</b><br/>
+    • Reducción mensual estimada:
+      <b>{money_L(impacto)}/mes</b><br/>
+    • Ahorro mínimo mensual estimado:
+      <b>{money_L(ahorro_minimo)}</b><br/>
     • DSCR: <b>{ds_txt}</b><br/>
-    • Peor mes: <b>{money_L(peor)}</b><br/>
-    • Sistema: {kwp:.2f} kWp<br/>
+    • Sistema propuesto: <b>{kwp:.2f} kWp</b><br/>
     {linea_bateria}
-    • Cobertura objetivo: {cobertura_obj * 100:.0f}%<br/>
-    • Cobertura real: <b>{cobertura_real * 100:.1f}%</b><br/>
+    • Cobertura solicitada:
+      {cobertura_obj * 100:.0f}%<br/>
+    • Cobertura recomendada:
+      <b>{cobertura_real * 100:.1f}%</b><br/>
     """
 
-    return [box_paragraph(concl, pal, content_w)]
+    return [
+        box_paragraph(
+            concl,
+            pal,
+            content_w,
+        )
+    ]
 
 
 # =========================================================
