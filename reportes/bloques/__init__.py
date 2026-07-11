@@ -19,7 +19,6 @@ from .ingenieria_electrica import build_ingenieria_electrica
 # - Para agregar una nueva sección, importar su build_* y
 #   agregarla al final o en la posición deseada.
 # ==========================================================
-
 BLOQUES_REPORTE = [
     # 1. Resumen inicial para toma de decisión
     build_resumen_ejecutivo,
@@ -27,12 +26,12 @@ BLOQUES_REPORTE = [
     # 2. Producción, consumo, cobertura y balance energético
     build_analisis_energetico,
 
-    # 3. Operación, factura residual y comportamiento mensual
-    build_analisis_operativo,
-
-    # 4. CAPEX, reducción económica, financiamiento y retorno
+    # 3. CAPEX, modalidad de pago, financiamiento y retorno
     build_analisis_financiero,
 
-    # 5. Diseño eléctrico, equipos, strings y anexos técnicos
+    # 4. Factura residual y comportamiento económico mensual
+    build_analisis_operativo,
+
+    # 5. Solución FV, conclusiones y anexo técnico eléctrico
     build_ingenieria_electrica,
 ]
