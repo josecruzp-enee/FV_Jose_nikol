@@ -75,7 +75,7 @@ def tabla_impacto_mensual_anio1(
         header = [
             "Mes",
             "Pago actual",
-            "Pago con FV",
+            "Pago a ENEE con FV",
             "Ahorro mes",
             "Ahorro acumulado",
         ]
