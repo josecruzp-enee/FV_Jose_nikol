@@ -356,20 +356,46 @@ def p1_tabla_decision(financiero, pal, content_w):
     pago_total = pago_residual + cuota
     ahorro = pago_actual - pago_total
 
-    capacidad_bateria = float(leer(financiero_pdf, "capacidad_bateria_kwh", 0.0) or 0.0)
+    capacidad_bateria = float(
+        leer(
+            financiero_pdf,
+            "capacidad_bateria_kwh",
+            0.0,
+        ) or 0.0
+    )
 
     rows = [
-        ["Pago actual ENEE (sin FV)", money_L(pago_actual)],
-        ["Pago ENEE con FV / batería", money_L(pago_residual)],
-        ["Cuota de financiamiento", money_L(cuota)],
+        [
+            "Pago actual ENEE (sin FV)",
+            money_L(pago_actual),
+        ],
+        [
+            "Pago ENEE después del proyecto",
+            money_L(pago_residual),
+        ],
+        [
+            "Cuota de financiamiento",
+            money_L(cuota),
+        ],
     ]
 
     if capacidad_bateria > 0:
-        rows.append(["Batería incluida", f"{capacidad_bateria:.1f} kWh"])
+        rows.append(
+            [
+                "Batería incluida",
+                f"{capacidad_bateria:.1f} kWh",
+            ]
+        )
 
     rows += [
-        ["Pago total con FV", money_L(pago_total)],
-        ["Ahorro neto mensual", money_L(ahorro)],
+        [
+            "Pago total mensual estimado",
+            money_L(pago_total),
+        ],
+        [
+            "Reducción mensual estimada",
+            money_L(ahorro),
+        ],
     ]
 
     t = tabla_2cols(
@@ -381,13 +407,15 @@ def p1_tabla_decision(financiero, pal, content_w):
     )
 
     return [
-        section_bar("Decisión del cliente (mensual)", pal, content_w),
+        section_bar(
+            "Impacto mensual para el cliente",
+            pal,
+            content_w,
+        ),
         Spacer(1, 6),
         t,
         Spacer(1, 12),
     ]
-
-
 # =========================================================
 # 5. SECCIÓN: CONCLUSIÓN EJECUTIVA
 # =========================================================
