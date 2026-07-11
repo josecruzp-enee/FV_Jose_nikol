@@ -174,73 +174,30 @@ def build_analisis_operativo(
 
     story = []
 
-    # =====================================================
-    # 3.1 TÍTULO DEL CAPÍTULO
-    # =====================================================
-    story.append(Paragraph("Impacto energético y financiero", styles["Title"]))
+    story.append(
+        Paragraph(
+            "Impacto energético y financiero",
+            styles["Title"],
+        )
+    )
     story.append(Spacer(1, 10))
 
-    story.append(Paragraph("Comparación mensual — Año 1", styles["H2b"]))
+    story.append(
+        Paragraph(
+            "Comparación mensual — Año 1",
+            styles["H2b"],
+        )
+    )
     story.append(Spacer(1, 6))
 
-    # =====================================================
-    # 3.2 TABLA DE IMPACTO MENSUAL
-    # =====================================================
-    tabla = tabla_impacto_mensual_anio1(resultado, pal, content_w)
+    tabla = tabla_impacto_mensual_anio1(
+        resultado,
+        pal,
+        content_w,
+    )
 
     if tabla:
         story += tabla
-
-    # =====================================================
-    # 3.3 CONFIGURACIÓN ELÉCTRICA DC
-    # =====================================================
-    strings_block = leer(resultado, "strings", None)
-    strings = leer(strings_block, "strings", []) if strings_block else []
-
-    if strings:
-
-        story.append(Paragraph("Configuración eléctrica (DC)", styles["H2b"]))
-        story.append(Spacer(1, 6))
-
-        lines = []
-
-        for s in strings:
-            lines.append(
-                f"MPPT {leer(s,'mppt','')}: "
-                f"{leer(s,'n_series','')} módulos en serie "
-                f"(Vmp={leer(s,'vmp_string_v','')} V, "
-                f"Voc frío={leer(s,'voc_frio_string_v','')} V)"
-            )
-
-        story.append(
-            box_paragraph("<br/>".join(lines), pal, content_w, font_size=9.5)
-        )
-
-        story.append(Spacer(1, 8))
-
-    # =====================================================
-    # 3.4 RESUMEN ELÉCTRICO NEC
-    # =====================================================
-    nec_block = leer(resultado, "nec", {})
-    nec_paq = leer(nec_block, "paquete_nec", {})
-
-    resumen_pdf = nec_paq.get("resumen_pdf")
-
-    if resumen_pdf:
-
-        story.append(Paragraph("Resumen eléctrico (NEC 2023)", styles["H2b"]))
-        story.append(Spacer(1, 6))
-
-        lines = [
-            f"I DC diseño: {resumen_pdf.get('i_dc_nom', '—')} A",
-            f"I AC diseño: {resumen_pdf.get('i_ac_nom', '—')} A",
-        ]
-
-        story.append(
-            box_paragraph("<br/>".join(lines), pal, content_w, font_size=9.5)
-        )
-
-        story.append(Spacer(1, 8))
 
     story.append(PageBreak())
 
