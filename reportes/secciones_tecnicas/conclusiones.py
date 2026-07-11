@@ -787,6 +787,7 @@ def generar_conclusiones_ejecutivas(resultado: Any, datos: Any = None) -> dict:
 # 7. RENDER REPORTLAB
 # ======================================================
 
+
 def agregar_pagina_conclusiones_ejecutivas(story, styles, resultado, datos=None, paths=None):
     """
     Agrega una página completa de conclusiones ejecutivas al PDF.
@@ -868,3 +869,4 @@ def agregar_pagina_conclusiones_ejecutivas(story, styles, resultado, datos=None,
     )
 
     story.append(Paragraph(nota, styles["Italic"]))
+
