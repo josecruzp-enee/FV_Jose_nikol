@@ -257,7 +257,7 @@ def p1_tabla_solucion_unica(
             (
                 f"{get_field(datos, 'cobertura_objetivo', 0) * 100:.0f}%"
             ),
-            "Cobertura recomendada",
+            "Cobertura real",
             f"{cobertura_real * 100:.1f}%",
         ],
 
@@ -269,7 +269,7 @@ def p1_tabla_solucion_unica(
         ],
 
         [
-            "Producción útil anual",
+            "Producción anual",
             f"{prod_anual:,.0f} kWh/año",
             "DSCR",
             ds_txt,
