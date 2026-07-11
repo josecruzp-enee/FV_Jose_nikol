@@ -16,6 +16,16 @@ from reportlab.platypus import (
     TableStyle,
 )
 
+from reportlab.platypus import (
+    Paragraph,
+    Spacer,
+    PageBreak,
+    Image,
+    Table,
+    TableStyle,
+    KeepTogether,
+)
+
 from ..secciones_tecnicas.resumen_tecnico import build_resumen_tecnico
 from ..secciones_tecnicas.tabla_strings import crear_tabla_strings
 from ..secciones_tecnicas.tabla_nec import (
@@ -302,85 +312,74 @@ def _section_bateria(story, resultado, energia, styles):
     if bateria_rec is None and bateria is None:
         return
 
-    story.append(Paragraph("Batería recomendada", styles["Heading2"]))
-    story.append(Spacer(1, 6))
+    data = [["Concepto", "Valor"]]
 
-    data = [
-        ["Concepto", "Valor"],
-    ]
-
-    # =====================================================
-    # BATERÍA RECOMENDADA
-    # =====================================================
     if bateria_rec is not None:
         data.extend([
             [
                 "Capacidad útil recomendada",
-                f"{float(leer(bateria_rec, 'capacidad_util_kwh', 0.0) or 0.0):.1f} kWh"
+                f"{float(leer(bateria_rec, 'capacidad_util_kwh', 0.0) or 0.0):.1f} kWh",
             ],
             [
                 "Potencia recomendada",
-                f"{float(leer(bateria_rec, 'potencia_max_kw', 0.0) or 0.0):.1f} kW"
+                f"{float(leer(bateria_rec, 'potencia_max_kw', 0.0) or 0.0):.1f} kW",
             ],
             [
                 "Excedente FV diario estimado",
-                f"{float(leer(bateria_rec, 'excedente_diario_kwh', 0.0) or 0.0):.1f} kWh/día"
+                f"{float(leer(bateria_rec, 'excedente_diario_kwh', 0.0) or 0.0):.1f} kWh/día",
             ],
             [
                 "Consumo nocturno estimado",
-                f"{float(leer(bateria_rec, 'consumo_nocturno_kwh', 0.0) or 0.0):.1f} kWh/día"
+                f"{float(leer(bateria_rec, 'consumo_nocturno_kwh', 0.0) or 0.0):.1f} kWh/día",
             ],
             [
                 "Energía objetivo recuperable",
-                f"{float(leer(bateria_rec, 'energia_objetivo_kwh', 0.0) or 0.0):.1f} kWh/día"
+                f"{float(leer(bateria_rec, 'energia_objetivo_kwh', 0.0) or 0.0):.1f} kWh/día",
             ],
         ])
 
-    # =====================================================
-    # RESULTADO DE BATERÍA ÓPTIMA
-    # =====================================================
-    bateria_ok = bool(leer(bateria, "ok", False)) if bateria is not None else False
+    bateria_ok = (
+        bool(leer(bateria, "ok", False))
+        if bateria is not None
+        else False
+    )
 
     if bateria is not None and bateria_ok:
-
         data.extend([
             [
                 "Capacidad batería instalada",
-                f"{float(leer(bateria_optima, 'capacidad_bateria_kwh', 0.0) or 0.0):.1f} kWh"
+                f"{float(leer(bateria_optima, 'capacidad_bateria_kwh', 0.0) or 0.0):.1f} kWh",
             ],
             [
                 "Potencia batería instalada",
-                f"{float(leer(bateria_optima, 'potencia_bateria_kw', 0.0) or 0.0):.1f} kW"
+                f"{float(leer(bateria_optima, 'potencia_bateria_kw', 0.0) or 0.0):.1f} kW",
             ],
             [
                 "Compra red sin batería",
-                f"{float(leer(bateria, 'compra_red_sin_bateria_kwh', 0.0) or 0.0):.1f} kWh/día"
+                f"{float(leer(bateria, 'compra_red_sin_bateria_kwh', 0.0) or 0.0):.1f} kWh/día",
             ],
             [
                 "Compra red con batería",
-                f"{float(leer(bateria, 'compra_red_con_bateria_kwh', 0.0) or 0.0):.1f} kWh/día"
+                f"{float(leer(bateria, 'compra_red_con_bateria_kwh', 0.0) or 0.0):.1f} kWh/día",
             ],
             [
                 "Excedente sin batería",
-                f"{float(leer(bateria, 'excedente_sin_bateria_kwh', 0.0) or 0.0):.1f} kWh/día"
+                f"{float(leer(bateria, 'excedente_sin_bateria_kwh', 0.0) or 0.0):.1f} kWh/día",
             ],
             [
                 "Excedente con batería",
-                f"{float(leer(bateria, 'excedente_con_bateria_kwh', 0.0) or 0.0):.1f} kWh/día"
+                f"{float(leer(bateria, 'excedente_con_bateria_kwh', 0.0) or 0.0):.1f} kWh/día",
             ],
             [
                 "Cobertura sin batería",
-                f"{float(leer(bateria, 'cobertura_sin_bateria_pct', 0.0) or 0.0):.1f}%"
+                f"{float(leer(bateria, 'cobertura_sin_bateria_pct', 0.0) or 0.0):.1f}%",
             ],
             [
                 "Cobertura con batería",
-                f"{float(leer(bateria, 'cobertura_con_bateria_pct', 0.0) or 0.0):.1f}%"
+                f"{float(leer(bateria, 'cobertura_con_bateria_pct', 0.0) or 0.0):.1f}%",
             ],
         ])
 
-    # =====================================================
-    # COSTOS DE BATERÍA
-    # =====================================================
     capacidad_bateria = float(
         bateria_optima.get("capacidad_bateria_kwh", 0.0) or 0.0
     )
@@ -390,28 +389,28 @@ def _section_bateria(story, resultado, energia, styles):
     )
 
     if capacidad_bateria > 0:
-
         data.extend([
             [
                 "Capacidad batería utilizada",
-                f"{capacidad_bateria:.1f} kWh"
+                f"{capacidad_bateria:.1f} kWh",
             ],
             [
                 "Costo estimado batería",
-                f"L {capex_bateria:,.0f}"
+                f"L {capex_bateria:,.0f}",
             ],
             [
                 "Escenario seleccionado",
-                str(bateria_optima.get("nombre", ""))
+                str(bateria_optima.get("nombre", "")),
             ],
         ])
 
-    t = Table(
+    tabla = Table(
         data,
-        colWidths=[220, 220]
+        colWidths=[220, 220],
+        repeatRows=1,
     )
 
-    t.setStyle(TableStyle([
+    tabla.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), HexColor("#1F4E79")),
         ("TEXTCOLOR", (0, 0), (-1, 0), HexColor("#FFFFFF")),
         ("GRID", (0, 0), (-1, -1), 0.25, HexColor("#CCCCCC")),
@@ -420,18 +419,20 @@ def _section_bateria(story, resultado, energia, styles):
         ("ALIGN", (1, 1), (1, -1), "RIGHT"),
     ]))
 
-    story.append(t)
-    story.append(Spacer(1, 8))
-
-    story.append(
+    bloque = [
+        Paragraph("Batería recomendada", styles["Heading2"]),
+        Spacer(1, 6),
+        tabla,
+        Spacer(1, 8),
         Paragraph(
-            "La batería mostrada corresponde al escenario financiero óptimo evaluado por el motor de optimización.",
-            styles["BodyText"]
-        )
-    )
+            "La batería mostrada corresponde al escenario financiero "
+            "óptimo evaluado por el motor de optimización.",
+            styles["BodyText"],
+        ),
+        Spacer(1, 12),
+    ]
 
-    story.append(Spacer(1, 12))
-
+    story.append(KeepTogether(bloque))
 
 # =========================================================
 # 5. SECCIÓN: OPTIMIZACIÓN ECONÓMICA
