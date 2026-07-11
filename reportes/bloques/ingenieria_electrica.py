@@ -781,36 +781,40 @@ def _section_layout_preliminar(story, resultado, pal, styles, content_w, paths=N
 # Esta función es llamada desde BLOQUES_REPORTE.
 # Mantener firma por compatibilidad.
 # =========================================================
-def build_ingenieria_electrica(
+# =========================================================
+# 7. BLOQUES PÚBLICOS DEL REPORTE
+# =========================================================
+
+def _datos_principales(resultado):
+
+    resultado = resultado or {}
+
+    paneles = leer(resultado, "paneles", None)
+    energia = leer(resultado, "energia", None)
+
+    if paneles and leer(paneles, "strings", None):
+        strings = leer(paneles, "strings", [])
+    else:
+        strings = []
+
+    return resultado, energia, strings
+
+
+# =========================================================
+# 7.1 SOLUCIÓN TÉCNICA
+# =========================================================
+
+def build_solucion_tecnica(
     resultado,
     datos,
     paths,
     pal,
     styles,
     content_w,
-    safe_image=None,
 ):
 
     story = []
-
     resultado = resultado or {}
-    paths = paths or {}
-
-    # =====================================================
-    # 1. OBTENER DATOS PRINCIPALES
-    # =====================================================
-
-    paneles = leer(resultado, "paneles", None)
-    energia = leer(resultado, "energia", None)
-
-    if paneles and hasattr(paneles, "strings") and paneles.strings:
-        strings = paneles.strings
-    else:
-        strings = []
-
-    # =====================================================
-    # 2. PRESENTACIÓN TÉCNICO-COMERCIAL
-    # =====================================================
 
     _section_resumen(
         story,
@@ -820,7 +824,29 @@ def build_ingenieria_electrica(
         content_w,
     )
 
+    return story
+
+
+# =========================================================
+# 7.2 LAYOUT DEL SISTEMA FV
+# =========================================================
+
+def build_layout_fv(
+    resultado,
+    datos,
+    paths,
+    pal,
+    styles,
+    content_w,
+):
+
+    story = []
+
+    resultado = resultado or {}
+    paths = paths or {}
+
     story.append(PageBreak())
+
     _section_layout_preliminar(
         story,
         resultado,
@@ -835,13 +861,32 @@ def build_ingenieria_electrica(
         paths,
         styles,
         content_w,
-        safe_image,
-        datos.get("sistema_fv", {}) if datos else {},
+        None,
+        leer(datos, "sistema_fv", {}) if datos else {},
     )
 
-    # =====================================================
-    # 3. COMPORTAMIENTO DEL SISTEMA
-    # =====================================================
+    return story
+
+
+# =========================================================
+# 7.3 COMPORTAMIENTO Y OPTIMIZACIÓN
+# =========================================================
+
+def build_operacion_fv(
+    resultado,
+    datos,
+    paths,
+    pal,
+    styles,
+    content_w,
+):
+
+    story = []
+
+    resultado = resultado or {}
+    paths = paths or {}
+
+    energia = leer(resultado, "energia", None)
 
     _section_potencia_horaria(
         story,
@@ -871,10 +916,6 @@ def build_ingenieria_electrica(
         content_w,
     )
 
-    # =====================================================
-    # 4. BATERÍA Y OPTIMIZACIÓN
-    # =====================================================
-
     _section_bateria(
         story,
         resultado,
@@ -890,9 +931,23 @@ def build_ingenieria_electrica(
         content_w,
     )
 
-    # =====================================================
-    # 5. CIERRE EJECUTIVO
-    # =====================================================
+    return story
+
+
+# =========================================================
+# 7.4 CONCLUSIONES
+# =========================================================
+
+def build_conclusiones(
+    resultado,
+    datos,
+    paths,
+    pal,
+    styles,
+    content_w,
+):
+
+    story = []
 
     agregar_pagina_conclusiones_ejecutivas(
         story,
@@ -902,9 +957,29 @@ def build_ingenieria_electrica(
         paths=paths,
     )
 
-    # =====================================================
-    # 6. ANEXO TÉCNICO ELÉCTRICO
-    # =====================================================
+    return story
+
+
+# =========================================================
+# 7.5 ANEXO TÉCNICO ELÉCTRICO
+# =========================================================
+
+def build_anexo_electrico(
+    resultado,
+    datos,
+    paths,
+    pal,
+    styles,
+    content_w,
+):
+
+    story = []
+
+    resultado, energia, strings = _datos_principales(
+        resultado
+    )
+
+    paths = paths or {}
 
     story.append(PageBreak())
 
@@ -966,7 +1041,7 @@ def build_ingenieria_electrica(
     )
 
     # =====================================================
-    # 7. GENERAR DIAGRAMA DE STRINGS
+    # GENERAR DIAGRAMA DE STRINGS
     # =====================================================
 
     string_fv_path = None
@@ -974,12 +1049,15 @@ def build_ingenieria_electrica(
     try:
         if strings:
             ruta = Path("outputs/string_fv.png")
+
             ruta.parent.mkdir(
                 parents=True,
                 exist_ok=True,
             )
 
-            from reportes.generar_string_fv import generar_string_fv
+            from reportes.generar_string_fv import (
+                generar_string_fv,
+            )
 
             generar_string_fv(
                 strings,
@@ -995,15 +1073,9 @@ def build_ingenieria_electrica(
             e,
         )
 
-        string_fv_path = None
-
-    # =====================================================
-    # 8. MOSTRAR DIAGRAMA DE STRINGS
-    # =====================================================
-
     existe_imagen = (
         string_fv_path
-        and Path(str(string_fv_path)).exists()
+        and Path(string_fv_path).exists()
     )
 
     if existe_imagen:
@@ -1018,21 +1090,12 @@ def build_ingenieria_electrica(
 
         story.append(Spacer(1, 6))
 
-        if safe_image:
-            img = safe_image(
-                str(string_fv_path),
-                max_w=content_w,
-                max_h=300,
-            )
-        else:
-            img = Image(str(string_fv_path))
-            img.drawWidth = content_w
-            img.drawHeight = 300
+        img = Image(string_fv_path)
+        img.drawWidth = content_w
+        img.drawHeight = 300
+        img.hAlign = "CENTER"
 
-        if img:
-            img.hAlign = "CENTER"
-            story.append(img)
-
+        story.append(img)
         story.append(Spacer(1, 12))
 
         story.append(
@@ -1044,33 +1107,5 @@ def build_ingenieria_electrica(
                 styles["BodyText"],
             )
         )
-
-        story.append(Spacer(1, 12))
-
-    else:
-        msg = (
-            "No se pudo generar el diagrama "
-            "del string fotovoltaico."
-        )
-
-        if not strings:
-            msg += (
-                " (Sin datos de strings "
-                "en resultado.paneles)"
-            )
-        else:
-            msg += (
-                " (Error al generar imagen "
-                "o archivo no encontrado)"
-            )
-
-        story.append(
-            Paragraph(
-                msg,
-                styles["BodyText"],
-            )
-        )
-
-        story.append(Spacer(1, 12))
 
     return story
