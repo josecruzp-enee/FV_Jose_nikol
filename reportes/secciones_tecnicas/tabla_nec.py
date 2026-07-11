@@ -123,133 +123,444 @@ def crear_tabla_parametros_electricos(resultado, pal, content_w):
 # TABLA 2 — DIMENSIONAMIENTO ELÉCTRICO NEC
 # ==========================================================
 
-def crear_tabla_dimensionamiento_nec(resultado, pal, content_w):
+def crear_tabla_dimensionamiento_nec(
+    resultado,
+    pal,
+    content_w,
+):
+    """
+    Construye la tabla de dimensionamiento eléctrico.
 
-    electrical = getattr(resultado, "electrical", None)
+    La función únicamente presenta resultados previamente calculados.
 
-    corr = getattr(electrical, "corrientes", None) if electrical else None
-    prot = getattr(electrical, "protecciones", None) if electrical else None
-    conductores = getattr(electrical, "conductores", None) if electrical else None
+    Criterios importantes:
+    - El conductor del MPPT crítico se obtiene del tramo DC con
+      mayor corriente de diseño.
+    - No se toma simplemente el último conductor de la lista.
+    - Las salidas AC conservan la asociación por índice entre
+      corriente, protección y conductor.
+    """
+
+    electrical = getattr(
+        resultado,
+        "electrical",
+        None,
+    )
+
+    corr = (
+        getattr(
+            electrical,
+            "corrientes",
+            None,
+        )
+        if electrical
+        else None
+    )
+
+    prot = (
+        getattr(
+            electrical,
+            "protecciones",
+            None,
+        )
+        if electrical
+        else None
+    )
+
+    conductores = (
+        getattr(
+            electrical,
+            "conductores",
+            None,
+        )
+        if electrical
+        else None
+    )
 
     if corr is None:
-        return _tabla_sin_datos("SIN DATOS ELÉCTRICOS")
+        return _tabla_sin_datos(
+            "SIN DATOS ELÉCTRICOS"
+        )
 
     # ======================================================
-    # CONDUCTORES
+    # FUNCIONES AUXILIARES
     # ======================================================
 
-    tramos = getattr(conductores, "tramos", None) if conductores else None
+    def texto_corriente(
+        nivel,
+        campo,
+    ):
+        if nivel is None:
+            return "—"
 
-    dc_mppt = getattr(tramos, "dc_mppt", []) if tramos else []
-    ac_inversores = getattr(tramos, "ac_inversores", []) if tramos else []
-    ac_principal = getattr(tramos, "ac_principal", None) if tramos else None
+        valor = float(
+            getattr(
+                nivel,
+                campo,
+                0.0,
+            )
+            or 0.0
+        )
 
-    cond_dc = "—"
-    cond_ac_principal = "—"
+        return f"{valor:.2f}"
 
-    for t in dc_mppt:
-        cond_dc = f'{getattr(t, "calibre", "—")} {getattr(t, "material", "")}'.strip()
+    def texto_conductor(
+        conductor,
+    ):
+        if conductor is None:
+            return "—"
 
-    if ac_principal:
-        cond_ac_principal = f'{getattr(ac_principal, "calibre", "—")} {getattr(ac_principal, "material", "")}'.strip()
+        calibre = str(
+            getattr(
+                conductor,
+                "calibre",
+                "—",
+            )
+            or "—"
+        ).strip()
+
+        material = str(
+            getattr(
+                conductor,
+                "material",
+                "",
+            )
+            or ""
+        ).strip()
+
+        return (
+            f"{calibre} {material}"
+            .strip()
+        )
+
+    def texto_proteccion(
+        proteccion,
+    ):
+        if proteccion is None:
+            return "—"
+
+        tamano_a = getattr(
+            proteccion,
+            "tamano_a",
+            None,
+        )
+
+        if tamano_a is None:
+            return "—"
+
+        return f"{tamano_a} A"
+
+    # ======================================================
+    # CONDUCTORES CALCULADOS
+    # ======================================================
+
+    tramos = (
+        getattr(
+            conductores,
+            "tramos",
+            None,
+        )
+        if conductores
+        else None
+    )
+
+    dc_mppt = (
+        getattr(
+            tramos,
+            "dc_mppt",
+            [],
+        )
+        if tramos
+        else []
+    ) or []
+
+    ac_inversores = (
+        getattr(
+            tramos,
+            "ac_inversores",
+            [],
+        )
+        if tramos
+        else []
+    ) or []
+
+    ac_principal = (
+        getattr(
+            tramos,
+            "ac_principal",
+            None,
+        )
+        if tramos
+        else None
+    )
+
+    # ======================================================
+    # MPPT CRÍTICO
+    # ======================================================
+    # La lista contiene un tramo por cada MPPT utilizado.
+    # Se selecciona el tramo con mayor corriente de diseño.
+    # Así, corriente y conductor pertenecen al mismo MPPT.
+    # ======================================================
+
+    tramo_mppt_critico = (
+        max(
+            dc_mppt,
+            key=lambda tramo: float(
+                getattr(
+                    tramo,
+                    "i_diseno_a",
+                    0.0,
+                )
+                or 0.0
+            ),
+        )
+        if dc_mppt
+        else None
+    )
+
+    conductor_mppt_critico = texto_conductor(
+        tramo_mppt_critico
+    )
+
+    conductor_ac_principal = texto_conductor(
+        ac_principal
+    )
 
     # ======================================================
     # PROTECCIONES
     # ======================================================
 
-    ocpd_ac_inversores = getattr(prot, "ocpd_ac_inversores", []) if prot else []
-    ocpd_ac_principal = getattr(prot, "ocpd_ac_principal", None) if prot else None
-    fusible = getattr(prot, "fusible_string", None) if prot else None
+    ocpd_ac_inversores = (
+        getattr(
+            prot,
+            "ocpd_ac_inversores",
+            [],
+        )
+        if prot
+        else []
+    ) or []
 
-    rows = [
-        ["Circuito", "I operación", "I diseño", "Protección", "Conductor"],
-    ]
+    ocpd_ac_principal = (
+        getattr(
+            prot,
+            "ocpd_ac_principal",
+            None,
+        )
+        if prot
+        else None
+    )
 
-    # ======================================================
-    # FILAS DC BASE
-    # ======================================================
-
-    niveles_base = [
-        ("panel", "Panel", None, "—"),
-        ("string", "String", fusible, cond_dc),
-        ("mppt", "MPPT crítico", None, cond_dc),
-    ]
-
-    for key, nombre, p, c in niveles_base:
-
-        d = getattr(corr, key, None)
-
-        if not d:
-            rows.append([nombre, "—", "—", "—", "—"])
-            continue
-
-        i_op = f"{getattr(d, 'i_operacion_a', 0):.2f}"
-        i_dis = f"{getattr(d, 'i_diseno_a', 0):.2f}"
-
-        prot_txt = f'{getattr(p, "tamano_a", "—")} A' if p else "—"
-        cond_txt = c if c else "—"
-
-        rows.append([
-            nombre,
-            i_op,
-            i_dis,
-            prot_txt,
-            cond_txt,
-        ])
+    fusible_string = (
+        getattr(
+            prot,
+            "fusible_string",
+            None,
+        )
+        if prot
+        else None
+    )
 
     # ======================================================
-    # FILAS AC POR INVERSOR
+    # ENCABEZADO
     # ======================================================
 
-    inversores_corr = getattr(corr, "inversores_detalle", [])
+    rows = [[
+        "Circuito",
+        "I operación",
+        "I diseño",
+        "Protección",
+        "Conductor",
+    ]]
+
+    # ======================================================
+    # PANEL
+    # ======================================================
+
+    panel_corr = getattr(
+        corr,
+        "panel",
+        None,
+    )
+
+    rows.append([
+        "Panel",
+        texto_corriente(
+            panel_corr,
+            "i_operacion_a",
+        ),
+        texto_corriente(
+            panel_corr,
+            "i_diseno_a",
+        ),
+        "—",
+        "—",
+    ])
+
+    # ======================================================
+    # STRING
+    # ======================================================
+    # Todavía no existe un tramo individual de conductor
+    # por string en TramosFV. Por eso no se reutiliza el
+    # conductor del MPPT como si fuera conductor del string.
+    # ======================================================
+
+    string_corr = getattr(
+        corr,
+        "string",
+        None,
+    )
+
+    rows.append([
+        "String",
+        texto_corriente(
+            string_corr,
+            "i_operacion_a",
+        ),
+        texto_corriente(
+            string_corr,
+            "i_diseno_a",
+        ),
+        texto_proteccion(
+            fusible_string
+        ),
+        "—",
+    ])
+
+    # ======================================================
+    # MPPT CRÍTICO
+    # ======================================================
+
+    mppt_corr = getattr(
+        corr,
+        "mppt",
+        None,
+    )
+
+    rows.append([
+        "MPPT crítico",
+        texto_corriente(
+            mppt_corr,
+            "i_operacion_a",
+        ),
+        texto_corriente(
+            mppt_corr,
+            "i_diseno_a",
+        ),
+        "—",
+        conductor_mppt_critico,
+    ])
+
+    # ======================================================
+    # AC POR INVERSOR
+    # ======================================================
+
+    inversores_corr = (
+        getattr(
+            corr,
+            "inversores_detalle",
+            [],
+        )
+        or []
+    )
 
     if inversores_corr:
 
-        for idx, inv_corr in enumerate(inversores_corr):
+        for idx, inv_corr in enumerate(
+            inversores_corr
+        ):
 
-            p = ocpd_ac_inversores[idx] if idx < len(ocpd_ac_inversores) else None
-            c = ac_inversores[idx] if idx < len(ac_inversores) else None
-
-            cond_txt = (
-                f'{getattr(c, "calibre", "—")} {getattr(c, "material", "")}'.strip()
-                if c else "—"
+            proteccion = (
+                ocpd_ac_inversores[idx]
+                if idx < len(
+                    ocpd_ac_inversores
+                )
+                else None
             )
 
-            prot_txt = f'{getattr(p, "tamano_a", "—")} A' if p else "—"
+            conductor = (
+                ac_inversores[idx]
+                if idx < len(
+                    ac_inversores
+                )
+                else None
+            )
 
             rows.append([
                 f"AC inversor {idx + 1}",
-                f"{getattr(inv_corr, 'i_operacion_a', 0):.2f}",
-                f"{getattr(inv_corr, 'i_diseno_a', 0):.2f}",
-                prot_txt,
-                cond_txt,
+                texto_corriente(
+                    inv_corr,
+                    "i_operacion_a",
+                ),
+                texto_corriente(
+                    inv_corr,
+                    "i_diseno_a",
+                ),
+                texto_proteccion(
+                    proteccion
+                ),
+                texto_conductor(
+                    conductor
+                ),
             ])
 
     else:
 
-        d = getattr(corr, "ac_inversor", None)
+        ac_inversor = getattr(
+            corr,
+            "ac_inversor",
+            None,
+        )
 
         rows.append([
             "AC por inversor",
-            f"{getattr(d, 'i_operacion_a', 0):.2f}" if d else "—",
-            f"{getattr(d, 'i_diseno_a', 0):.2f}" if d else "—",
+            texto_corriente(
+                ac_inversor,
+                "i_operacion_a",
+            ),
+            texto_corriente(
+                ac_inversor,
+                "i_diseno_a",
+            ),
             "—",
             "—",
         ])
 
     # ======================================================
-    # FILA AC PRINCIPAL
+    # AC PRINCIPAL
     # ======================================================
 
-    d = getattr(corr, "ac_total", getattr(corr, "ac", None))
+    ac_total = getattr(
+        corr,
+        "ac_total",
+        None,
+    )
+
+    if ac_total is None:
+        ac_total = getattr(
+            corr,
+            "ac",
+            None,
+        )
 
     rows.append([
         "AC total del sistema",
-        f"{getattr(d, 'i_operacion_a', 0):.2f}" if d else "—",
-        f"{getattr(d, 'i_diseno_a', 0):.2f}" if d else "—",
-        f'{getattr(ocpd_ac_principal, "tamano_a", "—")} A' if ocpd_ac_principal else "—",
-        cond_ac_principal,
+        texto_corriente(
+            ac_total,
+            "i_operacion_a",
+        ),
+        texto_corriente(
+            ac_total,
+            "i_diseno_a",
+        ),
+        texto_proteccion(
+            ocpd_ac_principal
+        ),
+        conductor_ac_principal,
     ])
+
+    # ======================================================
+    # CONSTRUIR TABLA
+    # ======================================================
 
     colw = [
         content_w * 0.24,
@@ -272,7 +583,6 @@ def crear_tabla_dimensionamiento_nec(resultado, pal, content_w):
         header_size=8.5,
         align_numeric_from_col=1,
     )
-
 
 # ==========================================================
 # TABLA 3 — INDICADORES TÉCNICOS
