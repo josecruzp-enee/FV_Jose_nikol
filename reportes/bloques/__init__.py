@@ -27,12 +27,12 @@ BLOQUES_REPORTE = [
     # 2. Producción, consumo, cobertura y balance energético
     build_analisis_energetico,
 
-    # 3. CAPEX, ahorro, financiamiento, DSCR y retorno
-    build_analisis_financiero,
-
-    # 4. Operación mensual, factura residual y comportamiento del sistema
+    # 3. Operación, factura residual y comportamiento mensual
     build_analisis_operativo,
 
-    # 5. Diseño eléctrico, strings, corrientes, NEC y protecciones
+    # 4. CAPEX, reducción económica, financiamiento y retorno
+    build_analisis_financiero,
+
+    # 5. Diseño eléctrico, equipos, strings y anexos técnicos
     build_ingenieria_electrica,
 ]
