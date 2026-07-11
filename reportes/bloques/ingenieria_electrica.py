@@ -25,7 +25,16 @@ from reportlab.platypus import (
     TableStyle,
     KeepTogether,
 )
-
+from reportlab.platypus import (
+    Paragraph,
+    Spacer,
+    PageBreak,
+    Image,
+    Table,
+    TableStyle,
+    KeepTogether,
+    CondPageBreak,
+)
 from ..secciones_tecnicas.resumen_tecnico import build_resumen_tecnico
 from ..secciones_tecnicas.tabla_strings import crear_tabla_strings
 from ..secciones_tecnicas.tabla_nec import (
@@ -251,24 +260,40 @@ def _section_energia_horaria(story, paths, styles, content_w):
     )
 
 
-def _section_demanda_vs_fv_horaria(story, paths, styles, content_w):
+def _section_demanda_vs_fv_horaria(
+    story,
+    paths,
+    styles,
+    content_w,
+):
 
-    story.append(Paragraph("Demanda del cliente vs generación fotovoltaica", styles["Heading2"]))
+    # Reserva espacio para evitar que el título quede solo
+    # al final de una página.
+    story.append(CondPageBreak(content_w * 0.50))
+
+    story.append(
+        Paragraph(
+            "Demanda del cliente vs generación fotovoltaica",
+            styles["Heading2"],
+        )
+    )
     story.append(Spacer(1, 6))
 
     chart = None
 
     if isinstance(paths, dict):
-        chart = paths.get("chart_demanda_vs_fv_horaria")
+        chart = paths.get(
+            "chart_demanda_vs_fv_horaria"
+        )
 
     _insert_chart(
         story,
         chart,
         styles,
         content_w,
-        "No se pudo generar la gráfica de demanda del cliente vs generación FV."
+        "No se pudo generar la gráfica de demanda del "
+        "cliente vs generación FV.",
     )
-
 
 def _section_energia_mensual(story, paths, styles, content_w):
 
