@@ -53,29 +53,53 @@ def leer(obj, campo, default=None):
 # 2. SECCIÓN: TABLA DE IMPACTO MENSUAL AÑO 1
 # =========================================================
 
-def tabla_impacto_mensual_anio1(resultado: Any, pal: dict, content_w: float):
+def tabla_impacto_mensual_anio1(
+    resultado: Any,
+    pal: dict,
+    content_w: float,
+):
 
     financiero = leer(resultado, "financiero", {}) or {}
-
     tabla_12m = leer(financiero, "tabla_12m", []) or []
-    cuota_m = float(leer(financiero, "cuota_mensual", 0.0))
+    cuota_m = float(
+        leer(
+            financiero,
+            "cuota_mensual_L",
+            leer(financiero, "cuota_mensual", 0.0),
+        ) or 0.0
+    )
 
-    header = [
-        "Mes",
-        "Pago actual",
-        "Pago ENEE",
-        "Cuota",
-        "Total Pago",
-        "Ahorro mes",
-        "Ahorro acumulado",
-    ]
+    es_contado = cuota_m <= 0.000001
+
+    if es_contado:
+        header = [
+            "Mes",
+            "Pago actual",
+            "Pago con FV",
+            "Ahorro mes",
+            "Ahorro acumulado",
+        ]
+        ratios = [0.7, 1.5, 1.5, 1.5, 1.7]
+        col_ahorro = 3
+    else:
+        header = [
+            "Mes",
+            "Pago actual",
+            "Pago ENEE",
+            "Cuota",
+            "Pago total",
+            "Ahorro mes",
+            "Ahorro acumulado",
+        ]
+        ratios = [0.7, 1.4, 1.4, 1.2, 1.4, 1.4, 1.5]
+        col_ahorro = 5
 
     rows = []
 
-    acum = 0.0
+    acumulado = 0.0
     total_pago_actual = 0.0
     total_enee = 0.0
-    total_total_fv = 0.0
+    total_pago_fv = 0.0
     total_ahorro = 0.0
 
     for r in tabla_12m:
@@ -83,79 +107,107 @@ def tabla_impacto_mensual_anio1(resultado: Any, pal: dict, content_w: float):
         if not isinstance(r, dict):
             continue
 
-        mes = r.get("mes", "")
-
         pago_actual = float(r.get("factura_base_L", 0.0))
         pago_enee = float(r.get("pago_enee_L", 0.0))
+        pago_fv = pago_enee + cuota_m
+        ahorro_mes = pago_actual - pago_fv
 
-        total_fv = pago_enee + cuota_m
-        ahorro_mes = pago_actual - total_fv
-
-        acum += ahorro_mes
-
+        acumulado += ahorro_mes
         total_pago_actual += pago_actual
         total_enee += pago_enee
-        total_total_fv += total_fv
+        total_pago_fv += pago_fv
         total_ahorro += ahorro_mes
 
-        rows.append([
-            str(mes),
-            money_L(pago_actual),
-            money_L(pago_enee),
-            money_L(cuota_m),
-            money_L(total_fv),
-            money_L(ahorro_mes),
-            money_L(acum),
-        ])
+        if es_contado:
+            rows.append([
+                str(r.get("mes", "")),
+                money_L(pago_actual),
+                money_L(pago_fv),
+                money_L(ahorro_mes),
+                money_L(acumulado),
+            ])
+        else:
+            rows.append([
+                str(r.get("mes", "")),
+                money_L(pago_actual),
+                money_L(pago_enee),
+                money_L(cuota_m),
+                money_L(pago_fv),
+                money_L(ahorro_mes),
+                money_L(acumulado),
+            ])
 
-    # 🔥 TOTAL
-    rows.append([
-        "TOTAL",
-        money_L(total_pago_actual),
-        money_L(total_enee),
-        money_L(cuota_m * 12),
-        money_L(total_total_fv),
-        money_L(total_ahorro),
-        money_L(total_ahorro),
-    ])
+    if es_contado:
+        rows.append([
+            "TOTAL",
+            money_L(total_pago_actual),
+            money_L(total_pago_fv),
+            money_L(total_ahorro),
+            money_L(total_ahorro),
+        ])
+    else:
+        rows.append([
+            "TOTAL",
+            money_L(total_pago_actual),
+            money_L(total_enee),
+            money_L(cuota_m * 12),
+            money_L(total_pago_fv),
+            money_L(total_ahorro),
+            money_L(total_ahorro),
+        ])
 
     table_data = [header] + rows
 
-    t = make_table(
+    tabla = make_table(
         table_data,
         content_w,
-        ratios=[0.7, 1.4, 1.4, 1.2, 1.4, 1.4, 1.5],
+        ratios=ratios,
         repeatRows=1,
     )
 
-    t.setStyle(table_style_uniform(pal, font_header=9, font_body=9))
+    tabla.setStyle(
+        table_style_uniform(
+            pal,
+            font_header=9,
+            font_body=9,
+        )
+    )
 
     last_row = len(table_data) - 1
 
-    t.setStyle(TableStyle([
-
+    estilos = [
         ("ALIGN", (0, 1), (0, -1), "CENTER"),
         ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
-
-        ("FONTNAME", (5, 1), (5, -2), "Helvetica-Bold"),
-
-        *[
-            ("TEXTCOLOR", (5, i), (5, i), pal.get("BAD", "red"))
-            for i, r in enumerate(tabla_12m, start=1)
-            if isinstance(r, dict)
-            and (float(r.get("factura_base_L", 0)) -
-                 (float(r.get("pago_enee_L", 0)) + cuota_m)) < 0
-        ],
-
+        ("FONTNAME", (col_ahorro, 1), (col_ahorro, -2), "Helvetica-Bold"),
         ("BACKGROUND", (0, last_row), (-1, last_row), pal.get("SOFT", "#EAEAEA")),
         ("FONTNAME", (0, last_row), (-1, last_row), "Helvetica-Bold"),
-        ("LINEABOVE", (0, last_row), (-1, last_row), 1.2, pal.get("PRIMARY", "#000000")),
+        ("LINEABOVE", (0, last_row), (-1, last_row), 1.2, pal.get("PRIMARY")),
+    ]
 
-    ]))
+    for i, r in enumerate(tabla_12m, start=1):
 
-    return [t, Spacer(1, 10)]
+        if not isinstance(r, dict):
+            continue
 
+        ahorro = (
+            float(r.get("factura_base_L", 0.0))
+            - float(r.get("pago_enee_L", 0.0))
+            - cuota_m
+        )
 
+        if ahorro < 0:
+            estilos.append(
+                (
+                    "TEXTCOLOR",
+                    (col_ahorro, i),
+                    (col_ahorro, i),
+                    pal.get("BAD", "red"),
+                )
+            )
+
+    tabla.setStyle(TableStyle(estilos))
+
+    return [tabla, Spacer(1, 10)]
 # =========================================================
 # 3. ORQUESTADOR DEL CAPÍTULO
 # =========================================================
@@ -174,13 +226,74 @@ def build_analisis_operativo(
 
     story = []
 
+    financiero = leer(resultado, "financiero", {}) or {}
+    tabla_12m = leer(financiero, "tabla_12m", []) or []
+
+    cuota_m = float(
+        leer(
+            financiero,
+            "cuota_mensual_L",
+            leer(financiero, "cuota_mensual", 0.0),
+        ) or 0.0
+    )
+
+    es_contado = cuota_m <= 0.000001
+
     story.append(
         Paragraph(
-            "Impacto energético y financiero",
+            "Impacto económico mensual",
             styles["Title"],
         )
     )
     story.append(Spacer(1, 10))
+
+    if es_contado:
+
+        capex = float(
+            leer(
+                financiero,
+                "capex_total_L",
+                leer(financiero, "capex_L", 0.0),
+            ) or 0.0
+        )
+
+        ahorro_anual = sum(
+            float(r.get("factura_base_L", 0.0))
+            - float(r.get("pago_enee_L", 0.0))
+            for r in tabla_12m
+            if isinstance(r, dict)
+        )
+
+        ahorro_mensual = (
+            ahorro_anual / len(tabla_12m)
+            if tabla_12m
+            else 0.0
+        )
+
+        retorno = (
+            capex / ahorro_anual
+            if capex > 0 and ahorro_anual > 0
+            else 0.0
+        )
+
+        lectura = (
+            "<b>Lectura ejecutiva</b><br/>"
+            "• Modalidad evaluada: <b>Pago de contado</b><br/>"
+            f"• CAPEX estimado: <b>{money_L(capex)}</b><br/>"
+            f"• Reducción mensual promedio: "
+            f"<b>{money_L(ahorro_mensual)}</b><br/>"
+            f"• Retorno simple estimado: <b>{retorno:.1f} años</b>"
+        )
+
+        story.append(
+            box_paragraph(
+                lectura,
+                pal,
+                content_w,
+                font_size=9,
+            )
+        )
+        story.append(Spacer(1, 10))
 
     story.append(
         Paragraph(
@@ -190,14 +303,11 @@ def build_analisis_operativo(
     )
     story.append(Spacer(1, 6))
 
-    tabla = tabla_impacto_mensual_anio1(
+    story += tabla_impacto_mensual_anio1(
         resultado,
         pal,
         content_w,
     )
-
-    if tabla:
-        story += tabla
 
     story.append(PageBreak())
 
