@@ -520,8 +520,8 @@ def clasificar_viabilidad(m: dict) -> tuple[str, str]:
     """
     Clasifica la viabilidad según la modalidad financiera.
 
-    - Contado: ahorro, flujo mensual y recuperación.
-    - Financiado: DSCR, ahorro neto y peor mes.
+    - Contado: ahorro mensual y recuperación simple.
+    - Financiado: DSCR, ahorro mensual y peor mes.
     """
 
     ahorro = _num(m.get("ahorro_mensual", 0.0))
@@ -545,28 +545,29 @@ def clasificar_viabilidad(m: dict) -> tuple[str, str]:
         if ahorro <= 0:
             return (
                 "NO RECOMENDADO",
-                "El proyecto no genera ahorro neto positivo bajo "
-                "las condiciones económicas evaluadas.",
+                "El proyecto no produce una reducción económica "
+                "positiva bajo las condiciones evaluadas.",
             )
 
         if peor_mes < 0:
             return (
                 "VIABLE CON OBSERVACIONES",
-                "El proyecto genera ahorro promedio positivo sin deuda "
-                "financiera, aunque presenta meses con flujo ajustado.",
+                "El proyecto produce una reducción económica promedio "
+                "positiva, aunque presenta meses que requieren revisión.",
             )
 
         if payback_anios is not None and payback_anios <= 10:
             return (
-                "VIABLE",
-                "El proyecto genera flujo neto positivo sin deuda "
-                f"financiera y recupera la inversión en aproximadamente "
+                "VIABLE PRELIMINAR",
+                "El proyecto produce ahorros operativos positivos "
+                "durante el período evaluado y presenta un período "
+                "simple de recuperación aproximado de "
                 f"{payback_anios:.1f} años.",
             )
 
         return (
             "VIABLE CON OBSERVACIONES",
-            "El proyecto genera ahorro neto positivo sin deuda financiera, "
+            "El proyecto produce una reducción económica positiva, "
             "aunque el período de recuperación requiere revisión.",
         )
 
@@ -578,9 +579,10 @@ def clasificar_viabilidad(m: dict) -> tuple[str, str]:
 
     if dscr_num >= 1.20 and ahorro > 0 and peor_mes >= 0:
         return (
-            "VIABLE",
-            "El proyecto presenta capacidad financiera adecuada, ahorro "
-            "neto positivo y margen suficiente para atender la deuda.",
+            "VIABLE PRELIMINAR",
+            "El proyecto presenta capacidad financiera adecuada "
+            "y margen suficiente para atender la deuda bajo las "
+            "condiciones evaluadas.",
         )
 
     if dscr_num >= 1.00 and ahorro > 0:
@@ -595,7 +597,6 @@ def clasificar_viabilidad(m: dict) -> tuple[str, str]:
         "Los ahorros generados no proporcionan cobertura suficiente "
         "para atender la deuda bajo las condiciones actuales.",
     )
-
 # ======================================================
 # 5. NARRATIVA EJECUTIVA
 # ======================================================
@@ -608,24 +609,27 @@ def _texto_viabilidad(
     Genera la narrativa de viabilidad según contado o crédito.
     """
 
-    ahorro_mensual = _fmt_lps(m["ahorro_mensual"])
+    reduccion_mensual = _fmt_lps(
+        m["ahorro_mensual"]
+    )
 
     if _es_pago_contado(m):
         return (
             f"El proyecto se clasifica como {estado}. "
             f"{criterio_estado} "
             f"El escenario corresponde a pago de contado, por lo que "
-            f"el indicador DSCR no aplica. El ahorro neto mensual "
-            f"estimado es de {ahorro_mensual}."
+            f"el indicador DSCR no aplica. La reducción promedio "
+            f"mensual estimada de la factura es de "
+            f"{reduccion_mensual}."
         )
 
     return (
         f"El proyecto se clasifica como {estado}. "
         f"{criterio_estado} "
         f"El indicador DSCR calculado es {_fmt_dscr(m)}, "
-        f"con un ahorro neto mensual estimado de {ahorro_mensual}."
+        f"con una reducción mensual estimada de "
+        f"{reduccion_mensual}."
     )
-
 
 def _texto_resultado_energetico(m: dict) -> str:
     return (
@@ -638,17 +642,19 @@ def _texto_resultado_energetico(m: dict) -> str:
 
 def _texto_impacto_financiero(m: dict) -> str:
     """
-    Describe el impacto financiero evitando hablar de deuda
-    cuando el escenario corresponde a pago de contado.
+    Describe el impacto financiero según la modalidad evaluada.
     """
 
     if _es_pago_contado(m):
-        ahorro_anual = _num(m["beneficio_neto_anual"])
+        reduccion_anual = _num(
+            m["beneficio_neto_anual"]
+        )
+
         capex = _num(m["capex"])
 
         payback = (
-            capex / ahorro_anual
-            if capex > 0 and ahorro_anual > 0
+            capex / reduccion_anual
+            if capex > 0 and reduccion_anual > 0
             else None
         )
 
@@ -663,11 +669,11 @@ def _texto_impacto_financiero(m: dict) -> str:
         return (
             f"El pago energético mensual actual se estima en "
             f"{_fmt_lps(m['pago_actual'])}. "
-            f"El proyecto fue evaluado bajo modalidad de pago de contado, "
-            f"sin cuota ni deuda financiera. Después de considerar los "
-            f"costos operativos, el ahorro neto mensual esperado es de "
+            f"El proyecto fue evaluado bajo modalidad de pago de "
+            f"contado, sin cuota ni deuda financiera. La reducción "
+            f"promedio mensual estimada de la factura es de "
             f"{_fmt_lps(m['ahorro_mensual'])}, equivalente a "
-            f"{_fmt_lps(m['beneficio_neto_anual'])} anuales."
+            f"{_fmt_lps(reduccion_anual)} durante el primer año."
             f"{texto_payback}"
         )
 
@@ -677,14 +683,15 @@ def _texto_impacto_financiero(m: dict) -> str:
         f"Con el sistema FV y el financiamiento considerado, el pago "
         f"total mensual proyectado es de aproximadamente "
         f"{_fmt_lps(m['pago_total_fv'])}, incluyendo una cuota de "
-        f"financiamiento de {_fmt_lps(m['cuota'])}. "
+        f"{_fmt_lps(m['cuota'])}. "
         f"El beneficio económico anual generado por la energía "
         f"fotovoltaica se estima en "
         f"{_fmt_lps(m['beneficio_bruto_anual'])}. "
-        f"Después de considerar el financiamiento, el ahorro neto "
-        f"anual esperado es de "
+        f"Después de considerar el financiamiento, la reducción "
+        f"económica anual estimada es de "
         f"{_fmt_lps(m['beneficio_neto_anual'])}."
     )
+
 
 def _texto_dimensionamiento() -> str:
     return (
@@ -821,7 +828,7 @@ def agregar_pagina_conclusiones_ejecutivas(story, styles, resultado, datos=None,
         ["Potencia FV propuesta", _fmt_kwp(m["kwp"])],
         ["Producción anual estimada", _fmt_kwh(m["produccion_anual"])],
         ["Cobertura energética real", _fmt_pct(m["cobertura_real"])],
-        ["Ahorro neto mensual", _fmt_lps(m["ahorro_mensual"])],
+        ["Reducción mensual estimada", _fmt_lps(m["ahorro_mensual"])],
         ["DSCR", _fmt_dscr(m)],
         ["CAPEX estimado", _fmt_lps(m["capex"])],
     ]
