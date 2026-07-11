@@ -820,6 +820,7 @@ def build_ingenieria_electrica(
         content_w,
     )
 
+    story.append(PageBreak())
     _section_layout_preliminar(
         story,
         resultado,
