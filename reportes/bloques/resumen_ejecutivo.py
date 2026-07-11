@@ -430,36 +430,21 @@ def p1_conclusion(
 ):
 
     financiero_pdf = _financiero_para_pdf(financiero)
-
-    evaluacion = leer(
-        financiero_pdf,
-        "evaluacion",
-        {},
-    ) or {}
+    evaluacion = leer(financiero_pdf, "evaluacion", {}) or {}
 
     ds_val = evaluacion.get("dscr", None)
-
-    ds_txt = (
-        "No aplica"
-        if ds_val is None
-        else f"{ds_val:.2f}"
-    )
+    ds_txt = "No aplica" if ds_val is None else f"{ds_val:.2f}"
 
     ahorro_minimo = float(
         evaluacion.get("peor_mes", 0.0)
     )
 
-    strings = (
-        leer(paneles, "strings", [])
-        if paneles
-        else []
-    )
+    # =====================================================
+    # SISTEMA FV REAL CONECTADO
+    # =====================================================
 
-    panel_obj = (
-        leer(paneles, "panel", None)
-        if paneles
-        else None
-    )
+    strings = leer(paneles, "strings", []) if paneles else []
+    panel_obj = leer(paneles, "panel", None) if paneles else None
 
     panel_wp = (
         float(leer(panel_obj, "pmax_w", 0.0))
@@ -475,19 +460,13 @@ def p1_conclusion(
     if n_paneles > 0 and panel_wp > 0:
         kwp = n_paneles * panel_wp / 1000.0
     else:
-        kwp = float(
-            leer(sizing, "kwp_dc", 0.0)
-        )
+        kwp = float(leer(sizing, "kwp_dc", 0.0))
 
     # =====================================================
     # IMPACTO FINANCIERO
     # =====================================================
 
-    tabla = leer(
-        financiero_pdf,
-        "tabla_12m",
-        [],
-    )
+    tabla = leer(financiero_pdf, "tabla_12m", [])
 
     if tabla:
         pago_actual = sum(
@@ -509,26 +488,18 @@ def p1_conclusion(
         leer(
             financiero_pdf,
             "cuota_mensual_L",
-            leer(
-                financiero_pdf,
-                "cuota_mensual",
-                0.0,
-            ),
+            leer(financiero_pdf, "cuota_mensual", 0.0),
         )
     )
 
     pago_total = pago_residual + cuota
-    impacto = pago_actual - pago_total
+    reduccion_mensual = pago_actual - pago_total
 
     # =====================================================
     # COBERTURA ENERGÉTICA
     # =====================================================
 
-    consumo_12m = get_field(
-        datos,
-        "consumo_12m",
-        [],
-    )
+    consumo_12m = get_field(datos, "consumo_12m", [])
 
     consumo_anual = (
         sum(consumo_12m)
@@ -553,11 +524,7 @@ def p1_conclusion(
     )
 
     cobertura_obj = float(
-        get_field(
-            datos,
-            "cobertura_objetivo",
-            0.0,
-        )
+        get_field(datos, "cobertura_objetivo", 0.0)
     )
 
     capacidad_bateria = float(
@@ -579,7 +546,7 @@ def p1_conclusion(
     concl = f"""
     <b>Conclusión ejecutiva</b><br/><br/>
     • Reducción mensual estimada:
-      <b>{money_L(impacto)}/mes</b><br/>
+      <b>{money_L(reduccion_mensual)}/mes</b><br/>
     • Ahorro mínimo mensual estimado:
       <b>{money_L(ahorro_minimo)}</b><br/>
     • DSCR: <b>{ds_txt}</b><br/>
@@ -598,7 +565,6 @@ def p1_conclusion(
             content_w,
         )
     ]
-
 
 # =========================================================
 # 6. ORQUESTADOR DEL CAPÍTULO
