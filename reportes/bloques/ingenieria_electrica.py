@@ -781,8 +781,15 @@ def _section_layout_preliminar(story, resultado, pal, styles, content_w, paths=N
 # Esta función es llamada desde BLOQUES_REPORTE.
 # Mantener firma por compatibilidad.
 # =========================================================
-
-def build_ingenieria_electrica(resultado, datos, paths, pal, styles, content_w, safe_image=None):
+def build_ingenieria_electrica(
+    resultado,
+    datos,
+    paths,
+    pal,
+    styles,
+    content_w,
+    safe_image=None,
+):
 
     story = []
 
@@ -790,9 +797,11 @@ def build_ingenieria_electrica(resultado, datos, paths, pal, styles, content_w, 
     paths = paths or {}
 
     # =====================================================
-    # 7.1 OBTENER STRINGS
+    # 1. OBTENER DATOS PRINCIPALES
     # =====================================================
+
     paneles = leer(resultado, "paneles", None)
+    energia = leer(resultado, "energia", None)
 
     if paneles and hasattr(paneles, "strings") and paneles.strings:
         strings = paneles.strings
@@ -800,26 +809,25 @@ def build_ingenieria_electrica(resultado, datos, paths, pal, styles, content_w, 
         strings = []
 
     # =====================================================
-    # 7.2 SECCIONES DEL CAPÍTULO
+    # 2. PRESENTACIÓN TÉCNICO-COMERCIAL
     # =====================================================
-    energia = leer(resultado, "energia", None)
 
-    _section_resumen(story, resultado, pal, styles, content_w)
-    _section_distribucion_strings(story, strings, pal, styles, content_w)
-    _section_config_strings(story, strings, pal, styles, content_w)
-    _section_parametros_electricos(story, resultado, pal, styles, content_w)
-    _section_nec(story, resultado, pal, styles, content_w)
-    _section_indicadores(story, resultado, pal, styles, content_w)
-    _section_caida_voltaje(story, resultado, pal, styles, content_w)
+    _section_resumen(
+        story,
+        resultado,
+        pal,
+        styles,
+        content_w,
+    )
 
-    _section_potencia_horaria(story, paths, styles, content_w)
-    _section_energia_horaria(story, paths, styles, content_w)
-    _section_demanda_vs_fv_horaria(story, paths, styles, content_w)
-    _section_bateria(story, resultado, energia, styles)
-    _section_energia_mensual(story, paths, styles, content_w)
-    _section_optimizacion_economica(story, resultado, pal, styles, content_w)
-    agregar_pagina_conclusiones_ejecutivas(story, styles, resultado, datos, paths=paths)
-    _section_layout_preliminar(story, resultado, pal, styles, content_w, paths=paths)
+    _section_layout_preliminar(
+        story,
+        resultado,
+        pal,
+        styles,
+        content_w,
+        paths=paths,
+    )
 
     insertar_layout_paneles(
         story,
@@ -830,42 +838,191 @@ def build_ingenieria_electrica(resultado, datos, paths, pal, styles, content_w, 
         datos.get("sistema_fv", {}) if datos else {},
     )
 
-    story.append(PageBreak())
+    # =====================================================
+    # 3. COMPORTAMIENTO DEL SISTEMA
+    # =====================================================
+
+    _section_potencia_horaria(
+        story,
+        paths,
+        styles,
+        content_w,
+    )
+
+    _section_energia_horaria(
+        story,
+        paths,
+        styles,
+        content_w,
+    )
+
+    _section_demanda_vs_fv_horaria(
+        story,
+        paths,
+        styles,
+        content_w,
+    )
+
+    _section_energia_mensual(
+        story,
+        paths,
+        styles,
+        content_w,
+    )
 
     # =====================================================
-    # 7.3 GENERAR DIAGRAMA STRING FV
+    # 4. BATERÍA Y OPTIMIZACIÓN
     # =====================================================
+
+    _section_bateria(
+        story,
+        resultado,
+        energia,
+        styles,
+    )
+
+    _section_optimizacion_economica(
+        story,
+        resultado,
+        pal,
+        styles,
+        content_w,
+    )
+
+    # =====================================================
+    # 5. CIERRE EJECUTIVO
+    # =====================================================
+
+    agregar_pagina_conclusiones_ejecutivas(
+        story,
+        styles,
+        resultado,
+        datos,
+        paths=paths,
+    )
+
+    # =====================================================
+    # 6. ANEXO TÉCNICO ELÉCTRICO
+    # =====================================================
+
+    story.append(PageBreak())
+
+    story.append(
+        Paragraph(
+            "Anexo Técnico Eléctrico",
+            styles["Title"],
+        )
+    )
+
+    story.append(Spacer(1, 12))
+
+    _section_distribucion_strings(
+        story,
+        strings,
+        pal,
+        styles,
+        content_w,
+    )
+
+    _section_config_strings(
+        story,
+        strings,
+        pal,
+        styles,
+        content_w,
+    )
+
+    _section_parametros_electricos(
+        story,
+        resultado,
+        pal,
+        styles,
+        content_w,
+    )
+
+    _section_nec(
+        story,
+        resultado,
+        pal,
+        styles,
+        content_w,
+    )
+
+    _section_indicadores(
+        story,
+        resultado,
+        pal,
+        styles,
+        content_w,
+    )
+
+    _section_caida_voltaje(
+        story,
+        resultado,
+        pal,
+        styles,
+        content_w,
+    )
+
+    # =====================================================
+    # 7. GENERAR DIAGRAMA DE STRINGS
+    # =====================================================
+
     string_fv_path = None
 
     try:
         if strings:
-
             ruta = Path("outputs/string_fv.png")
-            ruta.parent.mkdir(parents=True, exist_ok=True)
+            ruta.parent.mkdir(
+                parents=True,
+                exist_ok=True,
+            )
 
             from reportes.generar_string_fv import generar_string_fv
 
-            generar_string_fv(strings, ruta)
+            generar_string_fv(
+                strings,
+                ruta,
+            )
 
             string_fv_path = str(ruta)
             paths["string_fv"] = string_fv_path
 
     except Exception as e:
-        print("Error generando string FV:", e)
+        print(
+            "Error generando string FV:",
+            e,
+        )
+
         string_fv_path = None
 
     # =====================================================
-    # 7.4 MOSTRAR DIAGRAMA STRING FV
+    # 8. MOSTRAR DIAGRAMA DE STRINGS
     # =====================================================
-    existe_imagen = string_fv_path and Path(str(string_fv_path)).exists()
+
+    existe_imagen = (
+        string_fv_path
+        and Path(str(string_fv_path)).exists()
+    )
 
     if existe_imagen:
+        story.append(PageBreak())
 
-        story.append(Paragraph("Configuración del String Fotovoltaico", styles["Heading2"]))
+        story.append(
+            Paragraph(
+                "Configuración del String Fotovoltaico",
+                styles["Heading2"],
+            )
+        )
+
         story.append(Spacer(1, 6))
 
         if safe_image:
-            img = safe_image(str(string_fv_path), max_w=content_w, max_h=300)
+            img = safe_image(
+                str(string_fv_path),
+                max_w=content_w,
+                max_h=300,
+            )
         else:
             img = Image(str(string_fv_path))
             img.drawWidth = content_w
@@ -880,31 +1037,36 @@ def build_ingenieria_electrica(resultado, datos, paths, pal, styles, content_w, 
         story.append(
             Paragraph(
                 "Configuración real del generador fotovoltaico. "
-                "Cada string se conecta a su respectivo MPPT del inversor. "
-                "Solo se presentan conexiones en paralelo cuando múltiples strings "
-                "comparten el mismo MPPT.",
-                styles["BodyText"]
+                "Cada string se conecta a su respectivo MPPT del "
+                "inversor. Solo se presentan conexiones en paralelo "
+                "cuando múltiples strings comparten el mismo MPPT.",
+                styles["BodyText"],
             )
         )
 
         story.append(Spacer(1, 12))
 
     else:
-
-        msg = "No se pudo generar el diagrama del string fotovoltaico."
+        msg = (
+            "No se pudo generar el diagrama "
+            "del string fotovoltaico."
+        )
 
         if not strings:
-            msg += " (Sin datos de strings en resultado.paneles)"
+            msg += (
+                " (Sin datos de strings "
+                "en resultado.paneles)"
+            )
         else:
-            msg += " (Error al generar imagen o archivo no encontrado)"
-
-        story.append(Paragraph(msg, styles["BodyText"]))
-        story.append(Spacer(1, 6))
+            msg += (
+                " (Error al generar imagen "
+                "o archivo no encontrado)"
+            )
 
         story.append(
             Paragraph(
-                f"DEBUG → strings_detectados={len(strings)}",
-                styles["BodyText"]
+                msg,
+                styles["BodyText"],
             )
         )
 
