@@ -173,8 +173,8 @@ def obtener_perfil_financiamiento(
         perfil["prima_pct"] = 1.0
         perfil["porcentaje_financiado"] = 0.0
         perfil["nota"] = (
-            "Prima equivalente al 100% del CAPEX. "
-            "Proyecto evaluado sin deuda financiera."
+            "Proyecto evaluado bajo modalidad de pago de contado, "
+            "sin deuda financiera."
         )
 
     return perfil
