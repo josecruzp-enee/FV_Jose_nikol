@@ -263,10 +263,19 @@ def _extraer_valor_bateria(resultado_bateria, nombres, default=0.0) -> float:
     return float(default)
 
 
-def _energia_descargada_bateria_diaria(resultado_bateria) -> float:
+def _energia_descargada_bateria_diaria(
+    resultado_bateria,
+) -> float:
+
+    if resultado_bateria is None:
+        return 0.0
+
+    # Primero intenta leer el total diario ya calculado
+    # por el simulador de batería.
     valor_directo = _extraer_valor_bateria(
         resultado_bateria,
         [
+            "energia_descargada_bateria_kwh",
             "energia_descargada_kwh",
             "energia_entregada_kwh",
             "energia_util_bateria_kwh",
@@ -280,49 +289,76 @@ def _energia_descargada_bateria_diaria(resultado_bateria) -> float:
     if valor_directo > 0:
         return valor_directo
 
-    descarga_24h = getattr(resultado_bateria, "descarga_24h_kwh", None)
+    # Fallback: sumar la serie horaria.
+    descarga_24h = getattr(
+        resultado_bateria,
+        "descarga_bateria_24h",
+        None,
+    )
 
-    if descarga_24h is None and isinstance(resultado_bateria, dict):
-        descarga_24h = resultado_bateria.get("descarga_24h_kwh")
+    if descarga_24h is None:
+        descarga_24h = getattr(
+            resultado_bateria,
+            "descarga_24h_kwh",
+            None,
+        )
 
-    if isinstance(descarga_24h, list):
-        total = 0.0
-        for x in descarga_24h:
-            try:
-                total += float(x or 0.0)
-            except Exception:
-                pass
-        return total
+    if isinstance(resultado_bateria, dict):
 
-    tabla_24h = getattr(resultado_bateria, "tabla_24h", None)
+        if descarga_24h is None:
+            descarga_24h = resultado_bateria.get(
+                "descarga_bateria_24h"
+            )
 
-    if tabla_24h is None and isinstance(resultado_bateria, dict):
+        if descarga_24h is None:
+            descarga_24h = resultado_bateria.get(
+                "descarga_24h_kwh"
+            )
+
+    if isinstance(descarga_24h, (list, tuple)):
+        return sum(
+            float(x or 0.0)
+            for x in descarga_24h
+        )
+
+    # Último fallback para formatos antiguos.
+    tabla_24h = getattr(
+        resultado_bateria,
+        "tabla_24h",
+        None,
+    )
+
+    if tabla_24h is None and isinstance(
+        resultado_bateria,
+        dict,
+    ):
         tabla_24h = resultado_bateria.get("tabla_24h")
 
     if isinstance(tabla_24h, list):
+
         total = 0.0
 
         for fila in tabla_24h:
+
             if not isinstance(fila, dict):
                 continue
 
             for campo in [
+                "descarga_bateria_kwh",
                 "descarga_kwh",
                 "energia_descargada_kwh",
                 "energia_entregada_kwh",
                 "bateria_a_carga_kwh",
             ]:
                 if campo in fila:
-                    try:
-                        total += float(fila.get(campo) or 0.0)
-                    except Exception:
-                        pass
+                    total += float(
+                        fila.get(campo) or 0.0
+                    )
                     break
 
         return total
 
     return 0.0
-
 
 def _energia_fv_12m_con_bateria(
     *,
