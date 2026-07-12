@@ -70,6 +70,7 @@ class EntradaBateria:
 
     capex_fv_l: float = 0.0
     tarifa_compra_l_kwh: float = 0.0
+    tarifa_inyeccion_l_kwh: float = 2.72
     cargos_fijos_l_mes: float = 0.0
     om_anual_pct: float = 0.0
 
@@ -286,6 +287,11 @@ def _validar_costos(
     if entrada.tarifa_compra_l_kwh < 0:
         errores.append(
             "La tarifa de compra no puede ser negativa."
+        )
+
+    if entrada.tarifa_inyeccion_l_kwh < 0:
+        errores.append(
+            "La tarifa de inyección no puede ser negativa."
         )
 
 
@@ -570,6 +576,11 @@ def construir_entrada_bateria(
             datos,
             "tarifa_energia",
             0.0,
+        ),
+        tarifa_inyeccion_l_kwh=_leer_float(
+            datos,
+            "tarifa_inyeccion_l_kwh",
+            2.72,
         ),
         cargos_fijos_l_mes=_leer_float(
             datos,
