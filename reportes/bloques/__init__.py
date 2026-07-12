@@ -27,30 +27,31 @@ from .ingenieria_electrica import (
 # ==========================================================
 
 BLOQUES_REPORTE = [
-    # 1. Resumen para decisión
+
+    # 1. Reporte ejecutivo
     build_resumen_ejecutivo,
 
-    # 2. Conclusiones y recomendación
+    # 2. Conclusiones
     build_conclusiones,
 
-    # 3. Análisis energético
-    build_analisis_energetico,
-
-    # 4. Comportamiento energético, batería y optimización
-    build_operacion_fv,
-
-    # 5. Evaluación económica
+    # 3. Evaluación financiera
     build_analisis_financiero,
 
-    # 6. Impacto económico mensual
+    # 4. Impacto económico
     build_analisis_operativo,
 
-    # 7. Solución técnica propuesta
+    # 5. Análisis energético
+    build_analisis_energetico,
+
+    # 6. Solución técnica
     build_solucion_tecnica,
 
-    # 8. Distribución física
+    # 7. Layout FV
     build_layout_fv,
 
-    # 9. Respaldo técnico
+    # 8. Operación FV
+    build_operacion_fv,
+
+    # 9. Anexo técnico
     build_anexo_electrico,
 ]
