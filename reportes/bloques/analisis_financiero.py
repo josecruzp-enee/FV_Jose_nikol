@@ -429,6 +429,26 @@ def _build_bloque_contado(
         )
     )
 
+    story.append(Spacer(1, 12))
+
+    story.append(
+        Paragraph(
+            "Indicadores económicos",
+            styles["H2b"],
+        )
+    )
+
+    story.append(Spacer(1, 6))
+
+    story.append(
+        _tabla_indicadores_financieros(
+            params,
+            pal,
+            content_w,
+        )
+    )
+
+    story.append(Spacer(1, 12))
     story.append(PageBreak())
 
     return story
@@ -437,6 +457,88 @@ def _build_bloque_contado(
 # =========================================================
 # 5. TABLA DE AMORTIZACIÓN
 # =========================================================
+# =========================================================
+# INDICADORES ECONÓMICOS
+# =========================================================
+
+def _tabla_indicadores_financieros(
+    params: Dict[str, Any],
+    pal: dict,
+    content_w: float,
+):
+
+    financiero = params["financiero"]
+
+    ahorro_anual = float(
+        leer(
+            financiero,
+            "ahorro_anual_L",
+            0.0,
+        ) or 0.0
+    )
+
+    roi = leer(
+        financiero,
+        "roi_pct",
+        None,
+    )
+
+    payback = leer(
+        financiero,
+        "payback_anios",
+        None,
+    )
+
+    tir = leer(
+        financiero,
+        "tir_pct",
+        None,
+    )
+
+    rows = [
+        ["Indicador", "Valor"],
+        [
+            "Ahorro anual esperado",
+            money_L(ahorro_anual),
+        ],
+        [
+            "ROI anual simple",
+            f"{float(roi):.1f} %" if roi is not None else "—",
+        ],
+        [
+            "Período simple de recuperación",
+            f"{float(payback):.1f} años" if payback is not None else "—",
+        ],
+        [
+            "TIR estimada a 10 años",
+            f"{float(tir):.1f} %" if tir is not None else "—",
+        ],
+    ]
+
+    tabla = make_table(
+        rows,
+        content_w,
+        ratios=[1.8, 1.2],
+        repeatRows=1,
+    )
+
+    tabla.setStyle(
+        table_style_uniform(
+            pal,
+            font_header=9,
+            font_body=9,
+        )
+    )
+
+    tabla.setStyle(
+        TableStyle([
+            ("ALIGN", (1, 1), (1, -1), "RIGHT"),
+            ("FONTNAME", (0, 1), (0, -1), "Helvetica-Bold"),
+        ])
+    )
+
+    return tabla
+
 
 def _tabla_amortizacion_pdf(
     anual: List[Dict[str, Any]],
@@ -641,6 +743,26 @@ def _build_bloque_financiado(
         )
     )
 
+    story.append(Spacer(1, 12))
+
+    story.append(
+        Paragraph(
+            "Indicadores económicos",
+            styles["H2b"],
+        )
+    )
+
+    story.append(Spacer(1, 6))
+
+    story.append(
+        _tabla_indicadores_financieros(
+            params,
+            pal,
+            content_w,
+        )
+    )
+
+    story.append(Spacer(1, 12))
     story.append(PageBreak())
 
     return story
