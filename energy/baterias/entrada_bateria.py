@@ -39,7 +39,7 @@ class EntradaBateria:
     # CONFIGURACIÓN TÉCNICA
     # ======================================================
 
-    usar_bateria: bool = True
+    usar_bateria: bool = False
 
     factor_aprovechamiento: float = 0.80
 
@@ -515,6 +515,7 @@ def construir_entrada_bateria(
     energia,
 ) -> EntradaBateria:
 
+    
     consumo_12m = _obtener_consumo_12m(
         datos
     )
@@ -550,6 +551,14 @@ def construir_entrada_bateria(
         consumo_12m_kwh=consumo_12m,
         energia_fv_util_12m_kwh=energia_util_12m,
         energia_fv_generada_12m_kwh=energia_generada_12m,
+        usar_bateria=bool(
+            (
+                getattr(datos, "sistema_fv", {})
+                .get("bateria", {})
+                .get("usar_bateria", False)
+            )
+        ),
+        
         costo_bateria_usd_kwh=_leer_float(
             datos,
             "costo_bateria_usd_kwh",
