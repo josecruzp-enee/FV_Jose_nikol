@@ -588,39 +588,73 @@ def crear_tabla_indicadores(resultado, pal, content_w):
     sizing = getattr(resultado, "sizing", None)
     paneles = getattr(resultado, "paneles", None)
 
-    strings = getattr(paneles, "strings", []) if paneles else []
+    strings = (
+        getattr(paneles, "strings", [])
+        if paneles
+        else []
+    )
 
     # ======================================================
     # DATOS BASE
     # ======================================================
 
-    n_paneles_sizing = int(getattr(sizing, "n_paneles", 0) or 0) if sizing else 0
+    n_paneles_sizing = (
+        int(getattr(sizing, "n_paneles", 0) or 0)
+        if sizing
+        else 0
+    )
 
-    kw_ac_unitario = float(getattr(sizing, "kw_ac", 0) or 0) if sizing else 0
-    kw_ac_total = float(
-        getattr(sizing, "kw_ac_total", kw_ac_unitario) or kw_ac_unitario
-    ) if sizing else 0
+    kw_ac_unitario = (
+        float(getattr(sizing, "kw_ac", 0) or 0)
+        if sizing
+        else 0
+    )
 
-    n_inv = int(getattr(sizing, "n_inversores", 1) or 1) if sizing else 1
+    kw_ac_total = (
+        float(
+            getattr(
+                sizing,
+                "kw_ac_total",
+                kw_ac_unitario,
+            )
+            or kw_ac_unitario
+        )
+        if sizing
+        else 0
+    )
+
+    n_inv = (
+        int(getattr(sizing, "n_inversores", 1) or 1)
+        if sizing
+        else 1
+    )
 
     # ======================================================
     # PANEL REAL
     # ======================================================
 
-    panel = getattr(paneles, "panel", None) if paneles else None
+    panel = (
+        getattr(paneles, "panel", None)
+        if paneles
+        else None
+    )
 
     if panel is None and sizing is not None:
         panel = getattr(sizing, "panel", None)
 
-    panel_wp = float(getattr(panel, "pmax_w", 0) or 0) if panel else 0
+    panel_wp = (
+        float(getattr(panel, "pmax_w", 0) or 0)
+        if panel
+        else 0
+    )
 
     # ======================================================
     # PANELES REALMENTE CONECTADOS
     # ======================================================
 
     paneles_en_strings = sum(
-        int(getattr(s, "n_series", 0) or 0) * int(getattr(s, "n_paralelo", 1) or 1)
-        for s in strings
+        int(getattr(string, "n_series", 0) or 0)
+        for string in strings
     )
 
     if paneles_en_strings <= 0:
@@ -631,57 +665,149 @@ def crear_tabla_indicadores(resultado, pal, content_w):
     # ======================================================
 
     if paneles_en_strings > 0 and panel_wp > 0:
-        kwp_dc_real = paneles_en_strings * panel_wp / 1000.0
+        kwp_dc_real = (
+            paneles_en_strings
+            * panel_wp
+            / 1000.0
+        )
     else:
-        kwp_dc_real = float(
-            getattr(sizing, "kwp_dc", getattr(sizing, "pdc_kw", 0)) or 0
-        ) if sizing else 0
+        kwp_dc_real = (
+            float(
+                getattr(
+                    sizing,
+                    "kwp_dc",
+                    getattr(sizing, "pdc_kw", 0),
+                )
+                or 0
+            )
+            if sizing
+            else 0
+        )
 
     # ======================================================
     # UTILIZACIÓN DE PANELES
     # ======================================================
 
     utiliz_panel = (
-        paneles_en_strings / n_paneles_sizing * 100
-        if n_paneles_sizing else 0
+        paneles_en_strings
+        / n_paneles_sizing
+        * 100.0
+        if n_paneles_sizing > 0
+        else 0.0
     )
 
     # ======================================================
-    # MPPT
+    # UTILIZACIÓN DE MPPT
     # ======================================================
 
-    inversor = getattr(sizing, "inversor", None) if sizing else None
-    mppt_por_inv = int(getattr(inversor, "n_mppt", 2) or 2) if inversor else 2
+    inversor = (
+        getattr(sizing, "inversor", None)
+        if sizing
+        else None
+    )
+
+    mppt_por_inv = (
+        int(getattr(inversor, "n_mppt", 2) or 2)
+        if inversor
+        else 2
+    )
 
     n_mppt_total = n_inv * mppt_por_inv
 
-    array = getattr(paneles, "array", None) if paneles else None
-
-    strings_por_mppt = (
-        int(getattr(array, "strings_por_mppt", 1) or 1)
-        if array else 1
-    )
-
-    capacidad_total_strings = n_mppt_total * strings_por_mppt
+    mppt_utilizados = len({
+        (
+            int(getattr(string, "inversor", 1) or 1),
+            int(getattr(string, "mppt", 1) or 1),
+        )
+        for string in strings
+    })
 
     utiliz_mppt = (
-        len(strings) / capacidad_total_strings * 100
-        if capacidad_total_strings else 0
+        mppt_utilizados
+        / n_mppt_total
+        * 100.0
+        if n_mppt_total > 0
+        else 0.0
     )
 
     # ======================================================
-    # DC / AC
+    # UTILIZACIÓN DE ENTRADAS DE STRINGS
     # ======================================================
 
-    relacion = kwp_dc_real / kw_ac_total if kw_ac_total else 0
-    carga_inv = kwp_dc_real / n_inv if n_inv else 0
+    array = (
+        getattr(paneles, "array", None)
+        if paneles
+        else None
+    )
+
+    strings_por_mppt = (
+        int(
+            getattr(
+                array,
+                "strings_por_mppt",
+                1,
+            )
+            or 1
+        )
+        if array
+        else 1
+    )
+
+    capacidad_total_strings = (
+        n_mppt_total
+        * strings_por_mppt
+    )
+
+    utiliz_entradas_strings = (
+        len(strings)
+        / capacidad_total_strings
+        * 100.0
+        if capacidad_total_strings > 0
+        else 0.0
+    )
+
+    # ======================================================
+    # RELACIÓN DC / AC
+    # ======================================================
+
+    relacion = (
+        kwp_dc_real / kw_ac_total
+        if kw_ac_total > 0
+        else 0.0
+    )
+
+    carga_inv = (
+        kwp_dc_real / n_inv
+        if n_inv > 0
+        else 0.0
+    )
+
+    # ======================================================
+    # TABLA
+    # ======================================================
 
     rows = [
         ["Indicador", "Valor"],
-        ["Utilización de paneles", f"{utiliz_panel:.1f} %"],
-        ["Utilización de MPPT", f"{utiliz_mppt:.1f} %"],
-        ["Relación DC/AC", f"{relacion:.2f}"],
-        ["Carga promedio inversor", f"{carga_inv:.1f} kW DC"],
+        [
+            "Utilización de paneles",
+            f"{utiliz_panel:.1f} %",
+        ],
+        [
+            "Utilización de MPPT",
+            f"{utiliz_mppt:.1f} %",
+        ],
+        [
+            "Utilización de entradas de strings",
+            f"{utiliz_entradas_strings:.1f} %",
+        ],
+        [
+            "Relación DC/AC",
+            f"{relacion:.2f}",
+        ],
+        [
+            "Carga promedio inversor",
+            f"{carga_inv:.1f} kW DC",
+        ],
     ]
 
     colw = [
@@ -702,7 +828,6 @@ def crear_tabla_indicadores(resultado, pal, content_w):
         header_size=9,
         align_numeric_from_col=1,
     )
-
 
 # ==========================================================
 # TABLA 4 — ANÁLISIS DE CAÍDA DE VOLTAJE
