@@ -257,7 +257,7 @@ def p1_tabla_solucion_unica(
             (
                 f"{get_field(datos, 'cobertura_objetivo', 0) * 100:.0f}%"
             ),
-            "Cobertura real",
+            "Cobertura energética",
             f"{cobertura_real * 100:.1f}%",
         ],
 
@@ -269,7 +269,7 @@ def p1_tabla_solucion_unica(
         ],
 
         [
-            "Producción anual",
+            "Energía anual cubierta",
             f"{prod_anual:,.0f} kWh/año",
             "DSCR",
             ds_txt,
@@ -554,7 +554,7 @@ def p1_conclusion(
     {linea_bateria}
     • Cobertura solicitada:
       {cobertura_obj * 100:.0f}%<br/>
-    • Cobertura recomendada:
+    • Cobertura energética obtenida:
       <b>{cobertura_real * 100:.1f}%</b><br/>
     """
 
