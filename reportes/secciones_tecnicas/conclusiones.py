@@ -70,7 +70,7 @@ def _metricas_energia(resultado: Any, datos: Any) -> dict:
     consumo_anual = sum(_num(x) for x in consumo_12m)
     produccion_anual = sum(_num(x) for x in energia.energia_util_12m)
 
-    cobertura_real = (
+    produccion_vs_consumo_pct = (
         produccion_anual / consumo_anual * 100.0
         if consumo_anual > 0
         else 0.0
@@ -79,7 +79,7 @@ def _metricas_energia(resultado: Any, datos: Any) -> dict:
     return {
         "consumo_anual": consumo_anual,
         "produccion_anual": produccion_anual,
-        "cobertura_real": cobertura_real,
+        "produccion_vs_consumo_pct": produccion_vs_consumo_pct,
     }
 
 
@@ -262,7 +262,8 @@ def _texto_resultado_energetico(m: dict) -> str:
         f"El sistema fotovoltaico propuesto tiene una potencia instalada "
         f"de {_fmt_kwp(m['kwp'])} y una producción fotovoltaica anual "
         f"estimada de {_fmt_kwh(m['produccion_anual'])}. Esta producción "
-        f"equivale aproximadamente a {_fmt_pct(m['cobertura_real'])} del "
+        f"equivale aproximadamente a "
+        f"{_fmt_pct(m['produccion_vs_consumo_pct'])} del "
         f"consumo anual del cliente, cuyo consumo total es de "
         f"{_fmt_kwh(m['consumo_anual'])}."
     )
