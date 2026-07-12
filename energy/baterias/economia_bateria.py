@@ -282,9 +282,13 @@ def evaluar_escenario_bateria(
         0.0,
     )
     ahorro_incremental_l = (
-        ahorro_anual_l
-        - ahorro_base_l
-        - om_incremental_anual
+        0.0
+        if escenario_base is None
+        else (
+            ahorro_anual_l
+            - ahorro_base_l
+            - om_incremental_anual
+        )
     )
     ahorro_neto_total_l = ahorro_anual_l - om_mensual_l * 12.0
 
