@@ -327,6 +327,18 @@ def _extraer_series_bateria(bateria) -> dict:
     tabla_24h = _extraer_tabla_24h_bateria(resultado_bateria)
 
     return {
+        "demanda": _serie_24_desde_atributos(
+            resultado_bateria,
+            ["demanda_24h_kwh"],
+        ),
+        "fv": _serie_24_desde_atributos(
+            resultado_bateria,
+            ["fv_24h_kwh"],
+        ),
+        "red_sin_bateria": _serie_24_desde_atributos(
+            resultado_bateria,
+            ["compra_red_sin_bateria_24h"],
+        ),
         "red_con_bateria": _extraer_red_con_bateria(resultado_bateria, tabla_24h),
         "descarga": _extraer_descarga_bateria(resultado_bateria, tabla_24h),
         "carga": _extraer_carga_bateria(resultado_bateria, tabla_24h),
@@ -397,11 +409,11 @@ def _resumen_demanda_fv(
     )
 
     texto = (
-        f"Demanda diaria: {energia_demanda:.1f} kWh\n"
-        f"Generación FV: {energia_fv:.1f} kWh\n"
-        f"Autoconsumo: {energia_autoconsumo:.1f} kWh\n"
-        f"Energía desde red: {energia_red:.1f} kWh\n"
-        f"Excedente FV: {energia_excedente:.1f} kWh\n"
+        f"Demanda diaria promedio: {energia_demanda:.1f} kWh\n"
+        f"Generación FV promedio: {energia_fv:.1f} kWh\n"
+        f"Autoconsumo promedio: {energia_autoconsumo:.1f} kWh\n"
+        f"Compra de red promedio: {energia_red:.1f} kWh\n"
+        f"Excedente FV promedio: {energia_excedente:.1f} kWh\n"
         f"Cobertura directa: {cobertura_directa:.1f}%\n"
         f"Reducción compra red: {reduccion_red:.1f}%"
     )
@@ -569,6 +581,9 @@ def _dibujar_bateria(ax, horas_np, red_np, red_con_bateria):
 
     red_bat_np = np.array(red_con_bateria, dtype=float)
 
+    if np.allclose(red_bat_np, red_np, rtol=0.0, atol=1e-9):
+        return
+
     ax.fill_between(
         horas_np,
         red_bat_np,
@@ -634,7 +649,7 @@ def _dibujar_caja_resumen(ax, texto: str):
 
 
 def _configurar_ejes_demanda(ax):
-    ax.set_title("Demanda del cliente vs generación FV con batería")
+    ax.set_title("Demanda del cliente vs generación FV y almacenamiento")
     ax.set_xlabel("Hora del día")
     ax.set_ylabel("Energía promedio horaria (kWh)")
     ax.set_xticks(range(24))
@@ -660,14 +675,22 @@ def _chart_demanda_vs_fv_horaria(
 
     horas = list(range(24))
 
-    demanda = _demanda_24h_desde_dict(consumo_horario_24h_kwh)
-    fv = _promedio_fv_24h(energia_horaria_kwh or [0.0] * 8760)
+    series_bateria = _extraer_series_bateria(bateria)
 
-    red_sin_bateria = _calcular_red_sin_bateria(demanda, fv)
+    demanda = (
+        series_bateria.get("demanda")
+        or _demanda_24h_desde_dict(consumo_horario_24h_kwh)
+    )
+    fv = (
+        series_bateria.get("fv")
+        or _promedio_fv_24h(energia_horaria_kwh or [0.0] * 8760)
+    )
+    red_sin_bateria = (
+        series_bateria.get("red_sin_bateria")
+        or _calcular_red_sin_bateria(demanda, fv)
+    )
     autoconsumo = _calcular_autoconsumo(demanda, fv)
     excedente = _calcular_excedente(demanda, fv)
-
-    series_bateria = _extraer_series_bateria(bateria)
 
     red_con_bateria = series_bateria.get("red_con_bateria")
     descarga = series_bateria.get("descarga")
@@ -679,6 +702,20 @@ def _chart_demanda_vs_fv_horaria(
         red_con_bateria,
         descarga,
     )
+
+    bateria_activa = (
+        red_con_bateria is not None
+        and any(
+            abs(a - b) > 1e-9
+            for a, b in zip(red_sin_bateria, red_con_bateria)
+        )
+    )
+
+    if not bateria_activa:
+        red_con_bateria = None
+        descarga = None
+        carga = None
+        soc = None
 
     horas_np = np.array(horas, dtype=float)
     demanda_np = np.array(demanda, dtype=float)
