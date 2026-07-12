@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from energy.baterias.balance_bateria import (
-    simular_balance_bateria_24h,
+    simular_balance_bateria_horario,
 )
 from energy.baterias.economia_bateria import (
     evaluar_escenario_bateria,
@@ -25,11 +25,11 @@ from energy.baterias.resultado_bateria import (
 def _preparar_perfiles(
     entrada: EntradaBateria,
 ) -> dict:
-
     return preparar_perfiles_bateria(
         demanda_24h=entrada.demanda_24h_kwh,
         fv_24h=entrada.fv_horaria_kwh,
         consumo_anual_kwh=entrada.consumo_anual_kwh,
+        consumo_12m_kwh=entrada.consumo_12m_kwh,
     )
 
 
@@ -38,7 +38,6 @@ def _crear_config(
     capacidad: float,
     potencia: float,
 ) -> ConfigBateria:
-
     return ConfigBateria(
         usar_bateria=True,
         capacidad_util_kwh=capacidad,
@@ -52,16 +51,37 @@ def _crear_config(
     )
 
 
-def _crear_escenario_base(
-    entrada: EntradaBateria,
+def _simular(
+    *,
+    perfiles: dict,
+    config: ConfigBateria,
 ):
+    return simular_balance_bateria_horario(
+        demanda_horaria_kwh=perfiles["demanda_horaria"],
+        fv_horaria_kwh=perfiles["fv_horaria"],
+        cfg=config,
+    )
+
+
+def _crear_escenario_base(
+    *,
+    entrada: EntradaBateria,
+    perfiles: dict,
+):
+    resultado = _simular(
+        perfiles=perfiles,
+        config=ConfigBateria(usar_bateria=False),
+    )
+
+    if not resultado.ok:
+        return None
 
     return evaluar_escenario_bateria(
         entrada=entrada,
         nombre="Sin batería",
         capacidad_kwh=0.0,
         potencia_kw=0.0,
-        resultado_tecnico=None,
+        resultado_tecnico=resultado,
     )
 
 
@@ -72,17 +92,17 @@ def _evaluar_opcion(
     opcion,
     escenario_base,
 ):
+    if opcion.capacidad_util_kwh <= 0:
+        return None
 
     config = _crear_config(
         entrada,
         opcion.capacidad_util_kwh,
         opcion.potencia_max_kw,
     )
-
-    resultado = simular_balance_bateria_24h(
-        demanda_24h_kwh=perfiles["demanda_24h"],
-        fv_24h_kwh=perfiles["fv_24h"],
-        cfg=config,
+    resultado = _simular(
+        perfiles=perfiles,
+        config=config,
     )
 
     if not resultado.ok:
@@ -90,10 +110,7 @@ def _evaluar_opcion(
 
     return evaluar_escenario_bateria(
         entrada=entrada,
-        nombre=(
-            f"Batería "
-            f"{opcion.capacidad_util_kwh:.0f} kWh"
-        ),
+        nombre=f"Batería {opcion.capacidad_util_kwh:.0f} kWh",
         capacidad_kwh=opcion.capacidad_util_kwh,
         potencia_kw=opcion.potencia_max_kw,
         resultado_tecnico=resultado,
@@ -106,13 +123,10 @@ def _generar_opciones(
     entrada: EntradaBateria,
     perfiles: dict,
 ):
-
     return generar_opciones_bateria(
         demanda_24h=perfiles["demanda_24h"],
         fv_24h=perfiles["fv_24h"],
-        factor_aprovechamiento=(
-            entrada.factor_aprovechamiento
-        ),
+        factor_aprovechamiento=entrada.factor_aprovechamiento,
         capacidades_comerciales_kwh=(
             entrada.capacidades_comerciales_kwh
         ),
@@ -123,34 +137,46 @@ def _factor_normalizacion(
     entrada: EntradaBateria,
     perfiles: dict,
 ) -> tuple[float, float, float]:
-
     demanda_original = sum(
         convertir_a_perfil_24h(
             entrada.demanda_24h_kwh
         )
     )
-
     demanda_normalizada = sum(
         perfiles["demanda_24h"]
     )
-
     factor = (
         demanda_normalizada / demanda_original
         if demanda_original > 0
         else 1.0
     )
 
+    return demanda_original, demanda_normalizada, factor
+
+
+def _indicadores_recomendacion(opciones):
+    referencia = next(
+        (
+            opcion
+            for opcion in opciones
+            if opcion.capacidad_util_kwh > 0
+        ),
+        None,
+    )
+
+    if referencia is None:
+        return 0.0, 0.0, 0.0
+
     return (
-        demanda_original,
-        demanda_normalizada,
-        factor,
+        referencia.excedente_diario_kwh,
+        referencia.consumo_nocturno_kwh,
+        referencia.energia_objetivo_kwh,
     )
 
 
 def ejecutar_sistema_bateria(
     entrada: EntradaBateria,
 ) -> ResultadoSistemaBateria:
-
     errores = entrada.validar()
 
     if errores:
@@ -159,67 +185,70 @@ def ejecutar_sistema_bateria(
             errores=errores,
         )
 
-    perfiles = _preparar_perfiles(entrada)
-    opciones = _generar_opciones(entrada, perfiles)
+    try:
+        perfiles = _preparar_perfiles(entrada)
+        opciones = _generar_opciones(entrada, perfiles)
 
-    escenario_base = _crear_escenario_base(
-        entrada
-    )
-
-    escenarios = [escenario_base]
-
-    for opcion in opciones:
-        escenario = _evaluar_opcion(
+        escenario_base = _crear_escenario_base(
             entrada=entrada,
             perfiles=perfiles,
-            opcion=opcion,
-            escenario_base=escenario_base,
         )
 
-        if escenario:
-            escenarios.append(escenario)
+        if escenario_base is None:
+            return ResultadoSistemaBateria(
+                ok=False,
+                errores=[
+                    "No fue posible simular el escenario sin batería."
+                ],
+            )
 
-    if entrada.usar_bateria:
-        seleccionado = seleccionar_mejor_escenario(
-            escenarios=escenarios,
-            vida_util_bateria_anios=(
-                entrada.vida_util_bateria_anios
-            ),
-        )
-    else:
-        seleccionado = escenario_base
+        escenarios = [escenario_base]
 
-    original, normalizada, factor = (
-        _factor_normalizacion(
+        if entrada.usar_bateria:
+            for opcion in opciones:
+                escenario = _evaluar_opcion(
+                    entrada=entrada,
+                    perfiles=perfiles,
+                    opcion=opcion,
+                    escenario_base=escenario_base,
+                )
+
+                if escenario is not None:
+                    escenarios.append(escenario)
+
+            seleccionado = seleccionar_mejor_escenario(
+                escenarios=escenarios,
+                vida_util_bateria_anios=(
+                    entrada.vida_util_bateria_anios
+                ),
+            )
+        else:
+            seleccionado = escenario_base
+
+        original, normalizada, factor = _factor_normalizacion(
             entrada,
             perfiles,
         )
-    )
+        excedente, nocturno, objetivo = _indicadores_recomendacion(
+            opciones
+        )
 
-    referencia = opciones[-1] if opciones else None
+        return ResultadoSistemaBateria(
+            ok=True,
+            consumo_anual_kwh=entrada.consumo_anual_kwh,
+            demanda_diaria_original_kwh=original,
+            demanda_diaria_normalizada_kwh=normalizada,
+            factor_normalizacion_demanda=factor,
+            excedente_fv_diario_kwh=excedente,
+            consumo_nocturno_diario_kwh=nocturno,
+            energia_objetivo_diaria_kwh=objetivo,
+            escenarios=escenarios,
+            escenario_sin_bateria=escenario_base,
+            escenario_seleccionado=seleccionado,
+        )
 
-    return ResultadoSistemaBateria(
-        ok=True,
-        consumo_anual_kwh=entrada.consumo_anual_kwh,
-        demanda_diaria_original_kwh=original,
-        demanda_diaria_normalizada_kwh=normalizada,
-        factor_normalizacion_demanda=factor,
-        excedente_fv_diario_kwh=(
-            referencia.excedente_diario_kwh
-            if referencia
-            else 0.0
-        ),
-        consumo_nocturno_diario_kwh=(
-            referencia.consumo_nocturno_kwh
-            if referencia
-            else 0.0
-        ),
-        energia_objetivo_diaria_kwh=(
-            referencia.energia_objetivo_kwh
-            if referencia
-            else 0.0
-        ),
-        escenarios=escenarios,
-        escenario_sin_bateria=escenario_base,
-        escenario_seleccionado=seleccionado,
-    )
+    except (TypeError, ValueError) as error:
+        return ResultadoSistemaBateria(
+            ok=False,
+            errores=[str(error)],
+        )
