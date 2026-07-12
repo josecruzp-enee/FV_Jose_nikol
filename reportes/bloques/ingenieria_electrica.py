@@ -295,29 +295,41 @@ def _section_demanda_vs_fv_horaria(
         "cliente vs generación FV.",
     )
 
-def _section_energia_mensual(story, paths, styles, content_w):
+def _section_energia_mensual(
+    story,
+    paths,
+    styles,
+    content_w,
+):
 
-    story.append(Paragraph("Generación fotovoltaica mensual", styles["Heading2"]))
+    story.append(
+        Paragraph(
+            "Energía cubierta mensualmente por el sistema",
+            styles["Heading2"],
+        )
+    )
+
     story.append(Spacer(1, 6))
 
     chart = None
 
     if isinstance(paths, dict):
-        chart = paths.get("chart_energia_mensual") or paths.get("chart_mensual")
+        chart = (
+            paths.get("chart_energia_mensual")
+            or paths.get("chart_mensual")
+        )
 
     _insert_chart(
         story,
         chart,
         styles,
         content_w,
-        "No se pudo generar la gráfica de generación mensual."
+        "No se pudo generar la gráfica de energía mensual.",
     )
-
 
 # =========================================================
 # 4. SECCIÓN: BATERÍA RECOMENDADA
 # =========================================================
-
 def _section_bateria(story, resultado, energia, styles):
 
     if energia is None:
@@ -396,11 +408,11 @@ def _section_bateria(story, resultado, energia, styles):
                 f"{float(leer(bateria, 'excedente_con_bateria_kwh', 0.0) or 0.0):.1f} kWh/día",
             ],
             [
-                "Cobertura sin batería",
+                "Cobertura diaria sin batería",
                 f"{float(leer(bateria, 'cobertura_sin_bateria_pct', 0.0) or 0.0):.1f}%",
             ],
             [
-                "Cobertura con batería",
+                "Cobertura diaria con batería",
                 f"{float(leer(bateria, 'cobertura_con_bateria_pct', 0.0) or 0.0):.1f}%",
             ],
         ])
@@ -450,8 +462,11 @@ def _section_bateria(story, resultado, energia, styles):
         tabla,
         Spacer(1, 8),
         Paragraph(
-            "La batería mostrada corresponde al escenario financiero "
-            "óptimo evaluado por el motor de optimización.",
+            "Los indicadores energéticos mostrados en esta sección "
+            "corresponden al comportamiento del día representativo "
+            "utilizado para evaluar el desempeño de la batería. "
+            "La cobertura energética anual del sistema se presenta "
+            "en el análisis energético del proyecto.",
             styles["BodyText"],
         ),
         Spacer(1, 12),
