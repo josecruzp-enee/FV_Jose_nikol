@@ -5,10 +5,6 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 
-# ==========================================================
-# RESULTADO TÉCNICO DE UNA SIMULACIÓN
-# ==========================================================
-
 @dataclass
 class ResultadoBateria:
     ok: bool
@@ -23,41 +19,37 @@ class ResultadoBateria:
     capex_bateria_usd: float = 0.0
     vida_util_anios: int = 0
 
-    demanda_24h_kwh: List[float] = field(
-        default_factory=list
-    )
+    # Perfiles promedio para gráfica y compatibilidad.
+    demanda_24h_kwh: List[float] = field(default_factory=list)
+    fv_24h_kwh: List[float] = field(default_factory=list)
+    compra_red_sin_bateria_24h: List[float] = field(default_factory=list)
+    compra_red_con_bateria_24h: List[float] = field(default_factory=list)
+    excedente_sin_bateria_24h: List[float] = field(default_factory=list)
+    excedente_con_bateria_24h: List[float] = field(default_factory=list)
+    carga_bateria_24h: List[float] = field(default_factory=list)
+    descarga_bateria_24h: List[float] = field(default_factory=list)
+    soc_24h_pct: List[float] = field(default_factory=list)
 
-    fv_24h_kwh: List[float] = field(
-        default_factory=list
-    )
+    # Series reales de 8760 o 8784 horas.
+    demanda_horaria_kwh: List[float] = field(default_factory=list)
+    fv_horaria_kwh: List[float] = field(default_factory=list)
+    compra_red_sin_bateria_horaria_kwh: List[float] = field(default_factory=list)
+    compra_red_con_bateria_horaria_kwh: List[float] = field(default_factory=list)
+    excedente_sin_bateria_horaria_kwh: List[float] = field(default_factory=list)
+    excedente_con_bateria_horaria_kwh: List[float] = field(default_factory=list)
+    carga_bateria_horaria_kwh: List[float] = field(default_factory=list)
+    descarga_bateria_horaria_kwh: List[float] = field(default_factory=list)
+    soc_horario_pct: List[float] = field(default_factory=list)
 
-    compra_red_sin_bateria_24h: List[float] = field(
-        default_factory=list
-    )
-
-    compra_red_con_bateria_24h: List[float] = field(
-        default_factory=list
-    )
-
-    excedente_sin_bateria_24h: List[float] = field(
-        default_factory=list
-    )
-
-    excedente_con_bateria_24h: List[float] = field(
-        default_factory=list
-    )
-
-    carga_bateria_24h: List[float] = field(
-        default_factory=list
-    )
-
-    descarga_bateria_24h: List[float] = field(
-        default_factory=list
-    )
-
-    soc_24h_pct: List[float] = field(
-        default_factory=list
-    )
+    # Agregados mensuales calculados desde las series horarias.
+    demanda_12m_kwh: List[float] = field(default_factory=list)
+    fv_12m_kwh: List[float] = field(default_factory=list)
+    compra_red_sin_bateria_12m_kwh: List[float] = field(default_factory=list)
+    compra_red_con_bateria_12m_kwh: List[float] = field(default_factory=list)
+    excedente_sin_bateria_12m_kwh: List[float] = field(default_factory=list)
+    excedente_con_bateria_12m_kwh: List[float] = field(default_factory=list)
+    carga_bateria_12m_kwh: List[float] = field(default_factory=list)
+    descarga_bateria_12m_kwh: List[float] = field(default_factory=list)
 
     demanda_total_kwh: float = 0.0
     fv_total_kwh: float = 0.0
@@ -65,22 +57,18 @@ class ResultadoBateria:
     autoconsumo_directo_kwh: float = 0.0
     energia_cargada_bateria_kwh: float = 0.0
     energia_descargada_bateria_kwh: float = 0.0
+    perdidas_bateria_kwh: float = 0.0
+    ciclos_equivalentes: float = 0.0
 
     compra_red_sin_bateria_kwh: float = 0.0
     compra_red_con_bateria_kwh: float = 0.0
-
     excedente_sin_bateria_kwh: float = 0.0
     excedente_con_bateria_kwh: float = 0.0
 
     cobertura_sin_bateria_pct: float = 0.0
     cobertura_con_bateria_pct: float = 0.0
-
     reduccion_compra_red_pct: float = 0.0
 
-
-# ==========================================================
-# ESCENARIO TÉCNICO Y ECONÓMICO
-# ==========================================================
 
 @dataclass
 class EscenarioBateria:
@@ -98,6 +86,12 @@ class EscenarioBateria:
     ahorro_anual_l: float = 0.0
     ahorro_incremental_anual_l: float = 0.0
 
+    # Valores anuales para transparentar compra e inyección.
+    costo_red_sin_bateria_anual_l: float = 0.0
+    costo_red_con_bateria_anual_l: float = 0.0
+    ingreso_inyeccion_sin_bateria_anual_l: float = 0.0
+    ingreso_inyeccion_con_bateria_anual_l: float = 0.0
+
     cuota_mensual_l: float = 0.0
     om_mensual_l: float = 0.0
 
@@ -112,20 +106,10 @@ class EscenarioBateria:
     estado: str = "SIN EVALUAR"
     criterio_seleccion: str = ""
 
-    energia_util_12m_kwh: List[float] = field(
-        default_factory=list
-    )
-
-    tabla_12m: List[Dict[str, Any]] = field(
-        default_factory=list
-    )
-
+    energia_util_12m_kwh: List[float] = field(default_factory=list)
+    tabla_12m: List[Dict[str, Any]] = field(default_factory=list)
     resultado_tecnico: Optional[ResultadoBateria] = None
 
-
-# ==========================================================
-# SALIDA ÚNICA DEL MÓDULO DE BATERÍAS
-# ==========================================================
 
 @dataclass
 class ResultadoSistemaBateria:
@@ -144,21 +128,9 @@ class ResultadoSistemaBateria:
     consumo_nocturno_diario_kwh: float = 0.0
     energia_objetivo_diaria_kwh: float = 0.0
 
-    escenarios: List[EscenarioBateria] = field(
-        default_factory=list
-    )
-
-    escenario_sin_bateria: Optional[
-        EscenarioBateria
-    ] = None
-
-    escenario_seleccionado: Optional[
-        EscenarioBateria
-    ] = None
-
-    # ------------------------------------------------------
-    # ACCESOS DE COMPATIBILIDAD
-    # ------------------------------------------------------
+    escenarios: List[EscenarioBateria] = field(default_factory=list)
+    escenario_sin_bateria: Optional[EscenarioBateria] = None
+    escenario_seleccionado: Optional[EscenarioBateria] = None
 
     @property
     def bateria_recomendada(self) -> Optional[EscenarioBateria]:
