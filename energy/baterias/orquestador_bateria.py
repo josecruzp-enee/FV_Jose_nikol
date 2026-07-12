@@ -179,12 +179,15 @@ def ejecutar_sistema_bateria(
         if escenario:
             escenarios.append(escenario)
 
-    seleccionado = seleccionar_mejor_escenario(
-        escenarios=escenarios,
-        vida_util_bateria_anios=(
-            entrada.vida_util_bateria_anios
-        ),
-    )
+    if entrada.usar_bateria:
+        seleccionado = seleccionar_mejor_escenario(
+            escenarios=escenarios,
+            vida_util_bateria_anios=(
+                entrada.vida_util_bateria_anios
+            ),
+        )
+    else:
+        seleccionado = escenario_base
 
     original, normalizada, factor = (
         _factor_normalizacion(
