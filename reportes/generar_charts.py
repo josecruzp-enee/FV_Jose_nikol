@@ -448,66 +448,66 @@ def _resumen_demanda_fv(
 # GRÁFICAS BÁSICAS
 # ==========================================================
 
-def _guardar_figura(path: Path):
-    plt.tight_layout()
-    plt.savefig(path, dpi=160)
-    plt.close()
+def _guardar_figura(fig, path: Path):
+    fig.tight_layout()
+    fig.savefig(path, dpi=160, bbox_inches="tight")
+    plt.close(fig)
 
 
 def _chart_mensual(meses: List[str], energia: List[float], path: Path):
-    plt.figure()
-    plt.bar(meses, energia)
-    plt.title("Generación FV mensual")
-    plt.ylabel("Energía (kWh)")
-    plt.xticks(rotation=45)
-    plt.grid(True)
-    _guardar_figura(path)
+    fig, ax = plt.subplots()
+    ax.bar(meses, energia)
+    ax.set_title("Generación FV mensual")
+    ax.set_ylabel("Energía (kWh)")
+    ax.tick_params(axis="x", rotation=45)
+    ax.grid(True)
+    _guardar_figura(fig, path)
 
 
 def _chart_diaria(meses: List[str], energia: List[float], path: Path):
-    plt.figure()
-    plt.bar(meses, energia)
-    plt.title("Energía diaria promedio")
-    plt.ylabel("kWh/día")
-    plt.xticks(rotation=45)
-    plt.grid(True)
-    _guardar_figura(path)
+    fig, ax = plt.subplots()
+    ax.bar(meses, energia)
+    ax.set_title("Energía diaria promedio")
+    ax.set_ylabel("kWh/día")
+    ax.tick_params(axis="x", rotation=45)
+    ax.grid(True)
+    _guardar_figura(fig, path)
 
 
 def _chart_potencia_horaria(energia_horaria_kwh: List[float], path: Path):
     potencia_promedio = _promedio_fv_24h(energia_horaria_kwh)
     horas = list(range(24))
 
-    plt.figure()
-    plt.plot(horas, potencia_promedio, marker="o")
-    plt.title("Perfil horario de potencia FV")
-    plt.xlabel("Hora")
-    plt.ylabel("Potencia (kW)")
-    plt.xticks(range(24))
-    plt.grid(True)
-    _guardar_figura(path)
+    fig, ax = plt.subplots()
+    ax.plot(horas, potencia_promedio, marker="o")
+    ax.set_title("Perfil horario de potencia FV")
+    ax.set_xlabel("Hora")
+    ax.set_ylabel("Potencia (kW)")
+    ax.set_xticks(range(24))
+    ax.grid(True)
+    _guardar_figura(fig, path)
 
 
 def _chart_energia_horaria(energia_horaria_kwh: List[float], path: Path):
     energia_promedio = _promedio_fv_24h(energia_horaria_kwh)
     horas = list(range(24))
 
-    plt.figure()
-    plt.bar(horas, energia_promedio)
-    plt.title("Energía generada por hora")
-    plt.xlabel("Hora")
-    plt.ylabel("Energía (kWh)")
-    plt.xticks(range(24))
-    plt.grid(True)
-    _guardar_figura(path)
+    fig, ax = plt.subplots()
+    ax.bar(horas, energia_promedio)
+    ax.set_title("Energía generada por hora")
+    ax.set_xlabel("Hora")
+    ax.set_ylabel("Energía (kWh)")
+    ax.set_xticks(range(24))
+    ax.grid(True)
+    _guardar_figura(fig, path)
 
 
 def _chart_anual(energia_anual: float, path: Path):
-    plt.figure()
-    plt.bar(["Anual"], [energia_anual])
-    plt.title("Generación FV anual")
-    plt.ylabel("Energía (kWh)")
-    _guardar_figura(path)
+    fig, ax = plt.subplots()
+    ax.bar(["Anual"], [energia_anual])
+    ax.set_title("Generación FV anual")
+    ax.set_ylabel("Energía (kWh)")
+    _guardar_figura(fig, path)
 
 
 # ==========================================================
@@ -722,8 +722,7 @@ def _chart_demanda_vs_fv_horaria(
     fv_np = np.array(fv, dtype=float)
     red_np = np.array(red_sin_bateria, dtype=float)
 
-    plt.figure(figsize=(11, 5.8))
-    ax = plt.gca()
+    fig, ax = plt.subplots(figsize=(11, 5.8))
 
     _dibujar_area_fv(ax, horas_np, demanda_np, fv_np, red_np)
     _dibujar_lineas_base(ax, horas_np, demanda_np, fv_np, red_np)
@@ -747,7 +746,7 @@ def _chart_demanda_vs_fv_horaria(
     _configurar_ejes_demanda(ax)
     _configurar_leyenda(ax, ax_soc)
 
-    _guardar_figura(path)
+    _guardar_figura(fig, path)
 
 
 # ==========================================================
