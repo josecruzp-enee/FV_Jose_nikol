@@ -9,7 +9,9 @@ from core.servicios.layout import construir_layout_preliminar_fv
 # ==========================================================
 # BATERÍAS
 # ==========================================================
-from energy.baterias import generar_opciones_bateria
+from energy.baterias.orquestador_bateria import (
+    ejecutar_recomendacion_bateria,
+)
 
 # ==========================================================
 # HELPERS BATERÍA
@@ -19,26 +21,45 @@ def _aplicar_bateria_si_corresponde(
     energia,
 ):
     """
-    Genera opciones técnicas de batería y las guarda en energia.
-    Finanzas decidirá cuál opción conviene.
+    Genera opciones técnicas usando el perfil FV promedio
+    de 24 horas y las guarda en energia.
     """
 
-    demanda_24h = getattr(datos, "consumo_horario_24h_kwh", {}) or {}
-    fv_24h = getattr(energia, "energia_horaria_kwh", None)
+    demanda_24h = getattr(
+        datos,
+        "consumo_horario_24h_kwh",
+        {},
+    ) or {}
 
-    if not demanda_24h or not fv_24h:
+    energia_horaria = getattr(
+        energia,
+        "energia_horaria_kwh",
+        None,
+    )
+
+    if not demanda_24h or not energia_horaria:
         return None
 
-    opciones_bateria = generar_opciones_bateria(
+    opciones_bateria = ejecutar_recomendacion_bateria(
         demanda_24h=demanda_24h,
-        fv_24h=fv_24h,
+        fv_24h=energia_horaria,
         factor_aprovechamiento=0.80,
     )
 
-    setattr(energia, "opciones_bateria", opciones_bateria)
+    setattr(
+        energia,
+        "opciones_bateria",
+        opciones_bateria,
+    )
+
+    if opciones_bateria:
+        setattr(
+            energia,
+            "bateria_recomendada",
+            opciones_bateria[-1],
+        )
 
     return None
-    
 # ==========================================================
 # ORQUESTADOR PRINCIPAL
 # ==========================================================
