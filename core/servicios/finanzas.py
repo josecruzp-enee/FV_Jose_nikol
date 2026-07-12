@@ -212,29 +212,72 @@ def simular_12_meses(
     cargos_fijos,
     cuota_mensual,
     om_mensual_val,
+    compra_red_12m=None,
+    inyeccion_12m=None,
+    tarifa_inyeccion=0.0,
 ) -> List[Dict[str, float]]:
     consumo = _normalizar_12m(consumo_12m, "consumo_12m")
     energia = _normalizar_12m(energia_fv_12m, "energia_fv_12m")
+    compra = (
+        _normalizar_12m(compra_red_12m, "compra_red_12m")
+        if compra_red_12m
+        else [
+            max(consumo[i] - min(consumo[i], energia[i]), 0.0)
+            for i in range(12)
+        ]
+    )
+    inyeccion = (
+        _normalizar_12m(inyeccion_12m, "inyeccion_12m")
+        if inyeccion_12m
+        else [0.0] * 12
+    )
 
-    return [
-        _fila_mensual(
+    tabla = []
+    saldo_credito = 0.0
+
+    for i in range(12):
+        fila = _fila_mensual(
             mes=i + 1,
             consumo=consumo[i],
             energia=energia[i],
+            compra=compra[i],
+            inyeccion=inyeccion[i],
             tarifa=_float(tarifa_energia),
+            tarifa_inyeccion=_float(tarifa_inyeccion),
             cargos=_float(cargos_fijos),
             cuota=_float(cuota_mensual),
             om=_float(om_mensual_val),
+            saldo_credito=saldo_credito,
         )
-        for i in range(12)
-    ]
+        saldo_credito = fila["saldo_credito_L"]
+        tabla.append(fila)
+
+    return tabla
 
 
-def _fila_mensual(*, mes, consumo, energia, tarifa, cargos, cuota, om) -> dict:
+def _fila_mensual(
+    *,
+    mes,
+    consumo,
+    energia,
+    compra,
+    inyeccion,
+    tarifa,
+    tarifa_inyeccion,
+    cargos,
+    cuota,
+    om,
+    saldo_credito,
+) -> dict:
     fv_util = min(consumo, energia)
-    kwh_enee = max(consumo - fv_util, 0.0)
+    kwh_enee = max(compra, 0.0)
     factura_base = consumo * tarifa + cargos
-    pago_enee = kwh_enee * tarifa + cargos
+    cargo_energia = kwh_enee * tarifa
+    credito_generado = max(inyeccion, 0.0) * tarifa_inyeccion
+    credito_disponible = saldo_credito + credito_generado
+    credito_aplicado = min(cargo_energia, credito_disponible)
+    saldo_credito_final = credito_disponible - credito_aplicado
+    pago_enee = cargo_energia - credito_aplicado + cargos
     ahorro = factura_base - pago_enee
 
     return {
@@ -242,7 +285,12 @@ def _fila_mensual(*, mes, consumo, energia, tarifa, cargos, cuota, om) -> dict:
         "consumo_kwh": consumo,
         "fv_kwh": fv_util,
         "kwh_enee": kwh_enee,
+        "inyeccion_kwh": max(inyeccion, 0.0),
         "factura_base_L": factura_base,
+        "cargo_energia_enee_L": cargo_energia,
+        "credito_inyeccion_generado_L": credito_generado,
+        "credito_inyeccion_aplicado_L": credito_aplicado,
+        "saldo_credito_L": saldo_credito_final,
         "pago_enee_L": pago_enee,
         "ahorro_L": ahorro,
         "cuota_L": cuota,
@@ -258,7 +306,10 @@ def _evaluacion_mensual(tabla, cuota) -> dict:
     ahorro = sum(fila["ahorro_L"] for fila in tabla) / len(tabla)
     neto = sum(fila["neto_L"] for fila in tabla) / len(tabla)
     peor = min(fila["neto_L"] for fila in tabla)
-    dscr = ahorro / cuota if cuota > 0 else None
+    flujo_disponible = ahorro - sum(
+        fila["om_L"] for fila in tabla
+    ) / len(tabla)
+    dscr = flujo_disponible / cuota if cuota > 0 else None
     estado, nota = _clasificar_evaluacion(dscr, neto, peor)
 
     return {
@@ -319,6 +370,32 @@ def _energia_final(energia, escenario) -> List[float]:
     if valores:
         return list(valores)
     return list(getattr(energia, "energia_util_12m", []) or [])
+
+
+def _flujos_red_12m(escenario):
+    resultado = _leer(escenario, "resultado_tecnico", None)
+
+    if resultado is None:
+        return None, None
+
+    compra = _leer(
+        resultado,
+        "compra_red_con_bateria_12m_kwh",
+        None,
+    )
+    inyeccion = _leer(
+        resultado,
+        "excedente_con_bateria_12m_kwh",
+        None,
+    )
+
+    if not compra or len(compra) != 12:
+        return None, None
+
+    if not inyeccion or len(inyeccion) != 12:
+        return None, None
+
+    return list(compra), list(inyeccion)
 
 
 def _capex_total(capex_fv, escenario) -> float:
@@ -395,6 +472,13 @@ def _calcular_contexto(*, datos, sizing, energia, bateria) -> dict:
     escenario = _escenario_seleccionado(bateria)
     capex = _capex_total(capex_fv, escenario)
     energia_12m = _energia_final(energia, escenario)
+    compra_red_12m, inyeccion_12m = _flujos_red_12m(
+        escenario
+    )
+    tarifa_inyeccion = _float(
+        getattr(datos, "tarifa_inyeccion_l_kwh", 2.72),
+        2.72,
+    )
 
     cuota = calcular_cuota_mensual_perfil(capex_L_=capex, perfil=perfil)
     om = om_mensual(capex, datos.om_anual_pct)
@@ -405,6 +489,9 @@ def _calcular_contexto(*, datos, sizing, energia, bateria) -> dict:
         cargos_fijos=datos.cargos_fijos,
         cuota_mensual=cuota,
         om_mensual_val=om,
+        compra_red_12m=compra_red_12m,
+        inyeccion_12m=inyeccion_12m,
+        tarifa_inyeccion=tarifa_inyeccion,
     )
 
     evaluacion = _evaluacion_mensual(tabla, cuota)
@@ -436,6 +523,18 @@ def _armar_resultado(**ctx) -> Dict[str, Any]:
     detalle = ctx["detalle"]
     ahorro = ctx["ahorro_anual"]
     capex = ctx["capex"]
+    credito_inyeccion = sum(
+        fila.get("credito_inyeccion_aplicado_L", 0.0)
+        for fila in ctx["tabla"]
+    )
+    credito_generado = sum(
+        fila.get("credito_inyeccion_generado_L", 0.0)
+        for fila in ctx["tabla"]
+    )
+    ahorro_autoconsumo = max(
+        ahorro - credito_inyeccion,
+        0.0,
+    )
 
     resultado = {
         "capex_L": capex,
@@ -456,6 +555,13 @@ def _armar_resultado(**ctx) -> Dict[str, Any]:
         "tabla_12m": ctx["tabla"],
         "evaluacion": ctx["evaluacion"],
         "ahorro_anual_L": ahorro,
+        "ahorro_autoconsumo_anual_L": ahorro_autoconsumo,
+        "credito_inyeccion_anual_L": credito_inyeccion,
+        "credito_inyeccion_generado_anual_L": credito_generado,
+        "saldo_credito_final_L": (
+            ctx["tabla"][-1].get("saldo_credito_L", 0.0)
+            if ctx["tabla"] else 0.0
+        ),
         **detalle,
         **_metricas(capex, ahorro),
     }
