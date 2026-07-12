@@ -358,6 +358,32 @@ def ejecutar_estudio(
                     )
                 )
 
+        
+
+        # ==================================================
+        # 5. FINANZAS
+        # ==================================================
+        finanzas = None
+
+        if deps.finanzas is not None:
+
+            finanzas = deps.finanzas.ejecutar(
+                datos=datos,
+                sizing=sizing,
+                energia=energia,
+                bateria=bateria,
+        )
+
+            if finanzas is None:
+                raise ValueError("Finanzas devolvió None")
+
+            if not getattr(finanzas, "ok", True):
+                return ResultadoProyecto(
+                    sizing=sizing,
+                    paneles=paneles,
+                    strings=paneles.strings if paneles else None,
+                    energia=energia,
+        
         # ==================================================
         # 5.1 LAYOUT PRELIMINAR FV
         # ==================================================
