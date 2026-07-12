@@ -976,7 +976,6 @@ def evaluar_opciones_bateria_financieras(
         "mejor": mejor,
     }
 
-
 def ejecutar_finanzas(
     *,
     datos: Datosproyecto,
@@ -988,20 +987,41 @@ def ejecutar_finanzas(
     kwp_dc = float(sizing.pdc_kw)
 
     if kwp_dc <= 0:
-        raise ValueError("Sizing incompleto para finanzas.")
+        raise ValueError(
+            "Sizing incompleto para finanzas."
+        )
 
     if energia is None:
-        raise ValueError("Resultado energético no definido.")
+        raise ValueError(
+            "Resultado energético no definido."
+        )
 
     if not energia.ok:
-        raise ValueError(f"Energía inválida: {energia.errores}")
+        raise ValueError(
+            f"Energía inválida: {energia.errores}"
+        )
 
-    energia_fv_12m = getattr(energia, "energia_util_12m", None)
+    energia_fv_12m = getattr(
+        energia,
+        "energia_util_12m",
+        None,
+    )
 
-    if not energia_fv_12m or len(energia_fv_12m) != 12:
-        raise ValueError("Energía mensual inválida.")
+    if (
+        not energia_fv_12m
+        or len(energia_fv_12m) != 12
+    ):
+        raise ValueError(
+            "Energía mensual inválida."
+        )
 
-    perfil_financiamiento = obtener_perfil_financiamiento(datos)
+    # ======================================================
+    # DATOS FINANCIEROS BASE
+    # ======================================================
+
+    perfil_financiamiento = (
+        obtener_perfil_financiamiento(datos)
+    )
 
     capex_fv = calcular_capex_L(
         pdc_kw=kwp_dc,
@@ -1009,123 +1029,244 @@ def ejecutar_finanzas(
         tcambio=datos.tcambio,
     )
 
-    capex_bateria = 0.0
-    capacidad_bateria_kwh = 0.0
-    costo_bateria_usd_kwh = 0.0
+    # ======================================================
+    # EVALUAR ESCENARIOS DE BATERÍA
+    # ======================================================
 
-    if bateria is not None and getattr(bateria, "ok", False):
-
-        capacidad_bateria_kwh = float(
-            getattr(bateria, "capacidad_util_kwh", 0.0) or 0.0
+    optimizacion_bateria = (
+        evaluar_opciones_bateria_financieras(
+            datos=datos,
+            energia=energia,
+            capex_fv_L=capex_fv,
+            tarifa_energia=datos.tarifa_energia,
+            cargos_fijos=datos.cargos_fijos,
+            tasa_anual=float(
+                perfil_financiamiento.get(
+                    "tasa_anual",
+                    0.0,
+                ) or 0.0
+            ),
+            plazo_anios=int(
+                perfil_financiamiento.get(
+                    "plazo_anios",
+                    0,
+                ) or 0
+            ),
+            pct_fin=float(
+                perfil_financiamiento.get(
+                    "porcentaje_financiado",
+                    1.0,
+                ) or 1.0
+            ),
+            om_anual_pct=datos.om_anual_pct,
+            perfil_financiamiento=(
+                perfil_financiamiento
+            ),
         )
-
-        costo_bateria_usd_kwh = float(
-            getattr(bateria, "costo_usd_kwh", 0.0) or 0.0
-        )
-
-        if capacidad_bateria_kwh <= 0:
-            bateria_rec = getattr(energia, "bateria_recomendada", None)
-
-            if bateria_rec is not None:
-                capacidad_bateria_kwh = float(
-                    getattr(
-                        bateria_rec,
-                        "capacidad_util_kwh",
-                        0.0
-                    ) or 0.0
-                )
-
-        capex_bateria = (
-            capacidad_bateria_kwh
-            * costo_bateria_usd_kwh
-            * float(datos.tcambio)
-        )
-
-    capex = capex_fv + capex_bateria
-
-    cuota = calcular_cuota_mensual_perfil(
-        capex_L_=capex,
-        perfil=perfil_financiamiento,
     )
 
-    detalle_financiamiento = calcular_detalle_financiamiento(
-        capex_L_=capex,
-        perfil=perfil_financiamiento,
+    escenarios = (
+        optimizacion_bateria.get(
+            "escenarios",
+            [],
+        )
+        or []
     )
 
-    om_mensual_val = om_mensual(capex, datos.om_anual_pct)
-
-    tabla_12m = simular_12_meses(
-        consumo_12m=datos.consumo_12m,
-        energia_fv_12m=energia_fv_12m,
-        tarifa_energia=datos.tarifa_energia,
-        cargos_fijos=datos.cargos_fijos,
-        cuota_mensual=cuota,
-        om_mensual_val=om_mensual_val,
+    mejor = (
+        optimizacion_bateria.get("mejor")
+        or (
+            escenarios[0]
+            if escenarios
+            else None
+        )
     )
 
-    evaluacion = _evaluacion_mensual(tabla_12m, cuota)
-    ahorro_anual = sum(x["ahorro_L"] for x in tabla_12m)
+    if not isinstance(mejor, dict):
+        raise ValueError(
+            "No se obtuvo un escenario financiero válido."
+        )
 
-    roi = (ahorro_anual / capex) * 100 if capex > 0 else 0.0
-    payback = capex / ahorro_anual if ahorro_anual > 0 else 0.0
+    # ======================================================
+    # CONSOLIDAR ESCENARIO SELECCIONADO
+    # ======================================================
+
+    capex = float(
+        mejor.get(
+            "capex_total_L",
+            capex_fv,
+        ) or capex_fv
+    )
+
+    capex_bateria = float(
+        mejor.get(
+            "capex_bateria_L",
+            0.0,
+        ) or 0.0
+    )
+
+    capacidad_bateria_kwh = float(
+        mejor.get(
+            "capacidad_bateria_kwh",
+            0.0,
+        ) or 0.0
+    )
+
+    potencia_bateria_kw = float(
+        mejor.get(
+            "potencia_bateria_kw",
+            0.0,
+        ) or 0.0
+    )
+
+    costo_bateria_usd_kwh = (
+        float(
+            getattr(
+                datos,
+                "costo_bateria_usd_kwh",
+                250.0,
+            ) or 250.0
+        )
+        if capacidad_bateria_kwh > 0
+        else 0.0
+    )
+
+    cuota = float(
+        mejor.get(
+            "cuota_mensual_L",
+            0.0,
+        ) or 0.0
+    )
+
+    tabla_12m = (
+        mejor.get("tabla_12m")
+        or []
+    )
+
+    evaluacion = (
+        mejor.get("evaluacion")
+        or {}
+    )
+
+    ahorro_anual = float(
+        mejor.get(
+            "ahorro_anual_L",
+            0.0,
+        ) or 0.0
+    )
+
+    roi = (
+        ahorro_anual / capex * 100.0
+        if capex > 0
+        else 0.0
+    )
+
+    payback = (
+        capex / ahorro_anual
+        if ahorro_anual > 0
+        else 0.0
+    )
 
     flujos = [-capex]
 
     for _ in range(10):
         flujos.append(ahorro_anual)
 
-    tir = _tir(flujos) * 100
+    tir = _tir(flujos) * 100.0
 
-    optimizacion_bateria = evaluar_opciones_bateria_financieras(
-        datos=datos,
-        energia=energia,
-        capex_fv_L=capex_fv,
-        tarifa_energia=datos.tarifa_energia,
-        cargos_fijos=datos.cargos_fijos,
-        tasa_anual=float(perfil_financiamiento.get("tasa_anual", 0.0) or 0.0),
-        plazo_anios=int(perfil_financiamiento.get("plazo_anios", 0) or 0),
-        pct_fin=float(
-            perfil_financiamiento.get("porcentaje_financiado", 1.0) or 1.0
-        ),
-        om_anual_pct=datos.om_anual_pct,
-        perfil_financiamiento=perfil_financiamiento,
+    # ======================================================
+    # FINANCIAMIENTO DEL ESCENARIO SELECCIONADO
+    # ======================================================
+
+    detalle_financiamiento = (
+        calcular_detalle_financiamiento(
+            capex_L_=capex,
+            perfil=perfil_financiamiento,
+        )
     )
 
+    # ======================================================
+    # RESULTADO FINANCIERO CONSOLIDADO
+    # ======================================================
+
     return {
-        # ============================
-        # Salidas existentes
-        # ============================
         "capex_L": capex,
+        "capex_total_L": capex,
         "capex_fv_L": capex_fv,
         "capex_bateria_L": capex_bateria,
-        "capacidad_bateria_kwh": capacidad_bateria_kwh,
-        "costo_bateria_usd_kwh": costo_bateria_usd_kwh,
+
+        "capacidad_bateria_kwh": (
+            capacidad_bateria_kwh
+        ),
+        "potencia_bateria_kw": (
+            potencia_bateria_kw
+        ),
+        "costo_bateria_usd_kwh": (
+            costo_bateria_usd_kwh
+        ),
+
         "cuota_mensual": cuota,
+        "cuota_mensual_L": cuota,
+
         "tabla_12m": tabla_12m,
         "evaluacion": evaluacion,
         "ahorro_anual_L": ahorro_anual,
         "roi_pct": roi,
         "payback_anios": payback,
         "tir_pct": tir,
-        "optimizacion_bateria": optimizacion_bateria,
-        "escenarios_bateria": optimizacion_bateria["escenarios"],
-        "bateria_optima": optimizacion_bateria["mejor"],
 
-        # ============================
-        # Nuevas salidas financieras
-        # ============================
+        "optimizacion_bateria": (
+            optimizacion_bateria
+        ),
+        "escenarios_bateria": escenarios,
+        "bateria_optima": mejor,
+
         "financiamiento": perfil_financiamiento,
-        "modo_financiamiento": perfil_financiamiento.get("modo_financiamiento"),
-        "nombre_financiamiento": perfil_financiamiento.get("nombre"),
-        "entidad_financiera": perfil_financiamiento.get("entidad"),
-        "nota_financiamiento": perfil_financiamiento.get("nota"),
-        "tasa_anual": perfil_financiamiento.get("tasa_anual"),
+        "modo_financiamiento": (
+            perfil_financiamiento.get(
+                "modo_financiamiento"
+            )
+        ),
+        "nombre_financiamiento": (
+            perfil_financiamiento.get("nombre")
+        ),
+        "entidad_financiera": (
+            perfil_financiamiento.get("entidad")
+        ),
+        "nota_financiamiento": (
+            perfil_financiamiento.get("nota")
+        ),
+        "tasa_anual": (
+            perfil_financiamiento.get(
+                "tasa_anual"
+            )
+        ),
         "cat": perfil_financiamiento.get("cat"),
-        "plazo_anios": perfil_financiamiento.get("plazo_anios"),
-        "plazo_meses": perfil_financiamiento.get("plazo_meses"),
-        "prima_pct": detalle_financiamiento["prima_pct"],
-        "prima_L": detalle_financiamiento["prima_L"],
-        "porcentaje_financiado": detalle_financiamiento["porcentaje_financiado"],
-        "monto_financiado_L": detalle_financiamiento["monto_financiado_L"],
+        "plazo_anios": (
+            perfil_financiamiento.get(
+                "plazo_anios"
+            )
+        ),
+        "plazo_meses": (
+            perfil_financiamiento.get(
+                "plazo_meses"
+            )
+        ),
+
+        "prima_pct": (
+            detalle_financiamiento["prima_pct"]
+        ),
+        "prima_L": (
+            detalle_financiamiento["prima_L"]
+        ),
+        "porcentaje_financiado": (
+            detalle_financiamiento[
+                "porcentaje_financiado"
+            ]
+        ),
+        "monto_financiado_L": (
+            detalle_financiamiento[
+                "monto_financiado_L"
+            ]
+        ),
     }
