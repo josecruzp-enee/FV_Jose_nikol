@@ -124,8 +124,8 @@ def _generar_opciones(
     perfiles: dict,
 ):
     return generar_opciones_bateria(
-        demanda_24h=perfiles["demanda_24h"],
-        fv_24h=perfiles["fv_24h"],
+        demanda_24h=perfiles["demanda_horaria"],
+        fv_24h=perfiles["fv_horaria"],
         factor_aprovechamiento=entrada.factor_aprovechamiento,
         capacidades_comerciales_kwh=(
             entrada.capacidades_comerciales_kwh
