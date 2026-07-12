@@ -260,10 +260,11 @@ def _texto_viabilidad(m: dict, estado: str, criterio: str) -> str:
 def _texto_resultado_energetico(m: dict) -> str:
     return (
         f"El sistema fotovoltaico propuesto tiene una potencia instalada "
-        f"de {_fmt_kwp(m['kwp'])} y una producción anual estimada de "
-        f"{_fmt_kwh(m['produccion_anual'])}. Esta generación cubre "
-        f"aproximadamente {_fmt_pct(m['cobertura_real'])} del consumo anual "
-        f"del cliente, cuyo consumo total es de {_fmt_kwh(m['consumo_anual'])}."
+        f"de {_fmt_kwp(m['kwp'])} y una producción fotovoltaica anual "
+        f"estimada de {_fmt_kwh(m['produccion_anual'])}. Esta producción "
+        f"equivale aproximadamente a {_fmt_pct(m['cobertura_real'])} del "
+        f"consumo anual del cliente, cuyo consumo total es de "
+        f"{_fmt_kwh(m['consumo_anual'])}."
     )
 
 
@@ -432,8 +433,8 @@ def agregar_pagina_conclusiones_ejecutivas(
         ["Indicador", "Resultado"],
         ["Estado del proyecto", data["estado"]],
         ["Potencia FV propuesta", _fmt_kwp(m["kwp"])],
-        ["Producción anual estimada", _fmt_kwh(m["produccion_anual"])],
-        ["Cobertura energética real", _fmt_pct(m["cobertura_real"])],
+        ["Producción fotovoltaica anual", _fmt_kwh(m["produccion_anual"])]
+        ["Producción FV respecto al consumo", _fmt_pct(m["cobertura_real"])]
         ["Reducción mensual estimada", _fmt_lps(m["ahorro_mensual"])],
         ["DSCR", _fmt_dscr(m)],
         ["CAPEX estimado", _fmt_lps(m["capex"])],
