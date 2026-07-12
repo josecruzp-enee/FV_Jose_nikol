@@ -27,9 +27,9 @@ from reportes.pdf_utils import money_L, num
 # Responsabilidad:
 # - Presentar la información principal del estudio FV.
 # - Mostrar datos del cliente.
-# - Mostrar solución propuesta.
-# - Mostrar impacto económico mensual.
-# - Mostrar conclusión ejecutiva.
+# - Mostrar el resultado principal del estudio.
+# - Mostrar la solución propuesta.
+# - Mostrar el impacto económico mensual.
 #
 # Reglas de mantenimiento:
 # - No cambiar nombres de funciones p1_* sin revisar llamadas.
@@ -44,10 +44,13 @@ from reportes.pdf_utils import money_L, num
 # =========================================================
 
 def leer(obj, campo, default=None):
+
     if obj is None:
         return default
+
     if isinstance(obj, dict):
         return obj.get(campo, default)
+
     return getattr(obj, campo, default)
 
 
@@ -59,13 +62,28 @@ def _financiero_para_pdf(financiero):
     Si no hay batería óptima válida, conserva el financiero base.
     """
 
-    bateria_optima = leer(financiero, "bateria_optima", None)
+    bateria_optima = leer(
+        financiero,
+        "bateria_optima",
+        None,
+    )
 
     if isinstance(bateria_optima, dict):
-        nombre = str(bateria_optima.get("nombre", "")).strip().lower()
-        tabla_bat = bateria_optima.get("tabla_12m", [])
 
-        if nombre and nombre != "sin batería" and tabla_bat:
+        nombre = str(
+            bateria_optima.get("nombre", "")
+        ).strip().lower()
+
+        tabla_bat = bateria_optima.get(
+            "tabla_12m",
+            [],
+        )
+
+        if (
+            nombre
+            and nombre != "sin batería"
+            and tabla_bat
+        ):
             return bateria_optima
 
     return financiero
@@ -75,22 +93,70 @@ def _financiero_para_pdf(financiero):
 # 2. SECCIÓN: DATOS DEL CLIENTE Y SITUACIÓN ENERGÉTICA
 # =========================================================
 
-def p1_tabla_cliente(datos, sizing, fecha, pal, content_w):
+def p1_tabla_cliente(
+    datos,
+    sizing,
+    fecha,
+    pal,
+    content_w,
+):
 
-    consumo_12m = get_field(datos, "consumo_12m", [])
-    consumo_anual = sum(consumo_12m) if isinstance(consumo_12m, list) else 0.0
+    consumo_12m = get_field(
+        datos,
+        "consumo_12m",
+        [],
+    )
 
-    tarifa = float(get_field(datos, "tarifa_energia", 0.0))
-    cargos = float(get_field(datos, "cargos_fijos", 0.0))
+    consumo_anual = (
+        sum(consumo_12m)
+        if isinstance(consumo_12m, list)
+        else 0.0
+    )
+
+    tarifa = float(
+        get_field(
+            datos,
+            "tarifa_energia",
+            0.0,
+        )
+    )
+
+    cargos = float(
+        get_field(
+            datos,
+            "cargos_fijos",
+            0.0,
+        )
+    )
 
     rows = [
-        ["Cliente", get_field(datos, "cliente", ""), "Ubicación", get_field(datos, "ubicacion", "")],
-        ["Fecha", fecha, "Consumo anual", f"{consumo_anual:,.0f} kWh/año"],
-        ["Tarifa energía", f"{tarifa:.3f} L/kWh", "Cargos fijos", f"{money_L(cargos)}/mes"],
+        [
+            "Cliente",
+            get_field(datos, "cliente", ""),
+            "Ubicación",
+            get_field(datos, "ubicacion", ""),
+        ],
+        [
+            "Fecha",
+            fecha,
+            "Consumo anual",
+            f"{consumo_anual:,.0f} kWh/año",
+        ],
+        [
+            "Tarifa energía",
+            f"{tarifa:.3f} L/kWh",
+            "Cargos fijos",
+            f"{money_L(cargos)}/mes",
+        ],
     ]
 
     t = tabla_4cols(
-        header=["Dato", "Valor", "Dato", "Valor"],
+        header=[
+            "Dato",
+            "Valor",
+            "Dato",
+            "Valor",
+        ],
         rows=rows,
         content_w=content_w,
         pal=pal,
@@ -99,7 +165,11 @@ def p1_tabla_cliente(datos, sizing, fecha, pal, content_w):
     )
 
     return [
-        section_bar("Datos del cliente y situación energética", pal, content_w),
+        section_bar(
+            "Datos del cliente y situación energética",
+            pal,
+            content_w,
+        ),
         Spacer(1, 6),
         t,
         Spacer(1, 12),
@@ -107,7 +177,7 @@ def p1_tabla_cliente(datos, sizing, fecha, pal, content_w):
 
 
 # =========================================================
-# 3. SECCIÓN: SOLUCIÓN PROPUESTA E INDICADORES CLAVE
+# 3. SECCIÓN: SISTEMA FOTOVOLTAICO PROPUESTO
 # =========================================================
 
 def p1_tabla_solucion_unica(
@@ -120,14 +190,21 @@ def p1_tabla_solucion_unica(
     paneles=None,
 ):
 
-    financiero_pdf = _financiero_para_pdf(financiero)
+    financiero_pdf = _financiero_para_pdf(
+        financiero
+    )
 
     capex = float(
         leer(
             financiero_pdf,
             "capex_total_L",
-            leer(financiero_pdf, "capex_L", 0.0),
+            leer(
+                financiero_pdf,
+                "capex_L",
+                0.0,
+            ),
         )
+        or 0.0
     )
 
     # =====================================================
@@ -135,35 +212,81 @@ def p1_tabla_solucion_unica(
     # Prioridad: strings reales > sizing preliminar
     # =====================================================
 
-    strings = leer(paneles, "strings", []) if paneles else []
-    panel_obj = leer(paneles, "panel", None) if paneles else None
+    strings = (
+        leer(paneles, "strings", [])
+        if paneles
+        else []
+    )
+
+    panel_obj = (
+        leer(paneles, "panel", None)
+        if paneles
+        else None
+    )
 
     panel_wp = (
-        float(leer(panel_obj, "pmax_w", 0.0))
+        float(
+            leer(
+                panel_obj,
+                "pmax_w",
+                0.0,
+            )
+            or 0.0
+        )
         if panel_obj
         else 0.0
     )
 
     n_paneles = sum(
-        int(leer(s, "n_series", 0) or 0)
-        for s in strings
+        int(
+            leer(
+                string,
+                "n_series",
+                0,
+            )
+            or 0
+        )
+        for string in strings
     )
 
     if n_paneles > 0 and panel_wp > 0:
-        kwp = n_paneles * panel_wp / 1000.0
+
+        kwp = (
+            n_paneles
+            * panel_wp
+            / 1000.0
+        )
+
     else:
+
         kwp = float(
             leer(
                 sizing,
                 "kwp_dc",
-                leer(sizing, "pdc_kw", 0.0),
+                leer(
+                    sizing,
+                    "pdc_kw",
+                    0.0,
+                ),
             )
+            or 0.0
         )
 
-        n_paneles = int(leer(sizing, "n_paneles", 0))
+        n_paneles = int(
+            leer(
+                sizing,
+                "n_paneles",
+                0,
+            )
+            or 0
+        )
 
         panel_wp = (
-            int((kwp * 1000) / n_paneles)
+            int(
+                kwp
+                * 1000
+                / n_paneles
+            )
             if n_paneles > 0
             else 0
         )
@@ -172,9 +295,20 @@ def p1_tabla_solucion_unica(
     # ENERGÍA REAL USADA EN EL PDF
     # =====================================================
 
-    tabla_pdf = leer(financiero_pdf, "tabla_12m", [])
+    tabla_pdf = (
+        leer(
+            financiero_pdf,
+            "tabla_12m",
+            [],
+        )
+        or []
+    )
 
-    consumo_12m = get_field(datos, "consumo_12m", [])
+    consumo_12m = get_field(
+        datos,
+        "consumo_12m",
+        [],
+    )
 
     consumo_anual = (
         sum(consumo_12m)
@@ -183,12 +317,21 @@ def p1_tabla_solucion_unica(
     )
 
     if tabla_pdf:
+
         prod_anual = sum(
-            float(x.get("fv_kwh", 0.0))
-            for x in tabla_pdf
-            if isinstance(x, dict)
+            float(
+                fila.get(
+                    "fv_kwh",
+                    0.0,
+                )
+                or 0.0
+            )
+            for fila in tabla_pdf
+            if isinstance(fila, dict)
         )
+
     else:
+
         energia_12m = leer(
             energia,
             "energia_util_12m",
@@ -207,31 +350,49 @@ def p1_tabla_solucion_unica(
         else 0.0
     )
 
-    evaluacion = leer(
-        financiero_pdf,
-        "evaluacion",
-        {},
-    ) or {}
+    evaluacion = (
+        leer(
+            financiero_pdf,
+            "evaluacion",
+            {},
+        )
+        or {}
+    )
 
     estado_original = str(
-        evaluacion.get("estado", "")
+        evaluacion.get(
+            "estado",
+            "",
+        )
+        or ""
     ).upper().strip()
 
     if estado_original == "VIABLE":
         estado_txt = "VIABLE A NIVEL PRELIMINAR"
     else:
-        estado_txt = estado_original or "EN EVALUACIÓN"
+        estado_txt = (
+            estado_original
+            or "EN EVALUACIÓN"
+        )
 
-    ds_val = evaluacion.get("dscr", None)
+    ds_val = evaluacion.get(
+        "dscr",
+        None,
+    )
 
     ds_txt = (
         "No aplica"
         if ds_val is None
-        else f"{ds_val:.2f}"
+        else f"{float(ds_val):.2f}"
     )
 
     bateria_nombre = str(
-        leer(financiero_pdf, "nombre", "") or ""
+        leer(
+            financiero_pdf,
+            "nombre",
+            "",
+        )
+        or ""
     )
 
     capacidad_bateria = float(
@@ -239,19 +400,28 @@ def p1_tabla_solucion_unica(
             financiero_pdf,
             "capacidad_bateria_kwh",
             0.0,
-        ) or 0.0
+        )
+        or 0.0
     )
 
-    sistema_txt = f"{num(kwp, 2)} kWp"
+    sistema_txt = (
+        f"{num(kwp, 2)} kWp"
+    )
 
     if capacidad_bateria > 0:
+
         sistema_txt += (
-            f" + batería {capacidad_bateria:.0f} kWh"
+            f" + batería "
+            f"{capacidad_bateria:.0f} kWh"
         )
 
     data = [
-        ["Dato", "Valor", "Dato", "Valor"],
-
+        [
+            "Dato",
+            "Valor",
+            "Dato",
+            "Valor",
+        ],
         [
             "Cobertura solicitada",
             (
@@ -260,43 +430,47 @@ def p1_tabla_solucion_unica(
             "Cobertura energética",
             f"{cobertura_real * 100:.1f}%",
         ],
-
         [
             "Sistema",
             sistema_txt,
             "CAPEX estimado",
             money_L(capex),
         ],
-
         [
-            "Consumo anual abastecido"
+            "Consumo anual abastecido",
             f"{prod_anual:,.0f} kWh/año",
             "DSCR",
             ds_txt,
         ],
-
         [
             "Módulos FV",
-            f"{int(n_paneles)} × {int(panel_wp)} Wp",
+            (
+                f"{int(n_paneles)} × "
+                f"{int(panel_wp)} Wp"
+            ),
             "Estado",
             estado_txt,
         ],
     ]
 
     if capacidad_bateria > 0:
-        data.append(
-            [
-                "Batería evaluada",
-                bateria_nombre,
-                "Capacidad",
-                f"{capacidad_bateria:.1f} kWh",
-            ]
-        )
+
+        data.append([
+            "Batería evaluada",
+            bateria_nombre,
+            "Capacidad",
+            f"{capacidad_bateria:.1f} kWh",
+        ])
 
     t = make_table(
         data,
         content_w,
-        ratios=[1.25, 2.15, 1.25, 2.15],
+        ratios=[
+            1.25,
+            2.15,
+            1.25,
+            2.15,
+        ],
         repeatRows=1,
     )
 
@@ -310,7 +484,7 @@ def p1_tabla_solucion_unica(
 
     return [
         section_bar(
-            "Solución propuesta e indicadores clave",
+            "Sistema fotovoltaico propuesto",
             pal,
             content_w,
         ),
@@ -319,29 +493,64 @@ def p1_tabla_solucion_unica(
         Spacer(1, 12),
     ]
 
+
 # =========================================================
-# 4. SECCIÓN: DECISIÓN DEL CLIENTE / IMPACTO MENSUAL
+# 4. SECCIÓN: IMPACTO ECONÓMICO ESPERADO
 # =========================================================
 
-def p1_tabla_decision(financiero, pal, content_w):
+def p1_tabla_decision(
+    financiero,
+    pal,
+    content_w,
+):
 
-    financiero_pdf = _financiero_para_pdf(financiero)
+    financiero_pdf = _financiero_para_pdf(
+        financiero
+    )
 
-    tabla = leer(financiero_pdf, "tabla_12m", [])
+    tabla = (
+        leer(
+            financiero_pdf,
+            "tabla_12m",
+            [],
+        )
+        or []
+    )
 
     if tabla:
-        pago_actual = sum(
-            float(x.get("factura_base_L", 0.0))
-            for x in tabla
-            if isinstance(x, dict)
-        ) / 12.0
 
-        pago_residual = sum(
-            float(x.get("pago_enee_L", 0.0))
-            for x in tabla
-            if isinstance(x, dict)
-        ) / 12.0
+        pago_actual = (
+            sum(
+                float(
+                    fila.get(
+                        "factura_base_L",
+                        0.0,
+                    )
+                    or 0.0
+                )
+                for fila in tabla
+                if isinstance(fila, dict)
+            )
+            / 12.0
+        )
+
+        pago_residual = (
+            sum(
+                float(
+                    fila.get(
+                        "pago_enee_L",
+                        0.0,
+                    )
+                    or 0.0
+                )
+                for fila in tabla
+                if isinstance(fila, dict)
+            )
+            / 12.0
+        )
+
     else:
+
         pago_actual = 0.0
         pago_residual = 0.0
 
@@ -349,19 +558,32 @@ def p1_tabla_decision(financiero, pal, content_w):
         leer(
             financiero_pdf,
             "cuota_mensual_L",
-            leer(financiero_pdf, "cuota_mensual", 0.0),
+            leer(
+                financiero_pdf,
+                "cuota_mensual",
+                0.0,
+            ),
         )
+        or 0.0
     )
 
-    pago_total = pago_residual + cuota
-    ahorro = pago_actual - pago_total
+    pago_total = (
+        pago_residual
+        + cuota
+    )
+
+    ahorro = (
+        pago_actual
+        - pago_total
+    )
 
     capacidad_bateria = float(
         leer(
             financiero_pdf,
             "capacidad_bateria_kwh",
             0.0,
-        ) or 0.0
+        )
+        or 0.0
     )
 
     rows = [
@@ -380,12 +602,11 @@ def p1_tabla_decision(financiero, pal, content_w):
     ]
 
     if capacidad_bateria > 0:
-        rows.append(
-            [
-                "Batería incluida",
-                f"{capacidad_bateria:.1f} kWh",
-            ]
-        )
+
+        rows.append([
+            "Batería incluida",
+            f"{capacidad_bateria:.1f} kWh",
+        ])
 
     rows += [
         [
@@ -399,7 +620,10 @@ def p1_tabla_decision(financiero, pal, content_w):
     ]
 
     t = tabla_2cols(
-        header=["Concepto", "Monto (L/mes)"],
+        header=[
+            "Concepto",
+            "Monto (L/mes)",
+        ],
         rows=rows,
         content_w=content_w,
         pal=pal,
@@ -408,7 +632,7 @@ def p1_tabla_decision(financiero, pal, content_w):
 
     return [
         section_bar(
-            "Impacto mensual para el cliente",
+            "Impacto económico esperado",
             pal,
             content_w,
         ),
@@ -416,8 +640,10 @@ def p1_tabla_decision(financiero, pal, content_w):
         t,
         Spacer(1, 12),
     ]
+
+
 # =========================================================
-# 5. SECCIÓN: CONCLUSIÓN EJECUTIVA
+# 5. SECCIÓN: RESULTADO DEL ESTUDIO
 # =========================================================
 
 def p1_conclusion(
@@ -429,58 +655,149 @@ def p1_conclusion(
     paneles=None,
 ):
 
-    financiero_pdf = _financiero_para_pdf(financiero)
-    evaluacion = leer(financiero_pdf, "evaluacion", {}) or {}
+    financiero_pdf = _financiero_para_pdf(
+        financiero
+    )
 
-    ds_val = evaluacion.get("dscr", None)
-    ds_txt = "No aplica" if ds_val is None else f"{ds_val:.2f}"
+    evaluacion = (
+        leer(
+            financiero_pdf,
+            "evaluacion",
+            {},
+        )
+        or {}
+    )
+
+    ds_val = evaluacion.get(
+        "dscr",
+        None,
+    )
+
+    ds_txt = (
+        "No aplica"
+        if ds_val is None
+        else f"{float(ds_val):.2f}"
+    )
 
     ahorro_minimo = float(
-        evaluacion.get("peor_mes", 0.0)
+        evaluacion.get(
+            "peor_mes",
+            0.0,
+        )
+        or 0.0
     )
 
     # =====================================================
     # SISTEMA FV REAL CONECTADO
     # =====================================================
 
-    strings = leer(paneles, "strings", []) if paneles else []
-    panel_obj = leer(paneles, "panel", None) if paneles else None
+    strings = (
+        leer(paneles, "strings", [])
+        if paneles
+        else []
+    )
+
+    panel_obj = (
+        leer(paneles, "panel", None)
+        if paneles
+        else None
+    )
 
     panel_wp = (
-        float(leer(panel_obj, "pmax_w", 0.0))
+        float(
+            leer(
+                panel_obj,
+                "pmax_w",
+                0.0,
+            )
+            or 0.0
+        )
         if panel_obj
         else 0.0
     )
 
     n_paneles = sum(
-        int(leer(s, "n_series", 0) or 0)
-        for s in strings
+        int(
+            leer(
+                string,
+                "n_series",
+                0,
+            )
+            or 0
+        )
+        for string in strings
     )
 
     if n_paneles > 0 and panel_wp > 0:
-        kwp = n_paneles * panel_wp / 1000.0
+
+        kwp = (
+            n_paneles
+            * panel_wp
+            / 1000.0
+        )
+
     else:
-        kwp = float(leer(sizing, "kwp_dc", 0.0))
+
+        kwp = float(
+            leer(
+                sizing,
+                "kwp_dc",
+                leer(
+                    sizing,
+                    "pdc_kw",
+                    0.0,
+                ),
+            )
+            or 0.0
+        )
 
     # =====================================================
     # IMPACTO FINANCIERO
     # =====================================================
 
-    tabla = leer(financiero_pdf, "tabla_12m", [])
+    tabla = (
+        leer(
+            financiero_pdf,
+            "tabla_12m",
+            [],
+        )
+        or []
+    )
 
     if tabla:
-        pago_actual = sum(
-            float(x.get("factura_base_L", 0.0))
-            for x in tabla
-            if isinstance(x, dict)
-        ) / 12.0
 
-        pago_residual = sum(
-            float(x.get("pago_enee_L", 0.0))
-            for x in tabla
-            if isinstance(x, dict)
-        ) / 12.0
+        pago_actual = (
+            sum(
+                float(
+                    fila.get(
+                        "factura_base_L",
+                        0.0,
+                    )
+                    or 0.0
+                )
+                for fila in tabla
+                if isinstance(fila, dict)
+            )
+            / 12.0
+        )
+
+        pago_residual = (
+            sum(
+                float(
+                    fila.get(
+                        "pago_enee_L",
+                        0.0,
+                    )
+                    or 0.0
+                )
+                for fila in tabla
+                if isinstance(fila, dict)
+            )
+            / 12.0
+        )
+
     else:
+
         pago_actual = 0.0
         pago_residual = 0.0
 
@@ -488,18 +805,34 @@ def p1_conclusion(
         leer(
             financiero_pdf,
             "cuota_mensual_L",
-            leer(financiero_pdf, "cuota_mensual", 0.0),
+            leer(
+                financiero_pdf,
+                "cuota_mensual",
+                0.0,
+            ),
         )
+        or 0.0
     )
 
-    pago_total = pago_residual + cuota
-    reduccion_mensual = pago_actual - pago_total
+    pago_total = (
+        pago_residual
+        + cuota
+    )
+
+    reduccion_mensual = (
+        pago_actual
+        - pago_total
+    )
 
     # =====================================================
     # COBERTURA ENERGÉTICA
     # =====================================================
 
-    consumo_12m = get_field(datos, "consumo_12m", [])
+    consumo_12m = get_field(
+        datos,
+        "consumo_12m",
+        [],
+    )
 
     consumo_anual = (
         sum(consumo_12m)
@@ -509,9 +842,15 @@ def p1_conclusion(
 
     energia_real = (
         sum(
-            float(x.get("fv_kwh", 0.0))
-            for x in tabla
-            if isinstance(x, dict)
+            float(
+                fila.get(
+                    "fv_kwh",
+                    0.0,
+                )
+                or 0.0
+            )
+            for fila in tabla
+            if isinstance(fila, dict)
         )
         if tabla
         else 0.0
@@ -524,7 +863,12 @@ def p1_conclusion(
     )
 
     cobertura_obj = float(
-        get_field(datos, "cobertura_objetivo", 0.0)
+        get_field(
+            datos,
+            "cobertura_objetivo",
+            0.0,
+        )
+        or 0.0
     )
 
     capacidad_bateria = float(
@@ -532,30 +876,34 @@ def p1_conclusion(
             financiero_pdf,
             "capacidad_bateria_kwh",
             0.0,
-        ) or 0.0
+        )
+        or 0.0
     )
 
     linea_bateria = ""
 
     if capacidad_bateria > 0:
+
         linea_bateria = (
-            f"• Batería evaluada: "
+            "• Batería evaluada: "
             f"<b>{capacidad_bateria:.1f} kWh</b><br/>"
         )
 
     concl = f"""
-    <b>Conclusión ejecutiva</b><br/><br/>
+    <b>Resultado del estudio</b><br/><br/>
+    • Sistema propuesto:
+      <b>{kwp:.2f} kWp</b><br/>
+    • Demanda anual abastecida:
+      <b>{cobertura_real * 100:.1f}%</b><br/>
+    • Cobertura solicitada:
+      <b>{cobertura_obj * 100:.0f}%</b><br/>
     • Reducción mensual estimada:
       <b>{money_L(reduccion_mensual)}/mes</b><br/>
     • Ahorro mínimo mensual estimado:
       <b>{money_L(ahorro_minimo)}</b><br/>
-    • DSCR: <b>{ds_txt}</b><br/>
-    • Sistema propuesto: <b>{kwp:.2f} kWp</b><br/>
+    • DSCR:
+      <b>{ds_txt}</b><br/>
     {linea_bateria}
-    • Cobertura solicitada:
-      {cobertura_obj * 100:.0f}%<br/>
-    • Demanda anual abastecida:
-      <b>{cobertura_real * 100:.1f}%</b><br/>
     """
 
     return [
@@ -563,8 +911,10 @@ def p1_conclusion(
             concl,
             pal,
             content_w,
-        )
+        ),
+        Spacer(1, 12),
     ]
+
 
 # =========================================================
 # 6. ORQUESTADOR DEL CAPÍTULO
@@ -573,28 +923,110 @@ def p1_conclusion(
 # No cambiar su firma sin revisar generar_pdf_profesional.py.
 # =========================================================
 
-def build_resumen_ejecutivo(resultado, datos, paths, pal, styles, content_w):
+def build_resumen_ejecutivo(
+    resultado,
+    datos,
+    paths,
+    pal,
+    styles,
+    content_w,
+):
 
-    sizing = leer(resultado, "sizing", {})
-    energia = leer(resultado, "energia", {})
-    financiero = leer(resultado, "financiero", {})
-    paneles = leer(resultado, "paneles", None)
+    sizing = leer(
+        resultado,
+        "sizing",
+        {},
+    )
 
-    fecha = datetime.now().strftime("%Y-%m-%d")
+    energia = leer(
+        resultado,
+        "energia",
+        {},
+    )
+
+    financiero = leer(
+        resultado,
+        "financiero",
+        {},
+    )
+
+    paneles = leer(
+        resultado,
+        "paneles",
+        None,
+    )
+
+    fecha = datetime.now().strftime(
+        "%Y-%m-%d"
+    )
 
     story = []
 
-    story.append(Paragraph("Reporte Ejecutivo — Evaluación Fotovoltaica", styles["Title"]))
-    story.append(Spacer(1, 10))
+    story.append(
+        Paragraph(
+            "Reporte Ejecutivo — Evaluación Fotovoltaica",
+            styles["Title"],
+        )
+    )
+
+    story.append(
+        Spacer(
+            1,
+            10,
+        )
+    )
 
     # -----------------------------------------------------
-    # Orden visual del capítulo
+    # 1. Contexto del proyecto
     # -----------------------------------------------------
-    story += p1_tabla_cliente(datos, sizing, fecha, pal, content_w)
-    story += p1_tabla_solucion_unica(datos, sizing, energia, financiero, pal, content_w, paneles=paneles)
-    story += p1_tabla_decision(financiero, pal, content_w)
-    story += p1_conclusion(financiero, sizing, datos, pal, content_w, paneles=paneles)
 
-    story.append(PageBreak())
+    story += p1_tabla_cliente(
+        datos,
+        sizing,
+        fecha,
+        pal,
+        content_w,
+    )
+
+    # -----------------------------------------------------
+    # 2. Resultado principal del estudio
+    # -----------------------------------------------------
+
+    story += p1_conclusion(
+        financiero,
+        sizing,
+        datos,
+        pal,
+        content_w,
+        paneles=paneles,
+    )
+
+    # -----------------------------------------------------
+    # 3. Sistema fotovoltaico propuesto
+    # -----------------------------------------------------
+
+    story += p1_tabla_solucion_unica(
+        datos,
+        sizing,
+        energia,
+        financiero,
+        pal,
+        content_w,
+        paneles=paneles,
+    )
+
+    # -----------------------------------------------------
+    # 4. Impacto económico esperado
+    # -----------------------------------------------------
+
+    story += p1_tabla_decision(
+        financiero,
+        pal,
+        content_w,
+    )
+
+    story.append(
+        PageBreak()
+    )
 
     return story
