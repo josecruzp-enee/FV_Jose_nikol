@@ -5,63 +5,31 @@ from __future__ import annotations
 
 from typing import Any
 
-
-# ======================================================
-# CONCLUSIONES EJECUTIVAS — REPORTE FV
-# ======================================================
-# Responsabilidad:
-# - Extraer métricas consolidadas del resultado.
-# - Clasificar viabilidad ejecutiva.
-# - Generar narrativa automática.
-# - Insertar la página de conclusiones en el PDF.
-#
-# Este módulo NO calcula ingeniería eléctrica.
-# Este módulo NO optimiza el sistema FV.
-# Este módulo NO modifica resultados.
-# Solo presenta e interpreta información ya calculada.
-# ======================================================
+from reportlab.lib import colors
+from reportlab.lib.enums import TA_JUSTIFY
+from reportlab.lib.styles import ParagraphStyle
+from reportlab.lib.units import cm
+from reportlab.platypus import PageBreak, Paragraph, Spacer, Table, TableStyle
 
 
 # ======================================================
-# 1. UTILIDADES SEGURAS
+# UTILIDADES
 # ======================================================
 
-def _get(obj: Any, *paths: str, default: Any = None) -> Any:
-    """
-    Obtiene valores desde objetos, dataclasses o dicts sin romper el PDF.
-    """
-    for path in paths:
-        actual = obj
-        ok = True
-
-        for part in path.split("."):
-            if actual is None:
-                ok = False
-                break
-
-            if isinstance(actual, dict):
-                actual = actual.get(part)
-            else:
-                actual = getattr(actual, part, None)
-
-        if ok and actual is not None:
-            return actual
-
-    return default
+def _leer(obj: Any, campo: str, default=None):
+    if obj is None:
+        return default
+    if isinstance(obj, dict):
+        return obj.get(campo, default)
+    return getattr(obj, campo, default)
 
 
 def _num(valor: Any, default: float = 0.0) -> float:
     try:
-        if valor is None:
-            return default
-        return float(valor)
-    except Exception:
+        return default if valor is None else float(valor)
+    except (TypeError, ValueError):
         return default
 
-
-# ======================================================
-# 2. FORMATO
-# ======================================================
 
 def _fmt_lps(valor: Any) -> str:
     return f"L {_num(valor):,.2f}"
@@ -78,475 +46,149 @@ def _fmt_kwp(valor: Any) -> str:
 def _fmt_pct(valor: Any) -> str:
     return f"{_num(valor):,.1f}%"
 
+
 def _es_pago_contado(m: dict) -> bool:
-    """
-    Determina si el escenario fue evaluado sin deuda financiera.
-
-    La cuota mensual es el criterio final porque en pago de contado
-    el motor financiero devuelve cuota igual a cero.
-    """
-
-    cuota = _num(m.get("cuota", 0.0))
-
-    return cuota <= 0.000001
+    return _num(m["cuota"]) <= 0.000001
 
 
 def _fmt_dscr(m: dict) -> str:
-    """
-    Presenta el DSCR únicamente cuando existe financiamiento.
-    """
-
     if _es_pago_contado(m):
         return "No aplica"
 
-    dscr = m.get("dscr")
-
-    if dscr is None:
-        return "No disponible"
-
-    return f"{_num(dscr):.2f}"   
+    dscr = m["dscr"]
+    return "No disponible" if dscr is None else f"{_num(dscr):.2f}"
 
 
 # ======================================================
-# 3. EXTRACCIÓN DE MÉTRICAS
+# EXTRACCIÓN ANCLADA DE MÉTRICAS
 # ======================================================
 
-def extraer_metricas_conclusion(resultado: Any, datos: Any = None) -> dict:
-    """
-    Extrae métricas principales del resultado consolidado.
+def _metricas_energia(resultado: Any, datos: Any) -> dict:
+    energia = resultado.energia
 
-    Prioridad:
-    1. Sistema FV real conectado desde resultado.paneles.strings.
-    2. Fallback desde sizing / optimización económica.
-    """
+    consumo_anual = sum(_num(x) for x in datos.consumo_12m)
+    produccion_anual = sum(_num(x) for x in energia.energia_util_12m)
 
-    energia = _get(resultado, "energia", default=None)
-
-    financiero = _get(
-        resultado,
-        "finanzas",
-        "financiero",
-        "resultado_financiero",
-        default=None,
+    cobertura_real = (
+        produccion_anual / consumo_anual * 100.0
+        if consumo_anual > 0
+        else 0.0
     )
-
-    # ======================================================
-    # LAYOUT
-    # ======================================================
-
-    layout_preliminar = _get(resultado, "layout_preliminar", default=None)
-
-    area_layout = _num(
-        _get(
-            layout_preliminar,
-            "area_rectangular_m2",
-            "area_necesaria_m2",
-            default=0.0,
-        )
-    )
-
-    # ======================================================
-    # OPTIMIZACIÓN ECONÓMICA
-    # ======================================================
-
-    opt = _get(resultado, "optimizacion_economica", default=None)
-
-    if not opt and energia is not None:
-        opt = _get(energia, "optimizacion_economica", default=None)
-
-    sin = {}
-    con = {}
-
-    if isinstance(opt, dict):
-        sin = opt.get("sin_inyeccion", {}) or {}
-        con = opt.get("con_inyeccion", {}) or {}
-
-    # ======================================================
-    # ENERGÍA
-    # ======================================================
-
-    consumo_12m = []
-
-    if datos is not None:
-        consumo_12m = _get(datos, "consumo_12m", default=[]) or []
-
-    consumo_anual = sum(_num(x) for x in consumo_12m)
-
-    if not consumo_anual:
-        consumo_anual = _get(
-            resultado,
-            "consumo_anual",
-            "consumo_anual_kwh",
-            default=0,
-        )
-
-    produccion_anual = _get(
-        resultado,
-        "produccion_anual",
-        "produccion_anual_kwh",
-        "energia.produccion_anual",
-        "energia.generacion_anual",
-        "energia.produccion_anual_kwh",
-        "energia.generacion_anual_kwh",
-        "energia.energia_anual_kwh",
-        "energia.energia_util_anual",
-        "sizing.produccion_anual",
-        "sizing.produccion_anual_kwh",
-        default=0,
-    )
-
-    if not produccion_anual:
-        produccion_anual = sin.get("generacion_kwh_anual", 0.0)
-
-    cobertura_real = _get(
-        resultado,
-        "cobertura_real",
-        "cobertura_real_pct",
-        "energia.cobertura_real",
-        "energia.cobertura_real_pct",
-        "sizing.cobertura_real",
-        "sizing.cobertura_real_pct",
-        default=0,
-    )
-
-    if not cobertura_real:
-        cobertura_real = sin.get("cobertura_directa_pct", 0.0)
-
-    if _num(consumo_anual) > 0 and _num(produccion_anual) > 0:
-        cobertura_real = (_num(produccion_anual) / _num(consumo_anual)) * 100.0
-
-    # ======================================================
-    # SISTEMA FV REAL CONECTADO
-    # ======================================================
-
-    strings = _get(resultado, "paneles.strings", default=[]) or []
-    panel = _get(resultado, "paneles.panel", default=None)
-
-    panel_wp_real = _num(
-        _get(
-            panel,
-            "pmax_w",
-            "potencia_wp",
-            default=0,
-        )
-    )
-
-    n_paneles_reales = sum(
-        int(_get(s, "n_series", default=0) or 0)
-        for s in strings
-    )
-
-    if n_paneles_reales > 0 and panel_wp_real > 0:
-        n_paneles = n_paneles_reales
-        potencia_panel_wp = panel_wp_real
-        kwp = n_paneles * potencia_panel_wp / 1000.0
-
-    else:
-        kwp = _get(
-            resultado,
-            "kwp",
-            "pdc_kw",
-            "potencia_dc_kwp",
-            "sizing.kwp",
-            "sizing.pdc_kw",
-            "sizing.potencia_kwp",
-            "sizing.potencia_dc_kwp",
-            "paneles.kwp",
-            "paneles.pdc_kw",
-            "paneles.potencia_dc_kwp",
-            "paneles.kwp_total",
-            default=0,
-        )
-
-        if not kwp:
-            kwp = sin.get("pdc_kw", sin.get("kwp", 0.0))
-
-        n_paneles = _get(
-            resultado,
-            "n_paneles",
-            "numero_paneles",
-            "paneles.n_paneles",
-            "paneles.numero_paneles",
-            "sizing.n_paneles",
-            "sizing.numero_paneles",
-            default=0,
-        )
-
-        if not n_paneles:
-            n_paneles = sin.get("n_paneles", 0)
-
-        potencia_panel_wp = _get(
-            resultado,
-            "potencia_panel_wp",
-            "paneles.potencia_panel_wp",
-            "paneles.potencia_wp",
-            "paneles.modulo_wp",
-            "sizing.potencia_panel_wp",
-            default=0,
-        )
-
-        if not potencia_panel_wp and _num(kwp) > 0 and _num(n_paneles) > 0:
-            potencia_panel_wp = (_num(kwp) * 1000.0) / _num(n_paneles)
-
-    cantidad_inversores = _get(
-        resultado,
-        "cantidad_inversores",
-        "electrical.cantidad_inversores",
-        "paneles.cantidad_inversores",
-        "sizing.cantidad_inversores",
-        "sizing.n_inversores",
-        default=0,
-    )
-
-    kw_ac_total = _get(
-        resultado,
-        "kw_ac_total",
-        "potencia_ac_kw",
-        "electrical.kw_ac_total",
-        "paneles.kw_ac_total",
-        "sizing.kw_ac_total",
-        default=0,
-    )
-
-    # ======================================================
-    # FINANZAS
-    # ======================================================
-
-    capex = _get(
-        resultado,
-        "capex",
-        "capex_L",
-        "capex_total",
-        "financiero.capex",
-        "financiero.capex_L",
-        "financiero.capex_total",
-        "finanzas.capex",
-        "finanzas.capex_L",
-        "finanzas.capex_total",
-        "resultado_financiero.capex_L",
-        default=0,
-    )
-
-    if not capex:
-        capex = sin.get("capex_estimado_l", 0.0)
-
-    dscr = _get(
-        resultado,
-        "dscr",
-        "indicadores.dscr",
-        "resumen.dscr",
-        "financiero.evaluacion.dscr",
-        "finanzas.evaluacion.dscr",
-        "resultado_financiero.evaluacion.dscr",
-        default=0,
-    )
-
-    if not dscr and financiero:
-        try:
-            if isinstance(financiero, dict):
-                dscr = financiero.get("evaluacion", {}).get("dscr", 0.0)
-            else:
-                evaluacion = getattr(financiero, "evaluacion", None)
-
-                if isinstance(evaluacion, dict):
-                    dscr = evaluacion.get("dscr", 0.0)
-                else:
-                    dscr = getattr(evaluacion, "dscr", 0.0)
-        except Exception:
-            dscr = 0.0
-
-    ahorro_mensual = _get(
-        resultado,
-        "ahorro_neto_mensual",
-        "financiero.ahorro_neto_mensual",
-        "finanzas.ahorro_neto_mensual",
-        "financiero.evaluacion.neto_prom",
-        "finanzas.evaluacion.neto_prom",
-        default=0,
-    )
-
-    ahorro_anual = _get(
-        resultado,
-        "ahorro_neto_anual",
-        "beneficio_neto_anual",
-        "financiero.ahorro_neto_anual",
-        "financiero.ahorro_anual_L",
-        "finanzas.ahorro_neto_anual",
-        "finanzas.ahorro_anual_L",
-        default=0,
-    )
-
-    if not ahorro_anual:
-        ahorro_anual = sin.get("beneficio_neto_l_anual", 0.0)
-
-    if not ahorro_mensual and _num(ahorro_anual) != 0:
-        ahorro_mensual = _num(ahorro_anual) / 12.0
-
-    beneficio_bruto_anual = _num(ahorro_anual)
-    beneficio_neto_anual = _num(ahorro_mensual) * 12.0
-
-    pago_actual = _get(
-        resultado,
-        "pago_actual",
-        "pago_actual_mensual",
-        "financiero.pago_actual",
-        "financiero.pago_actual_mensual",
-        "finanzas.pago_actual",
-        "finanzas.pago_actual_mensual",
-        default=0,
-    )
-
-    pago_total_fv = _get(
-        resultado,
-        "pago_total_con_fv",
-        "total_pago_con_fv",
-        "financiero.pago_total_con_fv",
-        "finanzas.pago_total_con_fv",
-        default=0,
-    )
-
-    cuota = _get(
-        resultado,
-        "cuota_mensual",
-        "financiero.cuota_mensual",
-        "finanzas.cuota_mensual",
-        "resultado_financiero.cuota_mensual",
-        default=0,
-    )
-
-    peor_mes = _get(
-        resultado,
-        "peor_mes",
-        "financiero.evaluacion.peor_mes",
-        "finanzas.evaluacion.peor_mes",
-        "resultado_financiero.evaluacion.peor_mes",
-        default=0,
-    )
-
-    if not peor_mes and financiero:
-        try:
-            if isinstance(financiero, dict):
-                peor_mes = financiero.get("evaluacion", {}).get("peor_mes", 0.0)
-            else:
-                evaluacion = getattr(financiero, "evaluacion", None)
-
-                if isinstance(evaluacion, dict):
-                    peor_mes = evaluacion.get("peor_mes", 0.0)
-                else:
-                    peor_mes = getattr(evaluacion, "peor_mes", 0.0)
-        except Exception:
-            peor_mes = 0.0
-
-    # ======================================================
-    # FALLBACK DESDE TABLA 12 MESES
-    # ======================================================
-
-    tabla_12m = None
-
-    if financiero:
-        if isinstance(financiero, dict):
-            tabla_12m = financiero.get("tabla_12m")
-        else:
-            tabla_12m = getattr(financiero, "tabla_12m", None)
-
-    if isinstance(tabla_12m, list) and tabla_12m:
-
-        if not pago_actual:
-            pago_actual = sum(
-                float(x.get("factura_base_L", 0.0) or 0.0)
-                for x in tabla_12m
-            ) / len(tabla_12m)
-
-        if not pago_total_fv:
-            pago_total_fv = sum(
-                (
-                    float(x.get("pago_enee_L", 0.0) or 0.0)
-                    + float(x.get("cuota_L", 0.0) or 0.0)
-                    + float(x.get("om_L", 0.0) or 0.0)
-                )
-                for x in tabla_12m
-            ) / len(tabla_12m)
-
-        if not cuota:
-            cuota = sum(
-                float(x.get("cuota_L", 0.0) or 0.0)
-                for x in tabla_12m
-            ) / len(tabla_12m)
-
-        if not ahorro_mensual:
-            ahorro_mensual = sum(
-                float(x.get("neto_L", 0.0) or 0.0)
-                for x in tabla_12m
-            ) / len(tabla_12m)
-
-        if not peor_mes:
-            peor_mes = min(
-                float(x.get("neto_L", 0.0) or 0.0)
-                for x in tabla_12m
-            )
-
-        beneficio_neto_anual = _num(ahorro_mensual) * 12.0
 
     return {
-        "consumo_anual": _num(consumo_anual),
-        "produccion_anual": _num(produccion_anual),
-        "cobertura_real": _num(cobertura_real),
-        "kwp": _num(kwp),
-        "capex": _num(capex),
-        "dscr": _num(dscr),
-        "ahorro_mensual": _num(ahorro_mensual),
-        "ahorro_anual": _num(ahorro_anual),
-        "beneficio_bruto_anual": _num(beneficio_bruto_anual),
-        "beneficio_neto_anual": _num(beneficio_neto_anual),
-        "pago_actual": _num(pago_actual),
-        "pago_total_fv": _num(pago_total_fv),
-        "cuota": _num(cuota),
-        "peor_mes": _num(peor_mes),
-        "n_paneles": int(_num(n_paneles)),
-        "potencia_panel_wp": _num(potencia_panel_wp),
-        "cantidad_inversores": int(_num(cantidad_inversores)),
-        "kw_ac_total": _num(kw_ac_total),
-        "area_layout": _num(area_layout),
-        "escenario_base": sin,
-        "escenario_inyeccion": con,
+        "consumo_anual": consumo_anual,
+        "produccion_anual": produccion_anual,
+        "cobertura_real": cobertura_real,
     }
 
 
+def _metricas_sistema(resultado: Any) -> dict:
+    paneles = resultado.paneles
+    strings = paneles.strings
+    panel = paneles.panel
+    sizing = resultado.sizing
+
+    n_paneles = sum(int(s.n_series) for s in strings)
+    potencia_panel_wp = _num(panel.pmax_w)
+    kwp = n_paneles * potencia_panel_wp / 1000.0
+
+    return {
+        "kwp": kwp,
+        "n_paneles": n_paneles,
+        "potencia_panel_wp": potencia_panel_wp,
+        "cantidad_inversores": int(_num(sizing.n_inversores)),
+        "kw_ac_total": _num(sizing.kw_ac_total),
+    }
+
+
+def _metricas_financieras(resultado: Any) -> dict:
+    financiero = resultado.financiero
+    evaluacion = financiero["evaluacion"]
+    tabla_12m = financiero["tabla_12m"]
+
+    pago_actual = sum(
+        _num(fila["factura_base_L"])
+        for fila in tabla_12m
+    ) / len(tabla_12m)
+
+    pago_total_fv = sum(
+        _num(fila["pago_enee_L"])
+        + _num(fila["cuota_L"])
+        + _num(fila["om_L"])
+        for fila in tabla_12m
+    ) / len(tabla_12m)
+
+    ahorro_mensual = _num(evaluacion["neto_prom"])
+    ahorro_anual = _num(financiero["ahorro_anual_L"])
+
+    return {
+        "capex": _num(financiero["capex_L"]),
+        "dscr": evaluacion["dscr"],
+        "ahorro_mensual": ahorro_mensual,
+        "ahorro_anual": ahorro_anual,
+        "beneficio_bruto_anual": ahorro_anual,
+        "beneficio_neto_anual": ahorro_mensual * 12.0,
+        "pago_actual": pago_actual,
+        "pago_total_fv": pago_total_fv,
+        "cuota": _num(financiero["cuota_mensual"]),
+        "peor_mes": _num(evaluacion["peor_mes"]),
+    }
+
+
+def _metricas_layout(resultado: Any) -> dict:
+    layout = resultado.layout_preliminar
+
+    if isinstance(layout, dict):
+        layout = layout.get("layout", layout)
+
+    return {
+        "area_layout": _num(
+            _leer(layout, "area_rectangular_m2", 0.0)
+        )
+    }
+
+
+def extraer_metricas_conclusion(
+    resultado: Any,
+    datos: Any = None,
+) -> dict:
+    """
+    Extrae métricas desde una única fuente oficial por indicador.
+
+    No busca nombres alternativos ni calcula fallbacks silenciosos.
+    Si cambia el contrato de un módulo, debe corregirse aquí.
+    """
+
+    if datos is None:
+        raise ValueError("datos es obligatorio para generar conclusiones.")
+
+    metricas = {}
+    metricas.update(_metricas_energia(resultado, datos))
+    metricas.update(_metricas_sistema(resultado))
+    metricas.update(_metricas_financieras(resultado))
+    metricas.update(_metricas_layout(resultado))
+
+    return metricas
+
+
 # ======================================================
-# 4. CLASIFICACIÓN EJECUTIVA
+# CLASIFICACIÓN EJECUTIVA
 # ======================================================
 
 def clasificar_viabilidad(m: dict) -> tuple[str, str]:
-    """
-    Clasifica la viabilidad según la modalidad financiera.
-
-    - Contado: ahorro mensual y recuperación simple.
-    - Financiado: DSCR, ahorro mensual y peor mes.
-    """
-
-    ahorro = _num(m.get("ahorro_mensual", 0.0))
-    peor_mes = _num(m.get("peor_mes", 0.0))
-    capex = _num(m.get("capex", 0.0))
-    dscr = m.get("dscr")
-
-    # ======================================================
-    # PAGO DE CONTADO
-    # ======================================================
+    ahorro = _num(m["ahorro_mensual"])
+    peor_mes = _num(m["peor_mes"])
+    capex = _num(m["capex"])
 
     if _es_pago_contado(m):
         ahorro_anual = ahorro * 12.0
-
-        payback_anios = (
-            capex / ahorro_anual
-            if capex > 0 and ahorro_anual > 0
-            else None
-        )
+        payback = capex / ahorro_anual if ahorro_anual > 0 else None
 
         if ahorro <= 0:
             return (
                 "NO RECOMENDADO",
-                "El proyecto no produce una reducción económica "
-                "positiva bajo las condiciones evaluadas.",
+                "El proyecto no produce una reducción económica positiva "
+                "bajo las condiciones evaluadas.",
             )
 
         if peor_mes < 0:
@@ -556,122 +198,95 @@ def clasificar_viabilidad(m: dict) -> tuple[str, str]:
                 "positiva, aunque presenta meses que requieren revisión.",
             )
 
-        if payback_anios is not None and payback_anios <= 10:
+        if payback is not None and payback <= 10:
             return (
                 "VIABLE PRELIMINAR",
-                "El proyecto produce ahorros operativos positivos "
-                "durante el período evaluado y presenta un período "
-                "simple de recuperación aproximado de "
-                f"{payback_anios:.1f} años.",
+                "El proyecto produce ahorros operativos positivos y presenta "
+                f"un período simple de recuperación aproximado de {payback:.1f} años.",
             )
 
         return (
             "VIABLE CON OBSERVACIONES",
-            "El proyecto produce una reducción económica positiva, "
-            "aunque el período de recuperación requiere revisión.",
+            "El proyecto produce una reducción económica positiva, aunque "
+            "el período de recuperación requiere revisión.",
         )
 
-    # ======================================================
-    # PROYECTO FINANCIADO
-    # ======================================================
+    dscr = _num(m["dscr"])
 
-    dscr_num = _num(dscr, default=0.0)
-
-    if dscr_num >= 1.20 and ahorro > 0 and peor_mes >= 0:
+    if dscr >= 1.20 and ahorro > 0 and peor_mes >= 0:
         return (
             "VIABLE PRELIMINAR",
-            "El proyecto presenta capacidad financiera adecuada "
-            "y margen suficiente para atender la deuda bajo las "
-            "condiciones evaluadas.",
+            "El proyecto presenta capacidad financiera adecuada y margen "
+            "suficiente para atender la deuda.",
         )
 
-    if dscr_num >= 1.00 and ahorro > 0:
+    if dscr >= 1.00 and ahorro > 0:
         return (
             "VIABLE CON OBSERVACIONES",
             "El proyecto genera ahorro y cubre la deuda, pero su margen "
-            "financiero debe revisarse antes de la ejecución.",
+            "financiero debe revisarse.",
         )
 
     return (
         "NO RECOMENDADO",
         "Los ahorros generados no proporcionan cobertura suficiente "
-        "para atender la deuda bajo las condiciones actuales.",
+        "para atender la deuda.",
     )
-# ======================================================
-# 5. NARRATIVA EJECUTIVA
-# ======================================================
-def _texto_viabilidad(
-    m: dict,
-    estado: str,
-    criterio_estado: str,
-) -> str:
-    """
-    Genera la narrativa de viabilidad según contado o crédito.
-    """
 
-    reduccion_mensual = _fmt_lps(
-        m["ahorro_mensual"]
-    )
+
+# ======================================================
+# NARRATIVA
+# ======================================================
+
+def _texto_viabilidad(m: dict, estado: str, criterio: str) -> str:
+    ahorro = _fmt_lps(m["ahorro_mensual"])
 
     if _es_pago_contado(m):
         return (
-            f"El proyecto se clasifica como {estado}. "
-            f"{criterio_estado} "
-            f"El escenario corresponde a pago de contado, por lo que "
-            f"el indicador DSCR no aplica. La reducción promedio "
-            f"mensual estimada de la factura es de "
-            f"{reduccion_mensual}."
+            f"El proyecto se clasifica como {estado}. {criterio} "
+            f"El escenario corresponde a pago de contado, por lo que el "
+            f"indicador DSCR no aplica. La reducción promedio mensual "
+            f"estimada de la factura es de {ahorro}."
         )
 
     return (
-        f"El proyecto se clasifica como {estado}. "
-        f"{criterio_estado} "
-        f"El indicador DSCR calculado es {_fmt_dscr(m)}, "
-        f"con una reducción mensual estimada de "
-        f"{reduccion_mensual}."
+        f"El proyecto se clasifica como {estado}. {criterio} "
+        f"El indicador DSCR calculado es {_fmt_dscr(m)}, con una reducción "
+        f"mensual estimada de {ahorro}."
     )
+
 
 def _texto_resultado_energetico(m: dict) -> str:
     return (
-        f"El sistema fotovoltaico propuesto tiene una potencia instalada de {_fmt_kwp(m['kwp'])} "
-        f"y una producción anual estimada de {_fmt_kwh(m['produccion_anual'])}. "
-        f"Esta generación cubre aproximadamente {_fmt_pct(m['cobertura_real'])} "
-        f"del consumo anual del cliente, cuyo consumo total es de {_fmt_kwh(m['consumo_anual'])}."
+        f"El sistema fotovoltaico propuesto tiene una potencia instalada "
+        f"de {_fmt_kwp(m['kwp'])} y una producción anual estimada de "
+        f"{_fmt_kwh(m['produccion_anual'])}. Esta generación cubre "
+        f"aproximadamente {_fmt_pct(m['cobertura_real'])} del consumo anual "
+        f"del cliente, cuyo consumo total es de {_fmt_kwh(m['consumo_anual'])}."
     )
 
 
 def _texto_impacto_financiero(m: dict) -> str:
-    """
-    Describe el impacto financiero según la modalidad evaluada.
-    """
-
     if _es_pago_contado(m):
-        reduccion_anual = _num(
-            m["beneficio_neto_anual"]
-        )
-
-        capex = _num(m["capex"])
-
+        reduccion_anual = _num(m["beneficio_neto_anual"])
         payback = (
-            capex / reduccion_anual
-            if capex > 0 and reduccion_anual > 0
+            _num(m["capex"]) / reduccion_anual
+            if reduccion_anual > 0
             else None
         )
 
-        texto_payback = ""
-
-        if payback is not None:
-            texto_payback = (
-                f" El período simple estimado de recuperación "
-                f"de la inversión es de {payback:.1f} años."
-            )
+        texto_payback = (
+            f" El período simple estimado de recuperación de la inversión "
+            f"es de {payback:.1f} años."
+            if payback is not None
+            else ""
+        )
 
         return (
             f"El pago energético mensual actual se estima en "
-            f"{_fmt_lps(m['pago_actual'])}. "
-            f"El proyecto fue evaluado bajo modalidad de pago de "
-            f"contado, sin cuota ni deuda financiera. La reducción "
-            f"promedio mensual estimada de la factura es de "
+            f"{_fmt_lps(m['pago_actual'])}. El proyecto fue evaluado bajo "
+            f"modalidad de pago de contado, sin cuota ni deuda financiera. "
+            f"La reducción promedio mensual estimada es de "
             f"{_fmt_lps(m['ahorro_mensual'])}, equivalente a "
             f"{_fmt_lps(reduccion_anual)} durante el primer año."
             f"{texto_payback}"
@@ -679,15 +294,10 @@ def _texto_impacto_financiero(m: dict) -> str:
 
     return (
         f"El pago energético mensual actual se estima en "
-        f"{_fmt_lps(m['pago_actual'])}. "
-        f"Con el sistema FV y el financiamiento considerado, el pago "
-        f"total mensual proyectado es de aproximadamente "
+        f"{_fmt_lps(m['pago_actual'])}. Con el sistema FV y el financiamiento "
+        f"considerado, el pago total mensual proyectado es de "
         f"{_fmt_lps(m['pago_total_fv'])}, incluyendo una cuota de "
-        f"{_fmt_lps(m['cuota'])}. "
-        f"El beneficio económico anual generado por la energía "
-        f"fotovoltaica se estima en "
-        f"{_fmt_lps(m['beneficio_bruto_anual'])}. "
-        f"Después de considerar el financiamiento, la reducción "
+        f"{_fmt_lps(m['cuota'])}. Después del financiamiento, la reducción "
         f"económica anual estimada es de "
         f"{_fmt_lps(m['beneficio_neto_anual'])}."
     )
@@ -695,110 +305,100 @@ def _texto_impacto_financiero(m: dict) -> str:
 
 def _texto_dimensionamiento() -> str:
     return (
-        "El tamaño seleccionado prioriza autoconsumo, estabilidad financiera y control del excedente energético. "
-        "Aunque un sistema de mayor potencia puede incrementar la generación anual, también puede aumentar "
-        "la energía excedente y la dependencia de condiciones comerciales o regulatorias externas."
+        "El tamaño seleccionado prioriza autoconsumo, estabilidad financiera "
+        "y control del excedente energético. Un sistema de mayor potencia puede "
+        "incrementar la generación, pero también el excedente y la dependencia "
+        "de condiciones comerciales o regulatorias externas."
     )
 
 
 def _texto_alcance_fisico(m: dict) -> str:
     return (
-        f"La solución considera {m['n_paneles']} módulos fotovoltaicos "
-        f"de {m['potencia_panel_wp']:.0f} Wp. "
-        f"El área preliminar estimada para el arreglo es de {m['area_layout']:.2f} m². "
-        f"Este valor debe validarse en campo considerando obstáculos, sombras, orientación real, "
-        f"accesos de mantenimiento y revisión estructural de la cubierta."
+        f"La solución considera {m['n_paneles']} módulos fotovoltaicos de "
+        f"{m['potencia_panel_wp']:.0f} Wp. El área rectangular preliminar "
+        f"del arreglo es de {m['area_layout']:.2f} m². Este valor debe "
+        f"validarse en campo considerando obstáculos, sombras, orientación, "
+        f"accesos de mantenimiento y revisión estructural."
     )
+
 
 def _texto_recomendacion_final(estado: str) -> str:
     if estado == "NO RECOMENDADO":
         return (
             "No se recomienda avanzar a ejecución bajo las condiciones "
-            "económicas actuales. Antes de continuar, se recomienda revisar "
-            "CAPEX, tamaño del sistema, tarifa eléctrica aplicada y perfil "
-            "horario real de demanda. Si existe financiamiento, también deben "
-            "revisarse la tasa, el plazo y la prima."
+            "económicas actuales. Deben revisarse CAPEX, tamaño del sistema, "
+            "tarifa eléctrica y perfil horario real de demanda."
         )
 
     if estado == "VIABLE CON OBSERVACIONES":
         return (
-            "Se puede avanzar a una etapa de revisión técnica y económica "
-            "más detallada. Deben validarse el perfil horario real de demanda, "
-            "el período de recuperación, las condiciones de instalación, "
-            "el área útil, la capacidad estructural y las condiciones "
-            "definitivas de interconexión."
+            "Se puede avanzar a una revisión técnica y económica más detallada. "
+            "Deben validarse el perfil horario, el área útil, la estructura, "
+            "la interconexión y las condiciones financieras definitivas."
         )
 
     return (
-        "Se recomienda avanzar con el diseño base evaluado, manteniendo "
-        "como prioridad el autoconsumo y la reducción directa de la factura "
-        "eléctrica. Antes de la ejecución deben validarse el perfil horario "
-        "real de demanda, las condiciones de instalación, el área útil, "
-        "la capacidad estructural y las condiciones de interconexión."
+        "Se recomienda avanzar con el diseño base evaluado, manteniendo como "
+        "prioridad el autoconsumo y la reducción directa de la factura. Antes "
+        "de ejecutar deben validarse el sitio, el perfil horario, el área útil, "
+        "la estructura y las condiciones de interconexión."
     )
 
+
 # ======================================================
-# 6. GENERADOR DE CONTENIDO
+# CONTENIDO ESTRUCTURADO
 # ======================================================
 
-def generar_conclusiones_ejecutivas(resultado: Any, datos: Any = None) -> dict:
-    """
-    Genera contenido estructurado para la página de conclusiones.
-    """
-
+def generar_conclusiones_ejecutivas(
+    resultado: Any,
+    datos: Any = None,
+) -> dict:
     m = extraer_metricas_conclusion(resultado, datos)
-    estado, criterio_estado = clasificar_viabilidad(m)
-
-    conclusiones = [
-        {
-            "titulo": "1. Viabilidad general del proyecto",
-            "texto": _texto_viabilidad(m, estado, criterio_estado),
-        },
-        {
-            "titulo": "2. Resultado energético esperado",
-            "texto": _texto_resultado_energetico(m),
-        },
-        {
-            "titulo": "3. Impacto financiero esperado",
-            "texto": _texto_impacto_financiero(m),
-        },
-        {
-            "titulo": "4. Criterio técnico de dimensionamiento",
-            "texto": _texto_dimensionamiento(),
-        },
-        {
-            "titulo": "5. Alcance físico preliminar",
-            "texto": _texto_alcance_fisico(m),
-        },
-        {
-            "titulo": "6. Recomendación final",
-            "texto": _texto_recomendacion_final(estado),
-        },
-    ]
+    estado, criterio = clasificar_viabilidad(m)
 
     return {
         "estado": estado,
         "metricas": m,
-        "conclusiones": conclusiones,
+        "conclusiones": [
+            {
+                "titulo": "1. Viabilidad general del proyecto",
+                "texto": _texto_viabilidad(m, estado, criterio),
+            },
+            {
+                "titulo": "2. Resultado energético esperado",
+                "texto": _texto_resultado_energetico(m),
+            },
+            {
+                "titulo": "3. Impacto financiero esperado",
+                "texto": _texto_impacto_financiero(m),
+            },
+            {
+                "titulo": "4. Criterio técnico de dimensionamiento",
+                "texto": _texto_dimensionamiento(),
+            },
+            {
+                "titulo": "5. Alcance físico preliminar",
+                "texto": _texto_alcance_fisico(m),
+            },
+            {
+                "titulo": "6. Recomendación final",
+                "texto": _texto_recomendacion_final(estado),
+            },
+        ],
     }
 
 
 # ======================================================
-# 7. RENDER REPORTLAB
+# RENDER REPORTLAB
 # ======================================================
 
-
-def agregar_pagina_conclusiones_ejecutivas(story, styles, resultado, datos=None, paths=None):
-    """
-    Agrega una página completa de conclusiones ejecutivas al PDF.
-    """
-
-    from reportlab.platypus import Paragraph, Spacer, PageBreak, Table, TableStyle
-    from reportlab.lib import colors
-    from reportlab.lib.units import cm
-    from reportlab.lib.enums import TA_JUSTIFY
-    from reportlab.lib.styles import ParagraphStyle
-
+def agregar_pagina_conclusiones_ejecutivas(
+    story,
+    styles,
+    resultado,
+    datos=None,
+    paths=None,
+):
     if "BodyJustify" not in styles:
         styles.add(
             ParagraphStyle(
@@ -809,23 +409,27 @@ def agregar_pagina_conclusiones_ejecutivas(story, styles, resultado, datos=None,
         )
 
     data = generar_conclusiones_ejecutivas(resultado, datos)
+    m = data["metricas"]
 
     paths = paths or {}
+    area_layout = paths.get("layout_area_rectangular_m2")
 
-    if paths.get("layout_area_rectangular_m2"):
-        data["metricas"]["area_layout"] = float(paths["layout_area_rectangular_m2"])
-
-    m = data["metricas"]
-    estado = data["estado"]
+    if area_layout is not None:
+        m["area_layout"] = _num(area_layout)
+        data["conclusiones"][4]["texto"] = _texto_alcance_fisico(m)
 
     story.append(PageBreak())
-
-    story.append(Paragraph("Conclusiones Ejecutivas y Recomendaciones", styles["Title"]))
+    story.append(
+        Paragraph(
+            "Conclusiones Ejecutivas y Recomendaciones",
+            styles["Title"],
+        )
+    )
     story.append(Spacer(1, 0.35 * cm))
 
     resumen = [
         ["Indicador", "Resultado"],
-        ["Estado del proyecto", estado],
+        ["Estado del proyecto", data["estado"]],
         ["Potencia FV propuesta", _fmt_kwp(m["kwp"])],
         ["Producción anual estimada", _fmt_kwh(m["produccion_anual"])],
         ["Cobertura energética real", _fmt_pct(m["cobertura_real"])],
@@ -835,7 +439,6 @@ def agregar_pagina_conclusiones_ejecutivas(story, styles, resultado, datos=None,
     ]
 
     tabla = Table(resumen, colWidths=[7.0 * cm, 8.5 * cm])
-
     tabla.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0B3D5C")),
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
@@ -860,13 +463,13 @@ def agregar_pagina_conclusiones_ejecutivas(story, styles, resultado, datos=None,
         story.append(Paragraph(bloque["texto"], styles["BodyJustify"]))
         story.append(Spacer(1, 0.25 * cm))
 
-    story.append(Spacer(1, 0.25 * cm))
-
     nota = (
-        "Nota: Las conclusiones anteriores corresponden a una evaluación preliminar basada en los datos "
-        "ingresados y resultados calculados por FV Engine. Para etapa constructiva se requiere validación "
-        "final de sitio, ingeniería de detalle, interconexión, protecciones, canalización y revisión estructural."
+        "Nota: Las conclusiones corresponden a una evaluación preliminar "
+        "basada en los datos ingresados y resultados calculados por FV Engine. "
+        "Para etapa constructiva se requiere validación final de sitio, "
+        "ingeniería de detalle, interconexión, protecciones, canalización y "
+        "revisión estructural."
     )
 
+    story.append(Spacer(1, 0.25 * cm))
     story.append(Paragraph(nota, styles["Italic"]))
-
