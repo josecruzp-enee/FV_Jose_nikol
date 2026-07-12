@@ -66,7 +66,8 @@ def _fmt_dscr(m: dict) -> str:
 def _metricas_energia(resultado: Any, datos: Any) -> dict:
     energia = resultado.energia
 
-    consumo_anual = sum(_num(x) for x in datos.consumo_12m)
+    consumo_12m = _leer(datos, "consumo_12m", []) or []
+    consumo_anual = sum(_num(x) for x in consumo_12m)
     produccion_anual = sum(_num(x) for x in energia.energia_util_12m)
 
     cobertura_real = (
@@ -103,8 +104,8 @@ def _metricas_sistema(resultado: Any) -> dict:
 
 def _metricas_financieras(resultado: Any) -> dict:
     financiero = resultado.financiero
-    evaluacion = financiero["evaluacion"]
-    tabla_12m = financiero["tabla_12m"]
+    evaluacion = _leer(financiero, "evaluacion", {}) or {}
+    tabla_12m = _leer(financiero, "tabla_12m", []) or []
 
     pago_actual = sum(
         _num(fila["factura_base_L"])
@@ -118,20 +119,20 @@ def _metricas_financieras(resultado: Any) -> dict:
         for fila in tabla_12m
     ) / len(tabla_12m)
 
-    ahorro_mensual = _num(evaluacion["neto_prom"])
-    ahorro_anual = _num(financiero["ahorro_anual_L"])
+    ahorro_mensual = _num(_leer(evaluacion, "neto_prom", 0.0))
+    ahorro_anual = _num(_leer(financiero, "ahorro_anual_L", 0.0))
 
     return {
-        "capex": _num(financiero["capex_L"]),
-        "dscr": evaluacion["dscr"],
+        "capex": _num(_leer(financiero, "capex_L", 0.0)),
+        "dscr": _leer(evaluacion, "dscr", None),
         "ahorro_mensual": ahorro_mensual,
         "ahorro_anual": ahorro_anual,
         "beneficio_bruto_anual": ahorro_anual,
         "beneficio_neto_anual": ahorro_mensual * 12.0,
         "pago_actual": pago_actual,
         "pago_total_fv": pago_total_fv,
-        "cuota": _num(financiero["cuota_mensual"]),
-        "peor_mes": _num(evaluacion["peor_mes"]),
+        "cuota": _num(_leer(financiero, "cuota_mensual", 0.0)),
+        "peor_mes": _num(_leer(evaluacion, "peor_mes", 0.0)),
     }
 
 
