@@ -153,8 +153,8 @@ def _clasificar_dc_ac(
     tolerancia_dc_ac: float,
 ) -> tuple[str, str, int]:
 
-    dc_ac_min = max(0.01, dc_ac_obj - tolerancia_dc_ac)
-    dc_ac_max = dc_ac_obj + tolerancia_dc_ac
+    dc_ac_min = 1.10
+    dc_ac_max = 1.30
 
     if dc_ac_min <= ratio_real <= dc_ac_max:
         return (
@@ -166,16 +166,15 @@ def _clasificar_dc_ac(
     if ratio_real > dc_ac_max:
         return (
             "NO RECOMENDADO",
-            "DC/AC alto; posible sobredimensionamiento DC o clipping.",
+            "DC/AC mayor que 1.30; posible clipping excesivo.",
             1,
         )
 
     return (
         "NO RECOMENDADO",
-        "DC/AC bajo; inversor sobredimensionado respecto al arreglo.",
+        "DC/AC menor que 1.10; inversor sobredimensionado.",
         1,
     )
-
 
 def evaluar_opcion_inversor(
     *,
