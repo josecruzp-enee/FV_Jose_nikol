@@ -685,10 +685,10 @@ def _chart_demanda_vs_fv_horaria(
         series_bateria.get("fv")
         or _promedio_fv_24h(energia_horaria_kwh or [0.0] * 8760)
     )
-    red_sin_bateria = (
-        series_bateria.get("red_sin_bateria")
-        or _calcular_red_sin_bateria(demanda, fv)
-    )
+    # Se recalcula desde las mismas series usadas en la gráfica.
+    # Así siempre se cumple:
+    # demanda = autoconsumo + compra de red.
+    red_sin_bateria = _calcular_red_sin_bateria(demanda, fv)
     autoconsumo = _calcular_autoconsumo(demanda, fv)
     excedente = _calcular_excedente(demanda, fv)
 
