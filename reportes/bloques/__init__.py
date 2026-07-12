@@ -23,8 +23,9 @@ from .ingenieria_electrica import (
 # - No cambiar nombres de funciones build_*.
 # - No eliminar bloques sin revisar dependencias.
 # - Para agregar una nueva sección, importar su build_* y
-#   agregarla al final o en la posición deseada.
+#   agregarla en la posición deseada.
 # ==========================================================
+
 BLOQUES_REPORTE = [
     # 1. Resumen para decisión
     build_resumen_ejecutivo,
@@ -35,20 +36,20 @@ BLOQUES_REPORTE = [
     # 3. Análisis energético
     build_analisis_energetico,
 
-    # 4. Evaluación económica
+    # 4. Comportamiento energético, batería y optimización
+    build_operacion_fv,
+
+    # 5. Evaluación económica
     build_analisis_financiero,
 
-    # 5. Comportamiento mensual
+    # 6. Impacto económico mensual
     build_analisis_operativo,
 
-    # 6. Solución técnica propuesta
+    # 7. Solución técnica propuesta
     build_solucion_tecnica,
 
-    # 7. Distribución física
+    # 8. Distribución física
     build_layout_fv,
-
-    # 8. Operación y optimización
-    build_operacion_fv,
 
     # 9. Respaldo técnico
     build_anexo_electrico,
