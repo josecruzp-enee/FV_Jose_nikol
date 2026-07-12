@@ -269,7 +269,7 @@ def p1_tabla_solucion_unica(
         ],
 
         [
-            "Energía anual cubierta",
+            "Consumo anual abastecido"
             f"{prod_anual:,.0f} kWh/año",
             "DSCR",
             ds_txt,
@@ -554,7 +554,7 @@ def p1_conclusion(
     {linea_bateria}
     • Cobertura solicitada:
       {cobertura_obj * 100:.0f}%<br/>
-    • Cobertura energética obtenida:
+    • Demanda anual abastecida:
       <b>{cobertura_real * 100:.1f}%</b><br/>
     """
 
