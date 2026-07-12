@@ -433,8 +433,8 @@ def agregar_pagina_conclusiones_ejecutivas(
         ["Indicador", "Resultado"],
         ["Estado del proyecto", data["estado"]],
         ["Potencia FV propuesta", _fmt_kwp(m["kwp"])],
-        ["Producción fotovoltaica anual", _fmt_kwh(m["produccion_anual"])]
-        ["Producción FV respecto al consumo", _fmt_pct(m["cobertura_real"])]
+        ["Producción fotovoltaica anual", _fmt_kwh(m["produccion_anual"])],
+        ["Producción FV respecto al consumo", _fmt_pct(m["cobertura_real"])],
         ["Reducción mensual estimada", _fmt_lps(m["ahorro_mensual"])],
         ["DSCR", _fmt_dscr(m)],
         ["CAPEX estimado", _fmt_lps(m["capex"])],
