@@ -339,10 +339,24 @@ def _extraer_series_bateria(bateria) -> dict:
             resultado_bateria,
             ["compra_red_sin_bateria_24h"],
         ),
+        "excedente_sin_bateria": _serie_24_desde_atributos(
+            resultado_bateria,
+            ["excedente_sin_bateria_24h"],
+        ),
         "red_con_bateria": _extraer_red_con_bateria(resultado_bateria, tabla_24h),
         "descarga": _extraer_descarga_bateria(resultado_bateria, tabla_24h),
         "carga": _extraer_carga_bateria(resultado_bateria, tabla_24h),
         "soc": _extraer_soc_bateria(resultado_bateria, tabla_24h),
+        "capacidad_kwh": float(
+            _leer(resultado_bateria, "capacidad_util_kwh", 0.0) or 0.0
+        ),
+        "potencia_kw": float(
+            _leer(resultado_bateria, "potencia_max_kw", 0.0) or 0.0
+        ),
+        "descarga_total_kwh": float(
+            _leer(resultado_bateria, "energia_descargada_bateria_kwh", 0.0)
+            or 0.0
+        ),
     }
 
 
@@ -356,6 +370,16 @@ def _calcular_red_sin_bateria(demanda: List[float], fv: List[float]) -> List[flo
 
 def _calcular_autoconsumo(demanda: List[float], fv: List[float]) -> List[float]:
     return [min(d, f) for d, f in zip(demanda, fv)]
+
+
+def _autoconsumo_desde_balance(
+    demanda: List[float],
+    red_sin_bateria: List[float],
+) -> List[float]:
+    return [
+        max(demanda_h - red_h, 0.0)
+        for demanda_h, red_h in zip(demanda, red_sin_bateria)
+    ]
 
 
 def _calcular_excedente(demanda: List[float], fv: List[float]) -> List[float]:
@@ -648,8 +672,13 @@ def _dibujar_caja_resumen(ax, texto: str):
     )
 
 
-def _configurar_ejes_demanda(ax):
-    ax.set_title("Demanda del cliente vs generación FV y almacenamiento")
+def _configurar_ejes_demanda(ax, bateria_activa=False):
+    titulo = "Demanda del cliente vs generación FV"
+
+    if bateria_activa:
+        titulo += " y almacenamiento"
+
+    ax.set_title(titulo)
     ax.set_xlabel("Hora del día")
     ax.set_ylabel("Energía promedio horaria (kWh)")
     ax.set_xticks(range(24))
@@ -685,33 +714,40 @@ def _chart_demanda_vs_fv_horaria(
         series_bateria.get("fv")
         or _promedio_fv_24h(energia_horaria_kwh or [0.0] * 8760)
     )
-    # Se recalcula desde las mismas series usadas en la gráfica.
-    # Así siempre se cumple:
-    # demanda = autoconsumo + compra de red.
-    red_sin_bateria = _calcular_red_sin_bateria(demanda, fv)
-    autoconsumo = _calcular_autoconsumo(demanda, fv)
-    excedente = _calcular_excedente(demanda, fv)
+    red_sin_bateria = (
+        series_bateria.get("red_sin_bateria")
+        or _calcular_red_sin_bateria(demanda, fv)
+    )
+    autoconsumo = _autoconsumo_desde_balance(
+        demanda,
+        red_sin_bateria,
+    )
+    excedente = (
+        series_bateria.get("excedente_sin_bateria")
+        or [
+            max(fv_h - autoconsumo_h, 0.0)
+            for fv_h, autoconsumo_h in zip(fv, autoconsumo)
+        ]
+    )
 
     red_con_bateria = series_bateria.get("red_con_bateria")
     descarga = series_bateria.get("descarga")
     carga = series_bateria.get("carga")
     soc = series_bateria.get("soc")
 
-    red_con_bateria = _calcular_red_con_bateria_si_falta(
-        red_sin_bateria,
-        red_con_bateria,
-        descarga,
-    )
-
     bateria_activa = (
-        red_con_bateria is not None
-        and any(
-            abs(a - b) > 1e-9
-            for a, b in zip(red_sin_bateria, red_con_bateria)
-        )
+        series_bateria.get("capacidad_kwh", 0.0) > 0
+        and series_bateria.get("potencia_kw", 0.0) > 0
+        and series_bateria.get("descarga_total_kwh", 0.0) > 0
     )
 
-    if not bateria_activa:
+    if bateria_activa:
+        red_con_bateria = _calcular_red_con_bateria_si_falta(
+            red_sin_bateria,
+            red_con_bateria,
+            descarga,
+        )
+    else:
         red_con_bateria = None
         descarga = None
         carga = None
@@ -743,7 +779,7 @@ def _chart_demanda_vs_fv_horaria(
     )
 
     _dibujar_caja_resumen(ax, texto)
-    _configurar_ejes_demanda(ax)
+    _configurar_ejes_demanda(ax, bateria_activa)
     _configurar_leyenda(ax, ax_soc)
 
     _guardar_figura(fig, path)
