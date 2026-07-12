@@ -7,272 +7,129 @@ from core.aplicacion.dependencias import DependenciasEstudio
 from core.dominio.contrato import ResultadoProyecto
 from core.dominio.modelo import Datosproyecto
 from core.servicios.layout import construir_layout_preliminar_fv
-from core.servicios.optimizacion_fv import (
-    optimizar_kwp_doble_escenario,
-)
-from energy.baterias.orquestador_bateria import (
-    ejecutar_recomendacion_bateria,
+from core.servicios.optimizacion_fv import optimizar_kwp_doble_escenario
+from energy.baterias import (
+    construir_entrada_bateria,
+    ejecutar_sistema_bateria,
 )
 
-
-# ==========================================================
-# VALIDACIONES
-# ==========================================================
 
 def _validar_resultado(resultado, nombre: str) -> None:
-
     if resultado is None:
         raise ValueError(f"{nombre} devolvió None")
 
     if not getattr(resultado, "ok", True):
-        errores = getattr(
-            resultado,
-            "errores",
-            [f"Error en {nombre}"],
-        )
-
-        raise ValueError(
-            f"{nombre} inválido: {errores}"
-        )
+        errores = getattr(resultado, "errores", [f"Error en {nombre}"])
+        raise ValueError(f"{nombre} inválido: {errores}")
 
 
 # ==========================================================
 # ETAPAS PRINCIPALES
 # ==========================================================
 
-def _ejecutar_sizing(
-    datos: Datosproyecto,
-    deps: DependenciasEstudio,
-):
-
-    sizing = deps.sizing.ejecutar(datos)
-    _validar_resultado(sizing, "Sizing")
-
-    return sizing
+def _ejecutar_sizing(datos, deps):
+    resultado = deps.sizing.ejecutar(datos)
+    _validar_resultado(resultado, "Sizing")
+    return resultado
 
 
-def _ejecutar_paneles(
-    datos: Datosproyecto,
-    sizing,
-    deps: DependenciasEstudio,
-):
+def _ejecutar_paneles(datos, sizing, deps):
+    entrada = construir_entrada_paneles(datos, sizing)
+    resultado = deps.paneles.ejecutar(entrada)
+    _validar_resultado(resultado, "Paneles")
+    return resultado
 
-    entrada = construir_entrada_paneles(
-        datos,
-        sizing,
+
+def _ejecutar_energia(datos, sizing, paneles, deps):
+    resultado = deps.energia.ejecutar(datos, sizing, paneles)
+    _validar_resultado(resultado, "Energía")
+    return resultado
+
+
+def _ejecutar_bateria(datos, sizing, energia):
+    entrada = construir_entrada_bateria(
+        datos=datos,
+        sizing=sizing,
+        energia=energia,
     )
-
-    paneles = deps.paneles.ejecutar(entrada)
-    _validar_resultado(paneles, "Paneles")
-
-    return paneles
+    resultado = ejecutar_sistema_bateria(entrada)
+    _validar_resultado(resultado, "Batería")
+    return resultado
 
 
-def _ejecutar_energia(
-    datos: Datosproyecto,
-    sizing,
-    paneles,
-    deps: DependenciasEstudio,
-):
-
-    energia = deps.energia.ejecutar(
-        datos,
-        sizing,
-        paneles,
-    )
-
-    _validar_resultado(energia, "Energía")
-
-    return energia
-
-
-def _ejecutar_electrical(
-    datos: Datosproyecto,
-    sizing,
-    paneles,
-    deps: DependenciasEstudio,
-):
-
+def _ejecutar_electrical(datos, sizing, paneles, deps):
     if deps.electrical is None:
         return None
 
-    electrical = deps.electrical.ejecutar(
+    resultado = deps.electrical.ejecutar(
         datos=datos,
         paneles=paneles,
         sizing=sizing,
     )
-
-    _validar_resultado(
-        electrical,
-        "Electrical",
-    )
-
-    return electrical
+    _validar_resultado(resultado, "Electrical")
+    return resultado
 
 
-# ==========================================================
-# BATERÍAS
-# ==========================================================
-
-def _aplicar_bateria_si_corresponde(
-    datos: Datosproyecto,
-    energia,
-) -> None:
-
-    demanda_24h = getattr(
-        datos,
-        "consumo_horario_24h_kwh",
-        {},
-    ) or {}
-
-    energia_horaria = getattr(
-        energia,
-        "energia_horaria_kwh",
-        None,
-    )
-
-    if not demanda_24h or not energia_horaria:
-        return
-
-    opciones = ejecutar_recomendacion_bateria(
-        demanda_24h=demanda_24h,
-        fv_24h=energia_horaria,
-        factor_aprovechamiento=0.80,
-    )
-
-    setattr(
-        energia,
-        "opciones_bateria",
-        opciones,
-    )
-
-    if opciones:
-        setattr(
-            energia,
-            "bateria_recomendada",
-            opciones[-1],
-        )
-
-
-def _extraer_bateria_seleccionada(finanzas):
-
-    if not isinstance(finanzas, dict):
+def _ejecutar_finanzas(datos, sizing, energia, bateria, deps):
+    if deps.finanzas is None:
         return None
 
-    bateria_optima = (
-        finanzas.get("bateria_optima")
-        or {}
+    resultado = deps.finanzas.ejecutar(
+        datos=datos,
+        sizing=sizing,
+        energia=energia,
+        bateria=bateria,
     )
-
-    return bateria_optima.get(
-        "resultado_bateria"
-    )
+    _validar_resultado(resultado, "Finanzas")
+    return resultado
 
 
 # ==========================================================
 # OPTIMIZACIÓN FV
 # ==========================================================
 
-def _requiere_optimizacion(
-    datos: Datosproyecto,
-) -> bool:
-
-    sistema_fv = getattr(
-        datos,
-        "sistema_fv",
-        {},
-    ) or {}
-
-    return (
-        sistema_fv.get("modo")
-        == "optimizacion_economica"
-    )
+def _requiere_optimizacion(datos) -> bool:
+    sistema_fv = getattr(datos, "sistema_fv", {}) or {}
+    return sistema_fv.get("modo") == "optimizacion_economica"
 
 
-def _calcular_optimizacion(
-    datos: Datosproyecto,
-    sizing,
-    energia,
-):
-
-    demanda_24h = getattr(
-        datos,
-        "consumo_horario_24h_kwh",
-        {},
-    ) or {}
-
-    if not demanda_24h:
-        raise ValueError(
-            "Optimización económica requiere "
-            "perfil horario de consumo."
-        )
-
-    energia_horaria = getattr(
-        energia,
-        "energia_horaria_kwh",
-        None,
-    )
-
-    if not energia_horaria:
-        raise ValueError(
-            "Optimización económica requiere "
-            "energia.energia_horaria_kwh."
-        )
-
+def _panel_w(sizing) -> float:
     panel = getattr(sizing, "panel", None)
+    valor = float(getattr(panel, "pmax_w", 0.0) or 0.0)
 
-    panel_w = float(
-        getattr(panel, "pmax_w", 0.0)
-        or 0.0
-    )
+    if valor <= 0:
+        raise ValueError("Potencia de panel inválida para optimización.")
 
-    if panel_w <= 0:
-        raise ValueError(
-            "Potencia de panel inválida "
-            "para optimización."
-        )
+    return valor
 
-    costo_l_kwp = (
-        float(
-            getattr(
-                datos,
-                "costo_usd_kwp",
-                1200.0,
-            )
-            or 1200.0
-        )
-        * float(
-            getattr(
-                datos,
-                "tcambio",
-                26.61,
-            )
-            or 26.61
-        )
-    )
+
+def _costo_l_kwp(datos) -> float:
+    costo_usd = float(getattr(datos, "costo_usd_kwp", 1200.0) or 1200.0)
+    tcambio = float(getattr(datos, "tcambio", 26.61) or 26.61)
+    return costo_usd * tcambio
+
+
+def _calcular_optimizacion(datos, sizing, energia):
+    demanda = getattr(datos, "consumo_horario_24h_kwh", {}) or {}
+    energia_horaria = getattr(energia, "energia_horaria_kwh", None)
+
+    if not demanda:
+        raise ValueError("Optimización requiere perfil horario de consumo.")
+    if not energia_horaria:
+        raise ValueError("Optimización requiere energía horaria.")
 
     return optimizar_kwp_doble_escenario(
-        demanda_24h=demanda_24h,
+        demanda_24h=demanda,
         energia_horaria_base_kwh=energia_horaria,
         pdc_kw_base=float(sizing.pdc_kw),
-        panel_w=panel_w,
+        panel_w=_panel_w(sizing),
         tarifa_compra_l_kwh=float(
-            getattr(
-                datos,
-                "tarifa_energia",
-                0.0,
-            )
-            or 0.0
+            getattr(datos, "tarifa_energia", 0.0) or 0.0
         ),
         precio_inyeccion_l_kwh=2.20,
-        costo_l_kwp=costo_l_kwp,
+        costo_l_kwp=_costo_l_kwp(datos),
         tasa_descuento_anual=float(
-            getattr(
-                datos,
-                "tasa_anual",
-                0.10,
-            )
-            or 0.10
+            getattr(datos, "tasa_anual", 0.10) or 0.10
         ),
         vida_util_anios=20,
         kwp_min=1.0,
@@ -281,101 +138,25 @@ def _calcular_optimizacion(
     )
 
 
-def _aplicar_resultado_optimizacion(
-    datos: Datosproyecto,
-    optimizacion_economica,
-) -> None:
+def _aplicar_optimizacion(datos, optimizacion) -> None:
+    escenario = optimizacion["sin_inyeccion"]
+    sistema_fv = datos.sistema_fv
 
-    escenario = optimizacion_economica[
-        "sin_inyeccion"
-    ]
-
-    datos.sistema_fv[
-        "modo_original"
-    ] = "optimizacion_economica"
-
-    datos.sistema_fv["modo"] = "kw_objetivo"
-
-    datos.sistema_fv["valor"] = float(
-        escenario["pdc_kw"]
-    )
-
-    datos.sistema_fv[
-        "optimizacion_economica"
-    ] = optimizacion_economica
+    sistema_fv["modo_original"] = "optimizacion_economica"
+    sistema_fv["modo"] = "kw_objetivo"
+    sistema_fv["valor"] = float(escenario["pdc_kw"])
+    sistema_fv["optimizacion_economica"] = optimizacion
 
 
-def _optimizar_y_recalcular(
-    datos: Datosproyecto,
-    sizing,
-    energia,
-    deps: DependenciasEstudio,
-):
+def _optimizar_y_recalcular(datos, sizing, energia, deps):
+    optimizacion = _calcular_optimizacion(datos, sizing, energia)
+    _aplicar_optimizacion(datos, optimizacion)
 
-    optimizacion = _calcular_optimizacion(
-        datos,
-        sizing,
-        energia,
-    )
+    sizing = _ejecutar_sizing(datos, deps)
+    paneles = _ejecutar_paneles(datos, sizing, deps)
+    energia = _ejecutar_energia(datos, sizing, paneles, deps)
 
-    _aplicar_resultado_optimizacion(
-        datos,
-        optimizacion,
-    )
-
-    sizing = _ejecutar_sizing(
-        datos,
-        deps,
-    )
-
-    paneles = _ejecutar_paneles(
-        datos,
-        sizing,
-        deps,
-    )
-
-    energia = _ejecutar_energia(
-        datos,
-        sizing,
-        paneles,
-        deps,
-    )
-
-    return (
-        sizing,
-        paneles,
-        energia,
-        optimizacion,
-    )
-
-
-# ==========================================================
-# FINANZAS
-# ==========================================================
-
-def _ejecutar_finanzas(
-    datos: Datosproyecto,
-    sizing,
-    energia,
-    deps: DependenciasEstudio,
-):
-
-    if deps.finanzas is None:
-        return None
-
-    finanzas = deps.finanzas.ejecutar(
-        datos=datos,
-        sizing=sizing,
-        energia=energia,
-        bateria=None,
-    )
-
-    _validar_resultado(
-        finanzas,
-        "Finanzas",
-    )
-
-    return finanzas
+    return sizing, paneles, energia, optimizacion
 
 
 # ==========================================================
@@ -383,51 +164,23 @@ def _ejecutar_finanzas(
 # ==========================================================
 
 def _dimensiones_panel(sizing):
-
     panel = getattr(sizing, "panel", None)
-
-    largo_panel_m = 2.20
-    ancho_panel_m = 1.10
-
-    if panel is None:
-        return largo_panel_m, ancho_panel_m
-
-    largo_mm = getattr(
-        panel,
-        "largo_mm",
-        None,
-    )
-
-    ancho_mm = getattr(
-        panel,
-        "ancho_mm",
-        None,
-    )
+    largo_mm = getattr(panel, "largo_mm", None)
+    ancho_mm = getattr(panel, "ancho_mm", None)
 
     if largo_mm and ancho_mm:
-        largo_panel_m = float(largo_mm) / 1000.0
-        ancho_panel_m = float(ancho_mm) / 1000.0
+        return float(largo_mm) / 1000.0, float(ancho_mm) / 1000.0
 
-    return largo_panel_m, ancho_panel_m
+    return 2.20, 1.10
 
 
 def _construir_layout(sizing):
-
-    largo_panel_m, ancho_panel_m = (
-        _dimensiones_panel(sizing)
-    )
+    largo, ancho = _dimensiones_panel(sizing)
 
     return construir_layout_preliminar_fv(
-        n_paneles=int(
-            getattr(
-                sizing,
-                "n_paneles",
-                0,
-            )
-            or 0
-        ),
-        largo_panel_m=largo_panel_m,
-        ancho_panel_m=ancho_panel_m,
+        n_paneles=int(getattr(sizing, "n_paneles", 0) or 0),
+        largo_panel_m=largo,
+        ancho_panel_m=ancho,
         factor_ocupacion=0.75,
         separacion_x_m=0.20,
         separacion_y_m=0.40,
@@ -439,74 +192,86 @@ def _construir_layout(sizing):
 # RESULTADOS
 # ==========================================================
 
-def _resultado_final(
+def _crear_resultado(
     *,
-    sizing,
-    paneles,
-    energia,
-    bateria,
-    electrical,
-    finanzas,
-    layout_preliminar,
-    optimizacion_economica,
+    ok,
+    error=None,
+    sizing=None,
+    paneles=None,
+    energia=None,
+    bateria=None,
+    electrical=None,
+    finanzas=None,
+    layout=None,
+    optimizacion=None,
 ):
-
     return ResultadoProyecto(
         sizing=sizing,
         paneles=paneles,
-        strings=(
-            paneles.strings
-            if paneles
-            else None
-        ),
+        strings=getattr(paneles, "strings", None),
         energia=energia,
         bateria=bateria,
         electrical=electrical,
         financiero=finanzas,
-        layout_preliminar=layout_preliminar,
-        optimizacion_economica=(
-            optimizacion_economica
-        ),
-        ok=True,
-        errores=[],
+        layout_preliminar=layout,
+        optimizacion_economica=optimizacion,
+        ok=ok,
+        errores=[] if ok else [str(error)],
     )
 
 
-def _resultado_error(
-    *,
-    error,
-    sizing,
-    paneles,
-    energia,
-    bateria,
-    electrical,
-    finanzas,
-    layout_preliminar,
-    optimizacion_economica,
-):
+def _estado_inicial() -> dict:
+    return {
+        "sizing": None,
+        "paneles": None,
+        "energia": None,
+        "bateria": None,
+        "electrical": None,
+        "finanzas": None,
+        "layout": None,
+        "optimizacion": None,
+    }
 
-    print("💥 ERROR EN ORQUESTADOR:")
-    print(traceback.format_exc())
 
-    return ResultadoProyecto(
-        sizing=sizing,
-        paneles=paneles,
-        strings=(
-            paneles.strings
-            if paneles
-            else None
-        ),
-        energia=energia,
-        bateria=bateria,
-        electrical=electrical,
-        financiero=finanzas,
-        layout_preliminar=layout_preliminar,
-        optimizacion_economica=(
-            optimizacion_economica
-        ),
-        ok=False,
-        errores=[str(error)],
+def _ejecutar_base(datos, deps, estado) -> None:
+    estado["sizing"] = _ejecutar_sizing(datos, deps)
+    estado["paneles"] = _ejecutar_paneles(
+        datos, estado["sizing"], deps
     )
+    estado["energia"] = _ejecutar_energia(
+        datos, estado["sizing"], estado["paneles"], deps
+    )
+
+
+def _optimizar_si_corresponde(datos, deps, estado) -> None:
+    if not _requiere_optimizacion(datos):
+        return
+
+    resultado = _optimizar_y_recalcular(
+        datos,
+        estado["sizing"],
+        estado["energia"],
+        deps,
+    )
+    claves = ("sizing", "paneles", "energia", "optimizacion")
+    estado.update(dict(zip(claves, resultado)))
+
+
+def _completar_estudio(datos, deps, estado) -> None:
+    estado["bateria"] = _ejecutar_bateria(
+        datos, estado["sizing"], estado["energia"]
+    )
+    estado["electrical"] = _ejecutar_electrical(
+        datos, estado["sizing"], estado["paneles"], deps
+    )
+    estado["finanzas"] = _ejecutar_finanzas(
+        datos,
+        estado["sizing"],
+        estado["energia"],
+        estado["bateria"],
+        deps,
+    )
+    estado["layout"] = _construir_layout(estado["sizing"])
 
 
 # ==========================================================
@@ -517,102 +282,16 @@ def ejecutar_estudio(
     datos: Datosproyecto,
     deps: DependenciasEstudio,
 ) -> ResultadoProyecto:
-
-    sizing = None
-    paneles = None
-    energia = None
-    bateria = None
-    electrical = None
-    finanzas = None
-    optimizacion_economica = None
-    layout_preliminar = None
+    estado = _estado_inicial()
 
     try:
         datos.validar_minimo()
-
-        sizing = _ejecutar_sizing(
-            datos,
-            deps,
-        )
-
-        paneles = _ejecutar_paneles(
-            datos,
-            sizing,
-            deps,
-        )
-
-        energia = _ejecutar_energia(
-            datos,
-            sizing,
-            paneles,
-            deps,
-        )
-
-        if _requiere_optimizacion(datos):
-            (
-                sizing,
-                paneles,
-                energia,
-                optimizacion_economica,
-            ) = _optimizar_y_recalcular(
-                datos,
-                sizing,
-                energia,
-                deps,
-            )
-
-        # Se ejecuta una sola vez sobre la energía definitiva.
-        _aplicar_bateria_si_corresponde(
-            datos,
-            energia,
-        )
-
-        electrical = _ejecutar_electrical(
-            datos,
-            sizing,
-            paneles,
-            deps,
-        )
-
-        finanzas = _ejecutar_finanzas(
-            datos,
-            sizing,
-            energia,
-            deps,
-        )
-
-        bateria = _extraer_bateria_seleccionada(
-            finanzas
-        )
-
-        layout_preliminar = _construir_layout(
-            sizing
-        )
-
-        return _resultado_final(
-            sizing=sizing,
-            paneles=paneles,
-            energia=energia,
-            bateria=bateria,
-            electrical=electrical,
-            finanzas=finanzas,
-            layout_preliminar=layout_preliminar,
-            optimizacion_economica=(
-                optimizacion_economica
-            ),
-        )
+        _ejecutar_base(datos, deps, estado)
+        _optimizar_si_corresponde(datos, deps, estado)
+        _completar_estudio(datos, deps, estado)
+        return _crear_resultado(ok=True, **estado)
 
     except Exception as error:
-        return _resultado_error(
-            error=error,
-            sizing=sizing,
-            paneles=paneles,
-            energia=energia,
-            bateria=bateria,
-            electrical=electrical,
-            finanzas=finanzas,
-            layout_preliminar=layout_preliminar,
-            optimizacion_economica=(
-                optimizacion_economica
-            ),
-        )
+        print("💥 ERROR EN ORQUESTADOR:")
+        print(traceback.format_exc())
+        return _crear_resultado(ok=False, error=error, **estado)
