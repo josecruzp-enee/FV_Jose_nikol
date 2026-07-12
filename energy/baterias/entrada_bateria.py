@@ -214,3 +214,118 @@ class EntradaBateria:
             )
 
         return errores
+
+
+def construir_entrada_bateria(
+    *,
+    datos,
+    sizing,
+    energia,
+) -> EntradaBateria:
+
+    consumo_12m = list(
+        getattr(datos, "consumo_12m", [])
+        or []
+    )
+
+    energia_util_12m = list(
+        getattr(energia, "energia_util_12m", [])
+        or []
+    )
+
+    energia_generada_12m = (
+        getattr(energia, "energia_generada_12m", None)
+        or getattr(energia, "energia_bruta_12m", None)
+        or getattr(energia, "energia_fv_12m", None)
+        or getattr(energia, "produccion_12m", None)
+        or energia_util_12m
+    )
+
+    tipo_cambio = float(
+        getattr(datos, "tcambio", 26.61)
+        or 26.61
+    )
+
+    costo_usd_kwp = float(
+        getattr(datos, "costo_usd_kwp", 0.0)
+        or 0.0
+    )
+
+    potencia_fv_kwp = float(
+        getattr(sizing, "pdc_kw", 0.0)
+        or 0.0
+    )
+
+    return EntradaBateria(
+        demanda_24h_kwh=(
+            getattr(
+                datos,
+                "consumo_horario_24h_kwh",
+                {},
+            )
+            or {}
+        ),
+        fv_horaria_kwh=(
+            getattr(
+                energia,
+                "energia_horaria_kwh",
+                [],
+            )
+            or []
+        ),
+        consumo_12m_kwh=consumo_12m,
+        energia_fv_util_12m_kwh=energia_util_12m,
+        energia_fv_generada_12m_kwh=list(
+            energia_generada_12m
+        ),
+        costo_bateria_usd_kwh=float(
+            getattr(
+                datos,
+                "costo_bateria_usd_kwh",
+                250.0,
+            )
+            or 250.0
+        ),
+        tipo_cambio_l_usd=tipo_cambio,
+        capex_fv_l=(
+            potencia_fv_kwp
+            * costo_usd_kwp
+            * tipo_cambio
+        ),
+        tarifa_compra_l_kwh=float(
+            getattr(datos, "tarifa_energia", 0.0)
+            or 0.0
+        ),
+        cargos_fijos_l_mes=float(
+            getattr(datos, "cargos_fijos", 0.0)
+            or 0.0
+        ),
+        om_anual_pct=float(
+            getattr(datos, "om_anual_pct", 0.0)
+            or 0.0
+        ),
+        modo_financiamiento=str(
+            getattr(
+                datos,
+                "modo_financiamiento",
+                "contado",
+            )
+            or "contado"
+        ),
+        tasa_anual=float(
+            getattr(datos, "tasa_anual", 0.0)
+            or 0.0
+        ),
+        plazo_anios=int(
+            getattr(datos, "plazo_anios", 0)
+            or 0
+        ),
+        porcentaje_financiado=float(
+            getattr(
+                datos,
+                "porcentaje_financiado",
+                0.0,
+            )
+            or 0.0
+        ),
+    )
