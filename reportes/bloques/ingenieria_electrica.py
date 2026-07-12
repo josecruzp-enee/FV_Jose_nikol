@@ -331,113 +331,100 @@ def _section_energia_mensual(
 # 4. SECCIÓN: BATERÍA RECOMENDADA
 # =========================================================
 def _section_bateria(story, resultado, energia, styles):
-
-    if energia is None:
-        return
-
     financiero = leer(resultado, "financiero", {}) or {}
+    sistema_bateria = (
+        leer(resultado, "bateria", None)
+        or leer(energia, "bateria", None)
+    )
+    bateria_optima = (
+        leer(sistema_bateria, "escenario_seleccionado", None)
+        or leer(financiero, "bateria_optima", None)
+    )
+    escenarios = leer(sistema_bateria, "escenarios", []) or []
+    bateria = (
+        leer(bateria_optima, "resultado_tecnico", None)
+        or leer(bateria_optima, "resultado_bateria", None)
+    )
 
-    if not isinstance(financiero, dict):
-        financiero = {}
-
-    bateria_optima = financiero.get("bateria_optima", {}) or {}
-    opciones_bateria = leer(energia, "opciones_bateria", []) or []
-
-    bateria_rec = opciones_bateria[0] if opciones_bateria else None
-    bateria = bateria_optima.get("resultado_bateria")
-
-    if bateria_rec is None and bateria is None:
+    if bateria_optima is None or bateria is None:
         return
 
     data = [["Concepto", "Valor"]]
 
-    if bateria_rec is not None:
-        data.extend([
-            [
-                "Capacidad útil recomendada",
-                f"{float(leer(bateria_rec, 'capacidad_util_kwh', 0.0) or 0.0):.1f} kWh",
-            ],
-            [
-                "Potencia recomendada",
-                f"{float(leer(bateria_rec, 'potencia_max_kw', 0.0) or 0.0):.1f} kW",
-            ],
-            [
-                "Excedente FV diario estimado",
-                f"{float(leer(bateria_rec, 'excedente_diario_kwh', 0.0) or 0.0):.1f} kWh/día",
-            ],
-            [
-                "Consumo nocturno estimado",
-                f"{float(leer(bateria_rec, 'consumo_nocturno_kwh', 0.0) or 0.0):.1f} kWh/día",
-            ],
-            [
-                "Energía objetivo recuperable",
-                f"{float(leer(bateria_rec, 'energia_objetivo_kwh', 0.0) or 0.0):.1f} kWh/día",
-            ],
-        ])
-
-    bateria_ok = (
-        bool(leer(bateria, "ok", False))
-        if bateria is not None
-        else False
+    bateria_ok = bool(leer(bateria, "ok", False))
+    capacidad_bateria = float(
+        leer(bateria_optima, "capacidad_bateria_kwh", 0.0) or 0.0
+    )
+    potencia_bateria = float(
+        leer(bateria_optima, "potencia_bateria_kw", 0.0) or 0.0
     )
 
-    if bateria is not None and bateria_ok:
+    if bateria_ok:
         data.extend([
             [
-                "Capacidad batería instalada",
-                f"{float(leer(bateria_optima, 'capacidad_bateria_kwh', 0.0) or 0.0):.1f} kWh",
+                "Capacidad seleccionada",
+                f"{capacidad_bateria:.1f} kWh",
             ],
             [
-                "Potencia batería instalada",
-                f"{float(leer(bateria_optima, 'potencia_bateria_kw', 0.0) or 0.0):.1f} kW",
+                "Potencia seleccionada",
+                f"{potencia_bateria:.1f} kW",
             ],
             [
-                "Compra red sin batería",
-                f"{float(leer(bateria, 'compra_red_sin_bateria_kwh', 0.0) or 0.0):.1f} kWh/día",
+                "Compra anual de red sin batería",
+                f"{float(leer(bateria, 'compra_red_sin_bateria_kwh', 0.0) or 0.0):,.1f} kWh/año",
             ],
             [
-                "Compra red con batería",
-                f"{float(leer(bateria, 'compra_red_con_bateria_kwh', 0.0) or 0.0):.1f} kWh/día",
+                "Compra anual de red con batería",
+                f"{float(leer(bateria, 'compra_red_con_bateria_kwh', 0.0) or 0.0):,.1f} kWh/año",
             ],
             [
-                "Excedente sin batería",
-                f"{float(leer(bateria, 'excedente_sin_bateria_kwh', 0.0) or 0.0):.1f} kWh/día",
+                "Inyección anual sin batería",
+                f"{float(leer(bateria, 'excedente_sin_bateria_kwh', 0.0) or 0.0):,.1f} kWh/año",
             ],
             [
-                "Excedente con batería",
-                f"{float(leer(bateria, 'excedente_con_bateria_kwh', 0.0) or 0.0):.1f} kWh/día",
+                "Inyección anual con batería",
+                f"{float(leer(bateria, 'excedente_con_bateria_kwh', 0.0) or 0.0):,.1f} kWh/año",
             ],
             [
-                "Cobertura diaria sin batería",
+                "Cobertura anual sin batería",
                 f"{float(leer(bateria, 'cobertura_sin_bateria_pct', 0.0) or 0.0):.1f}%",
             ],
             [
-                "Cobertura diaria con batería",
+                "Cobertura anual con batería",
                 f"{float(leer(bateria, 'cobertura_con_bateria_pct', 0.0) or 0.0):.1f}%",
             ],
         ])
 
-    capacidad_bateria = float(
-        bateria_optima.get("capacidad_bateria_kwh", 0.0) or 0.0
-    )
-
-    capex_bateria = float(
-        bateria_optima.get("capex_bateria_L", 0.0) or 0.0
-    )
-
     if capacidad_bateria > 0:
+        capex_bateria = float(
+            leer(bateria_optima, "capex_bateria_l", 0.0)
+            or leer(bateria_optima, "capex_bateria_L", 0.0)
+            or 0.0
+        )
         data.extend([
-            [
-                "Capacidad batería utilizada",
-                f"{capacidad_bateria:.1f} kWh",
-            ],
             [
                 "Costo estimado batería",
                 f"L {capex_bateria:,.0f}",
             ],
             [
                 "Escenario seleccionado",
-                str(bateria_optima.get("nombre", "")),
+                str(leer(bateria_optima, "nombre", "")),
+            ],
+            [
+                "Ahorro incremental anual",
+                f"L {float(leer(bateria_optima, 'ahorro_incremental_anual_l', 0.0) or 0.0):,.0f}",
+            ],
+            [
+                "Recuperación de la batería",
+                (
+                    f"{float(leer(bateria_optima, 'payback_bateria_anios', 0.0) or 0.0):.1f} años"
+                    if leer(bateria_optima, "payback_bateria_anios", None) is not None
+                    else "No recuperable"
+                ),
+            ],
+            [
+                "Estado",
+                str(leer(bateria_optima, "estado", "SIN EVALUAR")),
             ],
         ])
 
@@ -456,23 +443,78 @@ def _section_bateria(story, resultado, energia, styles):
         ("ALIGN", (1, 1), (1, -1), "RIGHT"),
     ]))
 
+    titulo = (
+        "Batería recomendada"
+        if capacidad_bateria > 0
+        else "Evaluación de almacenamiento"
+    )
+    conclusion = (
+        "La simulación horaria anual seleccionó una batería de "
+        f"{capacidad_bateria:.1f} kWh. La recomendación considera "
+        "la compra evitada, el valor de la energía inyectada, las "
+        "pérdidas y la recuperación dentro de la vida útil."
+        if capacidad_bateria > 0
+        else
+        "No se recomienda instalar batería bajo los costos, tarifas "
+        "y vida útil evaluados. El escenario sin batería ofrece el "
+        "mejor resultado económico entre las alternativas analizadas."
+    )
+
     bloque = [
-        Paragraph("Batería recomendada", styles["Heading2"]),
+        Paragraph(titulo, styles["Heading2"]),
         Spacer(1, 6),
         tabla,
         Spacer(1, 8),
         Paragraph(
-            "Los indicadores energéticos mostrados en esta sección "
-            "corresponden al comportamiento del día representativo "
-            "utilizado para evaluar el desempeño de la batería. "
-            "La cobertura energética anual del sistema se presenta "
-            "en el análisis energético del proyecto.",
+            conclusion,
+            styles["BodyText"],
+        ),
+        Spacer(1, 5),
+        Paragraph(
+            "Los indicadores proceden de una simulación continua de "
+            "8760 horas. La gráfica horaria presenta únicamente el "
+            "perfil promedio anual para facilitar su interpretación.",
             styles["BodyText"],
         ),
         Spacer(1, 12),
     ]
 
     story.append(KeepTogether(bloque))
+
+    if len(escenarios) > 1:
+        comparacion = [[
+            "Escenario", "CAPEX batería", "Ahorro incremental", "Payback", "Estado"
+        ]]
+
+        for escenario in escenarios:
+            payback = leer(escenario, "payback_bateria_anios", None)
+            comparacion.append([
+                str(leer(escenario, "nombre", "")),
+                f"L {float(leer(escenario, 'capex_bateria_l', 0.0) or 0.0):,.0f}",
+                f"L {float(leer(escenario, 'ahorro_incremental_anual_l', 0.0) or 0.0):,.0f}",
+                f"{float(payback):.1f} años" if payback is not None else "—",
+                str(leer(escenario, "estado", "")),
+            ])
+
+        tabla_comparacion = Table(
+            comparacion,
+            colWidths=[110, 80, 95, 65, 90],
+            repeatRows=1,
+        )
+        tabla_comparacion.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), HexColor("#1F4E79")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), HexColor("#FFFFFF")),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 7),
+            ("GRID", (0, 0), (-1, -1), 0.25, HexColor("#CCCCCC")),
+            ("ALIGN", (1, 1), (-2, -1), "RIGHT"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ]))
+
+        story.append(Paragraph("Comparación de escenarios", styles["Heading3"]))
+        story.append(Spacer(1, 6))
+        story.append(tabla_comparacion)
+        story.append(Spacer(1, 12))
 
 # =========================================================
 # 5. SECCIÓN: OPTIMIZACIÓN ECONÓMICA
