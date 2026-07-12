@@ -1,12 +1,18 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
-from energy.baterias.recomendador_bateria import (
-    BateriaRecomendada,
-    generar_opciones_bateria,
+from energy.baterias.entrada_bateria import (
+    EntradaBateria,
+)
+from energy.baterias.orquestador_bateria import (
+    ejecutar_sistema_bateria,
+)
+from energy.baterias.resultado_bateria import (
+    ResultadoSistemaBateria,
 )
 
 __all__ = [
-    "BateriaRecomendada",
-    "generar_opciones_bateria",
+    "EntradaBateria",
+    "ResultadoSistemaBateria",
+    "ejecutar_sistema_bateria",
 ]
