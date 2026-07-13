@@ -41,6 +41,10 @@ class EntradaBateria:
 
     usar_bateria: bool = False
 
+    # Potencia nominal AC del inversor seleccionado.
+    # Se utiliza como límite general de descarga del sistema.
+    potencia_inversor_kw: float = 0.0
+
     factor_aprovechamiento: float = 0.80
 
     capacidades_comerciales_kwh: List[float] = field(
@@ -552,6 +556,21 @@ def construir_entrada_bateria(
         tipo_cambio=tipo_cambio,
     )
 
+    inversor = getattr(
+        sizing,
+        "inversor",
+        None,
+    )
+
+    potencia_inversor_kw = float(
+        getattr(
+            inversor,
+            "kw_ac",
+            0.0,
+        )
+        or 0.0
+    )
+
     return EntradaBateria(
         demanda_24h_kwh=_obtener_demanda_24h(
             datos
@@ -569,6 +588,8 @@ def construir_entrada_bateria(
                 .get("usar_bateria", False)
             )
         ),
+
+        potencia_inversor_kw=potencia_inversor_kw,
         
         costo_bateria_usd_kwh=_leer_float(
             datos,
