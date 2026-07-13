@@ -55,21 +55,22 @@ def _validar_perfiles(demanda, fv) -> None:
         )
 
 
-def _potencia_bateria_kw(capacidad_kwh: float) -> float:
-    if capacidad_kwh <= 0:
-        return 0.0
-    if capacidad_kwh <= 10:
-        return 5.0
-    if capacidad_kwh <= 20:
-        return 10.0
-    if capacidad_kwh <= 25:
-        return 17.0    
-    if capacidad_kwh <= 40:
-        return 15.0
-    if capacidad_kwh <= 80:
-        return 20.0
-    return 30.0
+def _potencia_bateria_kw(
+    capacidad_kwh: float,
+) -> float:
+    """
+    Potencia máxima estimada usando una tasa de descarga de 0.5 C.
 
+    Ejemplo:
+        25 kWh × 0.5 = 12.5 kW
+    """
+
+    capacidad = max(
+        0.0,
+        float(capacidad_kwh or 0.0),
+    )
+
+    return capacidad * 0.5
 def _indicadores_diarios(demanda, fv):
     dias = len(demanda) / 24.0
     excedente_total = 0.0
