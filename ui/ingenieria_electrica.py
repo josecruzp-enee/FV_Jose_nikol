@@ -237,6 +237,9 @@ def _render_resultado(resultado):
 # ==========================================================
 # MAIN
 # ==========================================================
+# ==========================================================
+# MAIN
+# ==========================================================
 def render(ctx):
 
     st.markdown("# ⚡ Ingeniería eléctrica")
@@ -244,32 +247,40 @@ def render(ctx):
     e = _asegurar_dict(ctx, "electrico")
     _ui_inputs_electricos(e)
 
-    if st.button("⚡ Generar ingeniería eléctrica"):
+    generar = st.button(
+        "⚡ Generar ingeniería eléctrica",
+        type="primary",
+    )
+
+    if generar:
 
         try:
-            p = construir_datos_proyecto(ctx)
-            setattr(ctx, "datos_proyecto", p)
-            st.session_state["datos_proyecto"] = p
-            deps = construir_dependencias()
-            resultado = ejecutar_estudio(p, deps)
+            with st.spinner("Calculando ingeniería eléctrica..."):
 
-            setattr(ctx, "resultado", resultado)
-            setattr(ctx, "resultado_proyecto", resultado)
-            st.session_state["resultado_proyecto"] = resultado
+                datos = construir_datos_proyecto(ctx)
+
+                setattr(ctx, "datos_proyecto", datos)
+                st.session_state["datos_proyecto"] = datos
+
+                deps = construir_dependencias()
+                resultado = ejecutar_estudio(datos, deps)
+
+                setattr(ctx, "resultado", resultado)
+                setattr(ctx, "resultado_proyecto", resultado)
+
+                st.session_state["resultado_proyecto"] = resultado
 
             st.success("✅ Ingeniería generada")
 
-            _render_resultado(resultado)
-
         except Exception as ex:
-            st.error("💥 Error")
+            st.error("💥 Error al generar la ingeniería")
             st.exception(ex)
+            return
 
     resultado = getattr(ctx, "resultado", None)
 
-    if resultado:
+    if resultado is not None:
         _render_resultado(resultado)
-
 
 # ==========================================================
 # VALIDACIÓN
