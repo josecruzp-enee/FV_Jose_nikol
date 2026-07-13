@@ -23,8 +23,10 @@ inversores:
       vac_nominal_v: 400
       corriente_nominal_a: 29
       corriente_max_a: 32
-      
+
+
   huawei_sun2000_115ktl_m2:
+
     marca: Huawei
     nombre: SUN2000-115KTL-M2
     codigo: SUN2000115KTLM2
@@ -49,6 +51,7 @@ inversores:
 
 
   growatt_min_5000tlx:
+
     marca: Growatt
     nombre: MIN 5000TL-X
     codigo: MIN5000TLX
@@ -65,6 +68,7 @@ inversores:
 
 
   sungrow_sg8rt:
+
     marca: Sungrow
     nombre: SG8RT
     codigo: SG8RT
@@ -81,6 +85,7 @@ inversores:
 
 
   solis_10k_4g:
+
     marca: Solis
     nombre: Solis-10K-4G
     codigo: SOLIS10K4G
@@ -94,3 +99,28 @@ inversores:
 
     salida_ac:
       kw_ac: 10.0
+
+
+  huawei_sun2000_6ktl_l1:
+
+    marca: Huawei
+    nombre: SUN2000-6KTL-L1
+    codigo: SUN20006KTLL1
+
+    entrada_dc:
+      vdc_max_v: 600
+      mppt_min_v: 90
+      mppt_max_v: 560
+      vdc_nominal_v: 360
+      n_mppt: 2
+      strings_por_mppt: 1
+      imppt_max_a: 12.5
+      i_string_max_a: 12.5
+      isc_mppt_max_a: 18
+
+    salida_ac:
+      kw_ac: 6.0
+      potencia_aparente_kva: 6.0
+      vac_nominal_v: 240
+      corriente_nominal_a: 25.0
+      corriente_max_a: 27.3
