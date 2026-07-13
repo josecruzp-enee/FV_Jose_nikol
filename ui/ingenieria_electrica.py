@@ -5,7 +5,7 @@ import pprint
 from core.aplicacion.dependencias import construir_dependencias
 from core.aplicacion.orquestador_estudio import ejecutar_estudio
 from core.aplicacion.datos_proyecto import construir_datos_proyecto
-
+MOSTRAR_DEBUG_COMPLETO = False
 
 # ==========================================================
 # HELPERS
@@ -232,8 +232,15 @@ def _render_resultado(resultado):
     # ======================================================
     # DEBUG (OPCIONAL)
     # ======================================================
-    with st.expander("🧠 Debug completo"):
-        st.code(pprint.pformat(resultado), language="python")
+    # ======================================================
+    # DEBUG COMPLETO — CONGELADO
+    # ======================================================
+    if MOSTRAR_DEBUG_COMPLETO:
+        with st.expander("🧠 Debug completo"):
+            st.code(
+                    pprint.pformat(resultado),
+            language="python",
+            )
 # ==========================================================
 # MAIN
 # ==========================================================
