@@ -16,7 +16,7 @@ from typing import Dict
 from typing import Dict
 
 
-def obtener_perfil_residencial_24h() -> Dict[int, float]:
+def obtener_perfil_kw_24h() -> Dict[int, float]:
     """
     Vivienda residencial de 2 a 3 habitaciones.
 
@@ -169,7 +169,7 @@ def render_perfil_horario_tecnico(
         "Cada valor en kW equivale al consumo de esa hora en kWh."
     )
 
-    sf.setdefault("perfil_kw_24h", obtener_perfil_kw_gasolinera_24h())
+    sf.setdefault("perfil_kw_24h", obtener_perfil_kw_24h())
 
     perfil_kw_24h = dict(sf["perfil_kw_24h"])
 
