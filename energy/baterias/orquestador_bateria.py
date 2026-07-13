@@ -38,10 +38,30 @@ def _crear_config(
     capacidad: float,
     potencia: float,
 ) -> ConfigBateria:
+
+    potencia_bateria_kw = max(
+        0.0,
+        float(potencia or 0.0),
+    )
+
+    potencia_inversor_kw = max(
+        0.0,
+        float(entrada.potencia_inversor_kw or 0.0),
+    )
+
+    # La descarga nunca puede superar la salida del inversor.
+    if potencia_inversor_kw > 0:
+        potencia_sistema_kw = min(
+            potencia_bateria_kw,
+            potencia_inversor_kw,
+        )
+    else:
+        potencia_sistema_kw = potencia_bateria_kw
+
     return ConfigBateria(
         usar_bateria=True,
         capacidad_util_kwh=capacidad,
-        potencia_max_kw=potencia,
+        potencia_max_kw=potencia_sistema_kw,
         soc_inicial_pct=entrada.soc_inicial_pct,
         soc_min_pct=entrada.soc_min_pct,
         soc_max_pct=entrada.soc_max_pct,
@@ -49,7 +69,6 @@ def _crear_config(
         costo_usd_kwh=entrada.costo_bateria_usd_kwh,
         vida_util_anios=entrada.vida_util_bateria_anios,
     )
-
 
 def _simular(
     *,
