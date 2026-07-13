@@ -19,8 +19,11 @@ def obtener_perfil_kw_gasolinera_24h() -> Dict[int, float]:
     y tres aires acondicionados de 12,000 BTU funcionando
     principalmente durante la noche.
 
-    Se conserva el nombre de la función por compatibilidad
-    con las llamadas existentes.
+    Los aires comienzan a impactar desde las 19:00.
+    Durante la madrugada reducen progresivamente su consumo
+    debido a la modulación de los compresores inverter.
+
+    Se conserva el nombre de la función por compatibilidad.
 
     Consumo aproximado:
     - Consumo base: 1,000 kWh/mes
@@ -30,12 +33,12 @@ def obtener_perfil_kw_gasolinera_24h() -> Dict[int, float]:
     """
 
     return {
-        0: 2.74,
-        1: 2.56,
-        2: 2.45,
-        3: 2.39,
-        4: 2.39,
-        5: 2.56,
+        0: 4.10,
+        1: 3.72,
+        2: 3.30,
+        3: 3.00,
+        4: 2.80,
+        5: 2.40,
         6: 1.29,
         7: 1.64,
         8: 1.06,
@@ -48,12 +51,12 @@ def obtener_perfil_kw_gasolinera_24h() -> Dict[int, float]:
         15: 0.76,
         16: 0.94,
         17: 1.41,
-        18: 4.98,
-        19: 5.69,
-        20: 6.04,
-        21: 5.92,
-        22: 5.22,
-        23: 4.16,
+        18: 2.58,
+        19: 4.50,
+        20: 5.60,
+        21: 5.50,
+        22: 5.00,
+        23: 4.60,
     }
 # ======================================================
 # VALIDACIONES PERFIL HORARIO
