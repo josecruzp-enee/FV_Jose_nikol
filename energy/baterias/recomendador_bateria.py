@@ -58,14 +58,15 @@ def _validar_perfiles(demanda, fv) -> None:
 def _potencia_bateria_kw(capacidad_kwh: float) -> float:
     if capacidad_kwh <= 0:
         return 0.0
-    if capacidad_kwh <= 5:
-        return 3.0
     if capacidad_kwh <= 10:
-        return 4.0
-    if capacidad_kwh <= 20:
         return 5.0
-    return 10.0
-
+    if capacidad_kwh <= 20:
+        return 10.0
+    if capacidad_kwh <= 40:
+        return 15.0
+    if capacidad_kwh <= 80:
+        return 20.0
+    return 30.0
 
 def _indicadores_diarios(demanda, fv):
     dias = len(demanda) / 24.0
