@@ -15,40 +15,46 @@ from typing import Dict
 
 def obtener_perfil_kw_gasolinera_24h() -> Dict[int, float]:
     """
-    Gasolinera 24h + tienda de conveniencia.
+    Perfil residencial con poca presencia durante el día
+    y tres aires acondicionados de 12,000 BTU funcionando
+    principalmente durante la noche.
+
+    Se conserva el nombre de la función por compatibilidad
+    con las llamadas existentes.
 
     Consumo aproximado:
-    - 600 kWh/día
-    - 18,000 kWh/mes
+    - Consumo base: 1,000 kWh/mes
+    - Aires acondicionados: 756 kWh/mes
+    - Consumo total proyectado: 1,756 kWh/mes
+    - Promedio diario: 58.54 kWh/día
     """
 
     return {
-        0: 0.94,
-        1: 0.76,
-        2: 0.65,
-        3: 0.59,
-        4: 0.59,
-        5: 0.76,
+        0: 2.74,
+        1: 2.56,
+        2: 2.45,
+        3: 2.39,
+        4: 2.39,
+        5: 2.56,
         6: 1.29,
         7: 1.64,
-        8: 3.46,
-        9: 3.16,
-        10: 3.05,
-        11: 3.05,
-        12: 3.22,
-        13: 3.16,
-        14: 3.10,
-        15: 3.16,
-        16: 3.34,
-        17: 3.81,
-        18: 2.58,
-        19: 3.29,
-        20: 3.64,
-        21: 3.52,
-        22: 2.82,
-        23: 1.76,
+        8: 1.06,
+        9: 0.76,
+        10: 0.65,
+        11: 0.65,
+        12: 0.82,
+        13: 0.76,
+        14: 0.70,
+        15: 0.76,
+        16: 0.94,
+        17: 1.41,
+        18: 4.98,
+        19: 5.69,
+        20: 6.04,
+        21: 5.92,
+        22: 5.22,
+        23: 4.16,
     }
-
 # ======================================================
 # VALIDACIONES PERFIL HORARIO
 # ======================================================
