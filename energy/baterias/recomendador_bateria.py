@@ -121,7 +121,7 @@ def generar_opciones_bateria(
 
     if capacidades_comerciales_kwh is None:
         capacidades_comerciales_kwh = [
-            5.0, 10.0, 15.0, 20.0, 30.0, 40.0
+            5.0, 10.0, 15.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0, 90.0, 100.0
         ]
 
     capacidades = sorted({
