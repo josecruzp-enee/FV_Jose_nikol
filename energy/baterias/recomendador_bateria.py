@@ -62,6 +62,8 @@ def _potencia_bateria_kw(capacidad_kwh: float) -> float:
         return 5.0
     if capacidad_kwh <= 20:
         return 10.0
+    if capacidad_kwh <= 25:
+        return 17.0    
     if capacidad_kwh <= 40:
         return 15.0
     if capacidad_kwh <= 80:
