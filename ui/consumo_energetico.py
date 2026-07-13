@@ -13,50 +13,50 @@ _MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", 
 
 from typing import Dict
 
-def obtener_perfil_kw_gasolinera_24h() -> Dict[int, float]:
+from typing import Dict
+
+
+def obtener_perfil_residencial_24h() -> Dict[int, float]:
     """
-    Perfil residencial con poca presencia durante el día
-    y tres aires acondicionados de 12,000 BTU funcionando
-    principalmente durante la noche.
+    Vivienda residencial de 2 a 3 habitaciones.
 
-    Los aires comienzan a impactar desde las 19:00.
-    Durante la madrugada reducen progresivamente su consumo
-    debido a la modulación de los compresores inverter.
-
-    Se conserva el nombre de la función por compatibilidad.
+    Características:
+    - Poca presencia durante el día.
+    - Mayor actividad después de las 18:00.
+    - Uso de aire acondicionado durante la noche.
+    - Continuidad entre las horas 23:00 y 00:00.
 
     Consumo aproximado:
-    - Consumo base: 1,000 kWh/mes
-    - Aires acondicionados: 756 kWh/mes
-    - Consumo total proyectado: 1,756 kWh/mes
-    - Promedio diario: 58.54 kWh/día
+    - 28.33 kWh/día
+    - 850 kWh/mes
+    - 10,200 kWh/año
     """
 
     return {
-        0: 4.10,
-        1: 3.72,
-        2: 3.30,
-        3: 3.00,
-        4: 2.80,
-        5: 2.40,
-        6: 1.29,
-        7: 1.64,
-        8: 1.06,
-        9: 0.76,
-        10: 0.65,
-        11: 0.65,
-        12: 0.82,
-        13: 0.76,
-        14: 0.70,
-        15: 0.76,
-        16: 0.94,
-        17: 1.41,
-        18: 2.58,
-        19: 4.50,
-        20: 5.60,
-        21: 5.50,
-        22: 5.00,
-        23: 4.60,
+        0: 1.90,
+        1: 1.55,
+        2: 1.25,
+        3: 1.00,
+        4: 0.85,
+        5: 0.75,
+        6: 1.05,
+        7: 1.25,
+        8: 0.75,
+        9: 0.55,
+        10: 0.45,
+        11: 0.45,
+        12: 0.55,
+        13: 0.50,
+        14: 0.45,
+        15: 0.50,
+        16: 0.65,
+        17: 0.90,
+        18: 1.40,
+        19: 2.20,
+        20: 2.60,
+        21: 2.70,
+        22: 2.30,
+        23: 1.78,
     }
 # ======================================================
 # VALIDACIONES PERFIL HORARIO
@@ -285,7 +285,7 @@ def render(ctx) -> None:
     # ------------------------------------------------------
     # VALORES POR DEFECTO (SOLO PRIMERA VEZ)
     # ------------------------------------------------------
-    sf.setdefault("kwh_12m", [1700.0] * 12)
+    sf.setdefault("kwh_12m", [850.0] * 12)
     sf.setdefault("cargos_fijos_L_mes", 250.0)
     sf.setdefault("tarifa_energia_L_kwh", 5.50)
 
