@@ -385,72 +385,37 @@ def seleccionar_mejor_escenario(
         escenarios[0],
     )
 
-    limite_observacion = vida_util_bateria_anios * 1.30
-
-    candidatos_rentables = [
+    candidatos = [
         escenario
         for escenario in escenarios
         if (
             escenario.capacidad_bateria_kwh > 0
+            and escenario.resultado_tecnico is not None
             and escenario.ahorro_incremental_anual_l > 0
-            and escenario.payback_bateria_anios is not None
-            and escenario.payback_bateria_anios
-            <= vida_util_bateria_anios
         )
     ]
 
-    candidatos_observados = [
-        escenario
-        for escenario in escenarios
-        if (
-            escenario.capacidad_bateria_kwh > 0
-            and escenario.ahorro_incremental_anual_l > 0
-            and escenario.payback_bateria_anios is not None
-            and vida_util_bateria_anios
-            < escenario.payback_bateria_anios
-            <= limite_observacion
+    if not candidatos:
+        escenario_base.criterio_seleccion = (
+            "No existe una batería con aprovechamiento energético positivo."
         )
-    ]
+        return escenario_base
 
-    if candidatos_rentables:
-        mejor = max(
-            candidatos_rentables,
-            key=lambda escenario: (
-                escenario.ahorro_incremental_anual_l
-                - escenario.capex_bateria_l
-                / max(vida_util_bateria_anios, 1),
-                -escenario.capex_bateria_l,
-            ),
-        )
-        mejor.criterio_seleccion = (
-            "Batería seleccionada por beneficio económico incremental "
-            "y recuperación dentro de su vida útil."
-        )
-        return mejor
-
-    if candidatos_observados:
-        mejor = max(
-            candidatos_observados,
-            key=lambda escenario: (
-                escenario.ahorro_incremental_anual_l,
-                -escenario.payback_bateria_anios,
-            ),
-        )
-        mejor.criterio_seleccion = (
-            "Alternativa técnicamente aprovechable seleccionada con "
-            "observaciones económicas. Su recuperación estimada supera "
-            "la vida útil de referencia, pero permanece dentro del margen "
-            "de evaluación del 30%."
-        )
-        return mejor
-
-    escenario_base.criterio_seleccion = (
-        "Ninguna batería presenta ahorro y recuperación dentro del "
-        "margen económico máximo evaluado."
+    mejor = max(
+        candidatos,
+        key=lambda escenario: (
+            escenario.energia_descargada_dia_kwh,
+            escenario.ahorro_incremental_anual_l,
+        ),
     )
-    return escenario_base
 
+    mejor.criterio_seleccion = (
+        "Batería seleccionada por mayor recuperación energética entre "
+        "las capacidades evaluadas. La rentabilidad se informa por "
+        "separado y no impide incluirla cuando el usuario solicita batería."
+    )
 
+    return mejor
 def seleccionar_escenario_tecnico(
     *,
     escenarios: List[EscenarioBateria],
