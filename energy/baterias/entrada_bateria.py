@@ -70,7 +70,7 @@ class EntradaBateria:
     # COSTOS
     # ======================================================
 
-    costo_bateria_usd_kwh: float = 250.0
+    costo_bateria_usd_kwh: float = 200.0
     tipo_cambio_l_usd: float = 26.61
 
     capex_fv_l: float = 0.0
