@@ -17,5 +17,5 @@ class ConfigBateria:
 
     eficiencia_ida_vuelta: float = 0.90
 
-    costo_usd_kwh: float = 250.0
+    costo_usd_kwh: float = 200.0
     vida_util_anios: int = 10
