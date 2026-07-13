@@ -521,15 +521,32 @@ def _armar_resultado(**ctx) -> Dict[str, Any]:
     escenario = ctx["escenario"]
     perfil = ctx["perfil"]
     detalle = ctx["detalle"]
+    tabla = ctx["tabla"]
     ahorro = ctx["ahorro_anual"]
     capex = ctx["capex"]
+
+    consumo_anual_kwh = sum(
+        fila["consumo_kwh"]
+        for fila in tabla
+    )
+    energia_fv_util_anual_kwh = sum(
+        fila["fv_kwh"]
+        for fila in tabla
+    )
+
+    cobertura_real = (
+        energia_fv_util_anual_kwh / consumo_anual_kwh * 100.0
+        if consumo_anual_kwh > 0
+        else 0.0
+    )
+
     credito_inyeccion = sum(
         fila.get("credito_inyeccion_aplicado_L", 0.0)
-        for fila in ctx["tabla"]
+        for fila in tabla
     )
     credito_generado = sum(
         fila.get("credito_inyeccion_generado_L", 0.0)
-        for fila in ctx["tabla"]
+        for fila in tabla
     )
     ahorro_autoconsumo = max(
         ahorro - credito_inyeccion,
@@ -540,7 +557,9 @@ def _armar_resultado(**ctx) -> Dict[str, Any]:
         "capex_L": capex,
         "capex_total_L": capex,
         "capex_fv_L": ctx["capex_fv"],
-        "capex_bateria_L": _float(_leer(escenario, "capex_bateria_l", 0.0)),
+        "capex_bateria_L": _float(
+            _leer(escenario, "capex_bateria_l", 0.0)
+        ),
         "capacidad_bateria_kwh": _float(
             _leer(escenario, "capacidad_bateria_kwh", 0.0)
         ),
@@ -548,25 +567,44 @@ def _armar_resultado(**ctx) -> Dict[str, Any]:
             _leer(escenario, "potencia_bateria_kw", 0.0)
         ),
         "costo_bateria_usd_kwh": _float(
-            getattr(ctx["datos"], "costo_bateria_usd_kwh", 0.0)
+            getattr(
+                ctx["datos"],
+                "costo_bateria_usd_kwh",
+                0.0,
+            )
         ),
+
+        # Energía y cobertura
+        "consumo_anual_kwh": consumo_anual_kwh,
+        "energia_fv_util_anual_kwh": energia_fv_util_anual_kwh,
+        "cobertura_real": cobertura_real,
+
+        # Financiamiento
         "cuota_mensual": ctx["cuota"],
         "cuota_mensual_L": ctx["cuota"],
-        "tabla_12m": ctx["tabla"],
+
+        # Resultados mensuales
+        "tabla_12m": tabla,
         "evaluacion": ctx["evaluacion"],
+
+        # Ahorros
         "ahorro_anual_L": ahorro,
         "ahorro_autoconsumo_anual_L": ahorro_autoconsumo,
         "credito_inyeccion_anual_L": credito_inyeccion,
         "credito_inyeccion_generado_anual_L": credito_generado,
         "saldo_credito_final_L": (
-            ctx["tabla"][-1].get("saldo_credito_L", 0.0)
-            if ctx["tabla"] else 0.0
+            tabla[-1].get("saldo_credito_L", 0.0)
+            if tabla
+            else 0.0
         ),
+
         **detalle,
         **_metricas(capex, ahorro),
     }
+
     resultado.update(_salida_bateria(ctx))
     resultado.update(_salida_financiamiento(perfil))
+
     return resultado
 
 
