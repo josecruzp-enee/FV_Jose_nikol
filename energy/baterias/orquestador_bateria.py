@@ -6,7 +6,7 @@ from energy.baterias.balance_bateria import (
 )
 from energy.baterias.economia_bateria import (
     evaluar_escenario_bateria,
-    seleccionar_mejor_escenario,
+    seleccionar_escenario_tecnico,
 )
 from energy.baterias.entrada_bateria import EntradaBateria
 from energy.baterias.modelos import ConfigBateria
@@ -173,10 +173,10 @@ def _indicadores_recomendacion(opciones):
         referencia.energia_objetivo_kwh,
     )
 
-
 def ejecutar_sistema_bateria(
     entrada: EntradaBateria,
 ) -> ResultadoSistemaBateria:
+
     errores = entrada.validar()
 
     if errores:
@@ -187,7 +187,10 @@ def ejecutar_sistema_bateria(
 
     try:
         perfiles = _preparar_perfiles(entrada)
-        opciones = _generar_opciones(entrada, perfiles)
+        opciones = _generar_opciones(
+            entrada,
+            perfiles,
+        )
 
         escenario_base = _crear_escenario_base(
             entrada=entrada,
@@ -203,9 +206,12 @@ def ejecutar_sistema_bateria(
             )
 
         escenarios = [escenario_base]
+        seleccionado = escenario_base
 
         if entrada.usar_bateria:
+
             for opcion in opciones:
+
                 escenario = _evaluar_opcion(
                     entrada=entrada,
                     perfiles=perfiles,
@@ -216,21 +222,20 @@ def ejecutar_sistema_bateria(
                 if escenario is not None:
                     escenarios.append(escenario)
 
-            seleccionado = seleccionar_mejor_escenario(
+            escenario_tecnico = seleccionar_escenario_tecnico(
                 escenarios=escenarios,
-                vida_util_bateria_anios=(
-                    entrada.vida_util_bateria_anios
-                ),
             )
-        else:
-            seleccionado = escenario_base
+
+            if escenario_tecnico is not None:
+                seleccionado = escenario_tecnico
 
         original, normalizada, factor = _factor_normalizacion(
             entrada,
             perfiles,
         )
-        excedente, nocturno, objetivo = _indicadores_recomendacion(
-            opciones
+
+        excedente, nocturno, objetivo = (
+            _indicadores_recomendacion(opciones)
         )
 
         return ResultadoSistemaBateria(
@@ -252,3 +257,4 @@ def ejecutar_sistema_bateria(
             ok=False,
             errores=[str(error)],
         )
+
