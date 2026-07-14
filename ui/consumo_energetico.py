@@ -18,40 +18,45 @@ from typing import Dict
 
 def obtener_perfil_kw_24h() -> Dict[int, float]:
     """
-    Perfil de demanda de una gasolinera con operación continua
-    durante las 24 horas.
+    Perfil de consumo para una escuela.
+
+    Características:
+    - Mayor actividad entre 7:00 a. m. y 1:00 p. m.
+    - Actividad reducida durante la tarde.
+    - Consumo mínimo durante la noche.
 
     Consumo aproximado:
-    - Consumo mensual: 18,000 kWh/mes
-    - Consumo diario: 600 kWh/día
-    - Demanda máxima: 32.16 kW
+    - Factura mensual: L 70,000
+    - Tarifa estimada: L 5.00/kWh
+    - Energía mensual: 14,000 kWh
+    - Energía diaria promedio: 466.67 kWh
     """
 
     return {
-        0: 18.38,
-        1: 16.54,
-        2: 14.70,
-        3: 14.70,
-        4: 15.62,
-        5: 18.38,
-        6: 22.05,
-        7: 25.73,
-        8: 27.57,
-        9: 28.48,
-        10: 29.40,
-        11: 30.32,
-        12: 32.16,
-        13: 31.24,
-        14: 30.32,
-        15: 29.40,
-        16: 28.48,
-        17: 29.40,
-        18: 31.24,
-        19: 30.32,
-        20: 28.48,
-        21: 25.73,
-        22: 22.97,
-        23: 18.39,
+        0: 0.95,
+        1: 0.95,
+        2: 0.95,
+        3: 0.95,
+        4: 0.95,
+        5: 2.38,
+        6: 14.29,
+        7: 44.29,
+        8: 53.81,
+        9: 58.57,
+        10: 60.95,
+        11: 60.95,
+        12: 58.57,
+        13: 48.57,
+        14: 23.81,
+        15: 16.67,
+        16: 11.90,
+        17: 7.14,
+        18: 3.33,
+        19: 1.90,
+        20: 1.43,
+        21: 0.95,
+        22: 0.95,
+        23: 0.96,
     }
 # ======================================================
 # VALIDACIONES PERFIL HORARIO
