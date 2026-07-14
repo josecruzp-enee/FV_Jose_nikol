@@ -18,45 +18,42 @@ from typing import Dict
 
 def obtener_perfil_kw_24h() -> Dict[int, float]:
     """
-    Vivienda residencial de 2 a 3 habitaciones.
+    Perfil residencial con poca presencia durante el día
+    y tres aires acondicionados de 12,000 BTU funcionando
+    principalmente durante la noche.
 
-    Características:
-    - Poca presencia durante el día.
-    - Mayor actividad después de las 18:00.
-    - Uso de aire acondicionado durante la noche.
-    - Continuidad entre las horas 23:00 y 00:00.
+    El nombre se conserva por compatibilidad.
 
     Consumo aproximado:
-    - 28.33 kWh/día
-    - 850 kWh/mes
-    - 10,200 kWh/año
+    - Consumo total: 1,756 kWh/mes
+    - Consumo diario promedio: 58.54 kWh/día
     """
 
     return {
-        0: 1.90,
-        1: 1.55,
-        2: 1.25,
-        3: 1.00,
-        4: 0.85,
-        5: 0.75,
-        6: 1.05,
-        7: 1.25,
-        8: 0.75,
-        9: 0.55,
-        10: 0.45,
-        11: 0.45,
-        12: 0.55,
-        13: 0.50,
-        14: 0.45,
-        15: 0.50,
-        16: 0.65,
-        17: 0.90,
-        18: 1.40,
-        19: 2.20,
-        20: 2.60,
-        21: 2.70,
-        22: 2.30,
-        23: 1.78,
+        0: 4.10,
+        1: 3.72,
+        2: 3.30,
+        3: 3.00,
+        4: 2.80,
+        5: 2.40,
+        6: 1.29,
+        7: 1.64,
+        8: 1.06,
+        9: 0.76,
+        10: 0.65,
+        11: 0.65,
+        12: 0.82,
+        13: 0.76,
+        14: 0.70,
+        15: 0.76,
+        16: 0.94,
+        17: 1.41,
+        18: 2.58,
+        19: 4.50,
+        20: 5.60,
+        21: 5.50,
+        22: 5.00,
+        23: 4.60,
     }
 # ======================================================
 # VALIDACIONES PERFIL HORARIO
