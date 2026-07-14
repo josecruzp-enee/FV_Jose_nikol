@@ -21,40 +21,37 @@ def obtener_perfil_kw_24h() -> Dict[int, float]:
     Perfil de demanda de una gasolinera con operación continua
     durante las 24 horas.
 
-    El nombre se conserva por compatibilidad.
-
     Consumo aproximado:
-    - Consumo diario: 653 kWh/día
-    - Consumo mensual: 19,590 kWh/mes
-    - Demanda mínima: 16 kW
-    - Demanda máxima: 35 kW
+    - Consumo mensual: 18,000 kWh/mes
+    - Consumo diario: 600 kWh/día
+    - Demanda máxima: 32.16 kW
     """
 
     return {
-        0: 20.0,
-        1: 18.0,
-        2: 16.0,
-        3: 16.0,
-        4: 17.0,
-        5: 20.0,
-        6: 24.0,
-        7: 28.0,
-        8: 30.0,
-        9: 31.0,
-        10: 32.0,
-        11: 33.0,
-        12: 35.0,
-        13: 34.0,
-        14: 33.0,
-        15: 32.0,
-        16: 31.0,
-        17: 32.0,
-        18: 34.0,
-        19: 33.0,
-        20: 31.0,
-        21: 28.0,
-        22: 25.0,
-        23: 20.0,
+        0: 18.38,
+        1: 16.54,
+        2: 14.70,
+        3: 14.70,
+        4: 15.62,
+        5: 18.38,
+        6: 22.05,
+        7: 25.73,
+        8: 27.57,
+        9: 28.48,
+        10: 29.40,
+        11: 30.32,
+        12: 32.16,
+        13: 31.24,
+        14: 30.32,
+        15: 29.40,
+        16: 28.48,
+        17: 29.40,
+        18: 31.24,
+        19: 30.32,
+        20: 28.48,
+        21: 25.73,
+        22: 22.97,
+        23: 18.39,
     }
 # ======================================================
 # VALIDACIONES PERFIL HORARIO
