@@ -16,47 +16,58 @@ from typing import Dict
 from typing import Dict
 
 
+from typing import Dict
+
+
 def obtener_perfil_kw_24h() -> Dict[int, float]:
     """
-    Perfil de consumo para una escuela.
+    Perfil horario estimado de consumo para una gasolinera 24/7.
 
     Características:
-    - Mayor actividad entre 7:00 a. m. y 1:00 p. m.
-    - Actividad reducida durante la tarde.
-    - Consumo mínimo durante la noche.
+    - Consumo permanente durante las 24 horas.
+    - Menor demanda durante la madrugada.
+    - Incremento de actividad desde las 5:00 a. m.
+    - Mayor demanda entre 9:00 a. m. y 2:00 p. m.
+    - Reducción gradual durante la tarde y la noche.
 
     Consumo aproximado:
-    - Factura mensual: L 70,000
-    - Tarifa estimada: L 5.00/kWh
-    - Energía mensual: 14,000 kWh
-    - Energía diaria promedio: 466.67 kWh
+    - Energía mensual objetivo: 13,000 kWh
+    - Mes de referencia: 30 días
+    - Energía diaria promedio: 433.33 kWh
+    - Demanda promedio: 18.06 kW
+    - Demanda máxima estimada: 28.30 kW
+
+    Nota:
+    Cada valor representa la potencia promedio durante una hora.
+    Por tanto, la suma de los 24 valores equivale a la energía
+    diaria aproximada en kWh.
     """
 
     return {
-        0: 0.95,
-        1: 0.95,
-        2: 0.95,
-        3: 0.95,
-        4: 0.95,
-        5: 2.38,
-        6: 14.29,
-        7: 44.29,
-        8: 53.81,
-        9: 58.57,
-        10: 60.95,
-        11: 60.95,
-        12: 58.57,
-        13: 48.57,
-        14: 23.81,
-        15: 16.67,
-        16: 11.90,
-        17: 7.14,
-        18: 3.33,
-        19: 1.90,
-        20: 1.43,
-        21: 0.95,
-        22: 0.95,
-        23: 0.96,
+        0: 10.11,
+        1: 8.09,
+        2: 6.07,
+        3: 6.07,
+        4: 8.09,
+        5: 11.46,
+        6: 16.85,
+        7: 20.22,
+        8: 22.91,
+        9: 24.94,
+        10: 26.28,
+        11: 26.96,
+        12: 28.30,
+        13: 26.28,
+        14: 24.94,
+        15: 23.59,
+        16: 22.24,
+        17: 21.57,
+        18: 20.22,
+        19: 18.87,
+        20: 18.20,
+        21: 16.17,
+        22: 13.48,
+        23: 11.42,
     }
 # ======================================================
 # VALIDACIONES PERFIL HORARIO
@@ -285,9 +296,9 @@ def render(ctx) -> None:
     # ------------------------------------------------------
     # VALORES POR DEFECTO (SOLO PRIMERA VEZ)
     # ------------------------------------------------------
-    sf.setdefault("kwh_12m", [14000.0] * 12)
+    sf.setdefault("kwh_12m", [13000.0] * 12)
     sf.setdefault("cargos_fijos_L_mes", 250.0)
-    sf.setdefault("tarifa_energia_L_kwh", 5.50)
+    sf.setdefault("tarifa_energia_L_kwh", 5.00)
 
     consumo = {
         "kwh_12m": list(sf["kwh_12m"]),
