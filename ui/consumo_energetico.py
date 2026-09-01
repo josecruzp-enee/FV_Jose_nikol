@@ -21,53 +21,56 @@ from typing import Dict
 
 def obtener_perfil_kw_24h() -> Dict[int, float]:
     """
-    Perfil horario estimado de consumo para una gasolinera 24/7.
+    Perfil horario estimado de consumo para el sistema de recirculación
+    de piscinas.
 
     Características:
-    - Consumo permanente durante las 24 horas.
-    - Menor demanda durante la madrugada.
-    - Incremento de actividad desde las 5:00 a. m.
-    - Mayor demanda entre 9:00 a. m. y 2:00 p. m.
-    - Reducción gradual durante la tarde y la noche.
+    - Tres bombas de recirculación.
+    - Potencia eléctrica estimada por bomba: 2.63 kW.
+    - Potencia total simultánea: 7.89 kW.
+    - Operación continua durante 8 horas al día.
+    - Horario de operación: 10:00 a. m. a 6:00 p. m.
+    - Fuera del horario de recirculación las bombas permanecen apagadas.
 
     Consumo aproximado:
-    - Energía mensual objetivo: 13,000 kWh
+    - Potencia durante operación: 7.89 kW
+    - Horas de operación diaria: 8 h
+    - Energía diaria: 63.12 kWh
+    - Energía mensual objetivo: 1,893.60 kWh
     - Mes de referencia: 30 días
-    - Energía diaria promedio: 433.33 kWh
-    - Demanda promedio: 18.06 kW
-    - Demanda máxima estimada: 28.30 kW
+    - Demanda máxima estimada: 7.89 kW
 
     Nota:
     Cada valor representa la potencia promedio durante una hora.
-    Por tanto, la suma de los 24 valores equivale a la energía
-    diaria aproximada en kWh.
+    Las horas 10 a 17 representan las ocho horas completas de operación.
+    A las 18:00 las bombas se consideran apagadas.
     """
 
     return {
-        0: 10.11,
-        1: 8.09,
-        2: 6.07,
-        3: 6.07,
-        4: 8.09,
-        5: 11.46,
-        6: 16.85,
-        7: 20.22,
-        8: 22.91,
-        9: 24.94,
-        10: 26.28,
-        11: 26.96,
-        12: 28.30,
-        13: 26.28,
-        14: 24.94,
-        15: 23.59,
-        16: 22.24,
-        17: 21.57,
-        18: 20.22,
-        19: 18.87,
-        20: 18.20,
-        21: 16.17,
-        22: 13.48,
-        23: 11.42,
+        0: 0.00,
+        1: 0.00,
+        2: 0.00,
+        3: 0.00,
+        4: 0.00,
+        5: 0.00,
+        6: 0.00,
+        7: 0.00,
+        8: 0.00,
+        9: 0.00,
+        10: 7.89,
+        11: 7.89,
+        12: 7.89,
+        13: 7.89,
+        14: 7.89,
+        15: 7.89,
+        16: 7.89,
+        17: 7.89,
+        18: 0.00,
+        19: 0.00,
+        20: 0.00,
+        21: 0.00,
+        22: 0.00,
+        23: 0.00,
     }
 # ======================================================
 # VALIDACIONES PERFIL HORARIO
@@ -296,7 +299,7 @@ def render(ctx) -> None:
     # ------------------------------------------------------
     # VALORES POR DEFECTO (SOLO PRIMERA VEZ)
     # ------------------------------------------------------
-    sf.setdefault("kwh_12m", [13000.0] * 12)
+    sf.setdefault("kwh_12m", [1890.0] * 12)
     sf.setdefault("cargos_fijos_L_mes", 250.0)
     sf.setdefault("tarifa_energia_L_kwh", 5.00)
 
