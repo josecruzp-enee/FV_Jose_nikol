@@ -72,6 +72,74 @@ def obtener_perfil_kw_24h() -> Dict[int, float]:
         22: 0.00,
         23: 0.00,
     }
+
+
+def obtener_perfil_kw_24h() -> Dict[int, float]:
+    """
+    Perfil horario estimado de consumo para sistema de aire acondicionado
+    residencial con equipos inverter.
+
+    Equipos:
+    - Tres aires inverter de 12,000 BTU/h.
+      Potencia nominal estimada por equipo: 1.00 kW.
+      Factor de utilización considerado: 0.65.
+      Potencia promedio conjunta estimada: 1.95 kW.
+      Horario: 7:00 p. m. a 6:00 a. m.
+
+    - Un aire inverter de 36,000 BTU/h para sala.
+      Potencia nominal estimada: 3.00 kW.
+      Factor de utilización considerado: 0.80.
+      Potencia promedio estimada: 2.40 kW.
+      Horario: 6:00 p. m. a 10:00 p. m.
+
+    Perfil:
+    - 00:00 a 06:00 -> 1.95 kW
+    - 06:00 a 18:00 -> 0.00 kW
+    - 18:00 a 19:00 -> 2.40 kW
+    - 19:00 a 22:00 -> 4.35 kW
+    - 22:00 a 24:00 -> 1.95 kW
+
+    Energía diaria aproximada:
+    - Dormitorios:
+      1.95 kW x 11 h = 21.45 kWh/día.
+    - Sala:
+      2.40 kW x 4 h = 9.60 kWh/día.
+    - Energía total:
+      31.05 kWh/día.
+
+    Energía mensual aproximada:
+    - 31.05 kWh/día x 30 días = 931.50 kWh/mes.
+
+    Demanda máxima promedio estimada:
+    - 4.35 kW.
+    """
+
+    return {
+        0: 1.95,
+        1: 1.95,
+        2: 1.95,
+        3: 1.95,
+        4: 1.95,
+        5: 1.95,
+        6: 0.00,
+        7: 0.00,
+        8: 0.00,
+        9: 0.00,
+        10: 0.00,
+        11: 0.00,
+        12: 0.00,
+        13: 0.00,
+        14: 0.00,
+        15: 0.00,
+        16: 0.00,
+        17: 0.00,
+        18: 2.40,
+        19: 4.35,
+        20: 4.35,
+        21: 4.35,
+        22: 1.95,
+        23: 1.95,
+    }
 # ======================================================
 # VALIDACIONES PERFIL HORARIO
 # ======================================================
@@ -299,9 +367,9 @@ def render(ctx) -> None:
     # ------------------------------------------------------
     # VALORES POR DEFECTO (SOLO PRIMERA VEZ)
     # ------------------------------------------------------
-    sf.setdefault("kwh_12m", [1890.0] * 12)
+    sf.setdefault("kwh_12m", [932] * 12)
     sf.setdefault("cargos_fijos_L_mes", 250.0)
-    sf.setdefault("tarifa_energia_L_kwh", 5.00)
+    sf.setdefault("tarifa_energia_L_kwh", 5.50)
 
     consumo = {
         "kwh_12m": list(sf["kwh_12m"]),
