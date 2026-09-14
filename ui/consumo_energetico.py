@@ -83,35 +83,44 @@ def obtener_perfil_kw_24h() -> Dict[int, float]:
     - Tres aires inverter de 12,000 BTU/h.
       Potencia nominal estimada por equipo: 1.00 kW.
       Factor de utilización considerado: 0.65.
+      Potencia promedio por equipo: 0.65 kW.
       Potencia promedio conjunta estimada: 1.95 kW.
       Horario: 7:00 p. m. a 6:00 a. m.
 
-    - Un aire inverter de 36,000 BTU/h para sala.
-      Potencia nominal estimada: 3.00 kW.
+    - Un aire inverter de 24,000 BTU/h para sala.
+      Potencia nominal estimada: 2.00 kW.
       Factor de utilización considerado: 0.80.
-      Potencia promedio estimada: 2.40 kW.
+      Potencia promedio estimada: 1.60 kW.
       Horario: 6:00 p. m. a 10:00 p. m.
 
     Perfil:
     - 00:00 a 06:00 -> 1.95 kW
     - 06:00 a 18:00 -> 0.00 kW
-    - 18:00 a 19:00 -> 2.40 kW
-    - 19:00 a 22:00 -> 4.35 kW
+    - 18:00 a 19:00 -> 1.60 kW
+    - 19:00 a 22:00 -> 3.55 kW
     - 22:00 a 24:00 -> 1.95 kW
 
     Energía diaria aproximada:
     - Dormitorios:
       1.95 kW x 11 h = 21.45 kWh/día.
     - Sala:
-      2.40 kW x 4 h = 9.60 kWh/día.
+      1.60 kW x 4 h = 6.40 kWh/día.
     - Energía total:
-      31.05 kWh/día.
+      27.85 kWh/día.
 
     Energía mensual aproximada:
-    - 31.05 kWh/día x 30 días = 931.50 kWh/mes.
+    - 27.85 kWh/día x 30 días = 835.50 kWh/mes.
+
+    Energía anual aproximada:
+    - 27.85 kWh/día x 365 días = 10,165.25 kWh/año.
 
     Demanda máxima promedio estimada:
-    - 4.35 kW.
+    - 3.55 kW.
+
+    Nota:
+    El perfil representa potencia promedio horaria estimada y considera
+    la modulación de los equipos inverter mediante factores de utilización.
+    No representa la potencia máxima instantánea de los equipos.
     """
 
     return {
@@ -133,10 +142,10 @@ def obtener_perfil_kw_24h() -> Dict[int, float]:
         15: 0.00,
         16: 0.00,
         17: 0.00,
-        18: 2.40,
-        19: 4.35,
-        20: 4.35,
-        21: 4.35,
+        18: 1.60,
+        19: 3.55,
+        20: 3.55,
+        21: 3.55,
         22: 1.95,
         23: 1.95,
     }
