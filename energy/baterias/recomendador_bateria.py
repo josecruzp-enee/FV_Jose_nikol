@@ -149,6 +149,27 @@ def generar_opciones_bateria(
         min(excedente_diario, consumo_nocturno)
         * factor
     )
+    # ========================================================
+    # MODO PRUEBA
+    # ========================================================
+    # Cuando está activo, el recomendador evalúa únicamente
+    # la batería definida manualmente.
+    # ========================================================
+
+    if USAR_BATERIA_PRUEBA:
+        return [
+            BateriaRecomendada(
+                capacidad_util_kwh=CAPACIDAD_BATERIA_PRUEBA_KWH,
+                potencia_max_kw=POTENCIA_BATERIA_PRUEBA_KW,
+                excedente_diario_kwh=excedente_diario,
+                consumo_nocturno_kwh=consumo_nocturno,
+                energia_objetivo_kwh=energia_objetivo,
+                criterio=(
+                    "Batería definida manualmente para "
+                    "simulación de prueba."
+                ),
+            )
+        ]
 
     if capacidades_comerciales_kwh is None:
         capacidades_comerciales_kwh = [
