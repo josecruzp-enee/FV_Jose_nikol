@@ -97,7 +97,7 @@ def _potencia_bateria_kw(
     # Funcionamiento normal: batería genérica a 0.5 C
     return capacidad * 0.5
 
-    return capacidad * 0.5
+   
 def _indicadores_diarios(demanda, fv):
     dias = len(demanda) / 24.0
     excedente_total = 0.0
