@@ -376,7 +376,7 @@ def render(ctx) -> None:
     # ------------------------------------------------------
     # VALORES POR DEFECTO (SOLO PRIMERA VEZ)
     # ------------------------------------------------------
-    sf.setdefault("kwh_12m", [932] * 12)
+    sf.setdefault("kwh_12m", [835.50] * 12)
     sf.setdefault("cargos_fijos_L_mes", 250.0)
     sf.setdefault("tarifa_energia_L_kwh", 5.50)
 
