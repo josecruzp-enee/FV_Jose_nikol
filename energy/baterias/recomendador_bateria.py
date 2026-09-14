@@ -4,6 +4,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List
 
+# ============================================================
+# PARCHE TEMPORAL DE SIMULACIÓN DE BATERÍA
+# ============================================================
+
+USAR_BATERIA_PRUEBA = True
+
+CAPACIDAD_BATERIA_PRUEBA_KWH = 25.0
+POTENCIA_BATERIA_PRUEBA_KW = 5.0
 
 @dataclass
 class BateriaRecomendada:
@@ -59,16 +67,35 @@ def _potencia_bateria_kw(
     capacidad_kwh: float,
 ) -> float:
     """
-    Potencia máxima estimada usando una tasa de descarga de 0.5 C.
+    Determina la potencia máxima de batería.
 
-    Ejemplo:
-        25 kWh × 0.5 = 12.5 kW
+    Modo normal:
+        Se utiliza una tasa de descarga genérica de 0.5 C.
+
+    Modo prueba:
+        Si USAR_BATERIA_PRUEBA = True y la capacidad evaluada
+        coincide con CAPACIDAD_BATERIA_PRUEBA_KWH, se utiliza
+        POTENCIA_BATERIA_PRUEBA_KW.
+
+    Esto permite probar temporalmente una batería comercial
+    específica sin modificar la lógica normal del recomendador.
     """
 
     capacidad = max(
         0.0,
         float(capacidad_kwh or 0.0),
     )
+
+    if (
+        USAR_BATERIA_PRUEBA
+        and abs(
+            capacidad - CAPACIDAD_BATERIA_PRUEBA_KWH
+        ) < 1e-9
+    ):
+        return POTENCIA_BATERIA_PRUEBA_KW
+
+    # Funcionamiento normal: batería genérica a 0.5 C
+    return capacidad * 0.5
 
     return capacidad * 0.5
 def _indicadores_diarios(demanda, fv):
