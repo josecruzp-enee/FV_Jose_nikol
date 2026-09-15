@@ -249,6 +249,7 @@ def construir_tabla_comparativa_inversores_pdf(
     comparativa_inversores,
     styles,
     content_w,
+    kwp_dc,
 ):
     """
     Construye la sección PDF de comparación de inversores.
@@ -296,7 +297,7 @@ def construir_tabla_comparativa_inversores_pdf(
         ["Parámetro", "Valor"],
         ["Configuración", Paragraph(str(seleccionada.get("configuracion", "") or ""), normal)],
         ["Potencia AC total", f"{float(seleccionada.get('kw_ac_total', 0) or 0):.2f} kW"],
-        ["Relación DC/AC", f"{float(seleccionada.get('dc_ac_real', seleccionada.get('ratio_real', 0)) or 0):.2f}"],
+        ["Relación DC/AC", f"{(float(kwp_dc) / float(seleccionada.get('kw_ac_total', 0) or 0)) if float(seleccionada.get('kw_ac_total', 0) or 0) > 0 else 0.0:.2f}"],
         ["Cantidad de inversores", str(seleccionada.get("n_inversores", ""))],
         ["Estado", Paragraph(estado_sel.replace(" ", "&nbsp;"), normal)],
         ["Criterio de selección", Paragraph(motivo_sel, normal)],
@@ -360,7 +361,7 @@ def construir_tabla_comparativa_inversores_pdf(
             str(fila.get("opcion", "")),
             Paragraph(str(fila.get("configuracion", "") or ""), normal),
             f"{float(fila.get('kw_ac_total', 0) or 0):.2f}",
-            f"{float(fila.get('dc_ac_real', fila.get('ratio_real', 0)) or 0):.2f}",
+            f"{(float(kwp_dc) / float(fila.get('kw_ac_total', 0) or 0)) if float(fila.get('kw_ac_total', 0) or 0) > 0 else 0.0:.2f}",
             str(fila.get("n_inversores", "")),
             Paragraph(estado.replace(" ", "&nbsp;"), normal),
         ])
@@ -619,6 +620,7 @@ def build_resumen_tecnico(resultado, pal, styles, content_w):
             comparativa_inversores,
             styles,
             content_w,
+            kwp_dc
         )
     )
 
