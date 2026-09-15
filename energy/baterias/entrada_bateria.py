@@ -594,7 +594,7 @@ def construir_entrada_bateria(
         costo_bateria_usd_kwh=_leer_float(
             datos,
             "costo_bateria_usd_kwh",
-            250.0,
+            350.0,
         ),
         tipo_cambio_l_usd=tipo_cambio,
         capex_fv_l=capex_fv_l,
