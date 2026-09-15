@@ -114,6 +114,7 @@ def _generar_layout_por_strings(
     panel_h,
     gap,
     separacion_sombra_m=0.0,
+    modo_sistema=None,
 ):
     """
     Genera layout físico orientativo agrupado por strings.
@@ -128,7 +129,7 @@ def _generar_layout_por_strings(
 
     cols = paneles_por_string
     rows = n_strings
-    total_dibujado = min(n_paneles, n_strings * paneles_por_string)
+    total_dibujado = n_paneles if modo_sistema == "paneles" else n_strings * paneles_por_string
 
     gap_col = gap
     gap_fila = max(gap, separacion_sombra_m)
