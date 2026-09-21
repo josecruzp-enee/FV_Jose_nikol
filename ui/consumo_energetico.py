@@ -149,6 +149,91 @@ def obtener_perfil_kw_24h() -> Dict[int, float]:
         22: 1.95,
         23: 1.95,
     }
+
+def obtener_perfil_kw_24h() -> Dict[int, float]:
+    """
+    Perfil horario estimado de consumo para vivienda residencial
+    de consumo eléctrico alto.
+
+    Escenario de referencia:
+    - Factura mensual informada: aproximadamente L 8,500.
+    - Consumo mensual adoptado para simulación: 1,250 kWh/mes.
+    - Mes de referencia: 30 días.
+    - Energía diaria objetivo: 41.67 kWh/día.
+
+    Criterio del perfil:
+    - Existe una carga base permanente durante las 24 horas.
+    - Durante la madrugada se considera uso de aire acondicionado
+      en dormitorios y cargas permanentes de la vivienda.
+    - En la mañana aumenta el consumo por actividad doméstica.
+    - Durante las horas solares se considera consumo residencial
+      normal y uso parcial de aire acondicionado en sala, cocina
+      o alguna habitación.
+    - El mayor consumo ocurre entre las 18:00 y 22:00 por la
+      coincidencia de climatización, cocina, iluminación,
+      entretenimiento y otras cargas residenciales.
+    - Después de las 22:00 disminuyen las cargas generales,
+      permaneciendo principalmente climatización de dormitorios
+      y cargas permanentes.
+
+    Perfil horario aproximado:
+    - 00:00 a 06:00 -> carga nocturna con climatización.
+    - 06:00 a 09:00 -> actividad residencial matutina.
+    - 09:00 a 18:00 -> consumo diurno con climatización parcial.
+    - 18:00 a 22:00 -> período de mayor demanda residencial.
+    - 22:00 a 24:00 -> reducción de cargas y climatización nocturna.
+
+    Energía diaria:
+    - 41.67 kWh/día.
+
+    Energía mensual:
+    - 41.67 kWh/día x 30 días = 1,250 kWh/mes.
+
+    Energía anual equivalente:
+    - 41.67 kWh/día x 365 días ≈ 15,208 kWh/año.
+
+    Demanda máxima promedio horaria estimada:
+    - 2.55 kW.
+
+    Nota:
+    Este perfil es una curva sintética de referencia construida
+    a partir del consumo mensual estimado. No corresponde a una
+    medición horaria real de la vivienda. Deberá sustituirse o
+    calibrarse cuando se disponga de mediciones de campo o de
+    información detallada sobre los equipos y horarios de uso.
+
+    Cada valor representa la potencia promedio durante una hora.
+    La suma de los 24 valores es igual a 41.67 kWh/día.
+    """
+
+    return {
+        0: 1.75,
+        1: 1.60,
+        2: 1.50,
+        3: 1.45,
+        4: 1.40,
+        5: 1.45,
+        6: 1.55,
+        7: 1.70,
+        8: 1.45,
+        9: 1.30,
+        10: 1.35,
+        11: 1.50,
+        12: 1.75,
+        13: 1.90,
+        14: 1.95,
+        15: 1.90,
+        16: 1.75,
+        17: 1.70,
+        18: 2.05,
+        19: 2.40,
+        20: 2.55,
+        21: 2.45,
+        22: 2.10,
+        23: 1.82,
+    }
+
+
 # ======================================================
 # VALIDACIONES PERFIL HORARIO
 # ======================================================
