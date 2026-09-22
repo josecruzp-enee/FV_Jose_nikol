@@ -862,18 +862,61 @@ def generar_charts(
 
     paths = {}
 
-    _generar_chart_mensual(base, paths, energia_mensual)
-    _generar_chart_diario(base, paths, energia_mensual)
-    _generar_charts_horarios(base, paths, energia_horaria)
+    # ======================================================
+    # GRÁFICAS PROPIAS DEL SISTEMA FV
+    # Se generan independientemente del consumo del cliente.
+    # ======================================================
 
-    _generar_chart_demanda_vs_fv(
-        base=base,
-        paths=paths,
-        proyecto=proyecto,
-        energia_horaria=energia_horaria,
-        bateria=bateria,
+    _generar_chart_mensual(
+        base,
+        paths,
+        energia_mensual,
     )
 
-    _generar_chart_anual(base, paths, energia_mensual)
+    _generar_chart_diario(
+        base,
+        paths,
+        energia_mensual,
+    )
+
+    _generar_charts_horarios(
+        base,
+        paths,
+        energia_horaria,
+    )
+
+    _generar_chart_anual(
+        base,
+        paths,
+        energia_mensual,
+    )
+
+    # ======================================================
+    # GRÁFICA DEMANDA DEL CLIENTE VS FV
+    #
+    # En dimensionamiento por potencia ("kw_objetivo"),
+    # el sistema se define a partir de una potencia FV
+    # solicitada y no de la demanda energética del cliente.
+    # Por tanto, esta gráfica no corresponde al análisis.
+    # ======================================================
+
+    sistema_fv = (
+        _leer(proyecto, "sistema_fv", {})
+        if proyecto is not None
+        else {}
+    ) or {}
+
+    modo = str(
+        sistema_fv.get("modo", "")
+    ).strip().lower()
+
+    if modo != "kw_objetivo":
+        _generar_chart_demanda_vs_fv(
+            base=base,
+            paths=paths,
+            proyecto=proyecto,
+            energia_horaria=energia_horaria,
+            bateria=bateria,
+        )
 
     return paths
