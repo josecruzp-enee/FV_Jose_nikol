@@ -437,7 +437,7 @@ def p1_tabla_solucion_unica(
             money_L(capex),
         ],
         [
-            "Consumo anual abastecido",
+            ""Energía abastecida",",
             f"{prod_anual:,.0f} kWh/año",
             "DSCR",
             ds_txt,
