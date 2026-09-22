@@ -971,6 +971,24 @@ def build_operacion_fv(
 
     energia = leer(resultado, "energia", None)
 
+    # =====================================================
+    # IDENTIFICAR MÉTODO DE DIMENSIONAMIENTO
+    # =====================================================
+
+    sistema_fv = leer(datos, "sistema_fv", {}) or {}
+
+    modo = str(
+        leer(sistema_fv, "modo", "")
+    ).strip().lower()
+
+    es_dimensionamiento_por_potencia = (
+        modo == "kw_objetivo"
+    )
+
+    # =====================================================
+    # GRÁFICAS PROPIAS DEL SISTEMA FV
+    # =====================================================
+
     _section_potencia_horaria(
         story,
         paths,
@@ -985,12 +1003,24 @@ def build_operacion_fv(
         content_w,
     )
 
-    _section_demanda_vs_fv_horaria(
-        story,
-        paths,
-        styles,
-        content_w,
-    )
+    # =====================================================
+    # DEMANDA DEL CLIENTE VS GENERACIÓN FV
+    #
+    # No aplica cuando el sistema fue dimensionado
+    # directamente por potencia FV.
+    # =====================================================
+
+    if not es_dimensionamiento_por_potencia:
+        _section_demanda_vs_fv_horaria(
+            story,
+            paths,
+            styles,
+            content_w,
+        )
+
+    # =====================================================
+    # GENERACIÓN FV MENSUAL
+    # =====================================================
 
     _section_energia_mensual(
         story,
@@ -999,12 +1029,20 @@ def build_operacion_fv(
         content_w,
     )
 
+    # =====================================================
+    # BATERÍA
+    # =====================================================
+
     _section_bateria(
         story,
         resultado,
         energia,
         styles,
     )
+
+    # =====================================================
+    # OPTIMIZACIÓN ECONÓMICA
+    # =====================================================
 
     _section_optimizacion_economica(
         story,
@@ -1015,7 +1053,6 @@ def build_operacion_fv(
     )
 
     return story
-
 
 # =========================================================
 # 7.4 CONCLUSIONES
